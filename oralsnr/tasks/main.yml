@@ -1,0 +1,22 @@
+---
+
+  - name: oralsnr | Add listener
+    shell: "{{ oracle_home_gi }}/bin/srvctl add listener"
+    when: master_node and oracle_install_option_gi == 'HA_CONFIG'
+    tags: listener
+
+  - name: oralsnr | Start listener
+    shell: "{{ oracle_home_gi }}/bin/srvctl start listener"
+    when: master_node and oracle_install_option_gi == 'HA_CONFIG'
+    tags: listener
+
+#  - name: oralsnr | Check listener status
+#    shell: {{ oracle_home_gi }}/bin/lsnrctl status
+#    when: master_node and oracle_install_option_gi == 'HA_CONFIG'
+#    tags: listenerstat
+#    register:
+#       - listener
+
+#  - debug: var=listener.stdout_lines
+#    when: master_node and oracle_install_option_gi == 'HA_CONFIG'
+#    tags: listenerstat

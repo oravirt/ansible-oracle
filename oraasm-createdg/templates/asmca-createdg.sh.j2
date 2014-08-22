@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+#!/bin/bash
+
+{{ oracle_home_gi }}/bin/asmca -silent -createDiskGroup \
+       -diskGroupName {{ item }} \
+      {% for disk in  storage_layout[item]    %}
+       -disk 'ORCL:{{ disk.asmlabel }}' \
+      {% endfor %}
+       -redundancy external \
+       -au_size 64 \
+       -compatible.asm '12.1.0.0.0' \
+       -compatible.rdbms '11.2.0.0.0' \
+       -compatible.advm '12.1.0.0.0' \

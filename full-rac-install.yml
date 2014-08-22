@@ -1,0 +1,23 @@
+---
+
+
+ - name: Host generic shit
+   hosts: orarac
+   user: miksan
+   sudo: yes
+   roles:
+      - common
+      - orahost
+      - orahost-storage
+
+ - name: Oracle Grid Infrastructure installation, ASM Configuration & Database Creation
+   hosts: orarac
+   user: miksan
+   sudo: yes
+   sudo_user: oracle
+   roles:
+      - oraswgi-install
+      - oraasm-createdg
+      - oraswdb-install
+      - oradb-create
+

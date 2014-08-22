@@ -1,0 +1,38 @@
+#!/bin/bash
+
+while read -r label device
+do
+
+device=${device%%[0-9]}
+partno=1
+#only new version parted supports -a
+if [ $(parted -h | grep -- -a | wc -l) -gt 0  ]; then
+ partedcmd='parted -a optimal'
+else
+ partedcmd='parted'
+fi
+
+if [[ -z $device ]]; then
+ echo "Usage: $0 device device name: e.g $0 /dev/sdb"
+ exit 0
+fi
+
+if [[ -e ${device}${partno} ]]; then
+ echo "Error: ${device}${partno} already exist"
+ continue
+fi
+
+parted -s $device  mklabel gpt
+ncyl=$(parted $device unit cyl print  | sed -n 's/.*: \([0-9]*\)cyl/\1/p')
+
+if [[ $ncyl != [0-9]* ]]; then
+        echo "device $device has invalid cylinders number: $ncyl"
+        continue
+fi
+
+echo "==> create primary parition  $partno with $ncyl cylinders"
+$partedcmd $device mkpart primary 0cyl ${ncyl}cyl
+partprobe > /dev/null 2>&1
+sleep 2
+
+done < {{ oracle_stage }}/asm-label-device-mapping-{{ item }}.txt

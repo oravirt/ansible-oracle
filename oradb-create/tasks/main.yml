@@ -1,0 +1,42 @@
+---
+
+  - name: Create responsefile for dbca
+    template: src=dbca-create-db.rsp.j2 dest={{ oracle_stage }}/{{ oracle_dbca_rsp }}  owner={{ oracle_user }} group={{ oracle_group }} mode=644 backup=no
+    with_dict: oracle_databases
+    when: master_node
+    tags: 
+    - dbcaresponse
+
+  - name: Create database(s)
+    shell: "{{ oracle_home_db }}/bin/dbca -responseFile {{ oracle_stage }}/{{ oracle_dbca_rsp }} -silent"
+    with_dict: oracle_databases
+    when: master_node
+    tags:
+      - oradbcreate
+    register: oradbcreate
+
+  - debug: var=oradbcreate.stdout_lines
+    with_items: oradbcreate.results
+    tags:
+     - oradbcreate
+
+#  - name: Add default services to databases
+#    shell: "{{ oracle_home_db }}/bin/srvctl add service -db {{ item.value.oracle_database }} -s {{ item.value.servicename }} -cardinality uniform -policy automatic
+#    with_dict: oracle_databases
+#    when: master_node and {{ oracle_install_option_gi }} == 'HA_CONFIG'
+#    tags:
+#      - oradbcreate
+#    register: oradbcreate
+
+  - name: Check if database is registered
+    shell: "{{ oracle_home_gi }}/bin/srvctl config database "
+    when: oracle_install_option_gi == 'CRS_CONFIG' or oracle_install_option_gi == 'HA'
+    tags:
+      - srvctlconfig
+    register: srvctlconfig
+      
+
+  - debug: var=srvctlconfig.stdout_lines
+    when: oracle_install_option_gi == 'CRS_CONFIG' or oracle_install_option_gi == 'HA'
+    tags:
+     - srvctlconfig

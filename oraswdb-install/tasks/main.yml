@@ -1,0 +1,129 @@
+---
+
+  - name: Add new dotprofile (DB)
+    template: src=dotprofile-db.j2 dest={{ oracle_user_home }}/{{oracle_profile_name }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
+    with_dict: oracle_databases
+    tags: 
+    - dotprofiledb
+
+  - name: Add oraInst.loc
+    template: src=oraInst.loc.j2 dest=/etc/oraInst.loc owner={{ oracle_user }} group={{ oracle_group }} mode=644 backup=yes
+    sudo: yes
+    sudo_user: root
+    tags: 
+    - orainst
+
+  - name: Create /u01 directory
+    file: dest=/u01 mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    sudo: yes
+    sudo_user: root
+    tags:
+      - directories
+
+  - name: Create stage directory
+    file: dest={{ oracle_stage }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directories
+  
+  - name: Create ORACLE_INVENTORY directory
+    file: dest={{ oracle_inventory_loc }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directories
+  
+  - name: Create ORACLE_BASE directory
+    file: dest={{ oracle_base }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directories
+  
+  - name: Create ORACLE_HOME directory
+    file: dest={{ oracle_home_db }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    with_dict: oracle_databases
+    tags:
+      - directories
+
+  - name: Transfer oracle installfiles to server
+    get_url: url={{ oracle_sw_source }}/{{ item }} dest={{ oracle_stage }} mode=755
+    #copy: src={{ oracle_sw_source }}/{{ item }} dest={{ oracle_stage }} mode=755
+    with_items: 
+       - "{{ oracle_sw_image_db }}"
+    when: master_node
+    tags:
+      - oradbsw
+
+  - name: Extract files to stage-area
+    unarchive: src={{ oracle_stage }}/{{ item }}  dest={{ oracle_stage }} copy=no
+    #shell: unzip {{ oracle_stage }}/{{ item }}  dest={{ oracle_stage }}
+    with_items:
+       - "{{ oracle_sw_image_db }}"
+    when: master_node
+    tags:
+      - oradbswunpack
+
+  - name: Setup response file for install (DB)
+    template: src=db-install.rsp.j2 dest={{ oracle_stage }}/{{ oracle_db_responsefile }}
+    with_dict: oracle_databases
+    when: master_node
+    tags:
+      - responsefileswdb
+
+#  - name: Setup response file
+#    template: src=clone.sh.j2 dest={{ oracle_stage }}/install-{{ oracle_home_name }}.sh owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
+#  - name: Setup response file
+#    template: src=clone.sh.j2 dest={{ oracle_stage }}/install-{{ oracle_home_name }}.sh owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
+#    tags:
+#      - responsefile
+
+  - name: Install Oracle Database Server
+    shell: "{{ oracle_stage }}/database/runInstaller -responseFile {{ oracle_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
+    with_dict: oracle_databases
+    when: master_node
+    tags:
+      - oradbinstall
+    register: oradbinstall
+
+  - debug: var=oradbinstall.stdout_lines
+    with_items: oradbinstall.results
+    when: master_node
+    tags:
+     - oradbinstall
+
+
+#  - name: Run oraInstroot script after installation
+#    shell: "{{ oracle_inventory_loc }}/orainstRoot.sh"
+#    sudo: yes
+#    sudo_user: root
+#    tags:
+#      - runroot
+
+  - name: Run root script after installation
+    shell: "{{ oracle_home_db }}/root.sh"
+    with_dict: oracle_databases
+    sudo: yes
+    sudo_user: root
+    when: master_node
+    tags:
+      - runroot
+
+  - name: Add additional info to glogin.sql (1)
+    lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line='set sqlprompt "_user @ _connect_identifier:>"' backup=yes
+    with_dict: oracle_databases
+    tags: 
+      - glogin
+
+  - name: Add additional info to glogin.sql (2)
+    lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line='set time on' backup=yes
+    with_dict: oracle_databases
+    tags: 
+      - glogin
+  
+  - name: Check opatch lsinventory
+    shell: "{{ oracle_home_db }}/OPatch/opatch lsinventory"
+    with_dict: oracle_databases
+    register: opatchls
+    tags:
+     - opatchls
+    
+  - debug: var=opatchls.stdout_lines
+    with_items: opatchls.results
+    tags:
+     - opatchls

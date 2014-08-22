@@ -1,0 +1,18 @@
+# oraswgi playbook - installs oracle
+---
+  oracle_user: oracle
+  oracle_user_home: /home/oracle
+  oracle_group: dba
+  oracle_image_source: "http://oladmin/oraimage"
+  oracle_sw_image_db: "oracledb-ee-rac-12101-psu1.tar.gz"
+  oracle_stage: /u01/stage/
+  oracle_base: /u01/app/oracle
+  oracle_home: "{{ oracle_base }}/12.1.0.1/{{ oracle_db_name }}"
+  oracle_home_name: "oradb_rac_{{ oracle_clone_version }}"
+  oracle_profile_name: ".profile_{{ oracle_db_name }}"
+  oracle_clone_version: 12101-psu1
+  oracle_db_name: "racdb"
+  oracle_inventory_loc: /u01/app/oraInventory
+  oracle_cluster_nodes: orarac01,orarac02
+  oracle_local_node: "{{ ansible_hostname }}"
+

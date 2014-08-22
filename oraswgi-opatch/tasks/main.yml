@@ -1,0 +1,100 @@
+---
+
+  - name: Create stage directory
+    file: dest={{ oracle_psu_stage }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directories
+    when: oracle_psu_apply_gi
+  
+  - name: Copy oracle installfiles to server
+    get_url: url={{ oracle_sw_source }}/{{ item }} dest={{ oracle_stage }} mode=755
+    with_items: 
+       - "{{ oracle_opatch_patch }}"
+       - "{{ oracle_psu_patch }}"
+       - "{{ oracle_ocm_rsp }}"
+    when: oracle_psu_apply_gi
+    tags:
+      - oragridpatchget
+
+  - name: Extract files to stage-area
+    unarchive: src={{ oracle_stage }}/{{ item }}  dest={{ oracle_psu_stage }} copy=no
+    with_items:
+       - "{{ oracle_opatch_patch }}"
+       - "{{ oracle_psu_patch }}"
+    when: oracle_psu_apply_gi
+    tags:
+      - oragridpatchunpack
+  
+  - name: Change permissions on staged patches
+    shell: chown -R {{ oracle_user }}:{{ oracle_group }} {{ oracle_psu_stage }}
+    sudo_user: root
+    when: oracle_psu_apply_gi
+    tags:
+      - oragridpatchunpack
+
+  - name: Distribute latest opatch
+    shell: rm -rf {{ oracle_home }}/OPatch; cp -Rvp {{ oracle_psu_stage }}/OPatch {{ oracle_home }}
+    sudo_user: root
+    when: oracle_psu_apply_gi
+    tags:
+      - oragridnewopatch
+
+  - name: Apply PSU to GI (Master node)
+    shell: "{{ oracle_home }}/OPatch/opatchauto apply {{ oracle_psu_stage }}/{{ oracle_psu_num_gi }} -oh {{ oracle_home }} -ocmrf {{ oracle_stage }}/{{ oracle_ocm_rsp }} "
+    sudo_user: root
+    tags:
+      - oragridpsuapply
+    when: master_node and oracle_psu_apply_gi
+    register: psuapplym
+  
+  - debug: var=psuapplym.stdout_lines
+    when: master_node and oracle_psu_apply_gi
+    tags:
+      - psuapplym
+  
+  - name: Check if stuff is running
+    shell: "{{ oracle_home }}/bin/crsctl stat res -t"
+    tags:
+     - crsctl
+    register: crsctl
+    when: master_node and oracle_psu_apply_gi
+  - debug: var=crsctl.stdout_lines
+    tags:
+     - crsctl
+    when: master_node
+
+  - name: Apply PSU to GI (other nodes)
+    shell: "{{ oracle_home }}/OPatch/opatchauto apply {{ oracle_psu_stage }}/{{ oracle_psu_num_gi }} -oh {{ oracle_home }} -ocmrf {{ oracle_stage }}/{{ oracle_ocm_rsp }} "
+    sudo_user: root
+    tags:
+      - oragridpsuapply
+    when: not master_node and oracle_psu_apply_gi
+    register: psuapplyo
+  
+  - debug: var=psuapplyo.stdout_lines
+    when: not master_node and oracle_psu_apply_gi
+    tags:
+      - psuapplyo
+
+  - name: Check if stuff is running
+    shell: "{{ oracle_home }}/bin/crsctl stat res -t"
+    tags:
+     - crsctl
+    register: crsctl
+    when: master_node and oracle_psu_apply_gi
+  - debug: var=crsctl.stdout_lines
+    tags:
+     - crsctl
+    when: master_node
+
+  - name: Check opatch lsinventory
+    shell: "{{ oracle_home }}/OPatch/opatch lsinventory"
+    register: opatchls
+    when: oracle_psu_apply_gi
+    tags:
+     - opatchls
+    
+  - debug: var=opatchls.stdout_lines
+    when: oracle_psu_apply_gi
+    tags:
+     - opatchls

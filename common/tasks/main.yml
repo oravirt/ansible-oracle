@@ -1,0 +1,64 @@
+# Common playbook - sets up the host specific shit
+---
+
+#  - name: Add {{ default_user }} user
+#    user: name={{ default_user }} state=present password={{ default_user_password }}
+#    tags:
+#     - user
+
+#  - name: Add {{ default_user }} to sudoers
+#    template: src=sudoers.j2 dest=/etc/sudoers.d/{{ default_user }} owner=root mode=0644
+#    tags:
+#     - sudoadd
+
+#  - name: Add motd
+#    template: src=motd.j2 dest=/etc/motd 
+#    tags:
+#     - motd
+
+  - name: Install EPEL Repo
+    yum: name={{ epel_rpm }} state=installed
+
+  - name: Get newest repo-file for OL6 (public)
+    get_url: dest={{ repo_dir}}/{{ ol6_repo_file }}  url=http://public-yum.oracle.com/{{ ol6_repo_file }} backup=yes
+    when: ansible_os_family == 'RedHat' and ansible_lsb.major_release|int == 6
+    tags:
+     - ol6repo
+
+#  - name: Set up authorized_keys for {{ default_user }}
+#    authorized_key: user={{ default_user }} key="{{ item }}"
+#    with_file:
+#     - "~/.ssh/authorized_keys"
+#    tags:
+#     - keys
+
+  - name: Install common packages
+    yum: name={{ item }} state=installed
+    with_items: 
+      - "{{ common_packages }}"
+    tags:
+      - commonpackages
+#      - screen
+#      - facter
+#      - procps
+#      - module-init-tools
+#      - ethtool
+#      - bc
+#      - bind-utils
+#      - nfs-utils
+#      - make
+#      - sysstat
+#      - openssh-clients
+#      - compat-libcap1
+#      - twm
+#      - collectl
+#      - rlwrap
+#      - tigervnc-server
+#      - ntp
+#      - expect
+   
+
+  - name: Start and enable NTP
+    service: name=ntpd  state=started  enabled=yes
+
+

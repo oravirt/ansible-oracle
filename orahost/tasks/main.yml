@@ -1,0 +1,174 @@
+# orahost playbook 
+---
+
+  - name: User | Add group(s)
+    group: name={{ oracle_group }} gid={{ oracle_group_id }} state=present 
+    tags:
+     - group
+
+  - name: User | Add Oracle user
+    user: name={{ oracle_user }}  group={{ oracle_group }} uid={{ oracle_user_id }} generate_ssh_key=yes append=yes state=present password={{ oracle_passwd }}
+    tags:
+     - user
+
+  - name: User | Add Oracle user to sudoers
+    template: src=sudoers.j2 dest=/etc/sudoers.d/{{ oracle_user }} owner=root mode=0644
+    tags:
+     - sudoadd
+
+  - name: ssh-keys | Generate SSH keys 
+    local_action: shell /usr/bin/rm -f /tmp/id_rsa*; ssh-keygen -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys
+    ignore_errors: True
+    when: master_node and oracle_install_option_gi == 'CRS_CONFIG'
+    tags:
+     - sshkeys
+
+  - name: ssh-keys | Add ssh-keys & authorized_keys
+    copy: src=/tmp/{{ item }} dest=/home/oracle/.ssh  owner=oracle group=dba force=yes mode=600
+    when: oracle_install_option_gi == 'CRS_CONFIG'
+    with_items:
+        - id_rsa
+        - id_rsa.pub
+        - authorized_keys
+    tags:
+     - sshkeys
+
+  - name: ssh-keys | Add short name to known_hosts
+    local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{inventory_hostname}} 2> /dev/null >> {{keyfile}}
+    ignore_errors: True
+    when: oracle_install_option_gi == 'CRS_CONFIG'
+    tags:
+     - sshkeys
+
+  - name: ssh-keys | Add FQDN to known_hosts
+    local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_fqdn}} 2> /dev/null >> {{keyfile}}
+    ignore_errors: True
+    when: oracle_install_option_gi == 'CRS_CONFIG'
+    tags:
+     - sshkeys
+
+  - name: ssh-keys | Add IPv4 to known_hosts
+    local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_default_ipv4.address}} 2> /dev/null >> {{keyfile}}
+    ignore_errors: True
+    when: oracle_install_option_gi == 'CRS_CONFIG'
+    tags:
+     - sshkeys
+
+  - name: ssh-keys | Copy known_hosts into place
+    copy: src={{keyfile}} dest=/home/{{ oracle_user }}/.ssh/known_hosts owner={{ oracle_user }} group={{ oracle_group }} owner={{ oracle_user }} group={{ oracle_group }}
+    when: oracle_install_option_gi == 'CRS_CONFIG'
+    tags:
+     - sshkeys
+
+  - name: filesystem | Create partition and pv
+    script: disks.sh {{ item.value.device }}
+    with_dict: host_fs_layout
+    tags: hostfs
+  
+  - name: filesystem | Create vg
+    lvg: vg={{ item.value.vgname }} pvs={{ item.value.pvname }} state=present vg_options="-f" # "-f used as workaround for https://github.com/ansible/ansible/pull/6859"
+    with_dict: host_fs_layout
+    tags: hostfs
+
+  - name: filesystem | create lv
+    lvol: vg={{ item.value.vgname }} lv={{ item.value.lvname }} size=100%FREE state=present
+    with_dict: host_fs_layout
+    tags: hostfs
+
+  - name: filesystem | create fs
+    filesystem: fstype=ext4 dev=/dev/{{ item.value.vgname }}/{{ item.value.lvname }} 
+    with_dict: host_fs_layout
+    tags: hostfs
+
+  - name: filesytem | mount dir
+    mount: name={{ item.value.mntp }} src=/dev/{{ item.value.vgname }}/{{ item.value.lvname }} dump=1 passno=2 fstype=ext4 state=mounted
+    with_dict: host_fs_layout
+    tags: hostfs
+
+  - name: filesystem | Change permissions on directories
+    file: path={{ item.value.mntp }} state=directory owner=oracle group=dba
+    with_dict: host_fs_layout
+    tags: hostfs
+
+
+  - name: Install required packages
+    yum: name={{ item }} state=installed
+    with_items: 
+      - "{{ oracle_packages }}"
+
+  - name: Oracle-recommended kernel settings
+    sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes ignoreerrors=yes
+    with_items: oracle_sysconfig
+    tags: sysconfig
+
+  - name: Oracle-recommended PAM config
+    lineinfile: dest=/etc/pam.d/login state=present line="session required pam_limits.so"
+    tags: pamconfig
+
+  - name: Oracle-recommended security limits
+    lineinfile: dest=/etc/security/limits.conf state=present line="{{ item }}"
+    with_items: oracle_seclimits
+    tags: seclimit
+  
+  - name: Count number of kernel lines that needs to be changed (numa=off transparent_hugepage=never)
+    shell: cat /etc/grub.conf | grep title |wc -l
+    register: count
+
+  - name: Disable Numa & Transparent Hugepages
+    lineinfile: dest=/etc/grub.conf
+              backup=True
+              backrefs=True
+              state=present
+              regexp='(^\s+kernel(\s+(?!numa=off transparent_hugepage=never)[\w=/\-\.]+)*)\s*$'
+              line='\1 numa=off transparent_hugepage=never'
+    with_sequence: start=0 end={{ count.stdout }}
+
+  - name: Disable selinux
+    selinux: state=disabled
+    tags:
+     - selinux
+
+  - name: Network | Setup ip-addresses for internal networks
+    template: src=ifcfg-eth1.j2 dest=/etc/sysconfig/network-scripts/ifcfg-eth1 owner=root mode=0644
+    when: oracle_install_option_gi == 'CRS_CONFIG'
+    tags:
+     - eth1
+  
+  - name: Network | Restart Network to bring up eth1
+    service: name=network  state=restarted
+    when: oracle_install_option_gi == 'CRS_CONFIG'
+    tags:
+     - eth1
+
+  - name: Asmlib | Configure Oracle Asmlib
+    template: src=oracleasm.j2 dest=/etc/sysconfig/oracleasm owner=root mode=0777 force=yes
+    tags:
+      - asmlibconfig
+
+  - name: Asmlib | Enable and start Oracle Asmlib
+    service: name=oracleasm  state=started  enabled=yes
+    tags:
+      - asmlibconfig
+  
+  - name: Asmlib | Restart Asmlib
+    service: name=oracleasm  state=restarted
+    tags:
+      - asmlibconfig
+
+#  - name: VNC | Create directory
+#    file: name=/home/{{ oracle_user }}/.vnc  state=directory owner={{ oracle_user }}  group={{ oracle_group }}
+#    tags:
+#      - vnc
+  
+#  - name: VNC | Copy passwd file
+#    copy: src=passwd  dest=/home/{{ oracle_user }}/.vnc/passwd  owner={{ oracle_user }}  group={{ oracle_group }} backup=yes
+#    tags:
+#      - vnc
+
+#  - name: VNC | Start VNC server
+#    shell: su - oracle -c vncserver start
+#    tags:
+#      - vnc
+
+  - name: Create stage directory
+    file: dest={{ oracle_stage }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory

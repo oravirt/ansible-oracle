@@ -1,0 +1,123 @@
+---
+
+  - name: Add new dotprofile (GI)
+    template: src=dotprofile-gi.j2 dest={{ oracle_user_home }}/{{ oracle_profile_name_gi }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
+    tags: 
+    - dotprofilegi
+
+  - name: Create stage directory
+    file: dest={{ oracle_stage }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directories
+  
+  - name: Create ORACLE_INVENTORY directory
+    file: dest={{ oracle_inventory_loc }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directories
+  
+  - name: Create ORACLE_BASE directory
+    file: dest={{ oracle_base }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directories
+  
+  - name: Create ORACLE_HOME directory (GI)
+    file: dest={{ oracle_home_gi }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directories
+
+  - name: Copy oracle installfiles to server (GI)
+    get_url: url={{ oracle_sw_source }}/{{ item }} dest={{ oracle_stage }} mode=755
+    with_items: 
+       - "{{ oracle_sw_image_gi }}"
+    tags:
+      - oragridsw
+    when: master_node
+
+  - name: Extract files to stage-area
+    unarchive: src={{ oracle_stage }}/{{ item }}  dest={{ oracle_stage }} copy=no
+    #shell: unzip {{ oracle_stage }}/{{ item }}  dest={{ oracle_stage }}
+    with_items:
+       - "{{ oracle_sw_image_gi }}"
+    tags:
+      - oragridswunpack
+    when: master_node
+
+  - name: Setup response file for install (GI)
+    template: src=grid-all.rsp.j2 dest={{ oracle_stage }}/{{ oracle_grid_responsefile }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
+    tags:
+      - responsefilegi
+    when: master_node
+
+
+  - name: Install Grid Infrastructure
+    shell: "{{ oracle_stage }}/grid/runInstaller -responseFile {{ oracle_stage }}/{{ oracle_grid_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
+    tags:
+      - oragridinstall
+    when: master_node
+    register: giinstall
+
+  - debug: var=giinstall.stdout_lines
+    when: master_node
+
+  - name: Run oraInstroot script after installation
+    shell: sudo su - -c {{ oracle_inventory_loc }}/orainstRoot.sh
+    tags:
+      - runroot
+
+  - name: Run root script after installation (Master Node)
+    shell: sudo su - -c {{ oracle_home_gi }}/root.sh
+    tags:
+      - runroot
+    when: master_node
+    register: rootmaster
+
+  - debug: var=rootmaster.stdout_lines
+    when: master_node
+
+  - name: Run root script after installation (Other Nodes)
+    shell: sudo su - -c {{ oracle_home_gi }}/root.sh
+    tags:
+      - runroot
+    when: not master_node
+    register: rootother
+  
+  - debug: var=rootother.stdout_lines
+    when: not master_node
+
+  - name: Check if stuff is running
+    shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
+    tags:
+     - crsctl
+    register: crsctl
+    when: master_node
+  
+  - debug: var=crsctl.stdout_lines
+    tags:
+     - crsctl
+    when: master_node
+
+  - name: Update Nodelist, set CRS=TRUE
+    shell: "{{ oracle_home_gi }}/oui/bin/runInstaller -updateNodeList ORACLE_HOME={{ oracle_home_gi }} CRS=TRUE"
+    tags:
+      - updatenodelist
+    when : master_node
+
+  - name: Add additional info to glogin.sql (1)
+    lineinfile: dest="{{ oracle_home_gi }}/sqlplus/admin/glogin.sql" line='set sqlprompt "_user @ _connect_identifier:>"' backup=yes
+    tags:
+      - glogin
+
+  - name: Add additional info to glogin.sql (2)
+    lineinfile: dest="{{ oracle_home_gi }}/sqlplus/admin/glogin.sql" line='set time on' backup=yes
+    tags:
+      - glogin
+
+  - name: Check opatch lsinventory
+    shell: "{{ oracle_home_gi }}/OPatch/opatch lsinventory"
+    register: opatchls
+    tags:
+     - opatchls
+    
+  - debug: var=opatchls.stdout_lines
+    tags:
+     - opatchls

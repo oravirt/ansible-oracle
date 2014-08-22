@@ -1,0 +1,35 @@
+#!/bin/bash
+
+while read -r asmlabel device
+do
+
+partno=1
+
+
+#if [[ $# -ne 2 ]]; then
+# echo "Usage: $0 LABEL DISK"
+# echo "       i.e: $0 DATA04 /dev/sdh1"
+# exit 1
+#fi
+
+if [[ ${device} == /dev/sda ]]; then
+ echo "Trying to use root disk. Exiting"
+ continue
+fi
+
+if [[ ! -e ${device}${partno} ]]; then
+ echo "Error: Partition ${device}$partno does not exist"
+ continue
+fi
+
+chkdisk=`service oracleasm querydisk ${device}${partno} |grep 'is marked an ASM disk' |wc -l`
+if [[ $chkdisk == 1 ]]; then
+ echo "Error: ${device}${partno} is already marked as ASM-disk"
+ continue
+fi
+
+echo "Creating ASM Label ${asmlabel} on ${device}"
+service oracleasm createdisk ${asmlabel} ${device}${partno}
+service oracleasm querydisk  ${device}${partno}
+
+done < {{ oracle_stage }}/asm-label-device-mapping-{{ item }}.txt

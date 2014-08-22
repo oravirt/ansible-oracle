@@ -1,0 +1,84 @@
+---
+
+  - name: Add new dotprofile
+    template: src=dotprofile-gi.j2 dest={{ oracle_user_home }}/{{ oracle_profile_name }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
+    tags: 
+    - dotprofile
+
+  - name: Create stage directory
+    file: dest={{ oracle_stage }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directories
+  
+  - name: Create ORACLE_INVENTORY directory
+    file: dest={{ oracle_inventory_loc }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directories
+  
+  - name: Create ORACLE_BASE directory
+    file: dest={{ oracle_base }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directories
+  
+  - name: Create ORACLE_HOME directory
+    file: dest={{ oracle_home }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directories
+
+  - name: Copy oracle image to server
+    get_url: url={{ oracle_sw_source }}/{{ oracle_sw_image_gi }} dest={{ oracle_stage }} mode=755
+    tags:
+      - oragridimageget
+
+  - name: Are files already unpacked?
+    shell: du -ks {{ oracle_home }} |awk '{print  $1 }'
+    register: size
+    tags:
+      - oragridimageunpack
+
+  - debug: var=size.stdout
+    tags:
+      - oragridimageunpack
+  
+  - name: Extract files to ORACLE_HOME
+    shell: tar -xf {{ oracle_stage }}/{{ oracle_sw_image_gi }} -C {{ oracle_home }}
+    when:  size.stdout < "8902016"
+    tags:
+      - oragridimageunpack
+
+  - name: Setup clone script
+    template: src=clone.sh.j2 dest={{ oracle_stage }}/clone-{{ oracle_home_name }}.sh owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
+    tags:
+      - clonescript
+
+  - name: Clone new ORACLE_HOME and add to inventory
+    shell: perl {{ oracle_home }}/clone/bin/clone.pl -silent ORACLE_BASE={{ oracle_base }} ORACLE_HOME={{ oracle_home }} ORACLE_HOME_NAME={{ oracle_home_name }} INVENTORY_LOCATION={{ oracle_inventory_loc }} -O'"CLUSTER_NODES={"{{ oracle_cluster_nodes }}"}"' -O'"LOCAL_NODE={{ oracle_local_node }}"' CRS=TRUE 
+  #- debug: msg="CLUSTER_NODES={"{{ oracle_cluster_nodes }}"} -O LOCAL_NODE={{ oracle_local_node }}"
+    register: cloneout
+    tags:
+      - oragridclone
+
+  - debug: var=cloneout.stdout_lines
+    tags:
+     - opatchls
+
+  - name: Run oraInstroot script after clone of ORACLE_HOME
+    shell: sudo su - -c {{ oracle_inventory_loc }}/orainstRoot.sh
+    tags:
+      - runrootclone
+
+#  - name: Run root script after clone of ORACLE_HOME
+#    shell: sudo su - -c {{ oracle_home }}/root.sh
+#    tags:
+#      - runrootclone
+
+  - name: Check opatch lsinventory
+    shell: "{{ oracle_home }}/OPatch/opatch lsinventory"
+    register: opatchls
+    tags:
+     - opatchls
+    
+  - debug: var=opatchls.stdout_lines
+    tags:
+     - opatchls
+

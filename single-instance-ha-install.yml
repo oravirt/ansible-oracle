@@ -1,0 +1,26 @@
+---
+
+
+ - name: Host generic shit
+   hosts: oradb
+   user: miksan
+   sudo: yes
+   roles:
+      - common
+      - orahost
+      - orahost-storage
+
+ - name: Oracle Database server installation & Database Creation
+   hosts: oradb
+   user: miksan
+   sudo: yes
+   sudo_user: oracle
+   roles:
+      #- { role: oraswgi-install, cluster_interfaces: ''}
+      - oraswgi-install
+      - oralsnr
+      - oraasm-configureasm
+      - oraasm-createdg
+      - oraswdb-install
+      - oradb-create
+

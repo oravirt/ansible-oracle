@@ -1,0 +1,34 @@
+---
+
+  - name: ASMCA | Create script to build asm-diskgroups
+    template: src=asmca-createdg.sh.j2 dest="{{ oracle_stage }}/asmca-createdg-{{ item }}.sh"  owner={{ oracle_user }} group={{ oracle_group }} mode=744 backup=yes
+    with_items:
+       - "{{ diskgroups }}"
+    when: master_node
+    tags: asmca
+
+  - name: ASMCA | Create ASM diskgroups
+    shell: "{{ oracle_stage }}/asmca-createdg-{{ item }}.sh"
+    with_items:
+       - "{{ diskgroups }}"
+    when: master_node
+    ignore_errors: True
+    tags: asmca
+    register: asmca
+
+  - debug: var=asmca.stdout_lines
+    with_items: asmca.results
+    tags: asmca
+
+  - name: ASMCA | List ASM diskgroups
+    shell: "{{ oracle_home_gi }}/bin/srvctl status diskgroup -diskgroup {{ item }}"
+    with_items:
+       - "{{ diskgroups }}"
+    when: master_node
+    tags: srvctlasm
+    register: srvctlasm
+
+
+  - debug: var=srvctlasm.stdout_lines
+    with_items: srvctlasm.results
+    tags: srvctlasm
