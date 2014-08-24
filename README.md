@@ -12,9 +12,10 @@ Note:
 The different roles are:
 
 common:
-This will configure stuff that I want on all my machines, - Install some generic packages 
+This will configure stuff that I want on all my machines, 
+- Install some generic packages 
 - Configure ntp 
-- Possibly add a default/deploy-user.
+- Possibly add a default/deploy user.
 
 orahost:
 This will configure the host specific Oracle stuff:
