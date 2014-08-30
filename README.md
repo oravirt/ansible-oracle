@@ -93,3 +93,8 @@ This role will use a previoulsy installed/patched Grid Infrastructure installati
 <b>oraswracdb-clone:</b>
 This role will take a previously installed/patched Oracle Database Server installation to perform a new database server installation using the clone method.
 
+
+
+<b>TODO</b>
+- Configure hugepages
+- ...
