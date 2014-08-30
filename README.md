@@ -24,7 +24,7 @@ This will configure stuff that I want on all my machines
 - Configure ntp 
 - Possibly add a default/deploy user.
 
- <b>orahost:</b>
+<b>orahost:</b>
 This will configure the host specific Oracle stuff:
 - Add a user & group
 - Create directory structures
