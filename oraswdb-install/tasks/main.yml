@@ -66,13 +66,6 @@
     tags:
       - responsefileswdb
 
-#  - name: Setup response file
-#    template: src=clone.sh.j2 dest={{ oracle_stage }}/install-{{ oracle_home_name }}.sh owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
-#  - name: Setup response file
-#    template: src=clone.sh.j2 dest={{ oracle_stage }}/install-{{ oracle_home_name }}.sh owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
-#    tags:
-#      - responsefile
-
   - name: Install Oracle Database Server
     shell: "{{ oracle_stage }}/database/runInstaller -responseFile {{ oracle_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
     with_dict: oracle_databases

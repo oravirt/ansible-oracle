@@ -19,7 +19,7 @@ You can take a freshly installed machine and configure it from ground up. It'll 
 <b>The different roles are:</b>
 
 <b> common: </b>
-This will configure stuff that I want on all my machines 
+This will configure stuff common to all machines
 - Install some generic packages 
 - Configure ntp 
 - Possibly add a default/deploy user.
@@ -34,7 +34,9 @@ If you want to create your database on a filesystem (instead of ASM) this is whe
 - Install required packages
 - Change kernel paramemeters
 - Set up pam.d/limits config
-- Disables transparent hugepages, and at the moment also disables numa. Will make this more dynamic in the future.
+- Configures Hugepages (as a percentage of total RAM)
+- Disables transparent hugepages
+- Disables NUMA (if needed)
 - Configures the interconnect network (if needed)
 - Configures Oracle ASMLib 
 
@@ -96,5 +98,8 @@ This role will take a previously installed/patched Oracle Database Server instal
 
 
 <b>TODO</b>
-- Configure hugepages
-- ...
+- Add checks to see if stuff is already installed  (GI, DB etc)
+- Add support for creating container databases
+- Add service to database as part of db-creation
+- Cleanup
+- .........

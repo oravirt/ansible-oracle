@@ -1,4 +1,4 @@
-# Common playbook - sets up the host specific shit
+# Common playbook - sets up the host generic stuff
 ---
 
 #  - name: Add {{ default_user }} user
@@ -18,10 +18,12 @@
 
   - name: Install EPEL Repo
     yum: name={{ epel_rpm }} state=installed
+    tags:
+     - epelrepo
 
-  - name: Get newest repo-file for OL6 (public)
+  - name: Get newest repo-file for OL6 (public-yum)
     get_url: dest={{ repo_dir}}/{{ ol6_repo_file }}  url=http://public-yum.oracle.com/{{ ol6_repo_file }} backup=yes
-    when: ansible_os_family == 'RedHat' and ansible_lsb.major_release|int == 6
+#    when: ansible_lsb.id == 'OracleServer' and ansible_lsb.major_release|int == 6
     tags:
      - ol6repo
 
@@ -38,24 +40,6 @@
       - "{{ common_packages }}"
     tags:
       - commonpackages
-#      - screen
-#      - facter
-#      - procps
-#      - module-init-tools
-#      - ethtool
-#      - bc
-#      - bind-utils
-#      - nfs-utils
-#      - make
-#      - sysstat
-#      - openssh-clients
-#      - compat-libcap1
-#      - twm
-#      - collectl
-#      - rlwrap
-#      - tigervnc-server
-#      - ntp
-#      - expect
    
 
   - name: Start and enable NTP

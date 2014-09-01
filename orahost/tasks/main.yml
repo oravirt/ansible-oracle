@@ -19,13 +19,13 @@
   - name: ssh-keys | Generate SSH keys 
     local_action: shell /usr/bin/rm -f /tmp/id_rsa*; ssh-keygen -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys
     ignore_errors: True
-    when: master_node and oracle_install_option_gi == 'CRS_CONFIG'
+    when: configure_ssh and master_node and oracle_install_option_gi == 'CRS_CONFIG'
     tags:
      - sshkeys
 
   - name: ssh-keys | Add ssh-keys & authorized_keys
     copy: src=/tmp/{{ item }} dest=/home/oracle/.ssh  owner=oracle group=dba force=yes mode=600
-    when: oracle_install_option_gi == 'CRS_CONFIG'
+    when: configure_ssh and oracle_install_option_gi == 'CRS_CONFIG'
     with_items:
         - id_rsa
         - id_rsa.pub
@@ -36,27 +36,27 @@
   - name: ssh-keys | Add short name to known_hosts
     local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{inventory_hostname}} 2> /dev/null >> {{keyfile}}
     ignore_errors: True
-    when: oracle_install_option_gi == 'CRS_CONFIG'
+    when: configure_ssh and oracle_install_option_gi == 'CRS_CONFIG'
     tags:
      - sshkeys
 
   - name: ssh-keys | Add FQDN to known_hosts
     local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_fqdn}} 2> /dev/null >> {{keyfile}}
     ignore_errors: True
-    when: oracle_install_option_gi == 'CRS_CONFIG'
+    when: configure_ssh and oracle_install_option_gi == 'CRS_CONFIG'
     tags:
      - sshkeys
 
   - name: ssh-keys | Add IPv4 to known_hosts
     local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_default_ipv4.address}} 2> /dev/null >> {{keyfile}}
     ignore_errors: True
-    when: oracle_install_option_gi == 'CRS_CONFIG'
+    when: configure_ssh and oracle_install_option_gi == 'CRS_CONFIG'
     tags:
      - sshkeys
 
   - name: ssh-keys | Copy known_hosts into place
     copy: src={{keyfile}} dest=/home/{{ oracle_user }}/.ssh/known_hosts owner={{ oracle_user }} group={{ oracle_group }} owner={{ oracle_user }} group={{ oracle_group }}
-    when: oracle_install_option_gi == 'CRS_CONFIG'
+    when: configure_ssh and oracle_install_option_gi == 'CRS_CONFIG'
     tags:
      - sshkeys
 
@@ -113,30 +113,55 @@
   - name: Count number of kernel lines that needs to be changed (numa=off transparent_hugepage=never)
     shell: cat /etc/grub.conf | grep title |wc -l
     register: count
+    tags: thpnuma
 
-  - name: Disable Numa & Transparent Hugepages
+  - name: Disable Transparent Hugepages (in grub.conf)
     lineinfile: dest=/etc/grub.conf
               backup=True
               backrefs=True
               state=present
-              regexp='(^\s+kernel(\s+(?!numa=off transparent_hugepage=never)[\w=/\-\.]+)*)\s*$'
-              line='\1 numa=off transparent_hugepage=never'
+              regexp='(^\s+kernel(\s+(?!transparent_hugepage=never)[\w=/\-\.]+)*)\s*$'
+              line='\1 transparent_hugepage=never'
     with_sequence: start=0 end={{ count.stdout }}
+    tags: thpnuma
 
-  - name: Disable selinux
+  - name: Disable Numa (in grub.conf)
+    lineinfile: dest=/etc/grub.conf
+              backup=True
+              backrefs=True
+              state=present
+              regexp='(^\s+kernel(\s+(?!numa=off)[\w=/\-\.]+)*)\s*$'
+              line='\1 numa=off'
+    with_sequence: start=0 end={{ count.stdout }}
+    tags: thpnuma
+    when: disable_numa_boot
+
+  - name: Disable Transparent Hugepages (runtime)
+    shell: if test -f /sys/kernel/mm/transparent_hugepage/enabled; then echo never > /sys/kernel/mm/transparent_hugepage/enabled; fi;
+    tags: tphnuma
+
+  - name: Disable selinux (permanently)
     selinux: state=disabled
     tags:
      - selinux
+    register: selinux
 
-  - name: Network | Setup ip-addresses for internal networks
+  - name: Disable selinux (runtime)
+    shell: setenforce 0
+    tags:
+     - selinux
+    ignore_errors: true
+
+  - name: Network | Setup ip-address for RAC Interconnect
     template: src=ifcfg-eth1.j2 dest=/etc/sysconfig/network-scripts/ifcfg-eth1 owner=root mode=0644
-    when: oracle_install_option_gi == 'CRS_CONFIG'
+    when: configure_interconnect and oracle_install_option_gi == 'CRS_CONFIG'
     tags:
      - eth1
+    register: ic
   
-  - name: Network | Restart Network to bring up eth1
+  - name: Network | Bring up eth1
     service: name=network  state=restarted
-    when: oracle_install_option_gi == 'CRS_CONFIG'
+    when: configure_interconnect and oracle_install_option_gi == 'CRS_CONFIG' and ic.changed
     tags:
      - eth1
 
@@ -172,3 +197,5 @@
 
   - name: Create stage directory
     file: dest={{ oracle_stage }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+
+
