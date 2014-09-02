@@ -1,12 +1,12 @@
 ---
 ################ Generic Oracle OS info ################
   oracle_user: oracle                        # User that will own the Oracle Installations. No support for separation of duties yet
-  oracle_passwd: "$6$Udd3YYk2C2KGDOw4$jpfNsWXbgJ.IeKpEjIF4cVRhZi62xZT37G5oHHlHmGvAkkPHfukE9cgRyjdgui/oqtPodoYbUSSvTeFpwvN270"       # Encrypted password for oracle_user
+  oracle_passwd: "$6$Udd3YYk2C2KGDOw4$jpfNsWXbgJ.IeKpEjIF4cVRhZi62xZT37G5oHHlHmGvAkkPHfukE9cgRyjdgui/oqtPodoYbUSSvTeFpwvN270"      # Encrypted password for oracle_user
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
   oracle_group: dba                          # Primary group for oracle_user. 
   oracle_user_id: 600                        # uid for oracle_user
   oracle_group_id: 600                       # gid for oracle_users's primary group
-  oracle_sw_source: http://oladmin/orasw     # www-address to all software if using the get_url module when putting software on the host(s)
+  oracle_sw_source: http://oladmin/orasw     # address to all software if using the get_url module when putting software on the host(s)
   #oracle_sw_source: /path/to/files/locally  # Path to all software if using the copy module when putting software on the host(s)
   disable_numa_boot: true                    # (true/false) Sets numa=off in grub.conf
   percent_hugepages: 60                      # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages & memlock settings in /etc/security/limits.conf. 
@@ -21,32 +21,31 @@
   oracle_inventory_loc: /u01/app/oraInventory # Oracle Inventory location
 
 ################ Grid Infrastructure specifics ################
-  oracle_install_option_gi: HA_CONFIG                              # Valid (tested) values are: CRS_CONFIG, HA_CONFIG. Valid (untested) values are: UPGRADE, CRS_SWONLY)
-  oracle_install_version: 12.1.0.2                                 # Oracle version to be installed. 
-  oracle_home_gi: "{{ oracle_base }}/{{ oracle_install_version }}/grid"     # ORACLE_HOME for Grid Infrastructure
-  oracle_profile_name_gi: ".profile_grid"                          # .profile that sets up the environment for Grid Infrastructure (Cluster or Single node)
-#  oracle_cluster_nodes: orarac01,orarac02                          # Cluster-nodes when setting up Clustered Grid Infrastructure. Eventually this will be populated automatically via inventory
-  oracle_cluster_name: ""                            # Name of the cluster when setting up Clustered Grid Infrastructure
-  oracle_sw_image_gi:                                              # Files containing the installation media for Grid Infrastructure 
+  oracle_install_option_gi: CRS_CONFIG       # Valid (tested) values are: CRS_CONFIG, HA_CONFIG. Valid (untested) values are: UPGRADE, CRS_SWONLY)
+  oracle_install_version: 12.1.0.2           # Oracle version to be installed. 
+  oracle_home_gi: "/u01/app/{{ oracle_install_version }}/grid" # ORACLE_HOME for Grid Infrastructure
+  oracle_profile_name_gi: ".profile_grid"    # .profile that sets up the environment for Grid Infrastructure (Cluster or Single node)
+  oracle_cluster_nodes: orarac01,orarac02    # Cluster-nodes when setting up Clustered Grid Infrastructure. Eventually this will be populated automatically via inventory
+  oracle_cluster_name: "orarac-cluster"      # Name of the cluster when setting up Clustered Grid Infrastructure
+  oracle_sw_image_gi:                        # Files containing the installation media for Grid Infrastructure 
        - linuxamd64_12102_grid_1of2.zip
        - linuxamd64_12102_grid_2of2.zip
 
   oracle_home_name_gi: "grid_{{ oracle_install_version }}"         # This parameter is used when cloning Grid Infrastructure
   oracle_grid_responsefile: "grid_{{ oracle_cluster_name }}.rsp"   # Name of responsefile-name used when installing Grid Infrastructure
 #  oracle_cluster_nodes: "{% for host in groups['orarac'] %} {{host}} {% if not loop.last %} , {% endif %} {% endfor %}"  # This will populate the clusternodes from the inventory
-  oracle_local_node: "{{ ansible_hostname }}"                      # Name of the local node (shortname)  
-  
-  
+  oracle_local_node: "{{ ansible_hostname }}"                      # Name of the local node (shortname)
+
 ################ Input for Grid Infrastructure responsefile ################
   oracle_password: Oracle123                                       # Password used for all Grid Infrastructure related resources (e.g ASM)
   oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
   oracle_scan: orarac-scan.discworld.net                           # Scan address for Clustered Grid Infrastructure
-#  oracle_vip: -vip                                                 # Suffix for the host VIP-addresses (e.g orarac01-vip)
+  oracle_vip: -vip                                                 # Suffix for the host VIP-addresses (e.g orarac01-vip)
   oracle_scan_port: 1521                                           # Listener port for scan-listener
-#  oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
-#  oracle_cluster_nodes_and_vips: orarac01.discworld.net:orarac01-vip.discworld.net, orarac02.discworld.net:orarac02-vip.discworld.net # Cluster-nodes and cluster-nodes with vip-suffix
+  oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
+  oracle_cluster_nodes_and_vips: orarac01.discworld.net:orarac01-vip.discworld.net, orarac02.discworld.net:orarac02-vip.discworld.net # Cluster-nodes and cluster-nodes with vip-suffix
 # oracle_cluster_nodes_and_vips: "{% for host in groups['orarac'] %} {{host}}.{{ ansible_domain }}:{{ host }}{{ oracle_vip }}.{{ ansible_domain }} {% if not loop.last %} , {% endif %} {% endfor %}" 
-#  oracle_cluster_interfaces: "eth0:{{ ansible_eth0.ipv4.network }}:1,eth1:{{ ansible_eth1.ipv4.network }}:5" # The nic's to use for the cluster
+  oracle_cluster_interfaces: "eth0:{{ ansible_eth0.ipv4.network }}:1,eth1:{{ ansible_eth1.ipv4.network }}:5" # The nic's to use for the cluster
   oracle_cluster_mgmdb: TRUE           # Should the Grid Infrastructure Management database be created (only valid in 12.1.0.1)
   oracle_asm_crs_diskgroup: CRS        # The diskgroup that gets created initially when creating a cluster (contains voting/ocr etc) Also valid when setting up Stand Alone Grid Infrastructure
   oracle_asm_crs_disks: "ORCL:CRS01"   # The disks to use when creating the initial diskgroup
@@ -54,37 +53,37 @@
 
 
 ################ Oracle databases and general config (ORACLE_BASE/HOME etc) ################
-#  oracle_cluster_nodes_db: "{{ oracle_cluster_nodes }}" ## Use when installing RAC/RACONE. Used in runInstaller responsefile for database-install (oracle.install.db.CLUSTER_NODES)
-  oracle_cluster_nodes_db: ""                            ## Use when installing single instance dbs. Used in runInstaller responsefile for database-install (oracle.install.db.CLUSTER_NODES)
+  oracle_cluster_nodes_db: "{{ oracle_cluster_nodes }}"   # Use when installing RAC/RACONE. Used in runInstaller responsefile for database-install (oracle.install.db.CLUSTER_NODES)
+#  oracle_cluster_nodes_db: ""                            # Use when installing single instance dbs. Used in runInstaller responsefile for database-install (oracle.install.db.CLUSTER_NODES)
  
-  oracle_sw_image_db:                                    # Installation files for the database installations
+  oracle_sw_image_db:                                     # Installation files for the database installations
        - linuxamd64_12102_database_1of2.zip
        - linuxamd64_12102_database_2of2.zip
 
   oracle_databases:                                               # Dictionary describing the databases to be installed
-        hadb1:                                                    # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
-             oracle_db_name: hadb1                                # Database name
+        racdb:                                                    # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
+             oracle_db_name: racdb                                # Database name
              oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
-             oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
+             oracle_db_type: RAC                                  # Type of database (RAC,RACONENODE,SI)
              is_container: "false"                                # (true/false) Is the database a container database
              is_racone: "false"                                   # (true/false) Is the database a RAC ONE NODE Database
              storage_type: ASM                                    # Database storage to be used. ASM or FS. 
-             servicename: hadb_serv                               # Inital service to be created (not in use yet)
+             servicename: racdb_serv                              # Inital service to be created (not in use yet)
              oracle_init_params: "open_cursors=300,processes=700" # Specific parameters to be set during installation. Comma-separated list
              oracle_db_mem_percent: 30                            # Amount of RAM to be used for SGA
              oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
              oracle_version_db: 12.1.0.2                          # Oracle version
-        hadb2:
-             oracle_db_name: hadb2
+        racone:
+             oracle_db_name: racone
              oracle_db_passwd: Oracle123
-             oracle_db_type: SI
+             oracle_db_type: RACONE
              is_container: "false"
-             is_racone: "false"
+             is_racone: "true"
              storage_type: ASM
-             servicename: hadb2_serv
+             servicename: racone_serv
              oracle_init_params: "open_cursors=1000,processes=400"
              oracle_db_mem_percent: 20
-             oracle_database_type: MULTIPURPOSE
+             oracle_database_type: MULTIPURPOSE 
              oracle_version_db: 12.1.0.2
 
 # The following variables are dependent on the 'oracle_databases' dict
@@ -124,7 +123,8 @@
      - {device: /dev/sdc, asmlabel: CRS01}
    data:
      - {device: /dev/sdd, asmlabel: DATA01}
+     - {device: /dev/sde, asmlabel: DATA02}
    fra:
-     - {device: /dev/sde, asmlabel: FRA01}
-     
-     
+     - {device: /dev/sdf, asmlabel: FRA01}
+     - {device: /dev/sdg, asmlabel: FRA02}
+     - {device: /dev/sdh, asmlabel: FRA03}

@@ -73,10 +73,11 @@
              servicename: fsdb_serv
              oracle_init_params: "open_cursors=300,processes=700"
              oracle_db_mem_percent: 20
-             oracle_database_type: MULTIPURPOSE 
+             oracle_database_type: MULTIPURPOSE
+             oracle_version_db: 12.1.0.2
 
 # The following variables are dependent on the 'oracle_databases' dict
-  oracle_home_db: "{{ oracle_base }}/{{ oracle_install_version }}/{{ item.key }}"
+  oracle_home_db: "{{ oracle_base }}/{{ item.value.oracle_version_db}}/{{ item.key }}"
   oracle_home_name_db: "{{ item.value.oracle_db_name }}_{{ oracle_clone_version }}"
   oracle_profile_name: ".profile_{{ item.value.oracle_db_name }}"
   oracle_db_responsefile: "{{ item.value.oracle_db_name}}_{{ oracle_local_node }}.rsp"
