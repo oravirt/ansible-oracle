@@ -29,8 +29,7 @@ This will configure the host specific Oracle stuff:
 - Add a user & group
 - Create directory structures
 - Generate ssh-keys and set up passwordless ssh between clusternodes in case of RAC/RAC One node
-- Handle filesystem storage (partition devices etc)
-If you want to create your database on a filesystem (instead of ASM) this is where you define the layout.
+- Handle filesystem storage (partition devices, creates vg/lv and a ext4 filesystem etc). If you want to create your database on a filesystem (instead of ASM) this is where you define the layout.
 - Install required packages
 - Change kernel paramemeters
 - Set up pam.d/limits config
@@ -54,14 +53,14 @@ This role will install and configure Oracle Grid Infrastructure. Tested with 12.
 
 <b>oralsnr:</b>
 This role will create a default listener.
-This only be run if the single node Grid Infrastructure installation (Oracle Restart) is performed.
+
 Note:
 At the moment there is no listener configured when creating a database on a filesystem (i.e no grid infrastructure present). Will be added later though.
 - Uses srvctl to add/start the default listener
 
 <b>oraasm-configureasm:</b>
 This role will create and configure the ASM-instance with an initial diskgroup.
-This only be run if the single node Grid Infrastructure installation (Oracle Restart) is performed.
+
 - Generates a shellscript that uses asmca to create the ASM instance
 
 <b>oraasm-createdg:</b>
@@ -90,7 +89,7 @@ At the moment there is no listener configured when creating a database on a file
 This role will use opatch to apply a patch to a Grid Infrastructure home.
 
 <b>oraswgi-clone:</b>
-This role will use a previoulsy installed/patched Grid Infrastructure installation to perform a new Grid Infrastructure installation using the clone method
+This role will use a previously installed/patched Grid Infrastructure installation to perform a new Grid Infrastructure installation using the clone method
 
 <b>oraswracdb-clone:</b>
 This role will take a previously installed/patched Oracle Database Server installation to perform a new database server installation using the clone method.

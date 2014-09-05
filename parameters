@@ -1,4 +1,23 @@
----
+
+
+# This is a description of the variables in use 
+
+# The master_node variable is mostly relevant during RAC-installs, where certain tasks only have to performed on 1 node in the cluster, e.g dealing with shared storage, the actual installations,
+# both GI and DB. So in the case of RAC you pick one node to be the 'master_node' (master_node: true) during the installations. All other nodes should be set to master_node: false.
+# When installing Grid Infrastructure in a stand-alone configuration (or even when not installing GI), each server belonging to the hostgroup you're running against should have master_node: true.
+# It is also the default setting.
+  master_node: true
+
+# The following parameter can be used here as well as in group_vars. If you already have a specified ip that should be used it should probably go in host_vars instead, where you can specify the
+# addresses per host.
+#  oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(.)[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g public: 192.168.0.51 -> ic: 3.3.3.51)
+
+
+
+
+
+## The following parameters goes into group_vars/<host_group> ##
+
 ################ Generic Oracle OS info ################
   oracle_user: oracle                        # User that will own the Oracle Installations. No support for separation of duties yet
   oracle_passwd: "yourencryptedpasswd"       # Encrypted password for oracle_user
@@ -6,17 +25,18 @@
   oracle_group: dba                          # Primary group for oracle_user. 
   oracle_user_id: 600                        # uid for oracle_user
   oracle_group_id: 600                       # gid for oracle_users's primary group
-  oracle_sw_source: http://oladmin/orasw     # www-address to all software if using the get_url module when putting software on the host(s)
+  oracle_sw_source: http://webserver/orasw   # www-address to all software if using the get_url module when putting software on the host(s)
   #oracle_sw_source: /path/to/files/locally  # Path to all software if using the copy module when putting software on the host(s)
   disable_numa_boot: true                    # (true/false) Sets numa=off in grub.conf
   percent_hugepages: 60                      # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages & memlock settings in /etc/security/limits.conf. 
   configure_interconnect: true               # (true/false) Should the Interconnect network be configured by Ansible (setup IP-address. IP-address configurable by variable oracle_ic_net). Only applicable to RAC-installs
   configure_ssh: true                        # (true/false). Should passwordless ssh be configured between clusternodes. Only applicable to RAC-installs
+  configure_host_disks: true                 # (true/false). Should the specified directories be on their on devices -> (true), or do they live in the root-filesystem (/) -> (false). Mountpoints are described in host_fs_layout
   
 ############### Generic Directory Structures ################
   oracle_stage: /u01/stage                    # All software is staged here
   oracle_psu_stage: /u01/stage/psu            # All psu's are staged here
-#  oracle_rsp_stage: /u01/stage/rsp           # All responsefiles are staged here (gi,db,dbca,asmca etc). Not in use yet
+  oracle_rsp_stage: /u01/stage/rsp           # All responsefiles are staged here (gi,db,dbca,asmca etc). 
   oracle_base: /u01/app/oracle                # Oracle Base for installations
   oracle_inventory_loc: /u01/app/oraInventory # Oracle Inventory location
 
@@ -49,7 +69,7 @@
   oracle_cluster_mgmdb: TRUE           # Should the Grid Infrastructure Management database be created (only valid in 12.1.0.1)
   oracle_asm_crs_diskgroup: CRS        # The diskgroup that gets created initially when creating a cluster (contains voting/ocr etc) Also valid when setting up Stand Alone Grid Infrastructure
   oracle_asm_crs_disks: "ORCL:CRS01"   # The disks to use when creating the initial diskgroup
-#  oracle_asm_crs_disks: "  {% for disk in  storage_layout[crs]    %}  -disk 'ORCL:{{ disk.asmlabel }}' {% endfor %}"
+#  oracle_asm_crs_disks: "  {% for disk in  asm_storage_layout[crs]    %}  -disk 'ORCL:{{ disk.asmlabel }}' {% endfor %}"
 
 
 ################ Oracle databases and general config (ORACLE_BASE/HOME etc) ################
@@ -62,6 +82,7 @@
 
   oracle_databases:                                     # Dictionary describing the databases to be installed
         racdb:  # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
+             oracle_edition: EE                         # The edition of database-server (EE,SE,SEONE)
              oracle_db_name: racdb                      # Database name
              oracle_db_passwd: Oracle123                # Passwords (sys/system/dbsnm etc)
              oracle_db_type: RAC                        # Type of database (RAC,RACONENODE,SI)
@@ -109,16 +130,16 @@
 #  oracle_opatch_patch: p6880880_121010_Linux-x86-64.zip
 
 ################ Storage/FS Layout ################
-  host_fs_layout:    # Sets up filesystem on host. If storage_type=FS under oracle_databases, this is where the mapping between device/fs is described
+  host_fs_layout:    # Sets up filesystem on host. If your database has storage_type=FS, this is where the mapping between device/fs is described
       u01:
         {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora}
 
-  diskgroups:        # ASM Diskgroups used for DB-storage. Should map to dict storage_layout. 
+  asm_diskgroups:        # ASM Diskgroups used for DB-storage. Should map to dict asm_storage_layout. 
      - crs
      - data
      - fra
 
-  storage_layout:    # Mapping between device & ASMlib label. If storage_type=ASM, this is where the mapping between device/asm-disk is described
+  asm_storage_layout:    # Mapping between device & ASMlib label. If storage_type=ASM, this is where the mapping between device/asm-disk is described
    crs:
      - {device: /dev/sdc, asmlabel: CRS01}
    data:

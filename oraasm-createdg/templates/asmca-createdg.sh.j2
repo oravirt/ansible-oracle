@@ -3,7 +3,7 @@
 
 {{ oracle_home_gi }}/bin/asmca -silent -createDiskGroup \
        -diskGroupName {{ item }} \
-      {% for disk in  storage_layout[item]    %}
+      {% for disk in  asm_storage_layout[item]    %}
        -disk 'ORCL:{{ disk.asmlabel }}' \
       {% endfor %}
        -redundancy external \

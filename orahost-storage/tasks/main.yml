@@ -2,37 +2,37 @@
 ---
   
   - name: ASMlib | Create device to label mappings for asm
-    template: src=asm-label-device-mapping.txt.j2 dest={{ oracle_stage }}/asm-label-device-mapping-{{ item }}.txt
+    template: src=asm-label-device-mapping.txt.j2 dest={{ oracle_rsp_stage }}/asm-label-device-mapping-{{ item }}.txt
     with_items:
-       - "{{ diskgroups }}"
+       - "{{ asm_diskgroups }}"
     when: master_node 
     tags: shareddisks
 
   - name: ASMlib | Build script to create partitions 
-    template: src=part-device.sh.j2 dest={{ oracle_stage }}/part-device-{{ item }}.sh owner={{ oracle_user }} group={{ oracle_group }} mode=755
+    template: src=part-device.sh.j2 dest={{ oracle_rsp_stage }}/part-device-{{ item }}.sh owner={{ oracle_user }} group={{ oracle_group }} mode=755
     with_items:
-       - "{{ diskgroups }}"
+       - "{{ asm_diskgroups }}"
     when: master_node 
     tags: shareddisks
 
   - name: ASMlib | Run script to create partitions
-    shell: sh {{ oracle_stage }}/part-device-{{ item }}.sh
+    shell: sh {{ oracle_rsp_stage }}/part-device-{{ item }}.sh
     with_items:
-       - "{{ diskgroups }}"
+       - "{{ asm_diskgroups }}"
     when: master_node
     tags: shareddisks
 
   - name: ASMlib | Build script to create asm-labels
-    template: src=label-asm-disks.sh.j2 dest={{ oracle_stage }}/label-asm-disks-{{ item }}.sh owner={{ oracle_user }} group={{ oracle_group }} mode=755
+    template: src=label-asm-disks.sh.j2 dest={{ oracle_rsp_stage }}/label-asm-disks-{{ item }}.sh owner={{ oracle_user }} group={{ oracle_group }} mode=755
     with_items:
-       - "{{ diskgroups }}"
+       - "{{ asm_diskgroups }}"
     when: master_node 
     tags: shareddisks
 
   - name: ASMlib | Run script to create asm-labels
-    shell: sh {{ oracle_stage }}/label-asm-disks-{{ item }}.sh
+    shell: sh {{ oracle_rsp_stage }}/label-asm-disks-{{ item }}.sh
     with_items:
-       - "{{ diskgroups }}"
+       - "{{ asm_diskgroups }}"
     when: master_node 
     tags: shareddisks
 

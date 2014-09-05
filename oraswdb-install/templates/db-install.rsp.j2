@@ -1,3 +1,5 @@
+# {{ ansible_managed }}
+#
 ####################################################################
 ## Copyright(c) Oracle Corporation 1998,2014. All rights reserved.##
 ##                                                                ##
@@ -102,7 +104,7 @@ ORACLE_BASE={{ oracle_base }}
 #   - EE     : Enterprise Edition 
 
 #-------------------------------------------------------------------------------
-oracle.install.db.InstallEdition=EE
+oracle.install.db.InstallEdition={{ item.value.oracle_edition }}
 
 ###############################################################################
 #                                                                             #
@@ -183,7 +185,7 @@ oracle.install.db.isRACOneInstall={{ item.value.is_racone }}
 # 
 # Specify the name for RAC One Node Service
 #------------------------------------------------------------------------------
-oracle.install.db.racOneServiceName={{ item.value.servicename }}
+oracle.install.db.racOneServiceName={{ item.value.service_name }}
 
 #------------------------------------------------------------------------------
 # Value is required only if RAC database type is POLICY_MANAGED

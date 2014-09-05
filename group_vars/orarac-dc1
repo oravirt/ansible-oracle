@@ -12,11 +12,13 @@
   percent_hugepages: 60                      # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages & memlock settings in /etc/security/limits.conf. 
   configure_interconnect: true               # (true/false) Should the Interconnect network be configured by Ansible (setup IP-address. IP-address configurable by variable oracle_ic_net). Only applicable to RAC-installs
   configure_ssh: true                        # (true/false). Should passwordless ssh be configured between clusternodes. Only applicable to RAC-installs
+  configure_host_disks: true                 # (true/false). Should the specified directories be on their on devices -> (true), or do they live in the root-filesystem (/) -> (false). 
+                                             # mountpoints are described in host_fs_layout
   
 ############### Generic Directory Structures ################
   oracle_stage: /u01/stage                    # All software is staged here
   oracle_psu_stage: /u01/stage/psu            # All psu's are staged here
-#  oracle_rsp_stage: /u01/stage/rsp           # All responsefiles are staged here (gi,db,dbca,asmca etc). Not in use yet
+  oracle_rsp_stage: /u01/stage/rsp           # All responsefiles are staged here (gi,db,dbca,asmca etc). 
   oracle_base: /u01/app/oracle                # Oracle Base for installations
   oracle_inventory_loc: /u01/app/oraInventory # Oracle Inventory location
 
@@ -49,7 +51,7 @@
   oracle_cluster_mgmdb: TRUE           # Should the Grid Infrastructure Management database be created (only valid in 12.1.0.1)
   oracle_asm_crs_diskgroup: CRS        # The diskgroup that gets created initially when creating a cluster (contains voting/ocr etc) Also valid when setting up Stand Alone Grid Infrastructure
   oracle_asm_crs_disks: "ORCL:CRS01"   # The disks to use when creating the initial diskgroup
-#  oracle_asm_crs_disks: "  {% for disk in  storage_layout[crs]    %}  -disk 'ORCL:{{ disk.asmlabel }}' {% endfor %}"
+#  oracle_asm_crs_disks: "  {% for disk in  asm_storage_layout[crs]    %}  -disk 'ORCL:{{ disk.asmlabel }}' {% endfor %}"
 
 
 ################ Oracle databases and general config (ORACLE_BASE/HOME etc) ################
@@ -62,25 +64,27 @@
 
   oracle_databases:                                               # Dictionary describing the databases to be installed
         racdb:                                                    # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
+             oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
              oracle_db_name: racdb                                # Database name
              oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
              oracle_db_type: RAC                                  # Type of database (RAC,RACONENODE,SI)
              is_container: "false"                                # (true/false) Is the database a container database
              is_racone: "false"                                   # (true/false) Is the database a RAC ONE NODE Database
              storage_type: ASM                                    # Database storage to be used. ASM or FS. 
-             servicename: racdb_serv                              # Inital service to be created (not in use yet)
+             service_name: racdb_serv                              # Inital service to be created (not in use yet)
              oracle_init_params: "open_cursors=300,processes=700" # Specific parameters to be set during installation. Comma-separated list
              oracle_db_mem_percent: 30                            # Amount of RAM to be used for SGA
              oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
              oracle_version_db: 12.1.0.2                          # Oracle version
         racone:
+             oracle_edition: EE
              oracle_db_name: racone
              oracle_db_passwd: Oracle123
-             oracle_db_type: RACONE
+             oracle_db_type: RACONENODE
              is_container: "false"
              is_racone: "true"
              storage_type: ASM
-             servicename: racone_serv
+             service_name: racone_serv
              oracle_init_params: "open_cursors=1000,processes=400"
              oracle_db_mem_percent: 20
              oracle_database_type: MULTIPURPOSE 
@@ -113,18 +117,15 @@
       u01:
         {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora}
 
-  diskgroups:        # ASM Diskgroups used for DB-storage. Should map to dict storage_layout. 
+  asm_diskgroups:        # ASM Diskgroups used for DB-storage. Should map to dict asm_storage_layout. 
      - crs
      - data
      - fra
 
-  storage_layout:    # Mapping between device & ASMlib label. If storage_type=ASM under oracle_databases, this is where the mapping between device/asm-disk is described
+  asm_storage_layout:    # Mapping between device & ASMlib label. If storage_type=ASM under oracle_databases, this is where the mapping between device/asm-disk is described
    crs:
      - {device: /dev/sdc, asmlabel: CRS01}
    data:
      - {device: /dev/sdd, asmlabel: DATA01}
-     - {device: /dev/sde, asmlabel: DATA02}
    fra:
-     - {device: /dev/sdf, asmlabel: FRA01}
-     - {device: /dev/sdg, asmlabel: FRA02}
-     - {device: /dev/sdh, asmlabel: FRA03}
+     - {device: /dev/sde, asmlabel: FRA01}

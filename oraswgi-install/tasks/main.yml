@@ -10,6 +10,11 @@
     tags:
       - directories
   
+  - name: Create rsp stage directory
+    file: dest={{ oracle_rsp_stage }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directories
+
   - name: Create ORACLE_INVENTORY directory
     file: dest={{ oracle_inventory_loc }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
@@ -43,14 +48,14 @@
     when: master_node
 
   - name: Setup response file for install (GI)
-    template: src=grid-all.rsp.j2 dest={{ oracle_stage }}/{{ oracle_grid_responsefile }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
+    template: src=grid-all.rsp.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
     tags:
       - responsefilegi
     when: master_node
 
 
   - name: Install Grid Infrastructure
-    shell: "{{ oracle_stage }}/grid/runInstaller -responseFile {{ oracle_stage }}/{{ oracle_grid_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
+    shell: "{{ oracle_stage }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
     tags:
       - oragridinstall
     when: master_node
@@ -83,6 +88,19 @@
   
   - debug: var=rootother.stdout_lines
     when: not master_node
+
+  - name: Setup response file for configToolAllCommands
+    template: src=configtoolallcommands.rsp.j2 dest={{ oracle_rsp_stage }}/configtoolallcommands.rsp owner={{ oracle_user }} group={{ oracle_group }} mode=600 backup=yes
+    tags:
+      - responsefileconfigtool
+    when: master_node 
+
+  - name: Run configToolAllCommands
+    shell: "{{ oracle_home_gi }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_rsp_stage }}/configtoolallcommands.rsp"
+    tags:
+      - runconfigtool
+    when: master_node
+    register: configtool
 
   - name: Check if stuff is running
     shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
