@@ -16,7 +16,7 @@ You can take a freshly installed machine and configure it from ground up. It'll 
 - You'll need to manually download the Oracle software and make it available to the control-machine (either locally or on a web-server) before running the playbook.
 - Also, parts of the playbooks are not idempotent (yet), meaning it will actually try to perform some of the installations again and they will fail. Will be fixed.
 - All roles are built on Oracle Linux 6, but should work with any Redhat6-based system.
-- Storage options only supports block devices at the momenti (FS & ASM). Will add support for NFS
+- Storage options only supports block devices at the moment (FS & ASM). Will add support for NFS
 
 <b>The different roles are:</b>
 
