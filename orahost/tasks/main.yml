@@ -60,6 +60,17 @@
     tags:
      - sshkeys
 
+  - name: ssh-keys | Remove generated keys from control machine
+    local_action: file  path="/tmp/{{ item }}" state=absent
+    with_items:
+        - id_rsa
+        - id_rsa.pub
+        - authorized_keys
+        - known_hosts
+    when: master_node and configure_ssh and oracle_install_option_gi == 'CRS_CONFIG'
+    tags:
+     - sshkeys
+
   - name: filesystem | Create partition and pv
     script: disks.sh {{ item.value.device }}
     with_dict: host_fs_layout
