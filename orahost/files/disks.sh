@@ -23,7 +23,7 @@ if [[ -e ${disk}${partno} ]]; then
 fi
 
 echo "==> Create MBR label"
-parted -s $disk  mklabel msdos
+parted -s $disk  mklabel gpt
 ncyl=$(parted $disk unit cyl print  | sed -n 's/.*: \([0-9]*\)cyl/\1/p')
 
 if [[ $ncyl != [0-9]* ]]; then
