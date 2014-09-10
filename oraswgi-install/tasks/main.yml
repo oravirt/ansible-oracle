@@ -1,5 +1,11 @@
 ---
 
+  - name: Check if GI is already installed
+    shell: grep "{{ oracle_home_gi }}" "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" |wc -l
+    tags: 
+    - checkifgiinstall
+    register: checkgiinstall
+
   - name: Add new dotprofile (GI)
     template: src=dotprofile-gi.j2 dest={{ oracle_user_home }}/{{ oracle_profile_name_gi }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
     tags: 
@@ -29,6 +35,7 @@
     file: dest={{ oracle_home_gi }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
       - directories
+    when: checkgiinstall.stdout != "1"
 
   - name: Copy oracle installfiles to server (GI)
     get_url: url={{ oracle_sw_source }}/{{ item }} dest={{ oracle_stage }} mode=755
@@ -36,7 +43,7 @@
        - "{{ oracle_sw_image_gi }}"
     tags:
       - oragridsw
-    when: master_node
+    when: master_node and checkgiinstall.stdout != "1"
 
   - name: Extract files to stage-area
     unarchive: src={{ oracle_stage }}/{{ item }}  dest={{ oracle_stage }} copy=no
@@ -45,61 +52,61 @@
        - "{{ oracle_sw_image_gi }}"
     tags:
       - oragridswunpack
-    when: master_node
+    when: master_node and checkgiinstall.stdout != "1"
 
   - name: Setup response file for install (GI)
     template: src=grid-all.rsp.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
     tags:
       - responsefilegi
-    when: master_node
-
-
+    when: master_node and checkgiinstall.stdout != "1"
+    
   - name: Install Grid Infrastructure
     shell: "{{ oracle_stage }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
     tags:
       - oragridinstall
-    when: master_node
+    when: master_node and checkgiinstall.stdout != "1"
     register: giinstall
 
   - debug: var=giinstall.stdout_lines
-    when: master_node
+    when: master_node and checkgiinstall.stdout != "1"
 
   - name: Run oraInstroot script after installation
     shell: sudo su - -c {{ oracle_inventory_loc }}/orainstRoot.sh
     tags:
       - runroot
+    when: checkgiinstall.stdout != "1"
 
   - name: Run root script after installation (Master Node)
     shell: sudo su - -c {{ oracle_home_gi }}/root.sh
     tags:
       - runroot
-    when: master_node
+    when: master_node and checkgiinstall.stdout != "1"
     register: rootmaster
 
   - debug: var=rootmaster.stdout_lines
-    when: master_node
+    when: master_node and checkgiinstall.stdout != "1"
 
   - name: Run root script after installation (Other Nodes)
     shell: sudo su - -c {{ oracle_home_gi }}/root.sh
     tags:
       - runroot
-    when: not master_node
+    when: not master_node and checkgiinstall.stdout != "1"
     register: rootother
   
   - debug: var=rootother.stdout_lines
-    when: not master_node
+    when: not master_node and checkgiinstall.stdout != "1"
 
   - name: Setup response file for configToolAllCommands
     template: src=configtoolallcommands.rsp.j2 dest={{ oracle_rsp_stage }}/configtoolallcommands.rsp owner={{ oracle_user }} group={{ oracle_group }} mode=600 backup=yes
     tags:
       - responsefileconfigtool
-    when: master_node 
+    when: master_node and checkgiinstall.stdout != "1"
 
   - name: Run configToolAllCommands
     shell: "{{ oracle_home_gi }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_rsp_stage }}/configtoolallcommands.rsp"
     tags:
       - runconfigtool
-    when: master_node
+    when: master_node and checkgiinstall.stdout != "1"
     register: configtool
 
   - name: Check if stuff is running
@@ -107,35 +114,39 @@
     tags:
      - crsctl
     register: crsctl
-    when: master_node
+    when: master_node and checkgiinstall.stdout != "1"
   
   - debug: var=crsctl.stdout_lines
     tags:
      - crsctl
-    when: master_node
+    when: master_node and checkgiinstall.stdout != "1"
 
   - name: Update Nodelist, set CRS=TRUE
     shell: "{{ oracle_home_gi }}/oui/bin/runInstaller -updateNodeList ORACLE_HOME={{ oracle_home_gi }} CRS=TRUE"
     tags:
       - updatenodelist
-    when : master_node
+    when : master_node and checkgiinstall.stdout != "1"
 
   - name: Add additional info to glogin.sql (1)
     lineinfile: dest="{{ oracle_home_gi }}/sqlplus/admin/glogin.sql" line='set sqlprompt "_user @ _connect_identifier:>"' backup=yes
     tags:
       - glogin
+    when: checkgiinstall.stdout != "1"
 
   - name: Add additional info to glogin.sql (2)
     lineinfile: dest="{{ oracle_home_gi }}/sqlplus/admin/glogin.sql" line='set time on' backup=yes
     tags:
       - glogin
+    when: checkgiinstall.stdout != "1"
 
   - name: Check opatch lsinventory (GI)
     shell: "{{ oracle_home_gi }}/OPatch/opatch lsinventory"
     register: opatchls
     tags:
      - opatchls
+    when: checkgiinstall.stdout != "1"
     
   - debug: var=opatchls.stdout_lines
     tags:
      - opatchls
+    when: checkgiinstall.stdout != "1"
