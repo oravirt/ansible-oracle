@@ -19,13 +19,13 @@
   - name: ssh-keys | Generate SSH keys 
     local_action: shell /usr/bin/rm -f /tmp/id_rsa*; ssh-keygen -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys
     ignore_errors: True
-    when: configure_ssh and master_node and oracle_install_option_gi == 'CRS_CONFIG'
+    when: configure_ssh and master_node and configure_cluster
     tags:
      - sshkeys
 
   - name: ssh-keys | Add ssh-keys & authorized_keys
     copy: src=/tmp/{{ item }} dest=/home/oracle/.ssh  owner=oracle group=dba force=yes mode=600
-    when: configure_ssh and oracle_install_option_gi == 'CRS_CONFIG'
+    when: configure_ssh and configure_cluster
     with_items:
         - id_rsa
         - id_rsa.pub
@@ -36,27 +36,27 @@
   - name: ssh-keys | Add short name to known_hosts
     local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{inventory_hostname}} 2> /dev/null >> {{keyfile}}
     ignore_errors: True
-    when: configure_ssh and oracle_install_option_gi == 'CRS_CONFIG'
+    when: configure_ssh and configure_cluster
     tags:
      - sshkeys
 
   - name: ssh-keys | Add FQDN to known_hosts
     local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_fqdn}} 2> /dev/null >> {{keyfile}}
     ignore_errors: True
-    when: configure_ssh and oracle_install_option_gi == 'CRS_CONFIG'
+    when: configure_ssh and configure_cluster
     tags:
      - sshkeys
 
   - name: ssh-keys | Add IPv4 to known_hosts
     local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_default_ipv4.address}} 2> /dev/null >> {{keyfile}}
     ignore_errors: True
-    when: configure_ssh and oracle_install_option_gi == 'CRS_CONFIG'
+    when: configure_ssh and configure_cluster
     tags:
      - sshkeys
 
   - name: ssh-keys | Copy known_hosts into place
     copy: src={{keyfile}} dest=/home/{{ oracle_user }}/.ssh/known_hosts owner={{ oracle_user }} group={{ oracle_group }} owner={{ oracle_user }} group={{ oracle_group }}
-    when: configure_ssh and oracle_install_option_gi == 'CRS_CONFIG'
+    when: configure_ssh and configure_cluster
     tags:
      - sshkeys
 
@@ -67,7 +67,7 @@
         - id_rsa.pub
         - authorized_keys
         - known_hosts
-    when: master_node and configure_ssh and oracle_install_option_gi == 'CRS_CONFIG'
+    when: master_node and configure_ssh and configure_cluster
     tags:
      - sshkeys
 
@@ -170,14 +170,14 @@
 
   - name: Network | Setup ip-address for RAC Interconnect
     template: src=ifcfg-eth1.j2 dest=/etc/sysconfig/network-scripts/ifcfg-eth1 owner=root mode=0644
-    when: configure_interconnect and oracle_install_option_gi == 'CRS_CONFIG'
+    when: configure_interconnect and configure_cluster
     tags:
      - eth1
     register: ic
   
   - name: Network | Bring up eth1
     service: name=network  state=restarted
-    when: configure_interconnect and oracle_install_option_gi == 'CRS_CONFIG' and ic.changed
+    when: configure_interconnect and configure_cluster and ic.changed
     tags:
      - eth1
 
