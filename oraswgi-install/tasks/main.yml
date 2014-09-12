@@ -58,7 +58,7 @@
     template: src=grid-all.rsp.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
     tags:
       - responsefilegi
-    when: master_node and checkgiinstall.stdout != "1"
+    when: master_node #and checkgiinstall.stdout != "1"
     
   - name: Install Grid Infrastructure
     shell: "{{ oracle_stage }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
@@ -100,13 +100,13 @@
     template: src=configtoolallcommands.rsp.j2 dest={{ oracle_rsp_stage }}/configtoolallcommands.rsp owner={{ oracle_user }} group={{ oracle_group }} mode=600 backup=yes
     tags:
       - responsefileconfigtool
-    when: master_node and checkgiinstall.stdout != "1"
+    when: master_node and oracle_cluster_mgmdb and checkgiinstall.stdout != "1"
 
   - name: Run configToolAllCommands
     shell: "{{ oracle_home_gi }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_rsp_stage }}/configtoolallcommands.rsp"
     tags:
       - runconfigtool
-    when: master_node and checkgiinstall.stdout != "1"
+    when: master_node and oracle_cluster_mgmdb and checkgiinstall.stdout != "1"
     register: configtool
 
   - name: Check if stuff is running
