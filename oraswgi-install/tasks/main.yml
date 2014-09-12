@@ -6,6 +6,10 @@
     - checkifgiinstall
     register: checkgiinstall
 
+  - debug: var=checkgiinstall.stdout
+    tags:
+     - checkifgiinstall
+
   - name: Add new dotprofile (GI)
     template: src=dotprofile-gi.j2 dest={{ oracle_user_home }}/{{ oracle_profile_name_gi }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
     tags: 
@@ -82,9 +86,6 @@
       - runroot
     when: master_node and checkgiinstall.stdout != "1"
     register: rootmaster
-
-  - debug: var=rootmaster.stdout_lines
-    when: master_node and checkgiinstall.stdout != "1"
 
   - name: Run root script after installation (Other Nodes)
     shell: sudo su - -c {{ oracle_home_gi }}/root.sh
