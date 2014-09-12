@@ -1,5 +1,6 @@
 ---
 ################ Generic Oracle OS info ################
+  hostgroup: oraha                           # Inventory group-alias This is used to populate cluster nodes for GI & RAC/RAC ONE DB installation
   oracle_user: oracle                        # User that will own the Oracle Installations. No support for separation of duties yet
   oracle_passwd: "$6$Udd3YYk2C2KGDOw4$jpfNsWXbgJ.IeKpEjIF4cVRhZi62xZT37G5oHHlHmGvAkkPHfukE9cgRyjdgui/oqtPodoYbUSSvTeFpwvN270"       # Encrypted password for oracle_user
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
@@ -13,7 +14,7 @@
   configure_interconnect: true               # (true/false) Should the Interconnect network be configured by Ansible (setup IP-address. IP-address configurable by variable oracle_ic_net). Only applicable to RAC-installs
   configure_ssh: true                        # (true/false). Should passwordless ssh be configured between clusternodes. Only applicable to RAC-installs
   configure_host_disks: true                 # (true/false). Should the specified directories be on their on devices -> (true), or do they live in the root-filesystem (/) -> (false). Mountpoints are described in host_fs_layout
-  
+  configure_cluster: false
 ############### Generic Directory Structures ################
   oracle_stage: /u01/stage                    # All software is staged here
   oracle_psu_stage: /u01/stage/psu            # All psu's are staged here
@@ -26,7 +27,6 @@
   oracle_install_version: 12.1.0.2                                 # Oracle version to be installed. 
   oracle_home_gi: "{{ oracle_base }}/{{ oracle_install_version }}/grid"     # ORACLE_HOME for Grid Infrastructure
   oracle_profile_name_gi: ".profile_grid"                          # .profile that sets up the environment for Grid Infrastructure (Cluster or Single node)
-#  oracle_cluster_nodes: orarac01,orarac02                          # Cluster-nodes when setting up Clustered Grid Infrastructure. Eventually this will be populated automatically via inventory
   oracle_cluster_name: ""                            # Name of the cluster when setting up Clustered Grid Infrastructure
   oracle_sw_image_gi:                                              # Files containing the installation media for Grid Infrastructure 
        - linuxamd64_12102_grid_1of2.zip
@@ -34,7 +34,6 @@
 
   oracle_home_name_gi: "grid_{{ oracle_install_version }}"         # This parameter is used when cloning Grid Infrastructure
   oracle_grid_responsefile: "grid_{{ oracle_cluster_name }}.rsp"   # Name of responsefile-name used when installing Grid Infrastructure
-#  oracle_cluster_nodes: "{% for host in groups['orarac'] %} {{host}} {% if not loop.last %} , {% endif %} {% endfor %}"  # This will populate the clusternodes from the inventory
   oracle_local_node: "{{ ansible_hostname }}"                      # Name of the local node (shortname)  
   
   
@@ -42,21 +41,14 @@
   oracle_password: Oracle123                                       # Password used for all Grid Infrastructure related resources (e.g ASM)
   oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
   oracle_scan: orarac-scan.discworld.net                           # Scan address for Clustered Grid Infrastructure
-#  oracle_vip: -vip                                                 # Suffix for the host VIP-addresses (e.g orarac01-vip)
+  oracle_vip: -vip                                                 # Suffix for the host VIP-addresses (e.g orarac01-vip)
   oracle_scan_port: 1521                                           # Listener port for scan-listener
-#  oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
-#  oracle_cluster_nodes_and_vips: orarac01.discworld.net:orarac01-vip.discworld.net, orarac02.discworld.net:orarac02-vip.discworld.net # Cluster-nodes and cluster-nodes with vip-suffix
-# oracle_cluster_nodes_and_vips: "{% for host in groups['orarac'] %} {{host}}.{{ ansible_domain }}:{{ host }}{{ oracle_vip }}.{{ ansible_domain }} {% if not loop.last %} , {% endif %} {% endfor %}" 
-#  oracle_cluster_interfaces: "eth0:{{ ansible_eth0.ipv4.network }}:1,eth1:{{ ansible_eth1.ipv4.network }}:5" # The nic's to use for the cluster
-  oracle_cluster_mgmdb: TRUE           # Should the Grid Infrastructure Management database be created (only valid in 12.1.0.1)
-  oracle_asm_crs_diskgroup: CRS        # The diskgroup that gets created initially when creating a cluster (contains voting/ocr etc) Also valid when setting up Stand Alone Grid Infrastructure
-  oracle_asm_crs_disks: "ORCL:CRS01"   # The disks to use when creating the initial diskgroup
-#  oracle_asm_crs_disks: "  {% for disk in  asm_storage_layout[crs]    %}  -disk 'ORCL:{{ disk.asmlabel }}' {% endfor %}"
+  oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
+  oracle_cluster_mgmdb: true           # Should the Grid Infrastructure Management database be created (only valid in 12.1.0.1)
+  oracle_asm_crs_diskgroup: crs        # The diskgroup that gets created initially when creating a cluster (contains voting/ocr etc) Also valid when setting up Stand Alone Grid Infrastructure
 
 
 ################ Oracle databases and general config (ORACLE_BASE/HOME etc) ################
-#  oracle_cluster_nodes_db: "{{ oracle_cluster_nodes }}" ## Use when installing RAC/RACONE. Used in runInstaller responsefile for database-install (oracle.install.db.CLUSTER_NODES)
-  oracle_cluster_nodes_db: ""                            ## Use when installing single instance dbs. Used in runInstaller responsefile for database-install (oracle.install.db.CLUSTER_NODES)
  
   oracle_sw_image_db:                                    # Installation files for the database installations
        - linuxamd64_12102_database_1of2.zip
