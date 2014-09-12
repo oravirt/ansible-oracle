@@ -23,20 +23,20 @@
 #  - name: Add default services to databases
 #    shell: "{{ oracle_home_db }}/bin/srvctl add service -db {{ item.value.oracle_database }} 
 #    with_dict: oracle_databases
-#    when: master_node and {{ oracle_install_option_gi }} == 'HA_CONFIG'
+#    when: master_node and oracle_install_option_gi == 'HA_CONFIG'
 #    tags:
 #      - oradbcreate
 #    register: oradbcreate
 
   - name: Check if database is registered
     shell: "{{ oracle_home_gi }}/bin/srvctl config database "
-    when: oracle_install_option_gi == 'CRS_CONFIG' or oracle_install_option_gi == 'HA'
+    when: oracle_install_option_gi == 'CRS_CONFIG' or oracle_install_option_gi == 'HA_CONFIG'
     tags:
       - srvctlconfig
     register: srvctlconfig
       
 
   - debug: var=srvctlconfig.stdout_lines
-    when: oracle_install_option_gi == 'CRS_CONFIG' or oracle_install_option_gi == 'HA'
+    when: oracle_install_option_gi == 'CRS_CONFIG' or oracle_install_option_gi == 'HA_CONFIG'
     tags:
      - srvctlconfig
