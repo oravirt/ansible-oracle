@@ -143,8 +143,7 @@ oracle.install.crs.config.gpnp.gnsVIPAddress=
 #
 #
 #-------------------------------------------------------------------------------
-#oracle.install.crs.config.clusterNodes=orarac01.discworld.net:orarac01-vip.discworld.net,orarac02.discworld.net:orarac02-vip.discworld.net
-oracle.install.crs.config.clusterNodes={{ oracle_cluster_nodes_and_vips | default ('') }}
+oracle.install.crs.config.clusterNodes={% for host in groups[hostgroup] -%} {{host}}.{{ ansible_domain }}:{{ host }}{{ oracle_vip }}.{{ ansible_domain }} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 
 #-------------------------------------------------------------------------------
 # The value should be a comma separated strings where each string is as shown below
@@ -160,7 +159,7 @@ oracle.install.crs.config.clusterNodes={{ oracle_cluster_nodes_and_vips | defaul
 # For example: eth0:140.87.24.0:1,eth1:10.2.1.0:2,eth2:140.87.52.0:3
 #
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.networkInterfaceList={{ oracle_cluster_interfaces | default ('') }}
+oracle.install.crs.config.networkInterfaceList={% if configure_cluster==True %}eth0:{{ ansible_eth0.ipv4.network }}:1,eth1:{{ ansible_eth1.ipv4.network }}:5{% else %}{% endif %}
 
 #-------------------------------------------------------------------------------
 # Specify 'true' if you would like to configure Management Database Option, else
@@ -280,8 +279,7 @@ oracle.install.asm.diskGroup.AUSize=1
 #     oracle.install.asm.diskGroup.disks=\\.\ORCLDISKDATA0,\\.\ORCLDISKDATA1
 #
 #-------------------------------------------------------------------------------
-#oracle.install.asm.diskGroup.disks=ORCL:CRS01
-oracle.install.asm.diskGroup.disks={{ oracle_asm_crs_disks }}
+oracle.install.asm.diskGroup.disks={% for disk in  asm_storage_layout[oracle_asm_crs_diskgroup]    -%}  ORCL:{{ disk.asmlabel }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 
 #-------------------------------------------------------------------------------
 # The disk discovery string to be used to discover the disks used create a ASM DiskGroup

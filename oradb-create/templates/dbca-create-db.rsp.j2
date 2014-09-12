@@ -253,7 +253,7 @@ SID = "{{ item.value.oracle_db_name }}"
 # Default value : None
 # Mandatory     : No (Yes for RAC database-centric database )
 #-----------------------------------------------------------------------------
-NODELIST= {{ oracle_cluster_nodes_db }}
+NODELIST={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : TEMPLATENAME

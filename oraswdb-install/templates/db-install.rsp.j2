@@ -168,7 +168,8 @@ oracle.install.db.rac.configurationType=ADMIN_MANAGED
 # 
 # Example : oracle.install.db.CLUSTER_NODES=node1,node2
 #------------------------------------------------------------------------------
-oracle.install.db.CLUSTER_NODES={{ oracle_cluster_nodes_db }}
+oracle.install.db.CLUSTER_NODES={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
+
 
 #------------------------------------------------------------------------------
 # This variable is used to enable or disable RAC One Node install.
