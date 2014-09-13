@@ -4,7 +4,7 @@
 
 - Ansible >= 1.6
 - Oracle Linux (or any RHEL-based Linux System) >= 6.4
-- Oracle Database/Grid Infrastructure 12.1.0.1 & 12.1.0.2
+- Oracle Database/Grid Infrastructure 12.1.0.2
 
 </b>
 
