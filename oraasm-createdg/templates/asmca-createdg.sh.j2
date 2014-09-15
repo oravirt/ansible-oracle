@@ -7,7 +7,10 @@
        -disk 'ORCL:{{ disk.asmlabel }}' \
       {% endfor %}
        -redundancy external \
-       -au_size 64 \
+       -au_size 4 \
        -compatible.asm '12.1.0.0.0' \
        -compatible.rdbms '11.2.0.0.0' \
+       {% if oracle_install_version=='12.1.0.1' %}
+       {% else %}
        -compatible.advm '12.1.0.0.0' \
+       {% endif %}
