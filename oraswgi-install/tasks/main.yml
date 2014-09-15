@@ -15,8 +15,14 @@
     tags: 
     - dotprofilegi
 
-  - name: Create stage directory
+  - name: Create stage directory (base)
     file: dest={{ oracle_stage }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directories
+ 
+  - name: Create stage directory (version specific)
+    file: dest={{ oracle_stage }}/{{ item.version }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    with_items: oracle_sw_image_gi
     tags:
       - directories
   
@@ -42,21 +48,19 @@
     when: checkgiinstall.stdout != "1"
 
   - name: Copy oracle installfiles to server (GI)
-    get_url: url={{ oracle_sw_source }}/{{ item }} dest={{ oracle_stage }} mode=755
-    with_items: 
-       - "{{ oracle_sw_image_gi }}"
+    get_url: url={{ oracle_sw_source }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
+    with_items:  oracle_sw_image_gi 
     tags:
       - oragridsw
     when: master_node and checkgiinstall.stdout != "1"
 
-  - name: Extract files to stage-area
-    unarchive: src={{ oracle_stage }}/{{ item }}  dest={{ oracle_stage }} copy=no
+  - name: Extract files to stage-area (GI)
+    unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no 
     #shell: unzip {{ oracle_stage }}/{{ item }}  dest={{ oracle_stage }}
-    with_items:
-       - "{{ oracle_sw_image_gi }}"
+    with_items: oracle_sw_image_gi
     tags:
       - oragridswunpack
-    when: master_node and checkgiinstall.stdout != "1"
+    when: master_node 
 
   - name: Setup response file for install (GI)
     template: src=grid-all.rsp.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
@@ -65,7 +69,7 @@
     when: master_node #and checkgiinstall.stdout != "1"
     
   - name: Install Grid Infrastructure
-    shell: "{{ oracle_stage }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
+    shell: "{{ oracle_stage }}/{{ oracle_install_version }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
     tags:
       - oragridinstall
     when: master_node and checkgiinstall.stdout != "1"

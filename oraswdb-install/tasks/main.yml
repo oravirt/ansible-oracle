@@ -32,48 +32,51 @@
     sudo: yes
     sudo_user: root
     tags:
-      - directories
+      - directoriesdb
 
-  - name: Create stage directory
+  - name: Create stage directory (base)
     file: dest={{ oracle_stage }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
-      - directories
+      - directoriesdb
   
+  - name: Create stage directory (version specific)
+    file: dest={{ oracle_stage }}/{{ item.version }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    with_items: oracle_sw_image_db
+    tags:
+      - directoriesdb
+
   - name: Create rsp stage directory
     file: dest={{ oracle_rsp_stage }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
-      - directories
+      - directoriesdb
 
   - name: Create ORACLE_INVENTORY directory
     file: dest={{ oracle_inventory_loc }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
-      - directories
+      - directoriesdb
   
   - name: Create ORACLE_BASE directory
     file: dest={{ oracle_base }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
-      - directories
+      - directoriesdb
   
   - name: Create ORACLE_HOME directory
     file: dest={{ oracle_home_db }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     with_dict: oracle_databases
     tags:
-      - directories
+      - directoriesdb
 
   - name: Transfer oracle installfiles to server
-    get_url: url={{ oracle_sw_source }}/{{ item }} dest={{ oracle_stage }} mode=755
-    #copy: src={{ oracle_sw_source }}/{{ item }} dest={{ oracle_stage }} mode=755
-    with_items: 
-       - "{{ oracle_sw_image_db }}"
+    get_url: url={{ oracle_sw_source }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
+    #copy: src={{ oracle_sw_source }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
+    with_items: oracle_sw_image_db
     when: master_node
     tags:
       - oradbsw
 
   - name: Extract files to stage-area
-    unarchive: src={{ oracle_stage }}/{{ item }}  dest={{ oracle_stage }} copy=no
-    #shell: unzip {{ oracle_stage }}/{{ item }}  dest={{ oracle_stage }}
-    with_items:
-       - "{{ oracle_sw_image_db }}"
+    unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no 
+    with_items: oracle_sw_image_db
     when: master_node
     tags:
       - oradbswunpack
@@ -86,7 +89,7 @@
       - responsefileswdb
 
   - name: Install Oracle Database Server
-    shell: "{{ oracle_stage }}/database/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
+    shell: "{{ oracle_stage }}/{{ item.value.oracle_version_db }}/database/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
     with_dict: oracle_databases
     when: master_node
     tags:
