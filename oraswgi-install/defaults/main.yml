@@ -1,3 +1,10 @@
 ---
 
   master_node: true
+  oracle_home_gi: "/u01/app/{{ oracle_install_version }}/grid" # ORACLE_HOME for Grid Infrastructure (Clustered)
+  #oracle_home_gi: "{{ oracle_base }}/{{ oracle_install_version }}/grid" # ORACLE_HOME for Grid Infrastructure (Stand Alone)
+  oracle_profile_name_gi: ".profile_grid"    # .profile that sets up the environment for Grid Infrastructure (Cluster or Single node)
+  oracle_grid_responsefile: "grid_{{ oracle_cluster_name }}.rsp"   # Name of responsefile-name used when installing Grid Infrastructure
+  oracle_cluster_name: "{{ hostgroup }}-cl"      # Name of the cluster when setting up Clustered Grid Infrastructure
+  oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
+

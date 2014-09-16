@@ -1,9 +1,8 @@
 ---
 
-  master_node: true
-  oracle_db_responsefile: "{{ oracle_databases[item.0].oracle_db_name}}_{{ ansible_hostname }}.rsp"
+  oracle_dbca_rsp: "dbca_{{ oracle_databases[item.0].oracle_db_name }}.rsp"        # Name of responsefile used by dbca. One per database
   oracle_home_db: "{{ oracle_base }}/{{ item.value.oracle_version_db }}/{{ item.key }}"      # ORACLE_HOME path
   oracle_home_db_install: "{{ oracle_base }}/{{ oracle_databases[item.0].oracle_version_db }}/{{ item.0 }}" # This is only used when installing the db server and creating the databases
   oracle_profile_name: ".profile_{{ item.value.oracle_db_name }}"                            # Name of profile-file. Sets up the environment for that database. One per database
-  oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
+
 
