@@ -90,7 +90,7 @@ SELECTED_LANGUAGES=en
 #-------------------------------------------------------------------------------
 # Specify the complete path of the Oracle Home. 
 #-------------------------------------------------------------------------------
-ORACLE_HOME={{ oracle_home_db }}
+ORACLE_HOME={{ oracle_home_db_install }}
 
 #-------------------------------------------------------------------------------
 # Specify the complete path of the Oracle Base. 
@@ -104,7 +104,7 @@ ORACLE_BASE={{ oracle_base }}
 #   - EE     : Enterprise Edition 
 
 #-------------------------------------------------------------------------------
-oracle.install.db.InstallEdition={{ item.value.oracle_edition }}
+oracle.install.db.InstallEdition={{ oracle_databases[item.0].oracle_edition }}
 
 ###############################################################################
 #                                                                             #
@@ -179,14 +179,14 @@ oracle.install.db.CLUSTER_NODES={% if configure_cluster==True %}{% for host in g
 #
 # If left blank, it will be assumed to be false.
 #------------------------------------------------------------------------------
-oracle.install.db.isRACOneInstall={{ item.value.is_racone }}
+oracle.install.db.isRACOneInstall={{ oracle_databases[item.0].is_racone }}
 
 #------------------------------------------------------------------------------
 # Value is required only if oracle.install.db.isRACOneInstall is true.
 # 
 # Specify the name for RAC One Node Service
 #------------------------------------------------------------------------------
-oracle.install.db.racOneServiceName={{ item.value.service_name }}
+oracle.install.db.racOneServiceName={{ oracle_databases[item.0].service_name }}
 
 #------------------------------------------------------------------------------
 # Value is required only if RAC database type is POLICY_MANAGED
@@ -474,7 +474,7 @@ PROXY_PWD=
 #------------------------------------------------------------------------------
 COLLECTOR_SUPPORTHUB_URL=
 
-{% if item.value.oracle_version_db=='12.1.0.1' %}
+{% if oracle_databases[item.0].oracle_version_db=='12.1.0.1' %}
 # Example    : PROXY_REALM=metalink
 PROXY_REALM=
 #  Example   : AUTOUPDATES_MYORACLESUPPORT_USERNAME=abc@oracle.com
