@@ -83,15 +83,19 @@
 
   - name: Setup response file for install (DB)
     template: src=db-install.rsp.j2 dest={{ oracle_rsp_stage }}/{{ oracle_db_responsefile }}
-    with_dict: oracle_databases
-    when: master_node
+    with_together:
+     - oracle_databases
+     - checkdbswinstall.results
+    when: master_node and item.1.stdout != "1"
     tags:
       - responsefileswdb
 
   - name: Install Oracle Database Server
-    shell: "{{ oracle_stage }}/{{ item.value.oracle_version_db }}/database/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
-    with_dict: oracle_databases
-    when: master_node
+    shell: "{{ oracle_stage }}/{{ oracle_databases[item.0].oracle_version_db }}/database/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
+    with_together:
+     - oracle_databases
+     - checkdbswinstall.results
+    when: master_node and item.1.stdout != "1"
     tags:
       - oradbinstall
     register: oradbinstall
@@ -111,11 +115,15 @@
 #      - runroot
 
   - name: Run root script after installation
-    shell: "{{ oracle_home_db }}/root.sh"
-    with_dict: oracle_databases
+    shell: "{{ oracle_home_db_install }}/root.sh"
     sudo: yes
     sudo_user: root
-    when: master_node
+    with_together:
+     - oracle_databases
+     - checkdbswinstall.results
+    when: master_node and item.1.stdout != "1"
+    #with_dict: oracle_databases
+    #when: master_node
     tags:
       - runroot
 

@@ -1,16 +1,34 @@
 ---
 
+  - name: Check if database is already created
+    shell: grep {{ item.value.oracle_db_name }}:{{ oracle_home_db }} /etc/oratab |wc -l
+    with_dict: oracle_databases
+    tags:
+    - checkifdbexists
+    register: checkdbexist
+
+#  - debug: var=checkdbexist.stdout
+#    with_items: checkdbexist.results
+#    when: master_node
+#    tags:
+#    - checkifdbexists
+
   - name: Create responsefile for dbca
     template: src=dbca-create-db.rsp.j2 dest={{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}  owner={{ oracle_user }} group={{ oracle_group }} mode=644 backup=no
-    with_dict: oracle_databases
-    when: master_node
+    with_together:
+       - oracle_databases
+       - checkdbexist.results
+    when: master_node and item.1.stdout != "1"
     tags: 
-    - dbcaresponse
+    - checkifdbexists
+    #- dbcaresponse
 
   - name: Create database(s)
-    shell: "{{ oracle_home_db }}/bin/dbca -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent"
-    with_dict: oracle_databases
-    when: master_node
+    shell: "{{ oracle_home_db_install }}/bin/dbca -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent"
+    with_together:
+       - oracle_databases
+       - checkdbexist.results
+    when: master_node and item.1.stdout != "1"
     tags:
       - oradbcreate
     register: oradbcreate
