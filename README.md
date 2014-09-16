@@ -4,7 +4,7 @@
 
 - Ansible >= 1.6
 - Oracle Linux (or any RHEL-based Linux System) >= 6.4
-- Oracle Database/Grid Infrastructure 12.1.0.2
+- Oracle Database/Grid Infrastructure 12.1.0.1 & 12.1.0.2
 
 </b>
 
@@ -14,7 +14,6 @@ You can take a freshly installed machine and configure it from ground up. It'll 
 
 <b>Note: </b>
 - You'll need to manually download the Oracle software and make it available to the control-machine (either locally or on a web-server) before running the playbook.
-- Also, parts of the playbooks are not idempotent (yet), meaning it will actually try to perform some of the installations again and they will fail. Will be fixed.
 - All roles are built on Oracle Linux 6, but should work with any Redhat6-based system.
 - Storage options only supports block devices at the moment (FS & ASM). Will add support for NFS
 
@@ -47,7 +46,7 @@ This role configures storage that shoud be used by ASM.
 - Create ASMlib labels on disks
 
 <b>oraswgi-install:</b>
-This role will install and configure Oracle Grid Infrastructure. Tested with 12.1.0.1/12.1.0.2 yet but shouldnt be a problem to configure earlier releases. A few templates will probably be needed though.
+This role will install and configure Oracle Grid Infrastructure. Tested with 12.1.0.1/12.1.0.2
 - Adds a .profile_grid to the oracle user
 - Sets up directory structures
 - Copies the install-files to the servers
@@ -99,7 +98,6 @@ This role will take a previously installed/patched Oracle Database Server instal
 
 
 <b>TODO</b>
-- Add checks to see if stuff is already installed  (GI, DB etc)
 - Add support for creating container databases
 - Add service to database as part of db-creation
 - Add support for NFS storage
