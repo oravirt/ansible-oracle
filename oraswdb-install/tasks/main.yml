@@ -11,7 +11,6 @@
     with_items: checkdbswinstall.results
     when: master_node
     tags:
-    # - oradbinstall
      - checkifdbinstall
 
   - name: Add new dotprofile (DB)
@@ -26,13 +25,6 @@
     sudo_user: root
     tags: 
     - orainst
-
-  - name: Create /u01 directory
-    file: dest=/u01 mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
-    sudo: yes
-    sudo_user: root
-    tags:
-      - directoriesdb
 
   - name: Create stage directory (base)
     file: dest={{ oracle_stage }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
