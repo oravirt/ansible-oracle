@@ -58,11 +58,17 @@
     tags:
       - directoriesdb
 
-  - name: Transfer oracle installfiles to server
-    get_url: url={{ oracle_sw_source }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
-    #copy: src={{ oracle_sw_source }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
+  - name: Transfer oracle installfiles to server (www)
+    get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
     with_items: oracle_sw_image_db
-    when: master_node
+    when: master_node and not is_sw_source_local
+    tags:
+      - oradbsw
+
+  - name: Transfer oracle installfiles to server (local)
+    copy: src={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
+    with_items: oracle_sw_image_db
+    when: master_node and is_sw_source_local
     tags:
       - oradbsw
 

@@ -47,12 +47,19 @@
       - directories
     when: checkgiinstall.stdout != "1"
 
-  - name: Copy oracle installfiles to server (GI)
-    get_url: url={{ oracle_sw_source }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
+  - name: Copy oracle installfiles to server (GI) (web)
+    get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
     with_items:  oracle_sw_image_gi 
     tags:
       - oragridsw
-    when: master_node and checkgiinstall.stdout != "1"
+    when: master_node and checkgiinstall.stdout != "1" and not is_sw_source_local
+
+  - name: Copy oracle installfiles to server (GI) (local)
+    get_url: url={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
+    with_items:  oracle_sw_image_gi 
+    tags:
+      - oragridsw
+    when: master_node and checkgiinstall.stdout != "1" and is_sw_source_local
 
   - name: Extract files to stage-area (GI)
     unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no 
