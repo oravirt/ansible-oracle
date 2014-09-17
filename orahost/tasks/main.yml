@@ -101,16 +101,15 @@
     when: configure_host_disks
     tags: hostfs
 
-  - name: filesystem | Change permissions on directories
-    file: path={{ item.value.mntp }} state=directory owner=oracle group=dba
+  - name: filesystem | Change permission on directories
+    file: path={{ item.value.mntp }} state=directory owner={{ oracle_user }} group={{ oracle_group }}
     with_dict: host_fs_layout
     tags: hostfs
 
 
   - name: Install packages required by Oracle
     yum: name={{ item }} state=installed
-    with_items: 
-      - "{{ oracle_packages }}"
+    with_items: oracle_packages 
 
   - name: Oracle-recommended kernel settings
     sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes ignoreerrors=yes
