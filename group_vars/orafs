@@ -7,53 +7,31 @@
   oracle_group: dba                          # Primary group for oracle_user. 
   oracle_user_id: 600                        # uid for oracle_user
   oracle_group_id: 600                       # gid for oracle_users's primary group
-  oracle_sw_source: http://oladmin/orasw     # www-address to all software if using the get_url module when putting software on the host(s)
-  #oracle_sw_source: /path/to/files/locally  # Path to all software if using the copy module when putting software on the host(s)
+  oracle_sw_source_www: http://oladmin/orasw     # address to all software if using the get_url module when putting software on the host(s)
+  oracle_sw_source_local: /path/to/files/locally  # Path to all software if using the copy module when putting software on the host(s)
+  is_sw_source_local: false                     # (true/false). true -> all software is available on the controlmachine. false -> Available on web-server
   disable_numa_boot: true                    # (true/false) Sets numa=off in grub.conf
   percent_hugepages: 60                      # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages & memlock settings in /etc/security/limits.conf. 
   configure_interconnect: false              # (true/false) Should the Interconnect network be configured by Ansible (setup IP-address. IP-address configurable by variable oracle_ic_net). Only applicable to RAC-installs
   configure_ssh: false                       # (true/false). Should passwordless ssh be configured between clusternodes. Only applicable to RAC-installs
-  configure_host_disks: true                # (true/false). Should the specified directories be on their on devices -> (true), or do they live in the root-filesystem (/) -> (false). Mountpoints are described in host_fs_layout 
+  configure_host_disks: true                # (true/false). Should the specified directories be on their own devices -> (true), or do they live in the root-filesystem (/) -> (false). Mountpoints are described in host_fs_layout 
   configure_cluster: false
   
 ############### Generic Directory Structures ################
   oracle_stage: /u01/stage                    # All software is staged here
-  oracle_psu_stage: /u01/stage/psu            # All psu's are staged here
-  oracle_rsp_stage: /u01/stage/rsp           # All responsefiles are staged here (gi,db,dbca,asmca etc).
+  oracle_psu_stage: "{{ oracle_stage }}/psu"            # All psu's are staged here
+  oracle_rsp_stage: "{{ oracle_stage }}/rsp"           # All responsefiles are staged here (gi,db,dbca,asmca etc).
   oracle_base: /u01/app/oracle                # Oracle Base for installations
   oracle_inventory_loc: /u01/app/oraInventory # Oracle Inventory location
-
-################ Grid Infrastructure specifics ################
-#  oracle_install_option_gi: HA_CONFIG                              # Valid (tested) values are: CRS_CONFIG, HA_CONFIG. Valid (untested) values are: UPGRADE, CRS_SWONLY)
-#  oracle_install_version: 12.1.0.2                                 # Oracle version to be installed. 
-#  oracle_home_gi: "{{ oracle_base }}/{{ oracle_install_version }}/grid"     # ORACLE_HOME for Grid Infrastructure
-#  oracle_profile_name_gi: ".profile_grid"                          # .profile that sets up the environment for Grid Infrastructure (Cluster or Single node)
-#  oracle_cluster_name: ""                            # Name of the cluster when setting up Clustered Grid Infrastructure
-#  oracle_sw_image_gi:                                              # Files containing the installation media for Grid Infrastructure 
-#       - linuxamd64_12102_grid_1of2.zip
-#       - linuxamd64_12102_grid_2of2.zip
-
-#  oracle_home_name_gi: "grid_{{ oracle_install_version }}"         # This parameter is used when cloning Grid Infrastructure
-#  oracle_grid_responsefile: "grid_{{ oracle_cluster_name }}.rsp"   # Name of responsefile-name used when installing Grid Infrastructure
-  oracle_local_node: "{{ ansible_hostname }}"                      # Name of the local node (shortname)  
-  
-  
-################ Input for Grid Infrastructure responsefile ################
-#  oracle_password: Oracle123                                       # Password used for all Grid Infrastructure related resources (e.g ASM)
-#  oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
-#  oracle_scan: orarac-scan.discworld.net                           # Scan address for Clustered Grid Infrastructure
-#  oracle_vip: -vip                                                 # Suffix for the host VIP-addresses (e.g orarac01-vip)
-#  oracle_scan_port: 1521                                           # Listener port for scan-listener
-#  oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
-#  oracle_cluster_mgmdb: true           # Should the Grid Infrastructure Management database be created (only valid in 12.1.0.1)
-#  oracle_asm_crs_diskgroup: crs        # The diskgroup that gets created initially when creating a cluster (contains voting/ocr etc) Also valid when setting up Stand Alone Grid Infrastructure
 
 
 ################ Oracle databases and general config (ORACLE_BASE/HOME etc) ################
   oracle_sw_image_db:                                    # Installation files for the database installations
-       - linuxamd64_12102_database_1of2.zip
-       - linuxamd64_12102_database_2of2.zip
-
+       - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2 }
+       - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2 }
+       #- { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1 }
+       #- { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1 }
+       
   oracle_databases:                                               # Dictionary describing the databases to be installed
         fsdb:                                                     # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
              oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
@@ -68,16 +46,23 @@
              oracle_db_mem_percent: 30                            # Amount of RAM to be used for SGA
              oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
              oracle_version_db: 12.1.0.2                          # Oracle version
+#        testdb:                                                     # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
+#             oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+#             oracle_db_name: testdb                                 # Database name
+#             oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
+#             oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
+#             is_container: "false"                                # (true/false) Is the database a container database
+#             is_racone: "false"                                   # (true/false) Is the database a RAC ONE NODE Database
+#             storage_type: FS                                     # Database storage to be used. ASM or FS. 
+#             service_name: testdb_serv                               # Inital service to be created (not in use yet)
+#             oracle_init_params: "open_cursors=300,processes=700" # Specific parameters to be set during installation. Comma-separated list
+#             oracle_db_mem_percent: 20                            # Amount of RAM to be used for SGA
+#             oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+#             oracle_version_db: 12.1.0.2                          # Oracle version
 
-# The following variables are dependent on the 'oracle_databases' dict
-  oracle_home_db: "{{ oracle_base }}/{{ item.value.oracle_version_db }}/{{ item.key }}"      # ORACLE_HOME path
-  oracle_home_name_db: "{{ item.value.oracle_db_name }}_{{ oracle_clone_version }}"          # ORACLE_HOME name when cloning ORACLE_HOME
-  oracle_profile_name: ".profile_{{ item.value.oracle_db_name }}"                            # Name of profile-file. Sets up the environment for that database. One per database
-  oracle_db_responsefile: "{{ item.value.oracle_db_name}}_{{ oracle_local_node }}.rsp"       # Name of responsefile to be used by runInstaller. One per ORACLE_HOME
 
 ################ Create database info, feeds into dbca responsefile (via oradb-create role) ################
-  oracle_dbca_rsp: "dbca_{{ item.value.oracle_db_name }}.rsp"        # Name of responsefile used by dbca. One per database
-  oracle_dbf_dir_fs: "/u01/oradata/"                                 # If storage_type=FS this is where the database is placed.
+  oracle_dbf_dir_fs: "/u02/oradata/"                                 # If storage_type=FS this is where the database is placed.
   oracle_reco_dir_fs: "/u01/fra/"                                    # If storage_type=FS this is where the fast recovery area is placed.
   oracle_dbf_dir_asm: "+DATA"                                        # If storage_type=ASM this is where the database is placed.
   oracle_reco_dir_asm: "+FRA"                                        # If storage_type=ASM this is where the fast recovery area is placed
@@ -98,17 +83,5 @@
       u02:
         {mntp: /u02, device: /dev/sdc, vgname: vgoradb, pvname: /dev/sdc1, lvname: lvoradb}
 
-#  asm_diskgroups:        # ASM Diskgroups used for DB-storage. Should map to dict asm_storage_layout. 
-#     - crs
-#     - data
-#     - fra
-#
-#  asm_storage_layout:    # Mapping between device & ASMlib label. If storage_type=ASM under oracle_databases, this is where the mapping between device/asm-disk is described
-#   crs:
-#     - {device: /dev/sdc, asmlabel: CRS01}
-#   data:
-#     - {device: /dev/sdd, asmlabel: DATA01}
-#   fra:
-#     - {device: /dev/sde, asmlabel: FRA01}
      
      

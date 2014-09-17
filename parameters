@@ -40,7 +40,7 @@
 ############### Generic Directory Structures ################
   oracle_stage: /u01/stage                    # All software is staged here
   oracle_psu_stage: /u01/stage/psu            # All psu's are staged here
-  oracle_rsp_stage: /u01/stage/rsp           # All responsefiles are staged here (gi,db,dbca,asmca etc). 
+  oracle_rsp_stage: /u01/stage/rsp            # All responsefiles are staged here (gi,db,dbca,asmca etc). 
   oracle_base: /u01/app/oracle                # Oracle Base for installations
   oracle_inventory_loc: /u01/app/oraInventory # Oracle Inventory location
 
@@ -48,17 +48,12 @@
   oracle_install_option_gi: CRS_CONFIG       # Valid (tested) values are: CRS_CONFIG, HA_CONFIG. Valid (untested) values are: UPGRADE, CRS_SWONLY)
   oracle_install_version: 12.1.0.2           # Oracle version to be installed. 
   oracle_home_gi: "/u01/app/{{ oracle_install_version }}/grid" # ORACLE_HOME for Grid Infrastructure
-  oracle_profile_name_gi: ".profile_grid"    # .profile that sets up the environment for Grid Infrastructure (Cluster or Single node)
-  oracle_cluster_nodes: orarac01,orarac02    # Cluster-nodes when setting up Clustered Grid Infrastructure. Eventually this will be populated automatically via inventory
-  oracle_cluster_name: "orarac-cluster"      # Name of the cluster when setting up Clustered Grid Infrastructure
   oracle_sw_image_gi:                        # Files containing the installation media for Grid Infrastructure 
-       - linuxamd64_12102_grid_1of2.zip
-       - linuxamd64_12102_grid_2of2.zip
-
-  oracle_home_name_gi: "grid_{{ oracle_install_version }}"         # This parameter is used when cloning Grid Infrastructure
-  oracle_grid_responsefile: "grid_{{ oracle_cluster_name }}.rsp"   # Name of responsefile-name used when installing Grid Infrastructure
-#  oracle_cluster_nodes: "{% for host in groups['orarac'] %} {{host}} {% if not loop.last %} , {% endif %} {% endfor %}"  # This will populate the clusternodes from the inventory
-  oracle_local_node: "{{ ansible_hostname }}"                      # Name of the local node (shortname)
+       - { filename: linuxamd64_12102_grid_1of2.zip, version: 12.1.0.2 }
+       - { filename: linuxamd64_12102_grid_2of2.zip, version: 12.1.0.2 }
+       #- { filename: linuxamd64_12c_grid_1of2.zip, version: 12.1.0.1 }
+       #- { filename: linuxamd64_12c_grid_2of2.zip, version: 12.1.0.1 }
+       
 
 ################ Input for Grid Infrastructure responsefile ################
   oracle_password: Oracle123                                       # Password used for all Grid Infrastructure related resources (e.g ASM)
@@ -73,9 +68,11 @@
 
 ################ Oracle databases and general config (ORACLE_BASE/HOME etc) ################
  
-  oracle_sw_image_db:                                     # Installation files for the database installations
-       - linuxamd64_12102_database_1of2.zip
-       - linuxamd64_12102_database_2of2.zip
+  oracle_sw_image_db:                                    # Installation files for the database installations
+       - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2 }
+       - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2 }
+       #- { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1 }
+       #- { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1 }
 
   oracle_databases:                                     # Dictionary describing the databases to be installed
         racdb:                                          # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
@@ -104,14 +101,7 @@
              oracle_database_type: MULTIPURPOSE 
              oracle_version_db: 12.1.0.2
 
-# The following variables are dependent on the 'oracle_databases' dict
-  oracle_home_db: "{{ oracle_base }}/{{ item.value.oracle_version_db }}/{{ item.key }}"      # ORACLE_HOME path
-  oracle_home_name_db: "{{ item.value.oracle_db_name }}_{{ oracle_clone_version }}"          # ORACLE_HOME name when cloning ORACLE_HOME
-  oracle_profile_name: ".profile_{{ item.value.oracle_db_name }}"                            # Name of profile-file. Sets up the environment for that database. One per database
-  oracle_db_responsefile: "{{ item.value.oracle_db_name}}_{{ oracle_local_node }}.rsp"       # Name of responsefile to be used by runInstaller. One per ORACLE_HOME
-
 ################ Create database info, feeds into dbca responsefile (via oradb-create role) ################
-  oracle_dbca_rsp: "dbca_{{ item.value.oracle_db_name }}.rsp"        # Name of responsefile used by dbca. One per database
   oracle_dbf_dir_fs: "/u01/oradata/"                                 # If storage_type=FS this is where the database is placed.
   oracle_reco_dir_fs: "/u01/fra/"                                    # If storage_type=FS this is where the fast recovery area is placed.
   oracle_dbf_dir_asm: "+DATA"                                        # If storage_type=ASM this is where the database is placed.
