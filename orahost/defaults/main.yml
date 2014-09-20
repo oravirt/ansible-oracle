@@ -6,7 +6,7 @@
   ol6_repo_file: public-yum-ol6.repo
   repo_dir: /etc/yum.repos.d/
   oracle_user: oracle                        # User that will own the Oracle Installations. No support for separation of duties yet
-  oracle_passwd: "yoursecrethashedpassword"      # Encrypted password for oracle_user
+  oracle_passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0"      # Encrypted password for oracle_user (Oracle123)
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
   oracle_group: dba                          # Primary group for oracle_user. 
   oracle_user_id: 600                        # uid for oracle_user
@@ -15,7 +15,7 @@
   percent_hugepages: 60                      # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages & memlock settings 
   configure_interconnect: true               # (true/false) Should the Interconnect network be configured by Ansible (setup IP-address. IP-address configurable by variable oracle_ic_net). Only applicable to RAC-installs
   configure_ssh: true                        # (true/false). Should passwordless ssh be configured between clusternodes. Only applicable to RAC-installs
-  configure_host_disks: true                 # (true/false). Should the specified directories be on their on devices -> (true), or do they live in the root-filesystem (/) -> (false). 
+  configure_host_disks: false                 # (true/false). Should the specified directories be on their on devices -> (true), or do they live in the root-filesystem (/) -> (false). 
                                              # mountpoints are described in host_fs_layout
                                              
 #  host_fs_layout:    # Sets up filesystem on host. If storage_type=FS under oracle_databases, this is where the mapping between device/fs is described
