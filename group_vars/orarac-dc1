@@ -17,6 +17,7 @@
   configure_host_disks: true                 # (true/false). Should the specified directories be on their on devices -> (true), or do they live in the root-filesystem (/) -> (false). 
                                              # mountpoints are described in host_fs_layout
   configure_cluster: true
+  run_configtoolallcommand: false            # Should ConfigToolAllCommands be run as part of the GI installation
   
 ############### Generic Directory Structures ################
   oracle_stage: /u01/stage                    # All software is staged here
@@ -38,11 +39,10 @@
 
 ################ Input for Grid Infrastructure responsefile ################
   oracle_password: Oracle123                                       # Password used for all Grid Infrastructure related resources (e.g ASM)
-  oracle_scan: orarac-scan.discworld.net                           # Scan address for Clustered Grid Infrastructure
+  oracle_scan: orarac-scan-dc1.discworld.net                           # Scan address for Clustered Grid Infrastructure
   oracle_vip: -vip                                                 # Suffix for the host VIP-addresses (e.g orarac01-vip)
   oracle_scan_port: 1521                                           # Listener port for scan-listener
   oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
-  oracle_cluster_mgmdb: true           # Should the Grid Infrastructure Management database be created 
   oracle_asm_crs_diskgroup: crs        # The diskgroup that gets created initially when creating a cluster (contains voting/ocr etc) Also valid when setting up Stand Alone Grid Infrastructure
 
 
