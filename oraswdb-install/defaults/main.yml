@@ -7,6 +7,13 @@
   oracle_profile_name: ".profile_{{ item.value.oracle_db_name }}"                            # Name of profile-file. Sets up the environment for that database. One per database
   oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
   oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
-  oracle_sw_source_local: /path/to/files/locally  # Path to all software if using the copy module when putting software on the host(s)
+  oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
   is_sw_source_local: true
 
+  oracle_sw_image_db:                                    # Installation files for the database installations                                                                                                                          
+       - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2 }                                                                                                                                                          
+       - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2 }                                                                                                                                                          
+#       - { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1 }                                                                                                                                                           
+#       - { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1 }     
+#       - { filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4 }     
+#       - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4 }     
