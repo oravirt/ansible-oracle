@@ -71,12 +71,13 @@
 
   - name: Setup response file for install (GI)
     template: src=grid-all.rsp.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
+    #template: src=grid_install.rsp.11.2.0.4.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
     tags:
       - responsefilegi
     when: master_node #and checkgiinstall.stdout != "1"
     
   - name: Install Grid Infrastructure
-    shell: "{{ oracle_stage }}/{{ oracle_install_version }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
+    shell: "{{ oracle_stage }}/{{ oracle_install_version_gi }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
     tags:
       - oragridinstall
     when: master_node and checkgiinstall.stdout != "1"

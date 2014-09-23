@@ -7,11 +7,11 @@
     - checkifdbinstall
     register: checkdbswinstall
 
-  - debug: var=checkdbswinstall.stdout
-    with_items: checkdbswinstall.results
-    when: master_node
-    tags:
-     - checkifdbinstall
+#  - debug: var=checkdbswinstall.stdout
+#    with_items: checkdbswinstall.results
+#    when: master_node
+#    tags:
+#     - checkifdbinstall
 
   - name: Add new dotprofile (DB)
     template: src=dotprofile-db.j2 dest={{ oracle_user_home }}/{{oracle_profile_name }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes

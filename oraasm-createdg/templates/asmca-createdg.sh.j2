@@ -8,9 +8,14 @@
       {% endfor %}
        -redundancy external \
        -au_size 4 \
+       {% if oracle_install_version_gi=='11.2.0.4' %}
+       -compatible.asm '11.2.0.0.0' \
+       -compatible.rdbms '11.2.0.0.0' \
+       {% elif oracle_install_version_gi=='12.1.0.2'%}
        -compatible.asm '12.1.0.0.0' \
        -compatible.rdbms '11.2.0.0.0' \
-       {% if oracle_install_version=='12.1.0.1' %}
-       {% else %}
        -compatible.advm '12.1.0.0.0' \
+       {% elif oracle_install_version_gi=='12.1.0.1' %}
+       -compatible.asm '12.1.0.0.0' \
+       -compatible.rdbms '11.2.0.0.0' \
        {% endif %}
