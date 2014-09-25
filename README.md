@@ -1,4 +1,4 @@
-<b>Ansible roles and playbooks to install various Oracle related products.</b>
+
 
 <b> Requirements:
 
@@ -101,5 +101,6 @@ This role will take a previously installed/patched Oracle Database Server instal
 - Add support for creating container databases
 - Add service to database as part of db-creation
 - Add support for NFS storage
+- Add support for installing software from NFS 
 - Cleanup
 - .........
