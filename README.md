@@ -4,7 +4,7 @@
 
 - Ansible >= 1.6
 - Oracle Linux (or any RHEL-based Linux System) >= 6.4
-- Oracle Database/Grid Infrastructure 12.1.0.1 & 12.1.0.2
+- Oracle Database/Grid Infrastructure 12.1.0.1 & 12.1.0.2, 11.2.0.4
 
 </b>
 
@@ -46,7 +46,7 @@ This role configures storage that shoud be used by ASM.
 - Create ASMlib labels on disks
 
 <b>oraswgi-install:</b>
-This role will install and configure Oracle Grid Infrastructure. Tested with 12.1.0.1/12.1.0.2
+This role will install and configure Oracle Grid Infrastructure. Tested with 12.1.0.1/12.1.0.2 & 11.2.0.4
 - Adds a .profile_grid to the oracle user
 - Sets up directory structures
 - Copies the install-files to the servers
@@ -101,6 +101,5 @@ This role will take a previously installed/patched Oracle Database Server instal
 - Add support for creating container databases
 - Add service to database as part of db-creation
 - Add support for NFS storage
-- Add support for other Oracle releases (11.2)
 - Cleanup
 - .........
