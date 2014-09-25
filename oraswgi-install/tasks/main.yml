@@ -23,6 +23,7 @@
   - name: Create stage directory (version specific)
     file: dest={{ oracle_stage }}/{{ item.version }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     with_items: oracle_sw_image_gi
+    when:  oracle_install_version_gi  ==  item.version 
     tags:
       - directories
   
@@ -45,21 +46,22 @@
     file: dest={{ oracle_home_gi }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
       - directories
-    when: checkgiinstall.stdout != "1"
+    when: checkgiinstall.stdout != "1" 
+
 
   - name: Copy oracle installfiles to server (GI) (web)
     get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
     with_items:  oracle_sw_image_gi 
     tags:
       - oragridsw
-    when: master_node and checkgiinstall.stdout != "1" and not is_sw_source_local
+    when: master_node and checkgiinstall.stdout != "1" and not is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}"
 
   - name: Copy oracle installfiles to server (GI) (local)
     get_url: url={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
     with_items:  oracle_sw_image_gi 
     tags:
       - oragridsw
-    when: master_node and checkgiinstall.stdout != "1" and is_sw_source_local
+    when: master_node and checkgiinstall.stdout != "1" and is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}"
 
   - name: Extract files to stage-area (GI)
     unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no 
@@ -67,17 +69,16 @@
     with_items: oracle_sw_image_gi
     tags:
       - oragridswunpack
-    when: master_node 
+    when: master_node and checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}"
 
   - name: Setup response file for install (GI)
-    template: src=grid-all.rsp.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
-    #template: src=grid_install.rsp.11.2.0.4.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
+    template: src=grid-install.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
     tags:
       - responsefilegi
-    when: master_node #and checkgiinstall.stdout != "1"
+    when: master_node and checkgiinstall.stdout != "1"
     
   - name: Install Grid Infrastructure
-    shell: "{{ oracle_stage }}/{{ oracle_install_version_gi }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
+    shell: "{{ oracle_stage }}/{{ oracle_install_version_gi }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -ignoreSysPrereqs -showProgress -silent"
     tags:
       - oragridinstall
     when: master_node and checkgiinstall.stdout != "1"
@@ -110,16 +111,24 @@
     when: not master_node and checkgiinstall.stdout != "1"
 
   - name: Setup response file for configToolAllCommands
-    template: src=configtoolallcommands.rsp.j2 dest={{ oracle_rsp_stage }}/configtoolallcommands.rsp owner={{ oracle_user }} group={{ oracle_group }} mode=600 backup=yes
+    template: src=configtoolallcommands.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/configtoolallcommands.rsp owner={{ oracle_user }} group={{ oracle_group }} mode=600 backup=yes
     tags:
       - responsefileconfigtool
-    when: master_node and run_configtoolallcommand and checkgiinstall.stdout != "1"
+    when: master_node and run_configtoolallcommand  and checkgiinstall.stdout != "1"
 
   - name: Run configToolAllCommands
     shell: "{{ oracle_home_gi }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_rsp_stage }}/configtoolallcommands.rsp"
     tags:
       - runconfigtool
-    when: master_node and run_configtoolallcommand and checkgiinstall.stdout != "1"
+    when: master_node and run_configtoolallcommand and oracle_install_version_gi != '11.2.0.4' and checkgiinstall.stdout != "1"
+    register: configtool
+
+  - name: Run configToolAllCommands (if 11.2.0.4)
+    shell: "{{ oracle_home_gi }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_rsp_stage }}/configtoolallcommands.rsp"
+    tags:
+      - runconfigtool
+    when: master_node and run_configtoolallcommand and oracle_install_version_gi == '11.2.0.4' and checkgiinstall.stdout != "1"
+    ignore_errors: true
     register: configtool
 
   - name: Check if stuff is running

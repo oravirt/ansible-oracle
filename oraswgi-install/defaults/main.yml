@@ -1,6 +1,9 @@
 ---
 
   master_node: true
+  oracle_user: oracle                        # User that will own the Oracle Installations. No support for separation of duties yet
+  oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+  oracle_group: dba                          # Primary group for oracle_user.
   oracle_home_gi: "/u01/app/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Clustered)
   #oracle_home_gi: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Stand Alone)
   oracle_profile_name_gi: ".profile_grid"    # .profile that sets up the environment for Grid Infrastructure (Cluster or Single node)
@@ -17,6 +20,6 @@
   oracle_sw_image_gi:                                              # Files containing the installation media for Grid Infrastructure 
        - { filename: linuxamd64_12102_grid_1of2.zip, version: 12.1.0.2 }
        - { filename: linuxamd64_12102_grid_2of2.zip, version: 12.1.0.2 }
-#       - { filename: linuxamd64_12c_grid_1of2.zip, version: 12.1.0.1 }
-#       - { filename: linuxamd64_12c_grid_2of2.zip, version: 12.1.0.1 }  
-#       - { filename: p13390677_112040_Linux-x86-64_3of7.zip, version: 11.2.0.4 }
+       - { filename: linuxamd64_12c_grid_1of2.zip, version: 12.1.0.1 }
+       - { filename: linuxamd64_12c_grid_2of2.zip, version: 12.1.0.1 }  
+       - { filename: p13390677_112040_Linux-x86-64_3of7.zip, version: 11.2.0.4 }

@@ -1,6 +1,9 @@
 ---
 
   master_node: true
+  oracle_user: oracle                        # User that will own the Oracle Installations. No support for separation of duties yet
+  oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+  oracle_group: dba                          # Primary group for oracle_user.
   oracle_db_responsefile: "{{ oracle_databases[item.0].oracle_db_name}}_{{ ansible_hostname }}.rsp"
   oracle_home_db: "{{ oracle_base }}/{{ item.value.oracle_version_db }}/{{ item.key }}"      # ORACLE_HOME path
   oracle_home_db_install: "{{ oracle_base }}/{{ oracle_databases[item.0].oracle_version_db }}/{{ item.0 }}" # This is only used when installing the db server and creating the databases

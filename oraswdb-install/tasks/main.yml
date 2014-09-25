@@ -61,26 +61,26 @@
   - name: Transfer oracle installfiles to server (www)
     get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
     with_items: oracle_sw_image_db
-    when: master_node and not is_sw_source_local
+    when: master_node and not is_sw_source_local #and {{ item.download }} == True
     tags:
       - oradbsw
 
   - name: Transfer oracle installfiles to server (local)
     copy: src={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
     with_items: oracle_sw_image_db
-    when: master_node and is_sw_source_local
+    when: master_node and is_sw_source_local #and {{ item.download }} == True
     tags:
       - oradbsw
 
   - name: Extract files to stage-area
     unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no 
     with_items: oracle_sw_image_db
-    when: master_node
+    when: master_node #and {{ item.download }} == True
     tags:
       - oradbswunpack
 
   - name: Setup response file for install (DB)
-    template: src=db-install.rsp.j2 dest={{ oracle_rsp_stage }}/{{ oracle_db_responsefile }}
+    template: src=db-install.rsp.{{ oracle_databases[item.0].oracle_version_db }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_db_responsefile }}
     with_together:
      - oracle_databases
      - checkdbswinstall.results
@@ -89,7 +89,7 @@
       - responsefileswdb
 
   - name: Install Oracle Database Server
-    shell: "{{ oracle_stage }}/{{ oracle_databases[item.0].oracle_version_db }}/database/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent"
+    shell: "{{ oracle_stage }}/{{ oracle_databases[item.0].oracle_version_db }}/database/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent -waitforcompletion"
     with_together:
      - oracle_databases
      - checkdbswinstall.results
@@ -100,7 +100,7 @@
 
   - debug: var=oradbinstall.stdout_lines
     with_items: oradbinstall.results
-    when: master_node
+    when: master_node 
     tags:
      - oradbinstall
 
