@@ -19,16 +19,16 @@
     tags: asmca
 
   - name: ASMCA | List ASM diskgroups
-    shell: "{{ oracle_home_gi }}/bin/srvctl status diskgroup -d {{ item }}"
+    shell: "{{ oracle_home_gi }}/bin/srvctl status diskgroup -g {{ item }}"
     with_items: asm_diskgroups
-    when: master_node and oracle_install_Version_gi == '11.2.0.4'
+    when: master_node and oracle_install_version_gi == "11.2.0.4"
     tags: srvctlasm
     register: srvctlasm
 
   - name: ASMCA | List ASM diskgroups
     shell: "{{ oracle_home_gi }}/bin/srvctl status diskgroup -diskgroup {{ item }}"
     with_items: asm_diskgroups
-    when: master_node
+    when: master_node and oracle_install_version_gi != "11.2.0.4"
     tags: srvctlasm
     register: srvctlasm
 
