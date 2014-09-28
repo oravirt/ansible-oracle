@@ -1,0 +1,15 @@
+---
+
+  - name: Delete database(s)
+    shell: "{{ oracle_home_db }}/bin/dbca -deleteDatabase -sourceDB {{ item.value.oracle_db_name }} -sysDBAUserName sys -sysDBAPassword {{ item.value.oracle_db_passwd }} -silent"
+    with_dict: oracle_databases
+    when: master_node and {{ item.value.delete_db }} 
+    tags:
+      - oradbdelete
+    register: oradbdelete
+
+  - debug: var=oraddelete.stdout_lines
+    with_items: oradbdelete.results
+    tags:
+     - oradbdelete
+
