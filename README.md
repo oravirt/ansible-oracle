@@ -8,9 +8,10 @@
 
 </b>
 
-
 At the moment you can install Oracle RAC, RAC One Node and normal single instances.
-You can take a freshly installed machine and configure it from ground up. It'll configure users, profiles, kernel parameters, storage and install the database server and create one or more databases.
+You can take a freshly installed machine and configure it from ground up. It'll conofigure users, profiles, kernel parameters, storage and install the database server and create one or more databases.
+
+By default, you can install a single instance database on filesystem storage, without having to change any parameters.
 
 <b>Note: </b>
 - You'll need to manually download the Oracle software and make it available to the control-machine (either locally or on a web-server) before running the playbook.
@@ -83,6 +84,11 @@ At the moment there is no listener configured when creating a database on a file
 - Generates a responsefile to be used by dbca
 - Creates the db using dbca
 - Changes parameters based on input.
+
+<b>oradb-delete:</b>
+This role deletes the databases, using dbca.
+Note:
+- This is toggled by the variable delete_db (true/false), which is embedded in the 'oracle_databases' dict.
 
 <b>*** THE FOLLOWING ROLES ARE NOT FINISHED/NOT WORKING PROPERLY YET ****</b>
 
