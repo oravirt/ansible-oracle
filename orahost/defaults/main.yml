@@ -11,31 +11,33 @@
   oracle_group: dba                          # Primary group for oracle_user. 
   oracle_user_id: 600                        # uid for oracle_user
   oracle_group_id: 600                       # gid for oracle_users's primary group
-  disable_numa_boot: true                    # (true/false) Sets numa=off in grub.conf
+  disable_numa_boot: false                    # (true/false) Sets numa=off in grub.conf
   percent_hugepages: 60                      # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages & memlock settings 
-  configure_interconnect: true               # (true/false) Should the Interconnect network be configured by Ansible (setup IP-address. IP-address configurable by variable oracle_ic_net). Only applicable to RAC-installs
-  configure_ssh: true                        # (true/false). Should passwordless ssh be configured between clusternodes. Only applicable to RAC-installs
+  configure_interconnect: false               # (true/false) Should the Interconnect network be configured by Ansible (setup IP-address. IP-address configurable by variable oracle_ic_net). Only applicable to RAC-installs
+  configure_ssh: false                        # (true/false). Should passwordless ssh be configured between clusternodes. Only applicable to RAC-installs
   configure_host_disks: false                 # (true/false). Should the specified directories be on their on devices -> (true), or do they live in the root-filesystem (/) -> (false). 
                                              # mountpoints are described in host_fs_layout
+  configure_cluster: false
+  oracle_stage: /u01/stage
+  oracle_rsp_stage: "{{ oracle_stage }}/rsp"
+
                                              
-#  host_fs_layout:    # Sets up filesystem on host. If storage_type=FS under oracle_databases, this is where the mapping between device/fs is described
-#      u01:
-#        {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora}
+  host_fs_layout:    # Sets up filesystem on host. If storage_type=FS under oracle_databases, this is where the mapping between device/fs is described
+      u01:
+        {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora}
 
-#  asm_diskgroups:        # ASM Diskgroups used for DB-storage. Should map to dict asm_storage_layout. 
-#     - crs
-#     - data
-#     - fra
+  asm_diskgroups:        # ASM Diskgroups used for DB-storage. Should map to dict asm_storage_layout. 
+     - crs
+     - data
+     - fra
 
-#  asm_storage_layout:    # Mapping between device & ASMlib label. If storage_type=ASM under oracle_databases, this is where the mapping between device/asm-disk is described
-#   crs:
-#     - {device: /dev/sdc, asmlabel: CRS01}
-#   data:
-#     - {device: /dev/sdd, asmlabel: DATA01}
-#   fra:
-#     - {device: /dev/sde, asmlabel: FRA01
-
-
+  asm_storage_layout:    # Mapping between device & ASMlib label. If storage_type=ASM under oracle_databases, this is where the mapping between device/asm-disk is described
+   crs:
+     - {device: /dev/sdc, asmlabel: CRS01}
+   data:
+     - {device: /dev/sdd, asmlabel: DATA01}
+   fra:
+     - {device: /dev/sde, asmlabel: FRA01 }
 
   oracle_packages:
       - libselinux-python
@@ -54,6 +56,7 @@
       - gcc-c++
       - glibc
       - glibc-devel
+      - glibc-devel.i686
       - libaio
       - libaio-devel
       - libgcc
@@ -97,7 +100,7 @@
   oracle_seclimits:
       - "{{ oracle_user }} soft nproc 2047"
       - "{{ oracle_user }} hard nproc 16384"
-      - "{{ oracle_user }} soft nofile 1024"
+      - "{{ oracle_user }} soft nofile 4096"
       - "{{ oracle_user }} hard nofile 65536"
       - "{{ oracle_user }} soft memlock {{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }} "
       - "{{ oracle_user }} hard hardlock {{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }}"

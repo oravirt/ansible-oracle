@@ -5,13 +5,19 @@
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
   oracle_group: dba                          # Primary group for oracle_user.
   oracle_db_responsefile: "{{ oracle_databases[item.0].oracle_db_name}}_{{ ansible_hostname }}.rsp"
+  oracle_stage: /u01/stage
+  oracle_rsp_stage: "{{ oracle_stage }}/rsp"
+  oracle_inventory_loc: /u01/app/oraInventory
+  oracle_base: /u01/app/oracle
   oracle_home_db: "{{ oracle_base }}/{{ item.value.oracle_version_db }}/{{ item.key }}"      # ORACLE_HOME path
   oracle_home_db_install: "{{ oracle_base }}/{{ oracle_databases[item.0].oracle_version_db }}/{{ item.0 }}" # This is only used when installing the db server and creating the databases
+
   oracle_profile_name: ".profile_{{ item.value.oracle_db_name }}"                            # Name of profile-file. Sets up the environment for that database. One per database
   oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
-  oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
+  oracle_sw_source_www: http://oladmin/orasw     # address to all software if using the get_url module when putting software on the host(s)
   oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
-  is_sw_source_local: true
+  is_sw_source_local: false
+  configure_cluster: false
 
   oracle_sw_image_db:                                    # Installation files for the database installations                                                                                                                          
        - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2 }                                                                                                                                                          
