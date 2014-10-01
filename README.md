@@ -17,6 +17,7 @@ By default, you can install a single instance database on filesystem storage, wi
 - You'll need to manually download the Oracle software and make it available to the control-machine (either locally or on a web-server) before running the playbook.
 - All roles are built on Oracle Linux 6, but should work with any EL6-based system.
 - Storage options only supports block devices at the moment (FS & ASM). Will add support for NFS
+- When using ASM only ASMlib is currently supported. Will add support for udev etc.
 
 <b>The different roles are:</b>
 
@@ -87,7 +88,7 @@ At the moment there is no listener configured when creating a database on a file
 
 <b>oradb-delete:</b>
 This role deletes the databases, using dbca.
-Note:
+
 - This is toggled by the variable delete_db (true/false), which is embedded in the 'oracle_databases' dict.
 
 <b>*** THE FOLLOWING ROLES ARE NOT FINISHED/NOT WORKING PROPERLY YET ****</b>
