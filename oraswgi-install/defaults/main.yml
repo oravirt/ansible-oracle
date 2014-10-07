@@ -1,21 +1,51 @@
 ---
 
   master_node: true
-  oracle_user: oracle                        # User that will own the Oracle Installations. No support for separation of duties yet
+  role_separation: false
+  hostgroup: default
+
+  oracle_user: oracle                        # User that will own the Oracle Installations.
+  grid_user: "{% if role_separation==true %}grid{% else %}oracle{% endif %}" 
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-  oracle_group: dba                          # Primary group for oracle_user.
-  oracle_home_gi: "/u01/app/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Clustered)
-  #oracle_home_gi: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Stand Alone)
-  oracle_profile_name_gi: ".profile_grid"    # .profile that sets up the environment for Grid Infrastructure (Cluster or Single node)
-  oracle_grid_responsefile: "grid_{{ oracle_cluster_name }}.rsp"   # Name of responsefile-name used when installing Grid Infrastructure
-  oracle_cluster_name: "{{ hostgroup }}-cl"      # Name of the cluster when setting up Clustered Grid Infrastructure
-  oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
+  grid_user_home: "/home/{{ grid_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+  oracle_group: oinstall                          # Primary group for oracle_user. 
+  oper_group: oper
+  dba_group: dba                          # Primary group for oracle_user. 
+  asmoper_group: asmoper
+  asmdba_group: asmdba                          # Primary group for oracle_user. 
+  asmadmin_group: asmadmin                          # Primary group for oracle_user. 
+
   oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
   oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
   is_sw_source_local: true
+
+  oracle_password: Oracle123
+  oracle_stage: /u01/stage
+  oracle_base: /u01/app/oracle
+  oracle_rsp_stage: "{{ oracle_stage }}/rsp"
+  oracle_inventory_loc: /u01/app/oraInventory
+  oracle_home_gi: "{% if configure_cluster==True %}{{ oracle_home_gi_cl }}{% else %}{{ oracle_home_gi_so }}{% endif %}"
+  oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Clustered)
+  oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Stand Alone)
+
+  oracle_profile_name_gi: ".profile_grid"    # .profile that sets up the environment for Grid Infrastructure (Cluster or Single node)
+  oracle_grid_responsefile: "grid-{{ oracle_cluster_name }}.rsp"   # Name of responsefile-name used when installing Grid oInfrastructure
+
+  oracle_password: Oracle123                                       # Password used for all Grid Infrastructure related resources (e.g ASM)
+  oracle_scan: your.scan.address                                   # Scan address for Clustered Grid Infrastructure
+  oracle_vip: -vip                                                 # Suffix for the host VIP-addresses (e.g orarac01-vip)
+  oracle_scan_port: 1521                                           # Listener port for scan-listener
+  oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
+  oracle_asm_crs_diskgroup: crs
+
+  oracle_cluster_name: "{{ hostgroup }}-cl"      # Name of the cluster when setting up Clustered Grid Infrastructure
+  oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
+
   run_configtoolallcommand: true
   oracle_cluster_mgmdb: true
+  oracle_install_option_gi: HA_CONFIG
   oracle_install_version_gi: 12.1.0.2
+  configure_cluster: false
 
   oracle_sw_image_gi:                                              # Files containing the installation media for Grid Infrastructure 
        - { filename: linuxamd64_12102_grid_1of2.zip, version: 12.1.0.2 }
@@ -23,3 +53,18 @@
        - { filename: linuxamd64_12c_grid_1of2.zip, version: 12.1.0.1 }
        - { filename: linuxamd64_12c_grid_2of2.zip, version: 12.1.0.1 }  
        - { filename: p13390677_112040_Linux-x86-64_3of7.zip, version: 11.2.0.4 }
+ 
+
+  asm_diskgroups:        # ASM Diskgroups used for DB-storage. Should map to dict asm_storage_layout. 
+     - crs
+     - data
+     - fra
+
+  asm_storage_layout:    # Mapping between device & ASMlib label. If storage_type=ASM under oracle_databases, this is where the mapping between device/asm-disk is described
+   crs:
+     - {device: /dev/sdc, asmlabel: CRS01}
+   data:
+     - {device: /dev/sdd, asmlabel: DATA01}
+   fra:
+     - {device: /dev/sde, asmlabel: FRA01 }
+

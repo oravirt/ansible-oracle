@@ -2,17 +2,34 @@
 ---
 
   - name: User | Add group(s)
-    group: name={{ oracle_group }} gid={{ oracle_group_id }} state=present 
+    group: name={{ item.group }} gid={{ item.gid }} state=present 
+    with_items: oracle_groups
     tags:
      - group
 
   - name: User | Add Oracle user
-    user: name={{ oracle_user }}  group={{ oracle_group }} uid={{ oracle_user_id }} generate_ssh_key=yes append=yes state=present password={{ oracle_passwd }}
+    user: name={{ item.username }}  group={{ item.primgroup }} groups={{ item.othergroups }} uid={{ item.uid }} generate_ssh_key=yes append=yes state=present password={{ item.passwd }}
+    with_items: oracle_users
+    tags:
+     - user
+
+  - name: User | Add Grid user
+    user: name={{ item.username }}  group={{ item.primgroup }} groups={{ item.othergroups }} uid={{ item.uid }} generate_ssh_key=yes append=yes state=present password={{ item.passwd }}
+    when: role_separation
+    with_items: grid_users
     tags:
      - user
 
   - name: User | Add Oracle user to sudoers
-    template: src=sudoers.j2 dest=/etc/sudoers.d/{{ oracle_user }} owner=root mode=0600
+    template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0600
+    with_items: oracle_users
+    tags:
+     - sudoadd
+
+  - name: User | Add Grid user to sudoers
+    template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0600
+    with_items: grid_users
+    when: role_separation
     tags:
      - sudoadd
 
@@ -23,13 +40,21 @@
     tags:
      - sshkeys
 
-  - name: ssh-keys | Add ssh-keys & authorized_keys
-    copy: src=/tmp/{{ item }} dest=/home/oracle/.ssh  owner=oracle group=dba force=yes mode=600
-    when: configure_ssh and configure_cluster
-    with_items:
-        - id_rsa
-        - id_rsa.pub
-        - authorized_keys
+  - name: ssh-keys | Add ssh-keys & authorized_keys to oracle user
+    copy: src={{ item[1] }} dest=/home/{{ item[0].username }}/.ssh  owner={{ item[0].username }} group={{ item[0].primgroup }} force=yes mode=600
+    when: configure_ssh and configure_cluster 
+    with_nested:
+        - oracle_users
+        - ssh_keys
+    tags:
+     - sshkeys
+
+  - name: ssh-keys | Add ssh-keys & authorized_keys to grid user
+    copy: src={{ item[1] }} dest=/home/{{ item[0].username }}/.ssh  owner={{ item[0].username }} group={{ item[0].primgroup }} force=yes mode=600
+    when: configure_ssh and configure_cluster and role_separation 
+    with_nested:
+        - grid_users
+        - ssh_keys
     tags:
      - sshkeys
 
@@ -54,19 +79,25 @@
     tags:
      - sshkeys
 
-  - name: ssh-keys | Copy known_hosts into place
-    copy: src={{keyfile}} dest=/home/{{ oracle_user }}/.ssh/known_hosts owner={{ oracle_user }} group={{ oracle_group }}
+  - name: ssh-keys | Copy known_hosts to oracle user
+    copy: src={{keyfile}} dest=/home/{{ item.username }}/.ssh/known_hosts owner={{ item.username }} group={{ item.primgroup }}
+    with_items: oracle_users
     when: configure_ssh and configure_cluster
     tags:
      - sshkeys
 
+  - name: ssh-keys | Copy known_hosts to grid user
+    copy: src={{keyfile}} dest=/home/{{ item.username }}/.ssh/known_hosts owner={{ item.username }} group={{ item.primgroup }}
+    with_items: grid_users
+    when: configure_ssh and configure_cluster and role_separation
+    tags:
+     - sshkeys
+
   - name: ssh-keys | Remove generated keys from control machine
-    local_action: file  path="/tmp/{{ item }}" state=absent
+    local_action: file  path="{{ item }}" state=absent
     with_items:
-        - id_rsa
-        - id_rsa.pub
-        - authorized_keys
-        - known_hosts
+        - "{{ ssh_keys }}"
+        - "{{ keyfile }}"
     when: master_node and configure_ssh and configure_cluster
     tags:
      - sshkeys
@@ -102,7 +133,7 @@
     tags: hostfs
 
   - name: filesystem | Change permission on directories
-    file: path={{ item.value.mntp }} state=directory owner={{ oracle_user }} group={{ oracle_group }}
+    file: path={{ item.value.mntp }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=775
     with_dict: host_fs_layout
     tags: hostfs
 
@@ -211,8 +242,8 @@
 #      - vnc
 
   - name: Create stage directory
-    file: dest={{ oracle_stage }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    file: dest={{ oracle_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
 
   - name: Create rsp stage directory
-    file: dest={{ oracle_rsp_stage }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    file: dest={{ oracle_rsp_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
 

@@ -14,60 +14,69 @@
 #     - checkifdbinstall
 
   - name: Add new dotprofile (DB)
-    template: src=dotprofile-db.j2 dest={{ oracle_user_home }}/{{oracle_profile_name }} owner={{ oracle_user }} group={{ oracle_group }} mode=755 backup=yes
+    template: src=dotprofile-db.j2 dest={{ oracle_user_home }}/{{oracle_profile_name }} owner={{ oracle_user }} group={{ oracle_group }} mode=775 backup=yes
     with_dict: oracle_databases
     tags: 
     - dotprofiledb
 
   - name: Add oraInst.loc
     template: src=oraInst.loc.j2 dest=/etc/oraInst.loc owner={{ oracle_user }} group={{ oracle_group }} mode=644 backup=yes
-    sudo: yes
-    sudo_user: root
     tags: 
     - orainst
 
   - name: Create stage directory (base)
-    file: dest={{ oracle_stage }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    file: dest={{ oracle_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
       - directoriesdb
   
   - name: Create stage directory (version specific)
-    file: dest={{ oracle_stage }}/{{ item.version }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    file: dest={{ oracle_stage }}/{{ item.version }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     with_items: oracle_sw_image_db
     tags:
       - directoriesdb
 
   - name: Create rsp stage directory
-    file: dest={{ oracle_rsp_stage }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    file: dest={{ oracle_rsp_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
       - directoriesdb
 
-  - name: Create ORACLE_INVENTORY directory
-    file: dest={{ oracle_inventory_loc }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+  - name: Create ORACLE_BASE directory
+    file: dest={{ oracle_base }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
       - directoriesdb
   
-  - name: Create ORACLE_BASE directory
-    file: dest={{ oracle_base }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+  - name: Create cfgtoollogs directory
+    file: dest={{ oracle_base }}/cfgtoollogs mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    sudo: yes
+    tags:
+      - directoriesdb
+  
+  - name: Create admin directory
+    file: dest={{ oracle_base }}/admin mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    sudo: yes
     tags:
       - directoriesdb
   
   - name: Create ORACLE_HOME directory
-    file: dest={{ oracle_home_db }} mode=755 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    file: dest={{ oracle_home_db }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     with_dict: oracle_databases
     tags:
       - directoriesdb
 
   - name: Transfer oracle installfiles to server (www)
-    get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
+    get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
     with_items: oracle_sw_image_db
+    sudo: yes
+    sudo_user: "{{ oracle_user }}"
     when: master_node and not is_sw_source_local #and {{ item.download }} == True
     tags:
       - oradbsw
 
   - name: Transfer oracle installfiles to server (local)
-    copy: src={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=755
+    copy: src={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
     with_items: oracle_sw_image_db
+    sudo: yes
+    sudo_user: "{{ oracle_user }}"
     when: master_node and is_sw_source_local #and {{ item.download }} == True
     tags:
       - oradbsw
@@ -75,6 +84,8 @@
   - name: Extract files to stage-area
     unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no 
     with_items: oracle_sw_image_db
+    sudo: yes
+    sudo_user: "{{ oracle_user }}"
     when: master_node #and {{ item.download }} == True
     tags:
       - oradbswunpack
@@ -84,6 +95,8 @@
     with_together:
      - oracle_databases
      - checkdbswinstall.results
+    sudo: yes
+    sudo_user: "{{ oracle_user }}"
     when: master_node and item.1.stdout != "1"
     tags:
       - responsefileswdb
@@ -93,6 +106,8 @@
     with_together:
      - oracle_databases
      - checkdbswinstall.results
+    sudo: yes
+    sudo_user: "{{ oracle_user }}"
     when: master_node and item.1.stdout != "1"
     tags:
       - oradbinstall
@@ -114,8 +129,6 @@
 
   - name: Run root script after installation
     shell: "{{ oracle_home_db_install }}/root.sh"
-    sudo: yes
-    sudo_user: root
     with_together:
      - oracle_databases
      - checkdbswinstall.results
@@ -128,6 +141,8 @@
   - name: Add additional info to glogin.sql (1)
     lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line='set sqlprompt "_user @ _connect_identifier:>"' backup=yes
     with_dict: oracle_databases
+    sudo: yes
+    sudo_user: "{{ oracle_user }}"
     tags: 
       - glogin
 
@@ -140,6 +155,8 @@
   - name: Check opatch lsinventory (DB)
     shell: "{{ oracle_home_db }}/OPatch/opatch lsinventory"
     with_dict: oracle_databases
+    sudo: yes
+    sudo_user: "{{ oracle_user }}"
     when: master_node
     register: opatchls
     tags:

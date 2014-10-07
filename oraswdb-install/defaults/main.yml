@@ -1,9 +1,19 @@
 ---
 
   master_node: true
-  oracle_user: oracle                        # User that will own the Oracle Installations. No support for separation of duties yet
+
+  oracle_user: oracle                        # User that will own the Oracle Installations.
+  grid_user: "{% if role_separation==true %}grid{% else %}oracle{% endif %}"
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-  oracle_group: dba                          # Primary group for oracle_user.
+  grid_user_home: "/home/{{ grid_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+  oracle_group: oinstall                          # Primary group for oracle_user. 
+  oper_group: oper
+  dba_group: dba                          # Primary group for oracle_user. 
+  asmoper_group: asmoper
+  asmdba_group: asmdba                          # Primary group for oracle_user. 
+  asmadmin_group: asmadmin                          # Primary group for oracle_user. 
+
+
   oracle_db_responsefile: "{{ oracle_databases[item.0].oracle_db_name}}_{{ ansible_hostname }}.rsp"
   oracle_stage: /u01/stage
   oracle_rsp_stage: "{{ oracle_stage }}/rsp"
@@ -19,10 +29,11 @@
   is_sw_source_local: false
   configure_cluster: false
 
-  oracle_sw_image_db:                                    # Installation files for the database installations                                                                                                                          
-       - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2 }                                                                                                                                                          
-       - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2 }                                                                                                                                                          
-#       - { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1 }                                                                                                                                                           
-#       - { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1 }     
-#       - { filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4 }     
-#       - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4 }     
+  oracle_sw_image_db: 
+       - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2 }
+       - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2 }
+#       - { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1 }
+#       - { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1 }
+#       - { filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4 }
+#       - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4 }
+#

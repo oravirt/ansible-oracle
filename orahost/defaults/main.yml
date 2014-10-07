@@ -1,19 +1,52 @@
 ---
   master_node: true
+
+# Users & groups
+
+  oracle_groups:
+    - { group: oinstall, gid: 11000 }
+    - { group: dba, gid: 11001 }
+    - { group: oper, gid: 11002 }
+    - { group: asmadmin, gid: 11003 }
+    - { group: asmdba, gid: 11004 }
+    - { group: asmoper, gid: 11005 }
+    - { group: backupdba, gid: 11006 }
+    - { group: dgdba, gid: 11007 }
+    - { group: kmdba, gid: 11008 }
+
+  oracle_users:         # Passwd :Oracle123
+   - { username: oracle, uid: 11000, primgroup: oinstall, othergroups: "dba,asmdba,backupdba,dgdba,kmdba,oper", passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0" }
+  grid_users:
+   - { username: grid, uid: 11001, primgroup: oinstall, othergroups: "asmadmin,asmdba,asmoper,dba", passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0" }
+
+  role_separation: false
+  oracle_user: oracle                        # User that will own the Oracle Installations.
+  grid_user: "{% if role_separation==true %}grid {% else %}oracle {% endif %}"
+
+  oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+  grid_user_home: "/home/{{ grid_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+  oracle_group: oinstall                          # Primary group for oracle_user. 
+  oper_group: oper
+  dba_group: dba                          # Primary group for oracle_user. 
+  asmoper_group: asmoper
+  asmdba_group: asmdba                          # Primary group for oracle_user. 
+  asmadmin_group: asmadmin                          # Primary group for oracle_user. 
+
+  ssh_keys:
+   - /tmp/id_rsa
+   - /tmp/id_rsa.pub
+   - /tmp/authorized_keys
   keyfile: /tmp/known_hosts
+
   epel_rpm: "http://download.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm"
   asmlib_rpm: "http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.4-1.el6.x86_64.rpm"
   ol6_repo_file: public-yum-ol6.repo
   repo_dir: /etc/yum.repos.d/
-  oracle_user: oracle                        # User that will own the Oracle Installations. No support for separation of duties yet
-  oracle_passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0"      # Encrypted password for oracle_user (Oracle123)
-  oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-  oracle_group: dba                          # Primary group for oracle_user. 
-  oracle_user_id: 600                        # uid for oracle_user
-  oracle_group_id: 600                       # gid for oracle_users's primary group
-  disable_numa_boot: false                    # (true/false) Sets numa=off in grub.conf
-  percent_hugepages: 60                      # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages & memlock settings 
+
+  disable_numa_boot: true                    # (true/false) Sets numa=off in grub.conf
+  percent_hugepages: 50                      # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages & memlock settings 
   configure_interconnect: false               # (true/false) Should the Interconnect network be configured by Ansible (setup IP-address. IP-address configurable by variable oracle_ic_net). Only applicable to RAC-installs
+  oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
   configure_ssh: false                        # (true/false). Should passwordless ssh be configured between clusternodes. Only applicable to RAC-installs
   configure_host_disks: false                 # (true/false). Should the specified directories be on their on devices -> (true), or do they live in the root-filesystem (/) -> (false). 
                                              # mountpoints are described in host_fs_layout
@@ -97,13 +130,20 @@
       - { name: net.core.wmem_max, value: 1048576 }
       - { name: vm.nr_hugepages, value: "{{ (((percent_hugepages/100) * ansible_memtotal_mb)/2)|round|int  }}" }
 
-  oracle_seclimits:
-      - "{{ oracle_user }} soft nproc 2047"
-      - "{{ oracle_user }} hard nproc 16384"
-      - "{{ oracle_user }} soft nofile 4096"
-      - "{{ oracle_user }} hard nofile 65536"
-      - "{{ oracle_user }} soft memlock {{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }} "
-      - "{{ oracle_user }} hard hardlock {{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }}"
+#  oracle_seclimits:
+#      - "{{ oracle_user }} soft nproc 2047"
+#      - "{{ oracle_user }} hard nproc 16384"
+#      - "{{ oracle_user }} soft nofile 4096"
+#      - "{{ oracle_user }} hard nofile 65536"
+#      - "{{ oracle_user }} soft memlock {{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }} "
+#      - "{{ oracle_user }} hard hardlock {{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }}"
 
+  oracle_seclimits:
+      - "* soft nproc 2047"
+      - "* hard nproc 16384"
+      - "* soft nofile 4096"
+      - "* hard nofile 65536"
+      - "* soft memlock {{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }} "
+      - "* hard hardlock {{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }}"
 
 

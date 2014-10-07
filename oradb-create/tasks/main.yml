@@ -23,10 +23,12 @@
     - dbcaresponse
 
   - name: Create database(s)
-    shell: "{{ oracle_home_db_install }}/bin/dbca -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent -redoLogFileSize {{ oracle_databases[item.0].redolog_size_in_mb }} "
+    shell: "time {{ oracle_home_db_install }}/bin/dbca -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent -redoLogFileSize {{ oracle_databases[item.0].redolog_size_in_mb }} "
     with_together:
        - oracle_databases
        - checkdbexist.results
+    sudo: yes
+    sudo_user: "{{ oracle_user }}"
     when: master_node and item.1.stdout != "1"
     tags:
       - oradbcreate
@@ -45,15 +47,15 @@
 #      - oradbcreate
 #    register: oradbcreate
 
-  - name: Check if database is registered
-    shell: "{{ oracle_home_gi }}/bin/srvctl config database "
-    when: oracle_install_option_gi == 'CRS_CONFIG' or oracle_install_option_gi == 'HA_CONFIG'
-    tags:
-      - srvctlconfig
-    register: srvctlconfig
+#  - name: Check if database is registered
+#    shell: "{{ oracle_home_db }}/bin/srvctl config database "
+#    when: oracle_install_option_gi == 'CRS_CONFIG' or oracle_install_option_gi == 'HA_CONFIG'
+#    tags:
+#      - srvctlconfig
+#    register: srvctlconfig
       
 
-  - debug: var=srvctlconfig.stdout_lines
-    when: oracle_install_option_gi == 'CRS_CONFIG' or oracle_install_option_gi == 'HA_CONFIG'
-    tags:
-     - srvctlconfig
+#  - debug: var=srvctlconfig.stdout_lines
+#    when: oracle_install_option_gi == 'CRS_CONFIG' or oracle_install_option_gi == 'HA_CONFIG'
+#    tags:
+#     - srvctlconfig

@@ -28,8 +28,9 @@
   oracle_group: dba                          # Primary group for oracle_user. 
   oracle_user_id: 600                        # uid for oracle_user
   oracle_group_id: 600                       # gid for oracle_users's primary group
-  oracle_sw_source: http://webserver/orasw   # www-address to all software if using the get_url module when putting software on the host(s)
-  #oracle_sw_source: /path/to/files/locally  # Path to all software if using the copy module when putting software on the host(s)
+  oracle_sw_source_www: http://webserver/orasw   # www-address to all software if using the get_url module when putting software on the host(s)
+  oracle_sw_source_local: /tmp               # Path to all software if using the copy module when putting software on the host(s)
+  is_sw_source_local: true                     # (true/false). true -> all software is available on the controlmachine. false -> Available on web-server
   disable_numa_boot: true                    # (true/false) Sets numa=off in grub.conf
   percent_hugepages: 60                      # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages & memlock settings in /etc/security/limits.conf. 
   configure_interconnect: true               # (true/false) Should the Interconnect network be configured by Ansible (setup IP-address. IP-address configurable by variable oracle_ic_net). Only applicable to RAC-installs
@@ -39,8 +40,8 @@
 
 ############### Generic Directory Structures ################
   oracle_stage: /u01/stage                    # All software is staged here
-  oracle_psu_stage: /u01/stage/psu            # All psu's are staged here
-  oracle_rsp_stage: /u01/stage/rsp            # All responsefiles are staged here (gi,db,dbca,asmca etc). 
+  oracle_psu_stage: {{ oracle_stage }}/psu            # All psu's are staged here
+  oracle_rsp_stage: {{ oracle_stage }}/rsp            # All responsefiles are staged here (gi,db,dbca,asmca etc). 
   oracle_base: /u01/app/oracle                # Oracle Base for installations
   oracle_inventory_loc: /u01/app/oraInventory # Oracle Inventory location
 
@@ -51,28 +52,25 @@
   oracle_sw_image_gi:                        # Files containing the installation media for Grid Infrastructure 
        - { filename: linuxamd64_12102_grid_1of2.zip, version: 12.1.0.2 }
        - { filename: linuxamd64_12102_grid_2of2.zip, version: 12.1.0.2 }
-       #- { filename: linuxamd64_12c_grid_1of2.zip, version: 12.1.0.1 }
-       #- { filename: linuxamd64_12c_grid_2of2.zip, version: 12.1.0.1 }
+       - { filename: linuxamd64_12c_grid_1of2.zip, version: 12.1.0.1 }
+       - { filename: linuxamd64_12c_grid_2of2.zip, version: 12.1.0.1 }
        
 
 ################ Input for Grid Infrastructure responsefile ################
   oracle_password: Oracle123                                       # Password used for all Grid Infrastructure related resources (e.g ASM)
-  oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
   oracle_scan: orarac-scan.discworld.net                           # Scan address for Clustered Grid Infrastructure
   oracle_vip: -vip                                                 # Suffix for the host VIP-addresses (e.g orarac01-vip)
   oracle_scan_port: 1521                                           # Listener port for scan-listener
   oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
-  oracle_cluster_mgmdb: true           # Should the Grid Infrastructure Management database be created 
   oracle_asm_crs_diskgroup: crs        # The diskgroup that gets created initially when creating a cluster (contains voting/ocr etc) Also valid when setting up Stand Alone Grid Infrastructure
-
 
 ################ Oracle databases and general config (ORACLE_BASE/HOME etc) ################
  
   oracle_sw_image_db:                                    # Installation files for the database installations
        - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2 }
        - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2 }
-       #- { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1 }
-       #- { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1 }
+       - { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1 }
+       - { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1 }
 
   oracle_databases:                                     # Dictionary describing the databases to be installed
         racdb:                                          # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
@@ -99,13 +97,13 @@
              oracle_init_params: "open_cursors=1000,processes=400"
              oracle_db_mem_percent: 20
              oracle_database_type: MULTIPURPOSE 
-             oracle_version_db: 12.1.0.2
+             oracle_version_db: 12.1.0.1
 
 ################ Create database info, feeds into dbca responsefile (via oradb-create role) ################
   oracle_dbf_dir_fs: "/u01/oradata/"                                 # If storage_type=FS this is where the database is placed.
   oracle_reco_dir_fs: "/u01/fra/"                                    # If storage_type=FS this is where the fast recovery area is placed.
-  oracle_dbf_dir_asm: "+DATA"                                        # If storage_type=ASM this is where the database is placed.
-  oracle_reco_dir_asm: "+FRA"                                        # If storage_type=ASM this is where the fast recovery area is placed
+  oracle_dbf_dir_asm: "DATA"                                        # If storage_type=ASM this is where the database is placed.
+  oracle_reco_dir_asm: "FRA"                                        # If storage_type=ASM this is where the fast recovery area is placed
 
 ################ Psu Information ################
 #  oracle_psu_apply_db: false

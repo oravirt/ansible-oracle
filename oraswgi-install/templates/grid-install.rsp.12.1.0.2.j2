@@ -34,35 +34,57 @@ ORACLE_HOME={{ oracle_home_gi }}
 #-------------------------------------------------------------------------------
 # The DBA_GROUP is the OS group which is to be granted OSDBA privileges.
 #-------------------------------------------------------------------------------
-oracle.install.asm.OSDBA={{ oracle_group }}
+
+{% if role_separation==True %}
+
+oracle.install.asm.OSDBA={{ asmdba_group }}
+
+##-------------------------------------------------------------------------------
+## The OPER_GROUP is the OS group which is to be granted OSOPER privileges.
+## The value to be specified for OSOPER group is optional.
+##-------------------------------------------------------------------------------
+oracle.install.asm.OSOPER={{ asmoper_group }}
+#
+##-------------------------------------------------------------------------------
+## The OSASM_GROUP is the OS group which is to be granted OSASM privileges. This
+## must be different than the previous two.
+##-------------------------------------------------------------------------------
+oracle.install.asm.OSASM={{ asmadmin_group }}
+
+   {% else %}
+
+oracle.install.asm.OSDBA={{ dba_group }}
 
 #-------------------------------------------------------------------------------
-# The OPER_GROUP is the OS group which is to be granted OSOPER privileges.
-# The value to be specified for OSOPER group is optional.
-#-------------------------------------------------------------------------------
-oracle.install.asm.OSOPER=
+## The OPER_GROUP is the OS group which is to be granted OSOPER privileges.
+## The value to be specified for OSOPER group is optional.
+##-------------------------------------------------------------------------------
+oracle.install.asm.OSOPER={{ oper_group }}
 
-#-------------------------------------------------------------------------------
+ ##-------------------------------------------------------------------------------
 # The OSASM_GROUP is the OS group which is to be granted OSASM privileges. This
 # must be different than the previous two.
 #-------------------------------------------------------------------------------
-oracle.install.asm.OSASM={{ oracle_group }}
+oracle.install.asm.OSASM={{ dba_group }}
 
+{% endif %}
+   
 ################################################################################
 #                                                                              #
 #                           SECTION C - SCAN                                   #
 #                                                                              #
 ################################################################################
+
+
 #-------------------------------------------------------------------------------
 # Specify a name for SCAN
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.gpnp.scanName={{ oracle_scan }}
+oracle.install.crs.config.gpnp.scanName={% if configure_cluster==True %}{{ oracle_scan }}{% else %}{% endif %}
 
 #-------------------------------------------------------------------------------
 # Specify a unused port number for SCAN service
 #-------------------------------------------------------------------------------
-
-oracle.install.crs.config.gpnp.scanPort={{ oracle_scan_port }}
+oracle.install.crs.config.gpnp.scanPort={% if configure_cluster==True %}{{ oracle_scan_port }}{% else %}{% endif %}
 
 ################################################################################
 #                                                                              #
@@ -83,7 +105,7 @@ oracle.install.crs.config.ClusterType=STANDARD
 # any combination of lower and uppercase alphabets (A - Z), (0 - 9), hyphen(-)
 # and underscore(_).
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.clusterName={{ oracle_cluster_name }}
+oracle.install.crs.config.clusterName={% if configure_cluster==True %}{{ oracle_cluster_name }}{% else %}{% endif %}
 
 #-------------------------------------------------------------------------------
 # Specify 'true' if you would like to configure Grid Naming Service(GNS), else
