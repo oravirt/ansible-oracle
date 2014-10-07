@@ -10,8 +10,11 @@
 
 At the moment you can install Oracle RAC, RAC One Node and normal single instances.
 You can take a freshly installed machine and configure it from ground up. It'll conofigure users, profiles, kernel parameters, storage and install the database server and create one or more databases.
+It also supports role separation when installing Grid Infrastructure, meaning a 'grid' user owns and runs the GI and the 'oracle' user owns and runs the databases.
 
 By default, you can install a single instance database on filesystem storage, without having to change any parameters.
+
+I'm creating a bunch of examples on http://oravirt.wordpress.com which illustrates how to use/run the different roles.
 
 <b>Note: </b>
 - You'll need to manually download the Oracle software and make it available to the control-machine (either locally or on a web-server) before running the playbook.
