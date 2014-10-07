@@ -3,7 +3,7 @@
   - name: ASMCA | Create script to build asm-diskgroups
     template: src=asmca-createdg.sh.j2 dest="{{ oracle_rsp_stage }}/asmca-createdg-{{ item }}.sh"  owner="{{ grid_user }}" group={{ oracle_group }} mode=744 backup=yes
     with_items: asm_diskgroups
-    when: master_node
+    when: master_node and item != oracle_asm_crs_diskgroup
     tags: asmca
 
   - name: ASMCA | Create ASM diskgroups
@@ -11,7 +11,7 @@
     with_items: asm_diskgroups
     sudo: yes
     sudo_user: "{{ grid_user }}"
-    when: master_node
+    when: master_node and item != oracle_asm_crs_diskgroup
     ignore_errors: True
     tags: asmca
     register: asmca
