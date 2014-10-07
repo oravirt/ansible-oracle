@@ -9,7 +9,7 @@
 </b>
 
 At the moment you can install Oracle RAC, RAC One Node and normal single instances.
-You can take a freshly installed machine and configure it from ground up. It'll conofigure users, profiles, kernel parameters, storage and install the database server and create one or more databases.
+You can take a freshly installed machine and configure it from ground up. It'll configure users, profiles, kernel parameters, storage and install the database server and create one or more databases.
 It also supports role separation when installing Grid Infrastructure, meaning a 'grid' user owns and runs the GI and the 'oracle' user owns and runs the databases.
 
 By default, you can install a single instance database on filesystem storage, without having to change any parameters.
