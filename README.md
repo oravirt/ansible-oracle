@@ -82,7 +82,7 @@ This role will install the oracle database server(s). If there will be more than
 - Installs the database-server(s)
 
 <b>oradb-create:</b>
-This role creates the databases (RAC/RAC One Node, Single Instance). Performs a dbca silent run to create the database.
+This role creates the databases (RAC/RAC One Node, Single Instance). Possible to create container databases. Performs a dbca silent run to create the database.
 Note:
 At the moment there is no listener configured when creating a database on a filesystem (i.e no grid infrastructure present). Will be added later though.
 - Generates a responsefile to be used by dbca
@@ -108,7 +108,6 @@ This role will take a previously installed/patched Oracle Database Server instal
 
 
 <b>TODO</b>
-- Add support for creating container databases
 - Add service to database as part of db-creation
 - Add support for NFS storage
 - Add support for installing software from NFS 
