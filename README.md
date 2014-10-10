@@ -54,7 +54,7 @@ This role configures storage that shoud be used by ASM.
 This role will install and configure Oracle Grid Infrastructure. Tested with 12.1.0.1/12.1.0.2 & 11.2.0.4
 - Adds a .profile_grid to the oracle user
 - Sets up directory structures
-- Copies the install-files to the servers
+- Copies the install-files to the servers, or installs from a remote location (e.g nfs share)
 - Install Oracle Grid Infrastructure
 
 <b>oralsnr:</b>
@@ -110,6 +110,29 @@ This role will take a previously installed/patched Oracle Database Server instal
 <b>TODO</b>
 - Add service to database as part of db-creation
 - Add support for NFS storage
-- Add support for installing software from NFS 
 - Cleanup
 - .........
+
+********************************
+<b>Changelog (bigger changes)</b>
+
+2014-10-10
+- Added 'oracle_gi_nic_pub|priv' and removed hardcoded nic's in grid-install template. Now possible to define which interface does what
+- Added support for installation from remote location (e.g nfs share)
+- Changed parameter name oracle_asm_crs_diskgroup to oracle_asm_init_dg
+
+2014-10-09
+- Added support for Container Databases
+
+
+2014-10-09
+- Added support for GI role separation
+
+
+2014-09-28
+- New role: oradb-delete, and parameters to support that role
+
+2014-09-25
+- Added support for 11.2.0.4
+
+
