@@ -181,7 +181,7 @@ oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for ho
 # For example: eth0:140.87.24.0:1,eth1:10.2.1.0:2,eth2:140.87.52.0:3
 #
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.networkInterfaceList={% if configure_cluster==True %}eth0:{{ ansible_eth0.ipv4.network }}:1,eth1:{{ ansible_eth1.ipv4.network }}:5{% else %}{% endif %}
+oracle.install.crs.config.networkInterfaceList={% if configure_cluster==True %}{{ oracle_gi_nic_pub }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_pub].ipv4.network }}:1,{{ oracle_gi_nic_priv }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_priv].ipv4.network }}:5{% else %}{% endif %}
 
 #-------------------------------------------------------------------------------
 # Specify 'true' if you would like to configure Management Database Option, else
