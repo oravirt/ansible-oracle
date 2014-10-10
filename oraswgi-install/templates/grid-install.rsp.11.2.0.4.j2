@@ -332,7 +332,7 @@ oracle.install.asm.SYSASMPassword={{ oracle_password }}
 # Example: oracle.install.asm.diskGroup.name=data
 #
 #-------------------------------------------------------------------------------
-oracle.install.asm.diskGroup.name={{ oracle_asm_crs_diskgroup }}
+oracle.install.asm.diskGroup.name={{ oracle_asm_init_dg }}
 
 #-------------------------------------------------------------------------------
 # Redundancy level to be used by ASM.
@@ -371,7 +371,7 @@ oracle.install.asm.diskGroup.AUSize=1
 #     oracle.install.asm.diskGroup.disks=\\.\ORCLDISKDATA0,\\.\ORCLDISKDATA1
 #
 #-------------------------------------------------------------------------------
-oracle.install.asm.diskGroup.disks={% for disk in  asm_storage_layout[oracle_asm_crs_diskgroup]    -%}  ORCL:{{ disk.asmlabel }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %}
+oracle.install.asm.diskGroup.disks={% for disk in  asm_storage_layout[oracle_asm_init_dg]    -%}  ORCL:{{ disk.asmlabel }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 
 #-------------------------------------------------------------------------------
 # The disk discovery string to be used to discover the disks used create a ASM DiskGroup

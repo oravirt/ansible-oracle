@@ -3,7 +3,7 @@
   - name: ASMCA | Create script to build asm-diskgroups
     template: src=asmca-createdg.sh.j2 dest="{{ oracle_rsp_stage }}/asmca-createdg-{{ item }}.sh"  owner="{{ grid_user }}" group={{ oracle_group }} mode=744 backup=yes
     with_items: asm_diskgroups
-    when: master_node and item != oracle_asm_crs_diskgroup
+    when: master_node and item != oracle_asm_init_dg
     tags: asmca
 
   - name: ASMCA | Create ASM diskgroups
@@ -11,16 +11,17 @@
     with_items: asm_diskgroups
     sudo: yes
     sudo_user: "{{ grid_user }}"
-    when: master_node and item != oracle_asm_crs_diskgroup
+    when: master_node and item != oracle_asm_init_dg
     ignore_errors: True
     tags: asmca
     register: asmca
 
-  - debug: var=asmca.stdout_lines
+  - name: Print Results
+    debug: var=asmca.stdout_lines
     with_items: asmca.results
     tags: asmca
 
-  - name: ASMCA | List ASM diskgroups
+  - name: ASMCA | List ASM diskgroups (11.2)
     shell: "{{ oracle_home_gi }}/bin/srvctl status diskgroup -g {{ item }}"
     with_items: asm_diskgroups
     sudo: yes
@@ -29,7 +30,7 @@
     tags: srvctlasm
     register: srvctlasm
 
-  - name: ASMCA | List ASM diskgroups
+  - name: ASMCA | List ASM diskgroups (12.1)
     shell: "{{ oracle_home_gi }}/bin/srvctl status diskgroup -diskgroup {{ item }}"
     with_items: asm_diskgroups
     sudo: yes
@@ -39,6 +40,7 @@
     register: srvctlasm
 
 
-  - debug: var=srvctlasm.stdout_lines
+  - name: list diskgroups
+    debug: var=srvctlasm.stdout_lines
     with_items: srvctlasm.results
     tags: srvctlasm
