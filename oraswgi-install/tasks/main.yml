@@ -68,7 +68,7 @@
     sudo_user: "{{ grid_user }}"
     tags:
       - oragridsw
-    when: master_node and checkgiinstall.stdout != "1" and not is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}"
+    when: master_node and checkgiinstall.stdout != "1" and not is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy
 
   - name: Copy oracle installfiles to server (GI) (local)
     get_url: url={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
@@ -77,17 +77,26 @@
     sudo_user: "{{ grid_user }}"
     tags:
       - oragridsw
-    when: master_node and checkgiinstall.stdout != "1" and is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}"
+    when: master_node and checkgiinstall.stdout != "1" and is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy
 
   - name: Extract files to stage-area (GI)
     unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no 
-    #shell: unzip {{ oracle_stage }}/{{ item }}  dest={{ oracle_stage }}
     with_items: oracle_sw_image_gi
     sudo: yes
     sudo_user: "{{ grid_user }}"
     tags:
       - oragridswunpack
-    when: master_node and checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}"
+    when: master_node and checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy and oracle_sw_unarchive
+
+  - name: Extract files to stage-area (GI) (from remote location)
+    unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no
+    with_items: oracle_sw_image_gi
+    sudo: yes
+    sudo_user: "{{ grid_user }}"
+    tags:
+    - oragridswunpack
+    when: master_node and checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy and oracle_sw_unarchive
+    
 
   - name: Setup response file for install (GI)
     template: src=grid-install.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner="{{ grid_user }}" group={{ oracle_group }} mode=775 backup=yes
@@ -96,13 +105,22 @@
     when: master_node and checkgiinstall.stdout != "1"
     
   - name: Install Grid Infrastructure
-    shell: "{{ oracle_stage }}/{{ oracle_install_version_gi }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -ignoreSysPrereqs -showProgress -silent"
+    shell: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -ignoreSysPrereqs -showProgress -silent"
     sudo: yes
     sudo_user: "{{ grid_user }}"
     tags:
       - oragridinstall
-    when: master_node and checkgiinstall.stdout != "1"
+    when: master_node and checkgiinstall.stdout != "1" #and oracle_sw_unarchive
     register: giinstall
+
+#  - name: Install Grid Infrastructure
+#    shell: "{{ oracle_stage }}/{{ oracle_install_version_gi }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -ignoreSysPrereqs -showProgress -silent"
+#    sudo: yes
+#    sudo_user: "{{ grid_user }}"
+#    tags:
+#      - oragridinstall
+#    when: master_node and checkgiinstall.stdout != "1" not and oracle_sw_unarchive
+#    register: giinstall
 
   - debug: var=giinstall.stdout_lines
     when: master_node and checkgiinstall.stdout != "1"

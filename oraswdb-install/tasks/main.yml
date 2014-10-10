@@ -68,7 +68,7 @@
     with_items: oracle_sw_image_db
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and not is_sw_source_local #and {{ item.download }} == True
+    when: master_node and not is_sw_source_local and oracle_sw_copy #and {{ item.download }} == True
     tags:
       - oradbsw
 
@@ -77,7 +77,7 @@
     with_items: oracle_sw_image_db
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and is_sw_source_local #and {{ item.download }} == True
+    when: master_node and is_sw_source_local and oracle_sw_copy #and {{ item.download }} == True
     tags:
       - oradbsw
 
@@ -86,9 +86,19 @@
     with_items: oracle_sw_image_db
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node #and {{ item.download }} == True
+    when: master_node and oracle_sw_copy and oracle_sw_unarchive #and {{ item.download }} == True
     tags:
       - oradbswunpack
+
+  - name: Extract files to stage-area (from remote location)
+    unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no
+    with_items: oracle_sw_image_db
+    sudo: yes
+    sudo_user: "{{ oracle_user }}"
+    when: master_node and not oracle_sw_copy and oracle_sw_unarchive #and {{ item.download }} == True
+    tags:
+      - oradbswunpack
+
 
   - name: Setup response file for install (DB)
     template: src=db-install.rsp.{{ oracle_databases[item.0].oracle_version_db }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_db_responsefile }}
@@ -102,16 +112,17 @@
       - responsefileswdb
 
   - name: Install Oracle Database Server
-    shell: "{{ oracle_stage }}/{{ oracle_databases[item.0].oracle_version_db }}/database/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent -waitforcompletion"
+    shell: "{{ oracle_stage_install }}/{{ oracle_databases[item.0].oracle_version_db }}/database/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent -waitforcompletion"
     with_together:
      - oracle_databases
      - checkdbswinstall.results
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and item.1.stdout != "1"
+    when: master_node and item.1.stdout != "1" #and oracle_sw_unarchive 
     tags:
       - oradbinstall
     register: oradbinstall
+
 
   - debug: var=oradbinstall.stdout_lines
     with_items: oradbinstall.results

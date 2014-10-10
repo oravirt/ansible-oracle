@@ -18,9 +18,14 @@
   oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
   oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
   is_sw_source_local: true
+  oracle_sw_copy: true
+  oracle_sw_unarchive: true
+  
 
   oracle_password: Oracle123
   oracle_stage: /u01/stage
+  oracle_stage_remote: "{{ oracle_stage }}"
+  oracle_stage_install: "{% if oracle_sw_copy==false and oracle_sw_unarchive==false%}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
   oracle_base: /u01/app/oracle
   oracle_rsp_stage: "{{ oracle_stage }}/rsp"
   oracle_inventory_loc: /u01/app/oraInventory
@@ -36,7 +41,7 @@
   oracle_vip: -vip                                                 # Suffix for the host VIP-addresses (e.g orarac01-vip)
   oracle_scan_port: 1521                                           # Listener port for scan-listener
   oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
-  oracle_asm_crs_diskgroup: crs
+  oracle_asm_init_dg: crs
 
   oracle_cluster_name: "{{ hostgroup }}-cl"      # Name of the cluster when setting up Clustered Grid Infrastructure
   oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
