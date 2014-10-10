@@ -125,7 +125,7 @@ This role will take a previously installed/patched Oracle Database Server instal
 - Added support for Container Databases
 
 
-2014-10-09
+2014-10-07
 - Added support for GI role separation
 
 
