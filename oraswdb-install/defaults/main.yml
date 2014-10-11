@@ -13,13 +13,15 @@
   asmdba_group: asmdba                          # Primary group for oracle_user. 
   asmadmin_group: asmadmin                          # Primary group for oracle_user. 
 
-
-  oracle_sw_copy: true
-  oracle_sw_unpack: true
+  install_from_nfs: false
+  nfs_server_sw: nfsserver
+  nfs_server_sw_path: /path/to/orasw
+  oracle_sw_copy: "{% if install_from_nfs==true %}false{% else %}true{% endif %}"
+  oracle_sw_unpack: "{% if install_from_nfs==true %}false{% else %}true{% endif %}"
   oracle_db_responsefile: "{{ oracle_databases[item.0].oracle_db_name}}_{{ ansible_hostname }}.rsp"
   oracle_stage: /u01/stage
   oracle_stage_remote: "{{ oracle_stage }}"
-  oracle_stage_install: "{% if oracle_sw_copy==false and oracle_sw_unpack==false%}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
+  oracle_stage_install: "{% if oracle_sw_copy=='false' and oracle_sw_unpack=='false'%}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
   oracle_rsp_stage: "{{ oracle_stage }}/rsp"
   oracle_inventory_loc: /u01/app/oraInventory
   oracle_base: /u01/app/oracle

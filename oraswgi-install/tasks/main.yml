@@ -6,9 +6,16 @@
     - checkifgiinstall
     register: checkgiinstall
 
-#  - debug: var=checkgiinstall.stdout
+#  - name: debug
+#    debug: msg="nfs; {{ install_from_nfs }},  copy; {{ oracle_sw_copy }}; unpack; {{ oracle_sw_unpack }}, install_stage; {{ oracle_stage_install }}"
 #    tags:
-#     - checkifgiinstall
+#       - debug
+
+  - name: Mount nfs share with installation media
+    mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=mounted
+    tags:
+      - nfsmountgi
+    when: not oracle_sw_copy|bool and not oracle_sw_unpack|bool
 
   - name: Add new dotprofile (GI)
     template: src=dotprofile-gi.j2 dest={{ grid_user_home }}/{{ oracle_profile_name_gi }} owner={{ grid_user }} group={{ oracle_group }} mode=755 backup=yes
@@ -68,7 +75,7 @@
     sudo_user: "{{ grid_user }}"
     tags:
       - oragridsw
-    when: master_node and checkgiinstall.stdout != "1" and not is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy
+    when: master_node and checkgiinstall.stdout != "1" and not is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool
 
   - name: Copy oracle installfiles to server (GI) (local)
     get_url: url={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
@@ -77,7 +84,7 @@
     sudo_user: "{{ grid_user }}"
     tags:
       - oragridsw
-    when: master_node and checkgiinstall.stdout != "1" and is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy
+    when: master_node and checkgiinstall.stdout != "1" and is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool
 
   - name: Extract files to stage-area (GI)
     unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no 
@@ -86,7 +93,7 @@
     sudo_user: "{{ grid_user }}"
     tags:
       - oragridswunpack
-    when: master_node and checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy and oracle_sw_unpack
+    when: master_node and checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool and oracle_sw_unpack|bool
 
   - name: Extract files to stage-area (GI) (from remote location)
     unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no
@@ -95,7 +102,7 @@
     sudo_user: "{{ grid_user }}"
     tags:
     - oragridswunpack
-    when: master_node and checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy and oracle_sw_unpack
+    when: master_node and checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy|bool and oracle_sw_unpack|bool
     
 
   - name: Setup response file for install (GI)
@@ -222,3 +229,10 @@
     tags:
      - opatchls
     when: checkgiinstall.stdout != "1"
+
+  - name: Unmount nfs share with installation media
+    mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=unmounted
+    tags:
+      - nfsunmount
+    when: not oracle_sw_copy|bool and not oracle_sw_unpack|bool
+    tags: nfsunmountgi

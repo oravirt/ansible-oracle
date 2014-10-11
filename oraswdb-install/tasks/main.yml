@@ -7,6 +7,13 @@
     - checkifdbinstall
     register: checkdbswinstall
 
+  - name: Mount nfs share with installation media
+    mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=mounted
+    when: not oracle_sw_copy|bool and not oracle_sw_unpack|bool
+    tags:
+      - nfsmountdb
+
+
 #  - debug: var=checkdbswinstall.stdout
 #    with_items: checkdbswinstall.results
 #    when: master_node
@@ -68,7 +75,7 @@
     with_items: oracle_sw_image_db
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and not is_sw_source_local and oracle_sw_copy #and {{ item.download }} == True
+    when: master_node and not is_sw_source_local and oracle_sw_copy|bool #and {{ item.download }} == True
     tags:
       - oradbsw
 
@@ -77,7 +84,7 @@
     with_items: oracle_sw_image_db
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and is_sw_source_local and oracle_sw_copy #and {{ item.download }} == True
+    when: master_node and is_sw_source_local and oracle_sw_copy|bool #and {{ item.download }} == True
     tags:
       - oradbsw
 
@@ -86,7 +93,7 @@
     with_items: oracle_sw_image_db
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and oracle_sw_copy and oracle_sw_unpack #and {{ item.download }} == True
+    when: master_node and oracle_sw_copy|bool and oracle_sw_unpack|bool #and {{ item.download }} == True
     tags:
       - oradbswunpack
 
@@ -95,7 +102,7 @@
     with_items: oracle_sw_image_db
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and not oracle_sw_copy and oracle_sw_unpack #and {{ item.download }} == True
+    when: master_node and not oracle_sw_copy|bool and oracle_sw_unpack|bool #and {{ item.download }} == True
     tags:
       - oradbswunpack
 
@@ -178,3 +185,11 @@
     when: master_node
     tags:
      - opatchls
+
+  - name: Unmount nfs share with installation media
+    mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=unmounted
+    when: not oracle_sw_copy|bool and not oracle_sw_unpack|bool
+    tags:
+      - nfsunmountdb
+    
+
