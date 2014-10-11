@@ -86,7 +86,7 @@
     with_items: oracle_sw_image_db
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and oracle_sw_copy and oracle_sw_unarchive #and {{ item.download }} == True
+    when: master_node and oracle_sw_copy and oracle_sw_unpack #and {{ item.download }} == True
     tags:
       - oradbswunpack
 
@@ -95,7 +95,7 @@
     with_items: oracle_sw_image_db
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and not oracle_sw_copy and oracle_sw_unarchive #and {{ item.download }} == True
+    when: master_node and not oracle_sw_copy and oracle_sw_unpack #and {{ item.download }} == True
     tags:
       - oradbswunpack
 
@@ -118,7 +118,7 @@
      - checkdbswinstall.results
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and item.1.stdout != "1" #and oracle_sw_unarchive 
+    when: master_node and item.1.stdout != "1" #and oracle_sw_unpack 
     tags:
       - oradbinstall
     register: oradbinstall
