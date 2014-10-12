@@ -63,6 +63,12 @@
     sudo: yes
     tags:
       - directoriesdb
+
+  - name: Create audit directory
+    file: dest={{ oracle_base }}/audit mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    sudo: yes
+    tags:
+      - directoriesdb
   
   - name: Create ORACLE_HOME directory
     file: dest={{ oracle_home_db }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
