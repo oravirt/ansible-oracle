@@ -15,7 +15,7 @@ It also supports role separation when installing Grid Infrastructure, meaning a 
 By default, you can install a single instance database on filesystem storage, without having to change any parameters.
 
 I'm creating a bunch of examples which illustrates how to use/run the different roles. They can be found here: http://oravirt.wordpress.com/category/ansible-oracle. 
-I'll also be setting up a page where I have a list of all parameters and explanations what they are used for. It can be found here: http://oravirt.wordpress.com/ansible-oracle-parameters
+I'll also be setting up a page where I have a list of all parameters and explanations of what they are used for, which can be found here: http://oravirt.wordpress.com/ansible-oracle-parameters
 
 <b>Note: </b>
 - You'll need to manually download the Oracle software and make it available to the control-machine (either locally or on a web-server) before running the playbook.
