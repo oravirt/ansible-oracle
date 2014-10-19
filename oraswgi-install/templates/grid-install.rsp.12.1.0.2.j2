@@ -301,7 +301,7 @@ oracle.install.asm.diskGroup.AUSize=1
 #     oracle.install.asm.diskGroup.disks=\\.\ORCLDISKDATA0,\\.\ORCLDISKDATA1
 #
 #-------------------------------------------------------------------------------
-oracle.install.asm.diskGroup.disks={% for disk in  asm_storage_layout[oracle_asm_init_dg]    -%}  ORCL:{{ disk.asmlabel }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %}
+oracle.install.asm.diskGroup.disks={% if device_persistency=='udev' %}{% for disk in  asm_storage_layout[oracle_asm_init_dg]    -%}  {{ oracle_asm_disk_string }}{{ disk.asmlabel }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% for disk in  asm_storage_layout[oracle_asm_init_dg]    -%} ORCL:{{ disk.asmlabel|upper }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %} {% endif %}
 
 #-------------------------------------------------------------------------------
 # The disk discovery string to be used to discover the disks used create a ASM DiskGroup
@@ -313,7 +313,7 @@ oracle.install.asm.diskGroup.disks={% for disk in  asm_storage_layout[oracle_asm
 #     oracle.install.asm.diskGroup.diskDiscoveryString=\\.\ORCLDISK*
 #
 #-------------------------------------------------------------------------------
-oracle.install.asm.diskGroup.diskDiscoveryString=
+oracle.install.asm.diskGroup.diskDiscoveryString={% if device_persistency == 'asmlib' %}{% else %}{{ oracle_asm_disk_string }}*{% endif %}
 
 #-------------------------------------------------------------------------------
 # oracle.install.asm.monitorPassword=password

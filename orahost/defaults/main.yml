@@ -21,16 +21,16 @@
 
   role_separation: false
   oracle_user: oracle                        # User that will own the Oracle Installations.
-  grid_user: "{% if role_separation==true %}grid {% else %}oracle {% endif %}"
+  grid_user: "{% if role_separation==true %}grid{% else %}oracle{% endif %}"
 
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
   grid_user_home: "/home/{{ grid_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
   oracle_group: oinstall                          # Primary group for oracle_user. 
   oper_group: oper
-  dba_group: dba                          # Primary group for oracle_user. 
+  dba_group: dba                          
   asmoper_group: asmoper
-  asmdba_group: asmdba                          # Primary group for oracle_user. 
-  asmadmin_group: asmadmin                          # Primary group for oracle_user. 
+  asmdba_group: asmdba                   
+  asmadmin_group: asmadmin              
 
   ssh_keys:
    - /tmp/id_rsa
@@ -53,6 +53,7 @@
   configure_cluster: false
   oracle_stage: /u01/stage
   oracle_rsp_stage: "{{ oracle_stage }}/rsp"
+  device_persistency: asmlib
 
                                              
   host_fs_layout:    # Sets up filesystem on host. If storage_type=FS under oracle_databases, this is where the mapping between device/fs is described

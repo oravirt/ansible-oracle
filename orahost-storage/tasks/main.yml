@@ -3,48 +3,84 @@
   
   - name: ASMlib | Create device to label mappings for asm
     template: src=asm-label-device-mapping.txt.j2 dest={{ oracle_rsp_stage }}/asm-label-device-mapping-{{ item }}.txt
-    with_items:
-       - "{{ asm_diskgroups }}"
-    when: master_node 
-    tags: shareddisks
-
-  - name: ASMlib | Build script to create partitions 
-    template: src=part-device.sh.j2 dest={{ oracle_rsp_stage }}/part-device-{{ item }}.sh owner={{ oracle_user }} group={{ oracle_group }} mode=775
-    with_items:
-       - "{{ asm_diskgroups }}"
-    when: master_node 
-    tags: shareddisks
-
-  - name: ASMlib | Run script to create partitions
-    shell: sh {{ oracle_rsp_stage }}/part-device-{{ item }}.sh
-    with_items:
-       - "{{ asm_diskgroups }}"
+    with_items: asm_diskgroups
     when: master_node
-    tags: shareddisks
+    tags: asmlib
 
-  - name: ASMlib | Build script to create asm-labels
+  - name: ASM-storage | Build script to create partitions 
+    template: src=part-device.sh.j2 dest={{ oracle_rsp_stage }}/part-device-{{ item }}.sh owner={{ oracle_user }} group={{ oracle_group }} mode=775
+    with_items: asm_diskgroups
+    when: master_node 
+    tags: asmlib
+
+  - name: ASM-storage | Run script to create partitions
+    shell: sh {{ oracle_rsp_stage }}/part-device-{{ item }}.sh
+    with_items: asm_diskgroups
+    when: master_node
+    tags: asmlib
+
+  - name: ASMlib | Build script to create asmlib-labels
     template: src=label-asm-disks.sh.j2 dest={{ oracle_rsp_stage }}/label-asm-disks-{{ item }}.sh owner={{ oracle_user }} group={{ oracle_group }} mode=775
-    with_items:
-       - "{{ asm_diskgroups }}"
-    when: master_node 
-    tags: shareddisks
+    with_items: asm_diskgroups
+    when: master_node and device_persistency == 'asmlib' 
+    tags: asmlib
 
-  - name: ASMlib | Run script to create asm-labels
+  - name: ASMlib | Run script to create asmlib-labels
     shell: sh {{ oracle_rsp_stage }}/label-asm-disks-{{ item }}.sh
-    with_items:
-       - "{{ asm_diskgroups }}"
-    when: master_node 
-    tags: shareddisks
+    with_items: asm_diskgroups
+    when: master_node and device_persistency == 'asmlib'
+    tags: asmlib
 
   - name: ASMlib | Rescan ASM disks
     shell: service oracleasm scandisks
-    tags: shareddisks
+    when: device_persistency == 'asmlib'
+    tags: asmlib
 
   - name: ASMlib | List ASM disks
     shell: service oracleasm listdisks
+    when: device_persistency == 'asmlib'
     register: listdisks
-    tags: listdisk
+    tags: asmlib
 
   - name: List ASM disks
     debug: var=listdisks.stdout_lines
-    tags: listdisk
+    when: device_persistency == 'asmlib'
+    tags: asmlib
+
+  - name: udev | Create device to label mappings for udev
+    template: src=udev-label-device-mapping.txt.j2 dest={{ oracle_stage }}/udev/udev-{{ item }}
+    with_items: asm_diskgroups
+    when: device_persistency == 'udev'
+    tags: udev
+
+  - name: udev | Assemble into one mapfile
+    assemble: src={{ oracle_stage }}/udev dest={{ oracle_rsp_stage }}/udev-device-input.txt
+    when: device_persistency == 'udev'
+    tags: udev
+
+  - name: udev | Create script to create rules
+    template: src=setup-udev.sh.j2 dest={{ oracle_rsp_stage }}/setup-udev-rules.sh mode=755
+    when: device_persistency == 'udev'
+    tags: udev
+
+  - name: udev | Run script to create udev rules
+    shell: "{{ oracle_rsp_stage }}/setup-udev-rules.sh"
+    when: device_persistency == 'udev' 
+    tags: udev
+
+  - name: udev | Reload rules
+    shell: partprobe; start_udev
+    when: device_persistency == 'udev' 
+    tags: udev
+
+  - name: udev | List device aliases (register)
+    shell: ls -l {{ oracle_asm_disk_string }}
+    when: device_persistency == 'udev' 
+    tags: udev
+    register: lsdevice
+ 
+  - name: List device aliases
+    debug: var=lsdevice.stdout_lines
+    when: device_persistency == 'udev' 
+    tags: udev
+   

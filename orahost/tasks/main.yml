@@ -213,16 +213,19 @@
 
   - name: Asmlib | Configure Oracle Asmlib
     template: src=oracleasm.j2 dest=/etc/sysconfig/oracleasm owner=root mode=0777 force=yes
+    when: device_persistency == 'asmlib'
     tags:
       - asmlibconfig
 
   - name: Asmlib | Enable and start Oracle Asmlib
     service: name=oracleasm  state=started  enabled=yes
+    when: device_persistency == 'asmlib'
     tags:
       - asmlibconfig
   
   - name: Asmlib | Restart Asmlib
     service: name=oracleasm  state=restarted
+    when: device_persistency == 'asmlib'
     tags:
       - asmlibconfig
 
@@ -247,3 +250,5 @@
   - name: Create rsp stage directory
     file: dest={{ oracle_rsp_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
 
+  - name: Create udev stage directory
+    file: dest={{ oracle_stage }}/udev mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory

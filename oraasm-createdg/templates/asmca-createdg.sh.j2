@@ -3,9 +3,16 @@
 
 {{ oracle_home_gi }}/bin/asmca -silent -createDiskGroup \
        -diskGroupName {{ item }} \
-      {% for disk in  asm_storage_layout[item]    %}
-       -disk 'ORCL:{{ disk.asmlabel }}' \
-      {% endfor %}
+{% if device_persistency == 'udev' %}
+     {% for disk in  asm_storage_layout[item]    %}
+       -disk '{{ oracle_asm_disk_string }}{{ disk.asmlabel }}' \
+     {% endfor %}
+{% elif device_persistency == 'asmlib' %}
+     {% for disk in  asm_storage_layout[item]    %}
+       -disk 'ORCL:{{ disk.asmlabel|upper }}' \
+     {% endfor %}
+  {% else %}
+{% endif %}
        -redundancy external \
        -au_size 4 \
        {% if oracle_install_version_gi=='11.2.0.4' %}
