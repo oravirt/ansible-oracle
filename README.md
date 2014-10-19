@@ -116,7 +116,7 @@ This role will take a previously installed/patched Oracle Database Server instal
 <b>Changelog (bigger changes)</b>
 
 2014-10-19
-- Added support for udev device name persistancy
+- Added support for udev device name persistency
 
 2014-10-10
 - Added 'oracle_gi_nic_pub|priv' and removed hardcoded nic's in grid-install template. Now possible to define which interface does what
