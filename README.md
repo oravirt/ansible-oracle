@@ -21,7 +21,6 @@ I'll also be setting up a page where I have a list of all parameters and explana
 - You'll need to manually download the Oracle software and make it available to the control-machine (either locally or on a web-server) before running the playbook.
 - All roles are built on Oracle Linux 6, but should work with any EL6-based system.
 - Storage options only supports block devices at the moment (FS & ASM). Will add support for NFS
-- When using ASM only ASMlib is currently supported. Will add support for udev etc.
 
 <b>The different roles are:</b>
 
@@ -49,7 +48,7 @@ This will configure the host specific Oracle stuff:
 <b>orahost-storage:</b>
 This role configures storage that shoud be used by ASM.
 - Partitions devices (using parted)
-- Create ASMlib labels on disks
+- Create ASMlib labels or sets up udev-rules for device name persistency
 
 <b>oraswgi-install:</b>
 This role will install and configure Oracle Grid Infrastructure. Tested with 12.1.0.1/12.1.0.2 & 11.2.0.4
@@ -73,7 +72,6 @@ This role will create and configure the ASM-instance with an initial diskgroup.
 <b>oraasm-createdg:</b>
 This role will create the diskgroup(s) that should be used for database storage. Uses asmca to create diskgroups.
 - Generates a shellscript that uses asmca to create the diskgroups. 
-Note: It will try to create the initial diskgroup again, and fail but that is ok, the error is ignored and the play will continue.
 
 <b>oraswdb-install:</b>
 This role will install the oracle database server(s). If there will be more than one database running it will get its own ORACLE_HOME. It performs both Single Instance/RAC installations.
@@ -116,6 +114,9 @@ This role will take a previously installed/patched Oracle Database Server instal
 
 ********************************
 <b>Changelog (bigger changes)</b>
+
+2014-10-19
+- Added support for udev device name persistancy
 
 2014-10-10
 - Added 'oracle_gi_nic_pub|priv' and removed hardcoded nic's in grid-install template. Now possible to define which interface does what
