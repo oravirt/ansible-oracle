@@ -1,0 +1,33 @@
+#!/bin/bash
+TEMPFILE=/tmp/udev-temp-file
+UDEVRULE=/etc/udev/rules.d/99-asm-devices.rules
+
+if [[ -f $TEMPFILE ]]; then
+   rm -f $TEMPFILE
+fi 
+
+while read -r device label owner group
+do
+
+if [[ ${device} == /dev/sda ]]; then
+ echo "Trying to use root disk. Exiting"
+ continue
+fi
+
+scsiid=`scsi_id -g -u -d $device`
+chkexist=`grep $scsiid $UDEVRULE |wc -l`
+if [[ $chkexist == 1 ]]; then
+ echo "Error: $scsiid is already present. Exiting"
+ continue
+fi
+echo "KERNEL==\"sd?1\", BUS==\"scsi\", PROGRAM==\"/sbin/scsi_id -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", NAME=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+
+done < {{ oracle_rsp_stage }}/udev-device-input.txt
+
+if [[ -f $TEMPFILE ]]; then
+   cp -f $TEMPFILE $UDEVRULE
+   exit 0
+else
+   exit 0
+fi
+

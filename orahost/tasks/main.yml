@@ -213,19 +213,19 @@
 
   - name: Asmlib | Configure Oracle Asmlib
     template: src=oracleasm.j2 dest=/etc/sysconfig/oracleasm owner=root mode=0777 force=yes
-    when: device_persistency == 'asmlib'
+    when: device_persistence == 'asmlib'
     tags:
       - asmlibconfig
 
   - name: Asmlib | Enable and start Oracle Asmlib
     service: name=oracleasm  state=started  enabled=yes
-    when: device_persistency == 'asmlib'
+    when: device_persistence == 'asmlib'
     tags:
       - asmlibconfig
   
   - name: Asmlib | Restart Asmlib
     service: name=oracleasm  state=restarted
-    when: device_persistency == 'asmlib'
+    when: device_persistence == 'asmlib'
     tags:
       - asmlibconfig
 

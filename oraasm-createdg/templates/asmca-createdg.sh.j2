@@ -3,11 +3,11 @@
 
 {{ oracle_home_gi }}/bin/asmca -silent -createDiskGroup \
        -diskGroupName {{ item }} \
-{% if device_persistency == 'udev' %}
+{% if device_persistence == 'udev' %}
      {% for disk in  asm_storage_layout[item]    %}
        -disk '{{ oracle_asm_disk_string }}{{ disk.asmlabel }}' \
      {% endfor %}
-{% elif device_persistency == 'asmlib' %}
+{% elif device_persistence == 'asmlib' %}
      {% for disk in  asm_storage_layout[item]    %}
        -disk 'ORCL:{{ disk.asmlabel|upper }}' \
      {% endfor %}

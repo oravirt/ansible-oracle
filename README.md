@@ -48,7 +48,7 @@ This will configure the host specific Oracle stuff:
 <b>orahost-storage:</b>
 This role configures storage that shoud be used by ASM.
 - Partitions devices (using parted)
-- Create ASMlib labels or sets up udev-rules for device name persistency
+- Create ASMlib labels or sets up udev-rules for device name persistence
 
 <b>oraswgi-install:</b>
 This role will install and configure Oracle Grid Infrastructure. Tested with 12.1.0.1/12.1.0.2 & 11.2.0.4
@@ -116,7 +116,7 @@ This role will take a previously installed/patched Oracle Database Server instal
 <b>Changelog (bigger changes)</b>
 
 2014-10-19
-- Added support for udev device name persistency
+- Added support for udev device name persistence
 
 2014-10-10
 - Added 'oracle_gi_nic_pub|priv' and removed hardcoded nic's in grid-install template. Now possible to define which interface does what

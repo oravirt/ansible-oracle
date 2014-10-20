@@ -1,0 +1,74 @@
+---
+  hostgroup: orarac-dc2
+  role_separation: false
+  device_persistence: udev
+
+  configure_interconnect: true               
+  configure_ssh: true                       
+  configure_host_disks: true               
+                                          
+  configure_cluster: true
+  
+################ Grid Infrastructure specifics ################
+  oracle_install_option_gi: CRS_CONFIG  
+  oracle_install_version_gi: 12.1.0.2
+
+  oracle_password: Oracle123
+  oracle_scan: orarac-scan-dc2.discworld.net
+  oracle_vip: -vip
+  oracle_scan_port: 1521
+  oracle_asm_init_dg: crs           
+
+
+ 
+  oracle_sw_image_db:
+       - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2, download: false }
+       - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2, download: false }
+#       - { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1, download: false }
+#       - { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1, download: false }
+#       - { filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4, download: true }      
+#       - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4, download: true } 
+
+  oracle_databases:           
+        racdb:               
+             oracle_version_db: 12.1.0.1
+             oracle_edition: EE
+             oracle_db_name: racdb                                                                                                                                                                                                         
+             oracle_db_passwd: Oracle123                                                                                                                                                                                                   
+             oracle_db_type: RAC                                                                                                                                                                                                           
+             is_container: "false"
+             pdb_prefix: racpdb
+             num_pdbs: 2
+             is_racone: "false"
+             storage_type: ASM
+             service_name: racdb_serv
+             oracle_init_params: "open_cursors=300,processes=700"
+             oracle_db_mem_percent: 20
+             oracle_database_type: MULTIPURPOSE
+             redolog_size_in_mb: 100
+             delete_db: false
+                                                                                                                                                                                                                                           
+                                                                                                                                                                                                                                           
+  oracle_dbf_dir_asm: "DATA"                                                                                                                                                                                                               
+  oracle_reco_dir_asm: "FRA"                                                                                                                                                                                                               
+                                                                                                                                                                                                                                           
+  host_fs_layout:                                                                                                                                                                                                                          
+      u01:                                                                                                                                                                                                                                 
+        {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora}
+
+  asm_diskgroups:  
+     - crs
+     - data
+     - fra
+
+  asm_storage_layout:   
+   crs:
+     - {device: /dev/sdc, asmlabel: crs01}
+   data:
+     - {device: /dev/sdd, asmlabel: data01}
+     - {device: /dev/sde, asmlabel: data02}
+   fra:
+     - {device: /dev/sdf, asmlabel: fra01}
+     - {device: /dev/sdg, asmlabel: fra02}
+     - {device: /dev/sdh, asmlabel: fra03}
+
