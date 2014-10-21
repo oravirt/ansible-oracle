@@ -103,8 +103,12 @@
     tags:
     - oragridswunpack
     when: master_node and checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy|bool and oracle_sw_unpack|bool
-    
 
+  - name: Install cvuqdisk rpm
+    yum: name="{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/grid/rpm/{{ cvuqdisk_rpm }}" state=present
+    when: configure_cluster
+    tags: cvuqdisk
+    
   - name: Setup response file for install (GI)
     template: src=grid-install.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner="{{ grid_user }}" group={{ oracle_group }} mode=775 backup=yes
     tags:
