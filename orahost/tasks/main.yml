@@ -1,6 +1,23 @@
 # orahost playbook 
 ---
 
+  - name: Install packages required by Oracle
+    yum: name={{ item }} state=installed
+    with_items: oracle_packages 
+
+  - name: Disable selinux (permanently)
+    selinux: state=disabled
+    tags:
+     - selinux
+    register: selinux
+
+  - name: Disable selinux (runtime)
+    shell: setenforce 0
+    tags:
+     - selinux
+    ignore_errors: true
+
+
   - name: User | Add group(s)
     group: name={{ item.group }} gid={{ item.gid }} state=present 
     with_items: oracle_groups
@@ -138,10 +155,6 @@
     tags: hostfs
 
 
-  - name: Install packages required by Oracle
-    yum: name={{ item }} state=installed
-    with_items: oracle_packages 
-
   - name: Oracle-recommended kernel settings
     sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes ignoreerrors=yes
     with_items: oracle_sysconfig
@@ -185,18 +198,6 @@
   - name: Disable Transparent Hugepages (runtime)
     shell: if test -f /sys/kernel/mm/transparent_hugepage/enabled; then echo never > /sys/kernel/mm/transparent_hugepage/enabled; fi;
     tags: tphnuma
-
-  - name: Disable selinux (permanently)
-    selinux: state=disabled
-    tags:
-     - selinux
-    register: selinux
-
-  - name: Disable selinux (runtime)
-    shell: setenforce 0
-    tags:
-     - selinux
-    ignore_errors: true
 
   - name: Network | Setup ip-address for RAC Interconnect
     template: src=ifcfg-eth1.j2 dest=/etc/sysconfig/network-scripts/ifcfg-eth1 owner=root mode=0644
