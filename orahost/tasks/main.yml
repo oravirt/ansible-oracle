@@ -4,6 +4,7 @@
   - name: Install packages required by Oracle
     yum: name={{ item }} state=installed
     with_items: oracle_packages 
+    when: install_os_packages
 
   - name: Disable selinux (permanently)
     selinux: state=disabled
