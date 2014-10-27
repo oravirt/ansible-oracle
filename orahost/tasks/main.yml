@@ -8,12 +8,14 @@
 
   - name: Disable selinux (permanently)
     selinux: state=disabled
+    when: disable_selinux
     tags:
      - selinux
     register: selinux
 
   - name: Disable selinux (runtime)
     shell: setenforce 0
+    when: disable_selinux
     tags:
      - selinux
     ignore_errors: true
