@@ -1,0 +1,50 @@
+#!/usr/bin/expect -f
+
+spawn service oracleasm configure
+{% if role_separation==True %}
+expect {
+  "Default user to own the driver interface*:"
+  {
+    send "{{ grid_user }}\r"
+    exp_continue
+  }
+  "Default group to own the driver interface*:"
+  {
+    send "{{ asmdba_group }}\r"
+    exp_continue
+  }
+  "Start Oracle ASM library driver on boot*:"
+  {
+    send "y\r"
+    exp_continue
+  }
+  "Scan for Oracle ASM disks on boot*:"
+  {
+    send "y\r"
+    exp_continue                                                                                                                                                                                                                             
+  }                                                                                                                                                                                                                                          
+}
+{% else %}
+expect {
+  "Default user to own the driver interface*:"
+  {
+    send "{{ oracle_user }}\r"
+    exp_continue
+  }
+  "Default group to own the driver interface*:"
+  {
+    send "{{ dba_group }}\r"
+    exp_continue
+  }
+  "Start Oracle ASM library driver on boot*:"
+  {
+    send "y\r"
+    exp_continue
+  }
+  "Scan for Oracle ASM disks on boot*:"
+  {
+    send "y\r"
+    exp_continue                                                                                                                                                                                                               
+  }                                                                                                                                                                                                                            
+}
+{% endif %}

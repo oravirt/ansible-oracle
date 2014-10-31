@@ -215,9 +215,16 @@
     tags:
      - eth1
 
-  - name: Asmlib | Configure Oracle Asmlib
-    template: src=oracleasm.j2 dest=/etc/sysconfig/oracleasm owner=root mode=0777 force=yes
+  - name: Asmlib | Configure Oracle Asmlib (1)
+    template: src=oracleasm-configure.expect.j2  dest={{ oracle_rsp_stage }}/asmlib-configure.expect owner=root mode=0777 force=yes
     when: device_persistence == 'asmlib'
+    tags:
+      - asmlibconfig
+    register: asmlib_expect_config
+
+  - name: Asmlib | Configure Oracle Asmlib (2)
+    shell: "{{ oracle_rsp_stage }}/asmlib-configure.expect"
+    when: device_persistence == 'asmlib' and asmlib_expect_config.changed
     tags:
       - asmlibconfig
 
@@ -229,7 +236,7 @@
   
   - name: Asmlib | Restart Asmlib
     service: name=oracleasm  state=restarted
-    when: device_persistence == 'asmlib'
+    when: device_persistence == 'asmlib' and asmlib_expect_config.changed
     tags:
       - asmlibconfig
 
