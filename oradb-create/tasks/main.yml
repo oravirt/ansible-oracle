@@ -3,6 +3,7 @@
   - name: Check if database is already created
     shell: grep {{ item.value.oracle_db_name }}:{{ oracle_home_db }} /etc/oratab |wc -l
     with_dict: oracle_databases
+    when: item.value.oracle_db_name is defined
     tags:
     - checkifdbexists
     register: checkdbexist
@@ -15,6 +16,7 @@
 
   - name: Create responsefile for dbca
     template: src=dbca-create-db.rsp.{{ oracle_databases[item.0].oracle_version_db }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}  owner={{ oracle_user }} group={{ oracle_group }} mode=644 backup=no
+    #debug: var=msg
     with_together:
        - oracle_databases
        - checkdbexist.results
@@ -29,7 +31,7 @@
        - checkdbexist.results
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and item.1.stdout != "1"
+    when: master_node and item.1.stdout != "1" 
     tags:
       - oradbcreate
     register: oradbcreate
@@ -59,3 +61,14 @@
 #    when: oracle_install_option_gi == 'CRS_CONFIG' or oracle_install_option_gi == 'HA_CONFIG'
 #    tags:
 #     - srvctlconfig
+
+  - name: Check if database is running
+    shell: ps -ef |grep pmon |grep -v grep
+    tags:
+     - psout
+    register: psout
+      
+
+  - debug: var=psout.stdout_lines
+    tags:
+     - psout
