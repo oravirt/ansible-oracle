@@ -105,7 +105,7 @@ ORACLE_BASE={{ oracle_base }}
 #   - SEONE  : Standard Edition One
 #   - PE     : Personal Edition (WINDOWS ONLY)
 #------------------------------------------------------------------------------
-oracle.install.db.InstallEdition={{ oracle_databases[item.0].oracle_edition }}
+oracle.install.db.InstallEdition={{ item.0.oracle_edition }}
 
 #------------------------------------------------------------------------------
 # This variable is used to enable or disable custom install and is considered
@@ -174,12 +174,12 @@ oracle.install.db.CLUSTER_NODES={% if configure_cluster==True %}{% for host in g
 #
 # If left blank, it will be assumed to be false
 #------------------------------------------------------------------------------
-oracle.install.db.isRACOneInstall={{ oracle_databases[item.0].is_racone }}
+oracle.install.db.isRACOneInstall={{ item.0.is_racone }}
 
 #------------------------------------------------------------------------------
 # Specify the name for RAC One Node Service. 
 #------------------------------------------------------------------------------
-oracle.install.db.racOneServiceName={{ oracle_databases[item.0].service_name }}
+oracle.install.db.racOneServiceName={{ item.0.service_name }}
 
 #------------------------------------------------------------------------------
 # Specify the type of database to create.
@@ -398,7 +398,7 @@ SECURITY_UPDATES_VIA_MYORACLESUPPORT=
 #
 # Example    : DECLINE_SECURITY_UPDATES=false
 #------------------------------------------------------------------------------
-DECLINE_SECURITY_UPDATES=
+DECLINE_SECURITY_UPDATES=true
 
 #------------------------------------------------------------------------------
 # Specify the Proxy server name. Length should be greater than zero.

@@ -18,17 +18,19 @@
   nfs_server_sw_path: /path/to/orasw
   oracle_sw_copy: "{% if install_from_nfs==true %}false{% else %}true{% endif %}"
   oracle_sw_unpack: "{% if install_from_nfs==true %}false{% else %}true{% endif %}"
-  oracle_db_responsefile: "{{ oracle_databases[item.0].oracle_db_name}}_{{ ansible_hostname }}.rsp"
+  oracle_db_responsefile: "{{ item.0.home}}_{{ ansible_hostname }}.rsp"
+  oracle_db_run_install: "install_{{ item.0.home }}_{{ ansible_hostname }}.sh"
+  #oracle_db_responsefile: "{% if item.0.oracle_db_name is defined %}{{ item.0.oracle_db_name }}_{{ ansible_hostname }}.rsp{% else %}nodbname_defined_{{ ansible_hostname }}.rsp{% endif %}"
   oracle_stage: /u01/stage
   oracle_stage_remote: "{{ oracle_stage }}"
   oracle_stage_install: "{% if oracle_sw_copy=='false' and oracle_sw_unpack=='false'%}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
   oracle_rsp_stage: "{{ oracle_stage }}/rsp"
   oracle_inventory_loc: /u01/app/oraInventory
   oracle_base: /u01/app/oracle
-  oracle_home_db: "{{ oracle_base }}/{{ item.value.oracle_version_db }}/{{ item.key }}"      # ORACLE_HOME path
-  oracle_home_db_install: "{{ oracle_base }}/{{ oracle_databases[item.0].oracle_version_db }}/{{ item.0 }}" # This is only used when installing the db server and creating the databases
+  oracle_home_db: "{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}"      # ORACLE_HOME path
+  oracle_home_db_install: "{{ oracle_base }}/{{ item.0.oracle_version_db }}/{{ item.0.home }}" # This is only used when installing the db server and creating the databases
 
-  oracle_profile_name: ".profile_{{ item.value.oracle_db_name }}"                            # Name of profile-file. Sets up the environment for that database. One per database
+  oracle_profile_name: "{% if item.oracle_db_name is defined %}.profile_{{ item.oracle_db_name }}{% else %}.profile_{{ item.home }}{% endif %}"    # Name of profile-file. Sets up the environment for that database. One per database
   oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
   oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
   oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
@@ -42,4 +44,6 @@
 #       - { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1 }
 #       - { filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4 }
 #       - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4 }
+#       - { filename: p10404530_112030_Linux-x86-64_1of7.zip, version: 11.2.0.3 }
+#       - { filename: p10404530_112030_Linux-x86-64_2of7.zip, version: 11.2.0.3 }
 #

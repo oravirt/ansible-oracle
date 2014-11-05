@@ -76,7 +76,7 @@ OPERATION_TYPE = "createDatabase"
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-GDBNAME = "{{ oracle_databases[item.0].oracle_db_name }}"
+GDBNAME = "{{ item.0.oracle_db_name }}"
 
 #-----------------------------------------------------------------------------
 # Name          : RACONENODE
@@ -86,7 +86,7 @@ GDBNAME = "{{ oracle_databases[item.0].oracle_db_name }}"
 # Default value : FALSE
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-RACONENODE  = "{{ oracle_databases[item.0].is_racone }}"
+RACONENODE  = "{{ item.0.is_racone }}"
 
 #-----------------------------------------------------------------------------
 # Name          : RACONENODESERVICENAME
@@ -97,7 +97,7 @@ RACONENODE  = "{{ oracle_databases[item.0].is_racone }}"
 # Default value : None
 # Mandatory     : No [required in case RACONENODE flag is set to true]
 #-----------------------------------------------------------------------------
-RACONENODESERVICENAME = "{{ oracle_databases[item.0].service_name }}"
+RACONENODESERVICENAME = "{{ item.0.service_name }}"
 
 #-----------------------------------------------------------------------------
 # Name          : POLICYMANAGED
@@ -168,7 +168,7 @@ POLICYMANAGED = "false"
 # Default value : <db_name> specified in GDBNAME
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-SID = "{{ oracle_databases[item.0].oracle_db_name }}"
+SID = "{{ item.0.oracle_db_name }}"
 
 #-----------------------------------------------------------------------------
 # Name          : NODELIST
@@ -209,7 +209,7 @@ TEMPLATENAME = "General_Purpose.dbc"
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-SYSPASSWORD = "{{ oracle_databases[item.0].oracle_db_passwd }}"
+SYSPASSWORD = "{{ item.0.oracle_db_passwd }}"
 
 #-----------------------------------------------------------------------------
 # Name          : SYSTEMPASSWORD
@@ -219,7 +219,7 @@ SYSPASSWORD = "{{ oracle_databases[item.0].oracle_db_passwd }}"
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-SYSTEMPASSWORD = "{{ oracle_databases[item.0].oracle_db_passwd }}"
+SYSTEMPASSWORD = "{{ item.0.oracle_db_passwd }}"
 
 #-----------------------------------------------------------------------------
 # Name          : EMCONFIGURATION
@@ -260,7 +260,7 @@ EMCONFIGURATION = "NONE"
 # Default value : None
 # Mandatory     : Yes, if EMCONFIGURATION is specified
 #-----------------------------------------------------------------------------
-DBSNMPPASSWORD = "{{ oracle_databases[item.0].oracle_db_passwd }}"
+DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
 
 #-----------------------------------------------------------------------------
 # Name          : CENTRALAGENT
@@ -378,7 +378,7 @@ RECOVERYAREADESTINATION={{ oracle_reco_dir_fs }}
 # Default value : FS
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-STORAGETYPE="{{ oracle_databases[item.0].storage_type }}"
+STORAGETYPE="{{ item.0.storage_type }}"
 
 #-----------------------------------------------------------------------------
 # Name          : DISKGROUPNAME
@@ -396,7 +396,7 @@ DISKGROUPNAME={{ oracle_dbf_dir_asm }}
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-ASMSNMP_PASSWORD="{{ oracle_databases[item.0].oracle_db_passwd }}"
+ASMSNMP_PASSWORD="{{ item.0.oracle_db_passwd }}"
 
 #-----------------------------------------------------------------------------
 # Name          : RECOVERYGROUPNAME
@@ -502,7 +502,7 @@ NATIONALCHARACTERSET= "AL16UTF16"
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-INITPARAMS ="{{ oracle_databases[item.0].oracle_init_params }}"
+INITPARAMS ="{{ item.0.oracle_init_params }}"
 
 #-----------------------------------------------------------------------------
 # Name          : SAMPLESCHEMA
@@ -521,7 +521,7 @@ SAMPLESCHEMA=FALSE
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-MEMORYPERCENTAGE = "{{ oracle_databases[item.0].oracle_db_mem_percent }}"
+MEMORYPERCENTAGE = "{{ item.0.oracle_db_mem_percent }}"
 
 #-----------------------------------------------------------------------------
 # Name          : DATABASETYPE
@@ -531,7 +531,7 @@ MEMORYPERCENTAGE = "{{ oracle_databases[item.0].oracle_db_mem_percent }}"
 # Default value : MULTIPURPOSE
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-DATABASETYPE = "{{ oracle_databases[item.0].oracle_database_type }}"
+DATABASETYPE = "{{ item.0.oracle_database_type }}"
 
 #-----------------------------------------------------------------------------
 # Name          : AUTOMATICMEMORYMANAGEMENT
