@@ -74,7 +74,7 @@ This role will create the diskgroup(s) that should be used for database storage.
 - Generates a shellscript that uses asmca to create the diskgroups. 
 
 <b>oraswdb-install:</b>
-This role will install the oracle database server(s). If there will be more than one database running it will get its own ORACLE_HOME. It performs both Single Instance/RAC installations.
+This role will install the oracle database server(s). It is possible to run more than 1 database from each home. It performs both Single Instance/RAC installations.
 - Creates a .profile_databasename
 - Creates directory structures
 - Transfers installfiles to server(s)
@@ -113,28 +113,3 @@ This role will take a previously installed/patched Oracle Database Server instal
 - .........
 
 ********************************
-<b>Changelog (bigger changes)</b>
-
-2014-10-19
-- Added support for udev device name persistence
-
-2014-10-10
-- Added 'oracle_gi_nic_pub|priv' and removed hardcoded nic's in grid-install template. Now possible to define which interface does what
-- Added support for installation from remote location (e.g nfs share)
-- Changed parameter name oracle_asm_crs_diskgroup to oracle_asm_init_dg
-
-2014-10-09
-- Added support for Container Databases
-
-
-2014-10-07
-- Added support for GI role separation
-
-
-2014-09-28
-- New role: oradb-delete, and parameters to support that role
-
-2014-09-25
-- Added support for 11.2.0.4
-
-
