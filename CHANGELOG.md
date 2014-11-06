@@ -1,4 +1,4 @@
-<b>Changelog (bigger changes)</b>
+Changelog (bigger changes)
 2014-11-06
 - Added support for running multiple databases from each ORACLE_HOME
 
