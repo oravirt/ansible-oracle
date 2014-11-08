@@ -141,13 +141,13 @@
     tags: hostfs
 
   - name: filesystem | create fs
-    filesystem: fstype=ext4 dev=/dev/{{ item.value.vgname }}/{{ item.value.lvname }} 
+    filesystem: fstype={{ item.value.fstype }} dev=/dev/{{ item.value.vgname }}/{{ item.value.lvname }} 
     with_dict: host_fs_layout
     when: configure_host_disks
     tags: hostfs
 
   - name: filesytem | mount dir
-    mount: name={{ item.value.mntp }} src=/dev/{{ item.value.vgname }}/{{ item.value.lvname }} dump=1 passno=2 fstype=ext4 state=mounted
+    mount: name={{ item.value.mntp }} src=/dev/{{ item.value.vgname }}/{{ item.value.lvname }} dump=1 passno=2 fstype={{ item.value.fstype }} state=mounted
     with_dict: host_fs_layout
     when: configure_host_disks
     tags: hostfs
