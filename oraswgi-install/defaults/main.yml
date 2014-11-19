@@ -3,6 +3,8 @@
   master_node: true
   role_separation: false
   hostgroup: default
+  hostgroup_hub: "{{ hostgroup }}-hub"
+  hostgroup_leaf: "{{ hostgroup }}-leaf"
 
   oracle_user: oracle                        # User that will own the Oracle Installations.
   grid_user: "{% if role_separation==true %}grid{% else %}oracle{% endif %}" 
@@ -57,9 +59,13 @@
 
   run_configtoolallcommand: true
   oracle_cluster_mgmdb: true
+  oracle_gi_cluster_type: STANDARD              # STANDARD | FLEX
   oracle_install_option_gi: HA_CONFIG
   oracle_install_version_gi: 12.1.0.2
+  oracle_asm_storage_option: LOCAL_ASM_STORAGE  # LOCAL_ASM_STORAGE | FLEX_ASM_STORAGE
   configure_cluster: false
+  oracle_gi_gns_subdomain: a.b.c
+  oracle_gi_gns_vip: gnsvip.a.b.c
 
   oracle_sw_image_gi:                                              # Files containing the installation media for Grid Infrastructure 
        - { filename: linuxamd64_12102_grid_1of2.zip, version: 12.1.0.2 }

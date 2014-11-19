@@ -95,7 +95,7 @@ oracle.install.crs.config.gpnp.scanPort={% if configure_cluster==True %}{{ oracl
 # Specify the type of cluster you would like to configure
 # Allowed values: FLEX and STANDARD
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.ClusterType=STANDARD
+oracle.install.crs.config.ClusterType={{ oracle_gi_cluster_type |upper}}
 
 
 #-------------------------------------------------------------------------------
@@ -111,8 +111,13 @@ oracle.install.crs.config.clusterName={% if configure_cluster==True %}{{ oracle_
 # Specify 'true' if you would like to configure Grid Naming Service(GNS), else
 # specify 'false'
 #-------------------------------------------------------------------------------
+{%  if oracle_gi_cluster_type|upper  == "FLEX" %}
+
+oracle.install.crs.config.gpnp.configureGNS=true
+{%  else %}
 oracle.install.crs.config.gpnp.configureGNS=false
 
+{%  endif %}
 #-------------------------------------------------------------------------------
 # Applicable only if you choose to configure GNS
 # Specify 'true' if you would like to assign SCAN name VIP and Node VIPs by DHCP
@@ -138,8 +143,14 @@ oracle.install.crs.config.gpnp.gnsClientDataFile=
 # oracle.install.crs.config.gpnp.gnsOption=CREATE_NEW_GNS
 # Specify the GNS subdomain and an unused virtual hostname for GNS service
 #-------------------------------------------------------------------------------
+{%  if oracle_gi_cluster_type|upper  == "FLEX" %}
+oracle.install.crs.config.gpnp.gnsSubDomain={{ oracle_gi_gns_subdomain }}
+oracle.install.crs.config.gpnp.gnsVIPAddress={{ oracle_gi_gns_vip }}
+{%  else %}
 oracle.install.crs.config.gpnp.gnsSubDomain=
 oracle.install.crs.config.gpnp.gnsVIPAddress=
+{%  endif %}
+
 
 
 
@@ -165,13 +176,23 @@ oracle.install.crs.config.gpnp.gnsVIPAddress=
 #
 #
 #-------------------------------------------------------------------------------
+{%  if oracle_gi_cluster_type|upper  == "STANDARD" %}                                                                                                                                                                                        
+                                                                                                                                                                                                                                             
+{%  if ansible_domain  == ""  %}                                                                                                                                                                                                             
+oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host}}:{{ host }}{{ oracle_vip }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}                   
+  {% else  %}                                                                                                                                                                                                                                
+oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host}}.{{ ansible_domain }}:{{ host }}{{ oracle_vip }}.{{ ansible_domain }} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}                                                                                                                                                                                                                     
+{% endif %}                                                                                                                                                                                                                                  
+                                                                                                                                                                                                                                             
+{% elif oracle_gi_cluster_type|upper == 'FLEX'  %}                                                                                                                                                                                           
+                                                                                                                                                                                                                                             
+{%  if ansible_domain  == ""  %}                                                                                                                                                                                                             
+oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup_hub] -%} {{host}}:{{ host }}{{ oracle_vip }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}::LEAF {%- if not loop.last -%} , {%- endif -%} {%- endfor %} {% else %}{% endif %}                                                                                                                                         
+ {% else  %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup_hub] -%} {{host}}.{{ ansible_domain }}:{{ host }}{{ oracle_vip }}.{{ ansible_domain }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}.{{ ansible_domain }}::LEAF {%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
+ {% endif %}
 
-{%  if ansible_domain  == ""  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host}}:{{ host }}{{ oracle_vip }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
-{% else  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host}}.{{ ansible_domain }}:{{ host }}{{ oracle_vip }}.{{ ansible_domain }} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
 {% endif %}
-
 
 #-------------------------------------------------------------------------------
 # The value should be a comma separated strings where each string is as shown below
@@ -187,8 +208,19 @@ oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for ho
 # For example: eth0:140.87.24.0:1,eth1:10.2.1.0:2,eth2:140.87.52.0:3
 #
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.networkInterfaceList={% if configure_cluster==True %}{{ oracle_gi_nic_pub }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_pub].ipv4.network }}:1,{{ oracle_gi_nic_priv }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_priv].ipv4.network }}:5{% else %}{% endif %}
-
+{%  if configure_cluster  == True %}
+{% if oracle_gi_cluster_type|upper  == "FLEX" %}
+oracle.install.crs.config.networkInterfaceList={{ oracle_gi_nic_pub }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_pub].ipv4.network }}:1,{{ oracle_gi_nic_priv }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_priv].ipv4.network }}:5
+{%  elif oracle_gi_cluster_type|upper  == "STANDARD" %}
+{%  if oracle_asm_storage_option|upper  == "FLEX_ASM_STORAGE" %}
+oracle.install.crs.config.networkInterfaceList={{ oracle_gi_nic_pub }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_pub].ipv4.network }}:1,{{ oracle_gi_nic_priv }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_priv].ipv4.network }}:5
+{% else %}     
+oracle.install.crs.config.networkInterfaceList={{ oracle_gi_nic_pub }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_pub].ipv4.network }}:1,{{ oracle_gi_nic_priv }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_priv].ipv4.network }}:2
+{% endif %}
+{% endif %}
+{% else %}
+oracle.install.crs.config.networkInterfaceList=
+{% endif %}
 #-------------------------------------------------------------------------------
 # Specify 'true' if you would like to configure Management Database Option, else
 # specify 'false'
@@ -209,7 +241,15 @@ oracle.install.crs.config.networkInterfaceList={% if configure_cluster==True %}{
 #   - FILE_SYSTEM_STORAGE
 # If configuring a Flex Cluster, FLEX_ASM_STORAGE is the only allowed value 
 #-------------------------------------------------------------------------------
+{% if oracle_gi_cluster_type|upper  == "FLEX" %}
 oracle.install.crs.config.storageOption=FLEX_ASM_STORAGE
+{% else %}
+oracle.install.crs.config.storageOption={{ oracle_asm_storage_option|upper }}
+{% endif %}
+
+
+
+
 
 #-------------------------------------------------------------------------------
 # These properties are applicable only if FILE_SYSTEM_STORAGE is chosen for 

@@ -2,6 +2,16 @@
 
   device_persistence: asmlib
   oracle_asm_disk_string: "{% if device_persistence == 'asmlib' %}{% elif device_persistence == 'udev' %}/dev/oracle/{% else %}{% endif %}"
+  oracle_stage: /u01/stage
+  oracle_rsp_stage: "{{ oracle_stage }}/rsp"
+  oracle_user: oracle
+  grid_user: "{% if role_separation==true %}grid{% else %}oracle{% endif %}"
+  oracle_group: oinstall
+  asmdba_group: asmdba
+  dba_group: dba
+
+
+
 
 #  asm_diskgroups:        # ASM Diskgroups used for DB-storage. Should map to dict asm_storage_layout. 
 #     - crs

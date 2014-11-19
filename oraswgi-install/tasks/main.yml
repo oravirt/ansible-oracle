@@ -6,11 +6,6 @@
     - checkifgiinstall
     register: checkgiinstall
 
-#  - name: debug
-#    debug: msg="nfs; {{ install_from_nfs }},  copy; {{ oracle_sw_copy }}; unpack; {{ oracle_sw_unpack }}, install_stage; {{ oracle_stage_install }}"
-#    tags:
-#       - debug
-
   - name: Mount nfs share with installation media
     mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=mounted
     tags:
@@ -75,7 +70,7 @@
     sudo_user: "{{ grid_user }}"
     tags:
       - oragridsw
-    when: master_node and checkgiinstall.stdout != "1" and not is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool
+    when: checkgiinstall.stdout != "1" and not is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool
 
   - name: Copy oracle installfiles to server (GI) (local)
     get_url: url={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
@@ -84,7 +79,7 @@
     sudo_user: "{{ grid_user }}"
     tags:
       - oragridsw
-    when: master_node and checkgiinstall.stdout != "1" and is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool
+    when: checkgiinstall.stdout != "1" and is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool
 
   - name: Extract files to stage-area (GI)
     unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no 
@@ -93,7 +88,7 @@
     sudo_user: "{{ grid_user }}"
     tags:
       - oragridswunpack
-    when: master_node and checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool and oracle_sw_unpack|bool
 
   - name: Extract files to stage-area (GI) (from remote location)
     unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no
@@ -102,12 +97,13 @@
     sudo_user: "{{ grid_user }}"
     tags:
     - oragridswunpack
-    when: master_node and checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy|bool and oracle_sw_unpack|bool
 
   - name: Install cvuqdisk rpm
     yum: name="{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/grid/rpm/{{ cvuqdisk_rpm }}" state=present
     when: configure_cluster
     tags: cvuqdisk
+    ignore_errors: true
     
   - name: Setup response file for install (GI)
     template: src=grid-install.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner="{{ grid_user }}" group={{ oracle_group }} mode=775 backup=yes
@@ -151,6 +147,9 @@
     when: master_node and checkgiinstall.stdout != "1"
     register: rootmaster
 
+  - debug: var=rootmaster.stdout_lines
+    when: master_node and checkgiinstall.stdout != "1"
+
   - name: Run root script after installation (Other Nodes)
     shell: "{{ oracle_home_gi }}/root.sh"
     sudo: yes
@@ -175,6 +174,7 @@
     tags:
       - runconfigtool
     when: master_node and run_configtoolallcommand and oracle_install_version_gi != '11.2.0.4' and checkgiinstall.stdout != "1"
+    ignore_errors: true
     register: configtool
 
   - name: Run configToolAllCommands (if 11.2.0.4)
@@ -234,8 +234,24 @@
      - opatchls
     when: checkgiinstall.stdout != "1"
 
+  - name: Check olsnodes (GI)
+    shell: "{{ oracle_home_gi }}/bin/olsnodes -a -n -s -t"
+    sudo: yes
+    sudo_user: "{{ grid_user }}"
+    when: oracle_gi_cluster_type |upper == 'FLEX'
+    register: olsnodes
+    tags:
+     - olsnodes
+
+  - name: Check olsnodes (GI)
+    debug: var=olsnodes.stdout_lines
+    when: oracle_gi_cluster_type|upper == 'FLEX'
+    tags:
+     - olsnodes
+
+
   - name: Unmount nfs share with installation media
-    mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=unmounted
+    mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=absent
     tags:
       - nfsunmount
     when: not oracle_sw_copy|bool and not oracle_sw_unpack|bool

@@ -253,7 +253,14 @@ PDBADMINPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Default value : None
 # Mandatory     : No (Yes for RAC database-centric database )
 #-----------------------------------------------------------------------------
-NODELIST={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
+{% if configure_cluster==True %}
+{% if oracle_gi_cluster_type |upper == 'FLEX' %}
+NODELIST={% for host in groups[hostgroup_hub] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
+{% else %}
+NODELIST={% for host in groups[hostgroup] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
+{% endif %}
+{% else %}
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : TEMPLATENAME
