@@ -8,7 +8,7 @@
     tags: asmlib
 
   - name: ASM-storage | Build script to create partitions 
-    template: src=part-device.sh.j2 dest={{ oracle_rsp_stage }}/part-device-{{ item }}.sh owner={{ oracle_user }} group={{ oracle_group }} mode=775
+    template: src=part-device.sh.j2 dest={{ oracle_rsp_stage }}/part-device-{{ item }}.sh mode=775
     with_items: asm_diskgroups
     when: master_node 
     tags: asmlib
@@ -20,7 +20,7 @@
     tags: asmlib
 
   - name: ASMlib | Build script to create asmlib-labels
-    template: src=label-asm-disks.sh.j2 dest={{ oracle_rsp_stage }}/label-asm-disks-{{ item }}.sh owner={{ oracle_user }} group={{ oracle_group }} mode=775
+    template: src=label-asm-disks.sh.j2 dest={{ oracle_rsp_stage }}/label-asm-disks-{{ item }}.sh mode=775
     with_items: asm_diskgroups
     when: master_node and device_persistence == 'asmlib' 
     tags: asmlib
