@@ -54,7 +54,7 @@
      - sudoadd
 
   - name: ssh-keys | Generate SSH keys 
-    local_action: shell /usr/bin/rm -f /tmp/id_rsa*; ssh-keygen -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys
+    local_action: shell /usr/bin/rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys
     ignore_errors: True
     when: configure_ssh and master_node and configure_cluster
     tags:
