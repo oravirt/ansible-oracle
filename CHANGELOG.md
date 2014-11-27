@@ -1,4 +1,7 @@
-Changelog (bigger changes)
+<b> Changelog (bigger changes) </b>
+2014-11-20
+- Added support for Flex Clusters
+
 2014-11-06
 - Added support for running multiple databases from each ORACLE_HOME
 
