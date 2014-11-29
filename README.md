@@ -12,13 +12,16 @@ At the moment you can install Oracle RAC, RAC One Node and normal single instanc
 You can take a freshly installed machine and configure it from ground up. It'll configure users, profiles, kernel parameters, storage and install the database server and create one or more databases.
 It also supports role separation when installing Grid Infrastructure, meaning a 'grid' user owns and runs the GI and the 'oracle' user owns and runs the databases.
 
-By default, you can install a single instance database on filesystem storage, without having to change any parameters.
+By default, you can install a single instance 12.1.0.2 database on filesystem, without having to change any parameters. Just put the following files in /tmp on the control-machine.
+- linuxamd64_12102_database_1of2.zip
+- linuxamd64_12102_database_2of2.zip
 
 I'm creating a bunch of examples which illustrates how to use/run the different roles. They can be found here: http://oravirt.wordpress.com/category/ansible-oracle. 
 I'll also be setting up a page where I have a list of all parameters and explanations of what they are used for, which can be found here: http://oravirt.wordpress.com/ansible-oracle-parameters
 
 <b>Note: </b>
-- You'll need to manually download the Oracle software and make it available to the control-machine (either locally or on a web-server) before running the playbook.
+- You'll need to manually download the Oracle software and make it available to the control-machine (either locally or on a web-server, or setup a nfs-share) before running the playbook. By default the 
+path to the software is /tmp on the control-machine.
 - All roles are built on Oracle Linux 6, but should work with any EL6-based system.
 - Storage options only supports block devices at the moment (FS & ASM). Will add support for NFS
 
