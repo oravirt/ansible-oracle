@@ -38,7 +38,7 @@ This will configure the host specific Oracle stuff:
 - Add a user & group
 - Create directory structures
 - Generate ssh-keys and set up passwordless ssh between clusternodes in case of RAC/RAC One node
-- Handle filesystem storage (partition devices, creates vg/lv and a ext4 filesystem etc). If you want to create your database on a filesystem (instead of ASM) this is where you define the layout.
+- Handle filesystem storage (partition devices, creates vg/lv and a filesystem (ext4, xfs, btrfs) etc). If you want to create your database on a filesystem (instead of ASM) this is where you define the layout.
 - Install required packages
 - Change kernel paramemeters
 - Set up pam.d/limits config
