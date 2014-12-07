@@ -1,47 +1,53 @@
+# Used as of 2014-12-07
 ---
   hostgroup: racattack
   role_separation: true
-  device_persistence: udev
+  device_persistence: asmlib
 
-  oracle_users:         # Passwd : oracle=oracle, grid=grid
-   - { username: oracle, uid: 11000, primgroup: oinstall, othergroups: "dba,asmadmin,asmdba,backupdba,dgdba,kmdba,oper", passwd: "$6$IbSYmgFj$uNNH0NjaUEP4.D5aQPfOKJBaDm28IWVZzGFnVk/EuCW4zGDtNrplw3K1n/VnGQEjSjiOsURJdAiEU7lFvDnaP0" }
-  grid_users:
-   - { username: grid, uid: 11001, primgroup: oinstall, othergroups: "asmadmin,asmdba,asmoper,dba", passwd: "$6$9rcikCoA$PiYzFvYpBoHxz5xFbH7ct9fKxLcFw8/vzb08Ewjwqw6j1.thdP7x5hpDOgKKYIcnEL7KbFs/13BUCyX6Y7AGT." }
+  oracle_groups:
+    - { group: asmdba, gid: 54318 }
+    - { group: asmoper, gid: 54319 }
+    - { group: asmadmin, gid: 54320 }
+    - { group: oinstall, gid: 54321 }
+    - { group: dba, gid: 54322 }
+    - { group: backupdba, gid: 54323 }
+    - { group: oper, gid: 54324 }
+    - { group: dgdba, gid: 54325 }
+    - { group: kmdba, gid: 54326 }
 
+  oracle_users:         # Passwd :oracle
+    - { username: oracle, uid: 54321, primgroup: oinstall, othergroups: "dba,asmdba,backupdba,dgdba,kmdba,oper", passwd: "$6$VwR.53R4$HtKoSj3TxZCc4nWoqCrnBx8ldjJ2e7pfe1KKEvjkctAK653RL5FfsPRh5SuhrZEcGElba.G68EPHG3dV5z7ty." }
+  grid_users:           # Passwd :grid
+    - { username: grid, uid: 54320, primgroup: oinstall, othergroups: "asmadmin,asmdba,asmoper,dba", passwd: "$6$/yJx24id$K8gB.l5GEMJlv9Q.v1bulyHiRRqZlZaUwoInNEixd9FBRxj9wyZYyyWzgOkRg9gBMfheH/kgRjranYpnAINRI1" }
 
   oracle_sw_copy: false 
   oracle_sw_unpack: true
+  oracle_stage: /media/sf_12cR1
   oracle_stage_remote: /media/sf_12cR1
-
+  oracle_rsp_stage: /media/sf_12cR1/rsp
 
   configure_interconnect: false
   configure_ssh: true
   configure_host_disks: false
                                           
   configure_cluster: true
-  run_configtoolallcommand: false
   install_os_packages: false
   disable_selinux: false
   
 ################ Grid Infrastructure specifics ################
   oracle_install_option_gi: CRS_CONFIG  
   oracle_install_version_gi: 12.1.0.2
-  oracle_gi_cluster_type: standard
-  oracle_gi_gns_subdomain: collabn.racattack
-  oracle_gi_gns_vip: collabn-cluster-gns.collabn.racattack
 
-
-  oracle_password: racattack                                       # Password used for all Grid Infrastructure related resources (e.g ASM)
-  oracle_scan: collabn-cluster-scan.racattack                           # Scan address for Clustered Grid Infrastructure
-  oracle_vip: -vip                                                 # Suffix for the host VIP-addresses (e.g orarac01-vip)
-  oracle_scan_port: 1521                                           # Listener port for scan-listener
-  oracle_asm_init_dg: data        # The diskgroup that gets created initially when creating a cluster (contains voting/ocr etc) Also valid when setting up Stand Alone Grid Infrastructure
+  oracle_password: racattack                                      
+  oracle_scan: collabn-cluster-scan.racattack                     
+  oracle_vip: -vip                                                
+  oracle_scan_port: 1521                                          
+  oracle_asm_init_dg: data        
   oracle_gi_nic_pub: eth1
   oracle_gi_nic_priv: eth2
+  oracle_gi_gns_subdomain: collabn.racattack
+  oracle_gi_gns_vip: collabn-cluster-gns.racattack.
 
-
-
- 
   oracle_sw_image_db:
        - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2, download: false }
        - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2, download: false }
@@ -50,29 +56,28 @@
 #       - { filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4, download: true }      
 #       - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4, download: true } 
 
-  oracle_databases:           
-        - home: racdb               
-          oracle_version_db: 12.1.0.2
-          oracle_edition: EE
-          oracle_db_name: racdb
-          oracle_db_passwd: Oracle123
-          oracle_db_type: RAC
-          is_container: "false"
-          pdb_prefix: racpdb
-          num_pdbs: 2
-          is_racone: "false"
-          storage_type: ASM
-          service_name: racdb_serv
-          oracle_init_params: "open_cursors=300,processes=700"
-          oracle_db_mem_percent: 30
-          oracle_database_type: MULTIPURPOSE
+  oracle_databases:                                               # Dictionary describing the databases to be installed
+        - home: rachome1                                                   # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
+          oracle_version_db: 12.1.0.2                         # Oracle versiono
+          oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+          oracle_db_name: racdba                                 # Database name
+          oracle_db_passwd: Password1                          # Passwords (sys/system/dbsnm etc)
+          oracle_db_type: RAC                                   # Type of database (RAC,RACONENODE,SI)
+          is_container: "false"                                # (true/false) Is the database a container database
+          pdb_prefix: pdb
+          num_pdbs: 1
+          is_racone: "false"                                   # (true/false) Is the database a RAC ONE NODE Database
+          storage_type: ASM                                     # Database storage to be used. ASM or FS.
+          service_name: racdb_serv                               # Inital service to be created (not in use yet)
+          oracle_init_params: "open_cursors=300,processes=500" # Specific parameters to be set during installation. Comma-separated list
+          oracle_db_mem_percent: 25                            # Amount of RAM to be used for SGA
+          oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
           redolog_size_in_mb: 100
           delete_db: false
-                                                                                                                                                                                                                                           
-                                                                                                                                                                                                                                           
-  oracle_dbf_dir_asm: "DATA"                                                                                                                                                                                                               
+
+
+  oracle_dbf_dir_asm: "DATA"
   oracle_reco_dir_asm: "FRA"                                                                                                                                                                                                               
-                                                                                                                                                                                                                                           
   host_fs_layout:
       u01:
         {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora, fstype: ext4}
@@ -85,7 +90,6 @@
    data:
      - {device: /dev/sdc, asmlabel: asmdisk01}
      - {device: /dev/sdd, asmlabel: asmdisk02}
-   fra:
      - {device: /dev/sde, asmlabel: asmdisk03}
+   fra:
      - {device: /dev/sdf, asmlabel: asmdisk04}
-
