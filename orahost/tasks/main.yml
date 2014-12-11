@@ -20,6 +20,9 @@
      - selinux
     ignore_errors: true
 
+  - name: Add local node's ip & hostname to /etc/hosts
+    lineinfile: dest=/etc/hosts line="{{ ansible_default_ipv4.address }} {{ ansible_fqdn }} {{ ansible_hostname }} " state=present
+    when: configure_etc_hosts and ansible_default_ipv4.address is defined
 
   - name: User | Add group(s)
     group: name={{ item.group }} gid={{ item.gid }} state=present 
