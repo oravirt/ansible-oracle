@@ -1,16 +1,17 @@
 ---
    oracle_sw_source_www: http://oladmin/orasw 
    is_sw_source_local: false
-   role_separation: false
+   role_separation: true
+   configure_cluster: false
 
    oracle_install_version_gi: 12.1.0.2
    
    configure_host_disks: true
    host_fs_layout:    
        u01:
-         {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora}
+         {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora, fstype: ext4 }
 
-   device_persistence: udev
+   device_persistence: asmlib
    oracle_asm_init_dg: crs
    asm_diskgroups:        # ASM Diskgroups used for DB-storage. Should map to dict asm_storage_layout. 
       - crs
@@ -55,21 +56,21 @@
           redolog_size_in_mb: 100
           delete_db: false                                     # Should the database be deleted? (Feeds into role: oradb-delete
 
-        - home: myhomeasm                                                     # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
-          oracle_version_db: 12.1.0.2                          # Oracle versiono
-          oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
-          oracle_db_name: asmdb2                                 # Database name
-          oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
-          oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
-          is_container: "false"                                # (true/false) Is the database a container database
-          pdb_prefix: pdb
-          num_pdbs: 1
-          is_racone: "false"                                   # (true/false) Is the database a RAC ONE NODE Database
-          storage_type: ASM                                     # Database storage to be used. ASM or FS.   
-          service_name: asmdb_serv                               # Inital service to be created (not in use yet)
-          oracle_init_params: "open_cursors=300,processes=700" # Specific parameters to be set during installation. Comma-separated list
-          oracle_db_mem_percent: 30                            # Amount of RAM to be used for SGA
-          oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
-          redolog_size_in_mb: 100
-          delete_db: false                                     # Should the database be deleted? (Feeds into role: oradb-delete
+#        - home: myhomeasm                                                     # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
+#          oracle_version_db: 12.1.0.2                          # Oracle versiono
+#          oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+#          oracle_db_name: asmdb2                                 # Database name
+#          oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
+#          oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
+#          is_container: "false"                                # (true/false) Is the database a container database
+#          pdb_prefix: pdb
+#          num_pdbs: 1
+#          is_racone: "false"                                   # (true/false) Is the database a RAC ONE NODE Database
+#          storage_type: ASM                                     # Database storage to be used. ASM or FS.   
+#          service_name: asmdb_serv                               # Inital service to be created (not in use yet)
+#          oracle_init_params: "open_cursors=300,processes=700" # Specific parameters to be set during installation. Comma-separated list
+#          oracle_db_mem_percent: 30                            # Amount of RAM to be used for SGA
+#          oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+#          redolog_size_in_mb: 100
+#          delete_db: false                                     # Should the database be deleted? (Feeds into role: oradb-delete
 

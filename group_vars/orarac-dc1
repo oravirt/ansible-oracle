@@ -1,32 +1,35 @@
 ---
   hostgroup: orarac-dc1
-  role_separation: false
-  device_persistency: udev
+  role_separation: true
+  device_persistence: udev
 
   configure_interconnect: true               
   configure_ssh: true                       
   configure_host_disks: true               
                                           
   configure_cluster: true
+  configure_epel_repo: false
+  configure_public_yum_repo: false
+  install_os_packages: false
   
 ################ Grid Infrastructure specifics ################
   oracle_install_option_gi: CRS_CONFIG  
   oracle_install_version_gi: 12.1.0.2
 
   oracle_password: Oracle123
-  oracle_scan: orarac-scan-dc1.discworld.lab
+  oracle_scan: orarac-scan-dc1.discworld.net
   oracle_vip: -vip
   oracle_scan_port: 1521
   oracle_asm_init_dg: crs           
 
  
   oracle_sw_image_db:
-       - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2, download: false }
-       - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2, download: false }
-#       - { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1, download: false }
-#       - { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1, download: false }
-#       - { filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4, download: true }      
-#       - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4, download: true } 
+       - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2 }
+       - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2 }
+#       - { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1 }
+#       - { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1 }
+#       - { filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4 }      
+#       - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4 } 
 
   oracle_databases:           
         racdb:               
@@ -53,7 +56,7 @@
                                                                                                                                                                                                                                            
   host_fs_layout:                                                                                                                                                                                                                          
       u01:                                                                                                                                                                                                                                 
-        {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora}
+        {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora, fstype: ext4}
 
   asm_diskgroups:  
      - crs
@@ -65,9 +68,6 @@
      - {device: /dev/sdc, asmlabel: crs01}
    data:
      - {device: /dev/sdd, asmlabel: data01}
-     - {device: /dev/sde, asmlabel: data02}
    fra:
-     - {device: /dev/sdf, asmlabel: fra01}
-     - {device: /dev/sdg, asmlabel: fra02}
-     - {device: /dev/sdh, asmlabel: fra03}
+     - {device: /dev/sde, asmlabel: fra01}
 

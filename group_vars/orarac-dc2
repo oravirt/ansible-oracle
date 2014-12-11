@@ -1,6 +1,6 @@
 ---
   hostgroup: orarac-dc2
-  role_separation: true
+  role_separation: false
   device_persistence: asmlib
 #  install_from_nfs: false
 #  is_sw_source_local: false
@@ -11,11 +11,14 @@
   configure_host_disks: true               
                                           
   configure_cluster: true
-  install_os_packages: false
+  install_os_packages: true
+  configure_epel_repo: true
+  configure_public_yum_repo: true
   
 ################ Grid Infrastructure specifics ################
   oracle_install_option_gi: CRS_CONFIG  
   oracle_install_version_gi: 12.1.0.2
+  oracle_gi_cluster_type: standard
 
   oracle_password: Oracle123
   oracle_scan: orarac-scan-dc2.discworld.net
@@ -26,16 +29,16 @@
 
  
   oracle_sw_image_db:
-       - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2, download: false }
-       - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2, download: false }
-#       - { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1, download: false }
-#       - { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1, download: false }
-#       - { filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4, download: true }      
-#       - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4, download: true } 
+       - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2 }
+       - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2 }
+#       - { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1 }
+#       - { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1 }
+#       - { filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4 }      
+#       - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4 } 
 
   oracle_databases:                                               # Dictionary describing the databases to be installed
         - home: rachome1                                                   # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
-          oracle_version_db: 12.1.0.2                          # Oracle versiono
+          oracle_version_db: 11.2.0.4                          # Oracle versiono
           oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
           oracle_db_name: racdba                                 # Database name
           oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
@@ -57,7 +60,7 @@
                                                                                                                                                                                                                                            
   host_fs_layout:                                                                                                                                                                                                                          
       u01:                                                                                                                                                                                                                                 
-        {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora}
+        {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora, fstype: ext4}
 
   asm_diskgroups:  
      - crs
