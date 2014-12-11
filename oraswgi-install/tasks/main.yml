@@ -13,7 +13,7 @@
     when: not oracle_sw_copy|bool and not oracle_sw_unpack|bool
 
   - name: Add new dotprofile (GI)
-    template: src=dotprofile-gi.j2 dest={{ grid_user_home }}/{{ oracle_profile_name_gi }} owner={{ grid_user }} group={{ oracle_group }} mode=755 backup=yes
+    template: src=dotprofile-gi.j2 dest={{ grid_user_home }}/{{ oracle_profile_name_gi }} owner={{ grid_install_user }} group={{ oracle_group }} mode=755 backup=yes
     tags: 
     - dotprofilegi
 
@@ -56,7 +56,7 @@
       - directories
   
   - name: Create ORACLE_HOME directory (GI)
-    file: dest={{ oracle_home_gi }} owner="{{ grid_user }}" group={{ oracle_group }} state=directory mode=775
+    file: dest={{ oracle_home_gi }} owner="{{ grid_install_user }}" group={{ oracle_group }} state=directory mode=775
     sudo: yes
     tags:
       - directories
@@ -67,7 +67,7 @@
     get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
     with_items:  oracle_sw_image_gi 
     sudo: yes
-    sudo_user: "{{ grid_user }}"
+    sudo_user: "{{ grid_install_user }}"
     tags:
       - oragridsw
     when: checkgiinstall.stdout != "1" and not is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool
@@ -76,7 +76,7 @@
     get_url: url={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
     with_items:  oracle_sw_image_gi 
     sudo: yes
-    sudo_user: "{{ grid_user }}"
+    sudo_user: "{{ grid_install_user }}"
     tags:
       - oragridsw
     when: checkgiinstall.stdout != "1" and is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool
@@ -85,7 +85,7 @@
     unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no 
     with_items: oracle_sw_image_gi
     sudo: yes
-    sudo_user: "{{ grid_user }}"
+    sudo_user: "{{ grid_install_user }}"
     tags:
       - oragridswunpack
     when: checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool and oracle_sw_unpack|bool
@@ -94,7 +94,7 @@
     unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no
     with_items: oracle_sw_image_gi
     sudo: yes
-    sudo_user: "{{ grid_user }}"
+    sudo_user: "{{ grid_install_user }}"
     tags:
     - oragridswunpack
     when: checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy|bool and oracle_sw_unpack|bool
@@ -106,7 +106,7 @@
     ignore_errors: true
     
   - name: Setup response file for install (GI)
-    template: src=grid-install.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner="{{ grid_user }}" group={{ oracle_group }} mode=775 backup=yes
+    template: src=grid-install.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner="{{ grid_install_user }}" group={{ oracle_group }} mode=775 backup=yes
     tags:
       - responsefilegi
     when: master_node and checkgiinstall.stdout != "1"
@@ -114,7 +114,7 @@
   - name: Install Grid Infrastructure
     shell: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -ignoreSysPrereqs -showProgress -silent"
     sudo: yes
-    sudo_user: "{{ grid_user }}"
+    sudo_user: "{{ grid_install_user }}"
     tags:
       - oragridinstall
     when: master_node and checkgiinstall.stdout != "1" #and oracle_sw_unpack
@@ -123,7 +123,7 @@
 #  - name: Install Grid Infrastructure
 #    shell: "{{ oracle_stage }}/{{ oracle_install_version_gi }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -ignoreSysPrereqs -showProgress -silent"
 #    sudo: yes
-#    sudo_user: "{{ grid_user }}"
+#    sudo_user: "{{ grid_install_user }}"
 #    tags:
 #      - oragridinstall
 #    when: master_node and checkgiinstall.stdout != "1" not and oracle_sw_unpack
@@ -162,7 +162,7 @@
     when: not master_node and checkgiinstall.stdout != "1"
 
   - name: Setup response file for configToolAllCommands
-    template: src=configtoolallcommands.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/configtoolallcommands.rsp owner="{{ grid_user }}" group={{ oracle_group }} mode=755 backup=yes
+    template: src=configtoolallcommands.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/configtoolallcommands.rsp owner="{{ grid_install_user }}" group={{ oracle_group }} mode=755 backup=yes
     tags:
       - responsefileconfigtool
     when: master_node and run_configtoolallcommand  and checkgiinstall.stdout != "1"
@@ -170,22 +170,22 @@
   - name: Run configToolAllCommands
     shell: "{{ oracle_home_gi }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_rsp_stage }}/configtoolallcommands.rsp"
     sudo: yes
-    sudo_user: "{{ grid_user }}"
+    sudo_user: "{{ grid_install_user }}"
     tags:
       - runconfigtool
-    when: master_node and run_configtoolallcommand and oracle_install_version_gi != '11.2.0.4' and checkgiinstall.stdout != "1"
+    when: master_node and run_configtoolallcommand and checkgiinstall.stdout != "1"
     ignore_errors: true
     register: configtool
 
-  - name: Run configToolAllCommands (if 11.2.0.4)
-    shell: "{{ oracle_home_gi }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_rsp_stage }}/configtoolallcommands.rsp"
-    sudo: yes
-    sudo_user: "{{ grid_user }}"
-    tags:
-      - runconfigtool
-    when: master_node and run_configtoolallcommand and oracle_install_version_gi == '11.2.0.4' and checkgiinstall.stdout != "1"
-    ignore_errors: true
-    register: configtool
+#  - name: Run configToolAllCommands (v11.2)
+#    shell: "{{ oracle_home_gi }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_rsp_stage }}/configtoolallcommands.rsp"
+#    sudo: yes
+#    sudo_user: "{{ grid_install_user }}"
+#    tags:
+#      - runconfigtool
+#    when: master_node and run_configtoolallcommand and '11.2' in oracle_install_version_gi and checkgiinstall.stdout != "1"
+#    ignore_errors: true
+#    register: configtool
 
   - name: Check if stuff is running
     shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
@@ -202,7 +202,7 @@
   - name: Update Nodelist, set CRS=TRUE
     shell: "{{ oracle_home_gi }}/oui/bin/runInstaller -updateNodeList ORACLE_HOME={{ oracle_home_gi }} CRS=TRUE"
     sudo: yes
-    sudo_user: "{{ grid_user }}"
+    sudo_user: "{{ grid_install_user }}"
     tags:
       - updatenodelist
     when : master_node and checkgiinstall.stdout != "1"
@@ -222,7 +222,7 @@
   - name: Check opatch lsinventory (GI)
     shell: "{{ oracle_home_gi }}/OPatch/opatch lsinventory"
     sudo: yes
-    sudo_user: "{{ grid_user }}"
+    sudo_user: "{{ grid_install_user }}"
     register: opatchls
     tags:
      - opatchls
@@ -237,7 +237,7 @@
   - name: Check olsnodes (GI)
     shell: "{{ oracle_home_gi }}/bin/olsnodes -a -n -s -t"
     sudo: yes
-    sudo_user: "{{ grid_user }}"
+    sudo_user: "{{ grid_install_user }}"
     when: oracle_gi_cluster_type |upper == 'FLEX'
     register: olsnodes
     tags:

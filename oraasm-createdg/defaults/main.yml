@@ -1,7 +1,15 @@
 ---
 
+  oracle_user: oracle
+  grid_user: grid
+  grid_install_user: "{% if role_separation==true %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
+  oracle_group: oinstall
+  oracle_base: /u01/app/oracle
   oracle_home_gi: "{% if configure_cluster==True %}{{ oracle_home_gi_cl }}{% else %}{{ oracle_home_gi_so }}{% endif %}"
   oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Clustered)
   oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Stand Alone)
+  oracle_stage: /u01/stage
+  oracle_rsp_stage: "{{ oracle_stage }}/rsp"
+  oracle_stage_remote: "{{ oracle_stage }}"
   device_persistence: asmlib
   oracle_asm_disk_string: "{% if device_persistence == 'asmlib' %}{% elif device_persistence == 'udev' %}/dev/oracle/{% else %}{% endif %}"

@@ -23,10 +23,11 @@
 
   role_separation: false
   oracle_user: oracle                        # User that will own the Oracle Installations.
-  grid_user: "{% if role_separation==true %}grid{% else %}oracle{% endif %}"
+  grid_user: grid
+  grid_install_user: "{% if role_separation==true %}{{grid_user }}{% else %}{{ oracle_user }}{% endif %}"
 
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-  grid_user_home: "/home/{{ grid_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+  grid_user_home: "/home/{{ grid_install_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
   oracle_group: oinstall                          # Primary group for oracle_user. 
   oper_group: oper
   dba_group: dba                          
@@ -52,6 +53,7 @@
   configure_ssh: false                        # (true/false). Should passwordless ssh be configured between clusternodes. Only applicable to RAC-installs
   configure_host_disks: false                 # (true/false). Should the specified directories be on their on devices -> (true), or do they live in the root-filesystem (/) -> (false). 
                                              # mountpoints are described in host_fs_layout
+  configure_etc_hosts: false
   configure_cluster: false
   oracle_stage: /u01/stage
   oracle_rsp_stage: "{{ oracle_stage }}/rsp"
