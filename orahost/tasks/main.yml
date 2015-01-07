@@ -1,6 +1,13 @@
 # orahost playbook 
 ---
 
+  - name: Check for correct OS family & min version
+    assert: 
+      that: "ansible_os_family == '{{ os_family_supported }}'"
+      that: "ansible_distribution_version >= '{{ os_min_supported_version }}'"
+    tags: 
+     - oscheck
+
   - name: Install packages required by Oracle
     yum: name={{ item }} state=installed
     with_items: oracle_packages 
@@ -226,6 +233,7 @@
 
   - name: Create udev stage directory
     file: dest={{ oracle_stage }}/udev mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    when: device_persistence == 'udev'
 
   - name: Asmlib | Configure Oracle Asmlib (1)
     template: src=oracleasm-configure.expect.j2  dest={{ oracle_rsp_stage }}/asmlib-configure.expect owner=root mode=0777 force=yes
