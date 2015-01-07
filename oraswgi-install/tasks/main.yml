@@ -120,15 +120,6 @@
     when: master_node and checkgiinstall.stdout != "1" #and oracle_sw_unpack
     register: giinstall
 
-#  - name: Install Grid Infrastructure
-#    shell: "{{ oracle_stage }}/{{ oracle_install_version_gi }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -ignoreSysPrereqs -showProgress -silent"
-#    sudo: yes
-#    sudo_user: "{{ grid_install_user }}"
-#    tags:
-#      - oragridinstall
-#    when: master_node and checkgiinstall.stdout != "1" not and oracle_sw_unpack
-#    register: giinstall
-
   - debug: var=giinstall.stdout_lines
     when: master_node and checkgiinstall.stdout != "1"
 
@@ -176,16 +167,6 @@
     when: master_node and run_configtoolallcommand and checkgiinstall.stdout != "1"
     ignore_errors: true
     register: configtool
-
-#  - name: Run configToolAllCommands (v11.2)
-#    shell: "{{ oracle_home_gi }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_rsp_stage }}/configtoolallcommands.rsp"
-#    sudo: yes
-#    sudo_user: "{{ grid_install_user }}"
-#    tags:
-#      - runconfigtool
-#    when: master_node and run_configtoolallcommand and '11.2' in oracle_install_version_gi and checkgiinstall.stdout != "1"
-#    ignore_errors: true
-#    register: configtool
 
   - name: Check if stuff is running
     shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
@@ -238,14 +219,14 @@
     shell: "{{ oracle_home_gi }}/bin/olsnodes -a -n -s -t"
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
-    when: oracle_gi_cluster_type |upper == 'FLEX'
+    when: oracle_gi_cluster_type |upper == 'FLEX' and '12.1' in oracle_install_version_gi
     register: olsnodes
     tags:
      - olsnodes
 
   - name: Check olsnodes (GI)
     debug: var=olsnodes.stdout_lines
-    when: oracle_gi_cluster_type|upper == 'FLEX'
+    when: oracle_gi_cluster_type|upper == 'FLEX' and '12.1' in oracle_install_version_gi
     tags:
      - olsnodes
 
