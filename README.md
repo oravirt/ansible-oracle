@@ -4,7 +4,7 @@
 
 - Ansible >= 1.6
 - Oracle Linux (or any RHEL-based Linux System) >= 6.4
-- Oracle Database/Grid Infrastructure 12.1.0.1 & 12.1.0.2, 11.2.0.4
+- Oracle Database/Grid Infrastructure 12.1.0.1 & 12.1.0.2, 11.2.0.4, 11.2.0.3
 
 </b>
 
@@ -18,6 +18,8 @@ By default, you can install a single instance 12.1.0.2 database on filesystem, w
 
 I'm creating a bunch of examples which illustrates how to use/run the different roles. They can be found here: http://oravirt.wordpress.com/category/ansible-oracle. 
 I'll also be setting up a page where I have a list of all parameters and explanations of what they are used for, which can be found here: http://oravirt.wordpress.com/ansible-oracle-parameters
+
+As this is based on the EL6 platform the lowest supported Oracle version will be 11.2.0.3, as per Oracle's certification matrix.
 
 <b>Note: </b>
 - You'll need to manually download the Oracle software and make it available to the control-machine (either locally or on a web-server, or through a nfs-share) before running the playbook. By default the 
@@ -54,7 +56,7 @@ This role configures storage that shoud be used by ASM.
 - Create ASMlib labels or sets up udev-rules for device name persistence
 
 <b>oraswgi-install:</b>
-This role will install and configure Oracle Grid Infrastructure. Tested with 12.1.0.1/12.1.0.2 & 11.2.0.4
+This role will install and configure Oracle Grid Infrastructure. Tested with 12.1.0.1/12.1.0.2 & 11.2.0.4/11.2.0.3
 - Adds a .profile_grid to the oracle user
 - Sets up directory structures
 - Copies the install-files to the servers, or installs from a remote location (e.g nfs share)

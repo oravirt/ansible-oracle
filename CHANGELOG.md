@@ -1,4 +1,9 @@
 <b> Changelog (bigger changes) </b>
+
+
+2015-01-07
+- Added support for 11.2.0.3
+
 2014-11-20
 - Added support for Flex Clusters
 
