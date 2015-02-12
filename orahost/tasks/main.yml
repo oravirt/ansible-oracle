@@ -12,6 +12,7 @@
     yum: name={{ item }} state=installed
     with_items: oracle_packages 
     when: install_os_packages
+    tags: os_packages
 
   - name: Disable selinux (permanently)
     selinux: state=disabled
@@ -129,6 +130,7 @@
         - "{{ ssh_keys }}"
         - "{{ keyfile }}"
     when: master_node and configure_ssh and configure_cluster
+    ignore_errors: true
     tags:
      - sshkeys
 
