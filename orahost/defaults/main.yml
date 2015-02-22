@@ -27,6 +27,7 @@
   oracle_user: oracle                        # User that will own the Oracle Installations.
   grid_user: grid
   grid_install_user: "{% if role_separation==true %}{{grid_user }}{% else %}{{ oracle_user }}{% endif %}"
+  configure_oracle_sudo: true
 
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
   grid_user_home: "/home/{{ grid_install_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
@@ -126,6 +127,7 @@
       - lvm2
       - xfsprogs
       - btrfs-progs
+      - parted
      
   oracle_sysconfig:
       - { name: kernel.shmall, value: 4294967296 }
