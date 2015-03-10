@@ -44,6 +44,7 @@
     with_items: oradbcreate.results
     tags:
      - oradbcreate
+    when: oradbcreate.changed
 
 #  - name: Add default services to databases
 #    shell: "{{ oracle_home_db }}/bin/srvctl add service -db {{ item.value.oracle_database }} 
@@ -65,7 +66,26 @@
 #    when: oracle_install_option_gi == 'CRS_CONFIG' or oracle_install_option_gi == 'HA_CONFIG'
 #    tags:
 #     - srvctlconfig
+  - name: Add dotprofile (1)
+    shell:  ps -ef | grep "ora_pmon_{{ item.oracle_db_name }}" |grep -v grep | sed 's/^.*pmon_//g'
+    with_items: oracle_databases
+    register: dbs
+    tags: dotprofile_db
+    
+  - name: Add dotprofile (2)
+    template: src=dotprofile-db.j2 dest={{ oracle_user_home }}/.profile_{{ item.0.oracle_db_name }} owner={{ oracle_user }} group={{ oracle_group }} mode=775 backup=yes
+    with_together:
+    - oracle_databases
+    - dbs.results
+    tags: dotprofile_db
 
+  - name: Update oratab
+    lineinfile: dest=/etc/oratab line="{{ item.1.stdout }}:{{ oracle_base }}/{{ item.0.oracle_version_db }}/{{ item.0.home }}:N" state=present
+    with_together:
+       - oracle_databases
+       - dbs.results
+    tags: update_oratab
+    
   - name: Check if database is running
     shell: ps -ef |grep pmon |grep -v grep
     tags:
