@@ -24,6 +24,10 @@
     tags: 
     - dbcaresponse
 
+#  - name: Check memory
+#    debug: msg="memfree={{ ansible_memfree_mb }}M totalmem={{ ansible_memtotal_mb }}M need 616M free"
+#    failed_when: "{{ ansible_memfree_mb }} < 616"
+
   - name: Create database(s)
     shell: "time {{ oracle_home_db_install }}/bin/dbca -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent -redoLogFileSize {{ item.0.redolog_size_in_mb }} "
     with_together:
@@ -31,7 +35,7 @@
        - checkdbexist.results
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and item.1.stdout != "1" 
+    when: master_node and item.1.stdout != "1" and "{{ item.0.state }}"|upper == "PRESENT"
     tags:
       - oradbcreate
     register: oradbcreate
@@ -67,6 +71,7 @@
     tags:
      - psout
     register: psout
+    ignore_errors: true
       
 
   - debug: var=psout.stdout_lines
