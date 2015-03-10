@@ -28,9 +28,20 @@
      - selinux
     ignore_errors: true
 
-  - name: Add local node's ip & hostname to /etc/hosts
-    lineinfile: dest=/etc/hosts line="{{ ansible_default_ipv4.address }} {{ ansible_fqdn }} {{ ansible_hostname }} " state=present
-    when: configure_etc_hosts and ansible_default_ipv4.address is defined
+  - name: Check dns for host
+    command: nslookup {{ ansible_hostname }}
+    register: ns
+    ignore_errors: True
+    tags: etchosts
+
+  - name: "Add host to /etc/hosts if needed"
+    lineinfile: dest=/etc/hosts regexp='.*{{ ansible_fqdn }}$' line="{{ ansible_default_ipv4.address }} {{ ansible_hostname }} {{ ansible_fqdn }}" state=present
+    when: "'find {{ ansible_hostname }}: NXDOMAIN' in ns.stdout"
+    tags: etchosts
+
+#  - name: Add local node's ip & hostname to /etc/hosts
+#    lineinfile: dest=/etc/hosts line="{{ ansible_default_ipv4.address }} {{ ansible_fqdn }} {{ ansible_hostname }} " state=present
+#    when: configure_etc_hosts and ansible_default_ipv4.address is defined
 
   - name: User | Add group(s)
     group: name={{ item.group }} gid={{ item.gid }} state=present 
@@ -54,13 +65,14 @@
   - name: User | Add Oracle user to sudoers
     template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0600
     with_items: oracle_users
+    when: configure_oracle_sudo
     tags:
      - sudoadd
 
   - name: User | Add Grid user to sudoers
     template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0600
     with_items: grid_users
-    when: role_separation
+    when: role_separation and configure_oracle_sudo
     tags:
      - sudoadd
 
@@ -252,7 +264,7 @@
 
   - name: Asmlib | Enable and start Oracle Asmlib
     service: name=oracleasm  state=started  enabled=yes
-    when: device_persistence == 'asmlib'
+    when: device_persistence == 'asmlib' 
     tags:
       - asmlibconfig
   
