@@ -62,7 +62,6 @@
       - directories
     when: checkgiinstall.stdout != "1" 
 
-
   - name: Copy oracle installfiles to server (GI) (web)
     get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
     with_items:  oracle_sw_image_gi 
@@ -229,7 +228,6 @@
     when: oracle_gi_cluster_type|upper == 'FLEX' and '12.1' in oracle_install_version_gi
     tags:
      - olsnodes
-
 
   - name: Unmount nfs share with installation media
     mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=absent

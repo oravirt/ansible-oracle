@@ -13,13 +13,6 @@
     tags:
       - nfsmountdb
 
-
-#  - debug: var=checkdbswinstall.stdout
-#    with_items: checkdbswinstall.results
-#    when: master_node
-#    tags:
-#     - checkifdbinstall
-
   - name: Add new dotprofile (DB)
     template: src=dotprofile-db.j2 dest={{ oracle_user_home }}/{{oracle_profile_name }} owner={{ oracle_user }} group={{ oracle_group }} mode=775 backup=yes
     with_items: oracle_databases
@@ -77,38 +70,46 @@
       - directoriesdb
 
   - name: Transfer oracle installfiles to server (www)
-    get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
-    with_items: oracle_sw_image_db
+    get_url: url={{ oracle_sw_source_www }}/{{ item[0].filename }} dest={{ oracle_stage }} mode=775
+    with_nested: 
+      - oracle_sw_image_db
+      - oracle_databases
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and not is_sw_source_local and oracle_sw_copy|bool 
+    when: master_node and item[0].version == item[1].oracle_version_db and not is_sw_source_local and oracle_sw_copy|bool 
     tags:
       - oradbsw
 
   - name: Transfer oracle installfiles to server (local)
-    copy: src={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
-    with_items: oracle_sw_image_db
+    copy: src={{ oracle_sw_source_local }}/{{ item[0].filename }} dest={{ oracle_stage }} mode=775
+    with_nested: 
+      - oracle_sw_image_db
+      - oracle_databases
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and is_sw_source_local and oracle_sw_copy|bool 
+    when: master_node and item[0].version == item[1].oracle_version_db and is_sw_source_local and oracle_sw_copy|bool 
     tags:
       - oradbsw
 
   - name: Extract files to stage-area
-    unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no 
-    with_items: oracle_sw_image_db
+    unarchive: src={{ oracle_stage }}/{{ item[0].filename }}  dest={{ oracle_stage }}/{{ item[0].version }} copy=no 
+    with_nested: 
+      - oracle_sw_image_db
+      - oracle_databases
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and oracle_sw_copy|bool and oracle_sw_unpack|bool 
+    when: master_node and item[0].version == item[1].oracle_version_db and oracle_sw_copy|bool and oracle_sw_unpack|bool 
     tags:
       - oradbswunpack
 
   - name: Extract files to stage-area (from remote location)
-    unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no
-    with_items: oracle_sw_image_db
+    unarchive: src={{ oracle_stage }}/{{ item[0].filename }}  dest={{ oracle_stage }}/{{ item[0].version }} copy=no 
+    with_nested: 
+      - oracle_sw_image_db
+      - oracle_databases
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and not oracle_sw_copy|bool and oracle_sw_unpack|bool 
+    when: master_node and item[0].version == item[1].oracle_version_db and not oracle_sw_copy|bool and oracle_sw_unpack|bool 
     tags:
       - oradbswunpack
 
@@ -134,8 +135,6 @@
     when: master_node #and item.1.stdout != "1" 
     tags:
       - responsefileswdb
-
-
 
   - name: Install Oracle Database Server
     #shell: "{{ oracle_stage_install }}/{{ item.0.oracle_version_db }}/database/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent -waitforcompletion"

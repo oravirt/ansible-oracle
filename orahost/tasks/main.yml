@@ -147,10 +147,18 @@
      - sshkeys
 
   - name: filesystem | Create partition and pv
-    script: disks.sh {{ item.value.device }}
+    shell:  parted -a optimal {{ item.value.device }} "mklabel gpt mkpart primary 1 -1"; pvcreate {{ item.value.pvname }}
+    args:
+     creates: "{{ item.value.pvname }}"
     with_dict: host_fs_layout
     when: configure_host_disks
     tags: hostfs
+
+#  - name: filesystem | Create partition and pv
+#    script: disks.sh {{ item.value.device }}
+#    with_dict: host_fs_layout
+#    when: configure_host_disks
+#    tags: hostf
   
   - name: filesystem | Create vg
     lvg: vg={{ item.value.vgname }} pvs={{ item.value.pvname }} state=present vg_options="-f" # "-f used as workaround for https://github.com/ansible/ansible/pull/6859"
