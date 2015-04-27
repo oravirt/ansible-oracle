@@ -1,7 +1,17 @@
 ---
 
+  - name: Check which GI patches are applied
+    shell: "{{ oracle_home_gi }}/OPatch/opatch lspatches -oh {{ oracle_home_gi }}  |grep  {{ item.patchversion }} |wc -l"
+    sudo: yes
+    sudo_user: "{{ grid_install_user }}"
+    with_items: oracle_sw_image_gi_psu
+    tags: check_applied_gi_patches
+    when: oracle_psu_apply_gi 
+    register: gi_applied_patches
+
+
   - name: Create stage directory
-    file: dest={{ oracle_psu_stage }} mode=775 owner={{ grid_install_user }} group={{ oracle_group }} state=directory
+    file: dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} mode=775 owner={{ grid_install_user }} group={{ oracle_group }} state=directory
     tags:
       - directoriespsu
     when: oracle_psu_apply_gi
@@ -25,7 +35,7 @@
       - oragridopatchget
 
   - name: Extract OPatch to stage-area
-    unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_psu_stage }} copy=no
+    unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
     with_items: oracle_opatch_patch 
@@ -34,7 +44,7 @@
       - oragridpatchunpack
   
   - name: Extract GI psu files to stage-area
-    unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_psu_stage }} copy=no
+    unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
     with_items: oracle_sw_image_gi_psu
@@ -42,14 +52,15 @@
     tags:
       - oragridpsuunpack
 
+
   - name: Distribute latest opatch
-    shell: rm -rf {{ oracle_home_gi }}/OPatch; cp -Rvp {{ oracle_psu_stage }}/OPatch {{ oracle_home_gi }}; chown -R {{ grid_user }}:{{ oracle_group }} {{ oracle_home_gi }}/OPatch
+    shell: rm -rf {{ oracle_home_gi }}/OPatch; cp -Rvp {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/OPatch {{ oracle_home_gi }}; chown -R {{ grid_install_user }}:{{ oracle_group }} {{ oracle_home_gi }}/OPatch
     when: oracle_psu_apply_gi
     tags:
       - oragridnewopatch
 
   - name: Configure ocm.rsp (1)
-    template: src=ocmrsp.expect.j2  dest={{ oracle_psu_stage }}/ocmrsp.expect mode=0777 force=yes
+    template: src=ocmrsp.expect.j2  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect mode=0777 force=yes
     when: oracle_psu_apply_gi
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
@@ -57,7 +68,7 @@
       - ocmconfig
 
   - name: Configure ocm.rsp (2)
-    shell: "{{ oracle_psu_stage }}/ocmrsp.expect"
+    shell: "{{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect"
     when: oracle_psu_apply_gi
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
@@ -65,21 +76,24 @@
       - ocmconfig
 
   - name: Apply PSU to GI (v12.1) (Master node)
-    shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_psu_stage }}/{{ item.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/ocm.rsp "
-    with_items: oracle_sw_image_gi_psu
+    shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
+    with_together: 
+       - oracle_sw_image_gi_psu
+       - gi_applied_patches.results
     tags:
-      - oragridpsuapply
-    when: master_node and oracle_psu_apply_gi and '12.1' in oracle_install_version_gi and "{{ item.version }}" == "{{ oracle_install_version_gi }}"
+      - apply_psu_grid
+    when: master_node and oracle_psu_apply_gi and '12.1' in oracle_install_version_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
     register: psuapplym
 
-  - name: Apply PSU to GI (v11.2) (Master node)
-    shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_psu_stage }}/{{ item.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/ocm.rsp "
-    with_items: oracle_sw_image_gi_psu
-    tags:
-      - oragridpsuapply
-    when: master_node and oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and "{{ item.version }}" == "{{ oracle_install_version_gi }}"
-    register: psuapplym
   
+  - name: Apply PSU to GI (v11.2) (Master node)
+    shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
+    with_together: 
+       - oracle_sw_image_gi_psu
+       - gi_applied_patches.results
+    tags: apply_psu_grid
+    when: master_node and oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
+    register: psuapplym
   
   - debug: var=psuapplym.stdout_lines
     when: master_node and oracle_psu_apply_gi
@@ -98,19 +112,22 @@
     when: master_node
 
   - name: Apply PSU to GI (v12.1) (other nodes)
-    shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_psu_stage }}/{{ item.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/ocm.rsp "
-    with_items: oracle_sw_image_gi_psu
+    shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
+    with_together: 
+       - oracle_sw_image_gi_psu
+       - gi_applied_patches.results
     tags:
-      - oragridpsuapply
-    when: not master_node and oracle_psu_apply_gi and  '12.1' in oracle_install_version_gi and "{{ item.version }}" == "{{ oracle_install_version_gi }}" 
+      - apply_psu_grid
+    when: not master_node and oracle_psu_apply_gi and  '12.1' in oracle_install_version_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
     register: psuapplyo
   
   - name: Apply PSU to GI (v11.2) (other nodes)
-    shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_psu_stage }}/{{ item.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/ocm.rsp "
-    with_items: oracle_sw_image_gi_psu
-    tags:
-      - oragridpsuapply
-    when: not master_node and oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and "{{ item.version }}" == "{{ oracle_install_version_gi }}" 
+    shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
+    with_together: 
+      - oracle_sw_image_gi_psu
+      - gi_applied_patches.results
+    tags: apply_psu_grid
+    when: not master_node and oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
     register: psuapplyo
   
   - debug: var=psuapplyo.stdout_lines
