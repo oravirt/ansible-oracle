@@ -17,16 +17,18 @@
     when: oracle_psu_apply_gi
   
   - name: Copy oracle GI patchfiles to server (www)
-    get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
-    with_items: oracle_sw_image_gi_psu
-    when: oracle_psu_apply_gi and "{{ item.version }}" == "{{ oracle_install_version_gi }}" 
+    get_url: url={{ oracle_sw_source_www }}/{{ item.0.filename }} dest={{ oracle_stage }} mode=775
+    with_together: 
+       - oracle_sw_image_gi_psu
+       - gi_applied_patches.results
+    when: oracle_psu_apply_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
     tags:
       - oragridpatchget
 
   - name: Copy oracle opatch to server (www)
-    get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
+    get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=775 force=yes
     with_items: oracle_opatch_patch
     when: oracle_psu_apply_gi and "{{ item.version }}" == "{{ oracle_install_version_gi }}" 
     sudo: yes
@@ -39,16 +41,18 @@
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
     with_items: oracle_opatch_patch 
-    when: oracle_psu_apply_gi and "{{ item.version }}" == "{{ oracle_install_version_gi }}"
+    when: oracle_psu_apply_gi and "{{ item.version }}" == "{{ oracle_install_version_gi }}" 
     tags:
       - oragridpatchunpack
   
   - name: Extract GI psu files to stage-area
-    unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
+    unarchive: src={{ oracle_stage }}/{{ item.0.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
-    with_items: oracle_sw_image_gi_psu
-    when: oracle_psu_apply_gi and "{{ item.version }}" == "{{ oracle_install_version_gi }}"
+    with_together: 
+       - oracle_sw_image_gi_psu
+       - gi_applied_patches.results
+    when: oracle_psu_apply_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
     tags:
       - oragridpsuunpack
 
@@ -61,7 +65,7 @@
 
   - name: Configure ocm.rsp (1)
     template: src=ocmrsp.expect.j2  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect mode=0777 force=yes
-    when: oracle_psu_apply_gi
+    when: oracle_psu_apply_gi #and not {{ item.1.stdout }} != 0
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
     tags:
@@ -69,7 +73,7 @@
 
   - name: Configure ocm.rsp (2)
     shell: "{{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect"
-    when: oracle_psu_apply_gi
+    when: oracle_psu_apply_gi #and not {{ item.1.stdout }} != 0
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
     tags:
@@ -105,7 +109,8 @@
     tags:
      - crsctl
     register: crsctl
-    when: master_node and oracle_psu_apply_gi
+    when: master_node and oracle_psu_apply_gi #and not {{ item.1.stdout }} != 0
+
   - debug: var=crsctl.stdout_lines
     tags:
      - crsctl
@@ -131,7 +136,7 @@
     register: psuapplyo
   
   - debug: var=psuapplyo.stdout_lines
-    when: not master_node and oracle_psu_apply_gi
+    when: not master_node and oracle_psu_apply_gi 
     tags:
       - psuapplyo
 
@@ -140,12 +145,12 @@
     tags:
      - crsctl-opatch
     register: crsctl
-    when: oracle_psu_apply_gi
+    when: oracle_psu_apply_gi 
 
   - debug: var=crsctl.stdout_lines
     tags:
      - crsctl-opatch
-    when: oracle_psu_apply_gi
+    when: oracle_psu_apply_gi 
 
   - name: Check opatch lsinventory
     shell: "{{ oracle_home_gi }}/OPatch/opatch lsinventory"
