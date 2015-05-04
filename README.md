@@ -17,7 +17,6 @@ By default, you can install a single instance 12.1.0.2 database on filesystem, w
 - linuxamd64_12102_database_2of2.zip
 
 I'm creating a bunch of examples which illustrates how to use/run the different roles. They can be found here: http://oravirt.wordpress.com/category/ansible-oracle. 
-I'll also be setting up a page where I have a list of all parameters and explanations of what they are used for, which can be found here: http://oravirt.wordpress.com/ansible-oracle-parameters
 
 As this is based on the EL6 platform the lowest supported Oracle version will be 11.2.0.3, as per Oracle's certification matrix.
 
@@ -62,12 +61,7 @@ This role will install and configure Oracle Grid Infrastructure. Tested with 12.
 - Copies the install-files to the servers, or installs from a remote location (e.g nfs share)
 - Install Oracle Grid Infrastructure
 
-<b>oralsnr:</b>
-This role will create a default listener.
 
-Note:
-At the moment there is no listener configured when creating a database on a filesystem (i.e no grid infrastructure present). Will be added later though.
-- Uses srvctl to add/start the default listener
 
 <b>oraasm-configureasm:</b>
 This role will create and configure the ASM-instance with an initial diskgroup.
@@ -93,15 +87,13 @@ At the moment there is no listener configured when creating a database on a file
 - Creates the db using dbca
 - Changes parameters based on input.
 
-<b>oradb-delete:</b>
-This role deletes the databases, using dbca.
-
-- This is toggled by the variable delete_db (true/false), which is embedded in the 'oracle_databases' dict.
-
-<b>*** THE FOLLOWING ROLES ARE NOT FINISHED/NOT WORKING PROPERLY YET ****</b>
 
 <b>oraswgi-opatch:</b>
-This role will use opatch to apply a patch to a Grid Infrastructure home.
+This role will use opatch to apply a patch to a Grid Infrastructure home. At the moment it is basically written to apply PSU's, not one-off patches. It'll probably work but it is not designed for that.
+Does an initial check to see if the patches are already applied, and skips through all steps if they are.
+
+
+<b>*** THE FOLLOWING ROLES ARE NOT FINISHED/NOT WORKING PROPERLY YET ****</b>
 
 <b>oraswgi-clone:</b>
 This role will use a previously installed/patched Grid Infrastructure installation to perform a new Grid Infrastructure installation using the clone method
