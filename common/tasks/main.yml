@@ -11,10 +11,18 @@
 #    tags:
 #     - sudoadd
 
-#  - name: Add motd
-#    template: src=motd.j2 dest=/etc/motd 
+#  - name: Set up authorized_keys for {{ default_user }}
+#    authorized_key: user={{ default_user }} key="{{ item }}"
+#    with_file:
+#     - "~/.ssh/authorized_keys"
 #    tags:
-#     - motd
+#     - keys
+
+
+  - name: Add motd
+    template: src=motd.j2 dest=/etc/motd 
+    tags: motd
+    when: configure_motd
 
   - name: Install EPEL Repo
     yum: name={{ epel_rpm }} state=installed
@@ -28,13 +36,6 @@
     tags:
      - ol6repo
 
-#  - name: Set up authorized_keys for {{ default_user }}
-#    authorized_key: user={{ default_user }} key="{{ item }}"
-#    with_file:
-#     - "~/.ssh/authorized_keys"
-#    tags:
-#     - keys
-
   - name: Install common packages
     yum: name={{ item }} state=installed
     with_items: common_packages 
@@ -45,5 +46,4 @@
 
   - name: Start and enable NTP
     service: name=ntpd  state=started  enabled=yes
-
 
