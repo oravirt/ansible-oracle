@@ -141,11 +141,12 @@
     when: master_node and checkgiinstall.stdout != "1"
 
   - name: Run root script after installation (Other Nodes)
-    shell: "{{ oracle_home_gi }}/root.sh"
+    shell: "sleep {{ item.0 * 60 }}; {{ oracle_home_gi }}/root.sh"
     sudo: yes
+    with_indexed_items: groups[hostgroup]
     tags:
       - runroot
-    when: not master_node and checkgiinstall.stdout != "1"
+    when: not master_node and checkgiinstall.stdout != "1" and inventory_hostname == item.1
     register: rootother
   
   - debug: var=rootother.stdout_lines
