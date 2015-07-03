@@ -7,7 +7,7 @@ module: oracle_user
 short_description: Manage users/schemas in an Oracle database
 description:
     - Manage users/schemas in an Oracle database
-    - Can be run locally on the controlmachine or pushed to a remote host
+    - Can be run locally on the controlmachine or on a remote host
 version_added: "1.9.1"
 options:
     hostname:
@@ -88,7 +88,6 @@ else:
 
 # Check if the user/schema exists
 def check_user_exists (msg, cursor, schema):
-	#sql = 'select count(*) from dba_users where username = upper(\''+schema+'\')'
 	sql = 'select count(*) from dba_users where username = upper(\'%s\')' % schema
 	
 	try:
@@ -159,7 +158,6 @@ def drop_user (msg, cursor, schema):
 	#	msg[0] = 'Trying to drop an internal user. Not allowed'
 	#	return False
 
-	#sql = 'drop user '+schema+' cascade'
 	sql = 'drop user %s cascade' % schema
 
 	try:
