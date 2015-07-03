@@ -9,6 +9,9 @@ These are the different modules:
 
 <b> oracle_user </b>
 
- - This module can create & drop a user. 
- - pre-req: cx_Oracle
+pre-req: cx_Oracle
+
+ - Creates & drops a user. 
+ - Grants privileges
+
 

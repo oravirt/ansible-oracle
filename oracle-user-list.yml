@@ -1,0 +1,53 @@
+# Test playbook to test the oracle-user module
+---
+- hosts: vagrant
+  user: ansible
+  sudo: yes
+  sudo_user: oracle
+  gather_facts: 
+  
+
+  vars:
+      oracle_home: /u01/app/oracle/11.2.0.4/rachome1
+      oracle_env:
+             ORACLE_HOME: "{{ oracle_home }}"
+             LD_LIBRARY_PATH: "{{ oracle_home }}/lib"
+      passw_user:
+            - {schema: userpw, schema_password: userpw, state: present, default_tablespace: users, grants: "'create table','create session','select any dictionary'"}
+      passw_hash_user:     
+            - {schema: userhash, schema_password_hash: C3880903C5C9494B , state: present, default_tablespace: users, grants: dba }
+
+      hostname: "{{ inventory_hostname }}"
+      service_name: orcl
+      
+
+  tasks:
+
+  #- name: Print grants
+  #  debug: msg={{ grants }}
+
+  - name: Manage user (pwbased)
+    oracle_user: hostname={{ hostname }}
+                 service_name={{ service_name }}
+                 user=system 
+                 password=Oracle123
+                 schema={{ item.schema }}
+                 schema_password={{ item.schema_password }}
+                 state={{ item.state }}
+                 default_tablespace={{ item.default_tablespace }}
+                 grants={{ item.grants }}
+    environment: oracle_env
+    with_items: passw_user
+
+  - name: Manage user (pwhashbased)
+    oracle_user: hostname={{ hostname }}
+                 service_name={{ service_name }}
+                 user=system 
+                 password=Oracle123
+                 schema={{ item.schema }}
+                 schema_password_hash={{ item.schema_password_hash }}
+                 state={{ item.state }}
+                 default_tablespace={{ item.default_tablespace }}
+                 grants={{ item.grants }}
+    environment: oracle_env
+    with_items: passw_hash_user
