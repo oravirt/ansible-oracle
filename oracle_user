@@ -76,169 +76,226 @@ oracle_user: hostname=localhost service_name=orcl user=system password=manager s
 
 '''
 
-
-
 try:
-	import cx_Oracle
+    import cx_Oracle
 except ImportError:
-	cx_oracle_exists = False
+    cx_oracle_exists = False
 else:
-	cx_oracle_exists = True
+    cx_oracle_exists = True
 
 
 # Check if the user/schema exists
-def check_user_exists (msg, cursor, schema):
-	sql = 'select count(*) from dba_users where username = upper(\'%s\')' % schema
-	
-	try:
-			cursor.execute(sql)
-			result = cursor.fetchall()[0][0]
-	except cx_Oracle.DatabaseError, exc:
-			error, = exc.args
-			msg[0] = error.message+ 'sql: ' + sql
-			return False
-			
-	if result > 0:
-		#msg[0] = 'The schema '+schema+' already exists'
-		msg[0] = 'The schema %s already exists' % schema
-		return True
+def check_user_exists(msg, cursor, schema):
+    sql = 'select count(*) from dba_users where username = upper(\'%s\')' % schema
+    
+    try:
+            cursor.execute(sql)
+            #result = cursor.fetchall()[0][0]
+            result = cursor.fetchone()[0]
+    except cx_Oracle.DatabaseError, exc:
+            error, = exc.args
+            msg[0] = error.message+ 'sql: ' + sql
+            return False
+            
+    if result > 0:
+        msg[0] = 'The schema %s already exists' % schema
+        return True
 
 # Create the user/schema
-def create_user (msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, grants):
-	if not (schema):
-		msg[0] = 'Error: Missing schema name'
-		return False
+def create_user(msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, grants):
+    if not (schema):
+        msg[0] = 'Error: Missing schema name'
+        return False
 
-	if not (schema_password):
-		if not (schema_password_hash):
-			msg[0] = 'Error: Missing schema password or password hash'
-			return False
-	
-	
-	if (schema_password_hash):
-		sql = 'create user %s identified by values \'%s\' ' % (schema,schema_password_hash)
+    if not (schema_password):
+        if not (schema_password_hash):
+            msg[0] = 'Error: Missing schema password or password hash'
+            return False
+    
+    
+    if (schema_password_hash):
+        sql = 'create user %s identified by values \'%s\' ' % (schema, schema_password_hash)
 
-	else:
-		sql = 'create user %s identified by %s '% (schema,schema_password)
-	
-	if (default_tablespace):
-		sql += 'default tablespace %s '% default_tablespace
-		sql += 'quota unlimited on %s '% default_tablespace
-		
+    else:
+        sql = 'create user %s identified by %s '% (schema, schema_password)
+    
+    if (default_tablespace):
+        sql += 'default tablespace %s '% default_tablespace
+        sql += 'quota unlimited on %s '% default_tablespace
+        
+    
+    try:
+        cursor.execute(sql)
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Blergh, something went wrong while creating the schema - %s sql: %s' % (error.message, sql)
+        return False
 
-	
-	try:
-		cursor.execute(sql)
-	except cx_Oracle.DatabaseError, exc:
-		error, = exc.args
-		msg[0] = 'Blergh, something went wrong while creating the schema - %s sql: %s' % (error.message, sql)
-		return False
-
-	# Add grants to user if explicitly set. If not, only 'create session' is granted
-	if (grants):
-		grants=grants.replace("'","").replace(", ",",").lstrip(" ").rstrip(",")
-		sql = 'grant %s to %s '% (grants, schema)
-	else:
-		sql = 'grant create session to %s '% schema
+    # Add grants to user if explicitly set. If not, only 'create session' is granted
+    if (grants):
+        grants=grants.replace("'","").replace(", ",",").lstrip(" ").rstrip(",")
+        sql = 'grant %s to %s '% (grants, schema)
+    else:
+        sql = 'grant create session to %s '% schema
 
 
-	try:
-		cursor.execute(sql)
-	except cx_Oracle.DatabaseError, exc:
-		error, = exc.args
-		msg[0] = 'Blergh, something went wrong while adding grants to the schema - %s sql: %s' % (error.message, sql)
-		return False
+    try:
+        cursor.execute(sql)
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Blergh, something went wrong while adding grants to the schema - %s sql: %s' % (error.message, sql)
+        return False
 
-	return True
-	
+    return True
+
+# Get the current password hash for the user
+def get_user_password_hash(msg, cursor, schema):
+    sql = 'select password from sys.user$ where name = upper(\'%s\')' % schema
+    try:
+            cursor.execute(sql)
+            pwhashresult = cursor.fetchone()[0]
+    except cx_Oracle.DatabaseError, exc:
+            error, = exc.args
+            msg[0] = error.message+ ': sql: ' + sql
+            print "msg: %s "% msg[0]
+            sys.exit(1)
+
+    return pwhashresult
+
+
+# Modify the user/schema
+def modify_user(msg, cursor, schema, schema_password, schema_password_hash):
+    global old_pw_hash
+    global new_pw_hash
+    old_pw_hash = get_user_password_hash(msg, cursor, schema)
+    
+    if (schema_password_hash):
+        sql = 'alter user %s identified by values \'%s\' ' % (schema, schema_password_hash)
+
+    else:
+        sql = 'alter user %s identified by %s  '% (schema, schema_password)
+
+
+    try:
+        cursor.execute(sql)
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = error.message+ 'sql: ' + sql
+        return False
+
+    new_pw_hash = get_user_password_hash(msg, cursor, schema)
+    
+    #if old_pw_hash == new_pw_hash:
+    #   msg[0] = 'The password has not changed for user %s ' % schema
+    #   return True
+
+    return True
+
+    
 # Drop the user
-def drop_user (msg, cursor, schema):
-	#black_list = ['sys','system']
+def drop_user(msg, cursor, schema):
+    #black_list = ['sys','system']
 
-	#	msg[0] = 'Trying to drop an internal user. Not allowed'
-	#	return False
+    #   msg[0] = 'Trying to drop an internal user. Not allowed'
+    #   return False
 
-	sql = 'drop user %s cascade' % schema
+    sql = 'drop user %s cascade' % schema
 
-	try:
-		cursor.execute(sql)
-	except cx_Oracle.DatabaseError, exc:
-		error, = exc.args
-		msg[0] = 'Blergh, something went wrong while dropping the schema - %s sql: %s' % (error.message, sql)
-		return False
+    try:
+        cursor.execute(sql)
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Blergh, something went wrong while dropping the schema - %s sql: %s' % (error.message, sql)
+        return False
 
-	return True
+    return True
 
 
 def main():
 
-	msg = ['']
-	module = AnsibleModule(
-		argument_spec = dict(
-			hostname      = dict(default='localhost'),
-			port          = dict(default=1521),
-			service_name  = dict(required=True),
-			user          = dict(required=True),
-			password      = dict(required=True),
-			schema        = dict(default=None),
-			schema_password  = dict(default=None),
-			schema_password_hash  = dict(default=None),
-			state         = dict(sdefault="present", choices=["present", "absent"]),
-			default_tablespace = dict(default=None),
-			grants         = dict(default=None)
-		),
-		mutually_exclusive=[['schema_password', 'schema_password_hash']]
-	)
+    msg = ['']
+    module = AnsibleModule(
+        argument_spec = dict(
+            hostname      = dict(default='localhost'),
+            port          = dict(default=1521),
+            service_name  = dict(required=True),
+            user          = dict(required=True),
+            password      = dict(required=True),
+            mode          = dict(default='normal', choices=["normal","sysdba"]),
+            schema        = dict(default=None),
+            schema_password  = dict(default=None),
+            schema_password_hash  = dict(default=None),
+            state         = dict(default="present", choices=["present", "absent", "modify"]),
+            modify_type = dict(default='password'),
+            default_tablespace = dict(default=None),
+            grants         = dict(default=None)
+        ),
+        mutually_exclusive=[['schema_password', 'schema_password_hash']]
+    )
 
-	hostname = module.params["hostname"]
-	port = module.params["port"]
-	service_name = module.params["service_name"]
-	user = module.params["user"]
-	password = module.params["password"]
-	schema = module.params["schema"]
-	schema_password = module.params["schema_password"]
-	schema_password_hash = module.params["schema_password_hash"]
-	state = module.params["state"]
-	default_tablespace = module.params["default_tablespace"]
-	grants = module.params["grants"]
+    hostname = module.params["hostname"]
+    port = module.params["port"]
+    service_name = module.params["service_name"]
+    user = module.params["user"]
+    password = module.params["password"]
+    mode = module.params["mode"]
+    schema = module.params["schema"]
+    schema_password = module.params["schema_password"]
+    schema_password_hash = module.params["schema_password_hash"]
+    state = module.params["state"]
+    modify_type = module.params["modify_type"]
+    default_tablespace = module.params["default_tablespace"]
+    grants = module.params["grants"]
 
-	if not cx_oracle_exists:
-		module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
+    if not cx_oracle_exists:
+        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
 
+    dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
 
-	dsn = cx_Oracle.makedsn(host=hostname,port=port,service_name=service_name)
-	try:
-		conn = cx_Oracle.connect(user,password,dsn)
-	except cx_Oracle.DatabaseError, exc:
-		error, = exc.args
-		msg[0] = 'Could not connect to database - %s' % error.message
-		module.fail_json(msg=msg[0], changed=False)
+    
+    try:
+        if mode == 'sysdba':
+            conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+        else:
+            conn = cx_Oracle.connect(user, password, dsn)
+    
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Could not connect to database - %s ' % (error.message)
+        module.fail_json(msg=msg[0], changed=False)
 
-	cursor = conn.cursor()
+    cursor = conn.cursor()
 
-	if state == 'present':
-		if not check_user_exists(msg, cursor, schema):
-			if create_user(msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, grants):
-				msg[0] = 'The schema %s has been created successfully' % schema
-				module.exit_json(msg=msg[0], changed=True)
-			else:
-				module.fail_json(msg=msg[0], changed=False)
-
-	elif state == 'absent':
-		if check_user_exists(msg, cursor, schema):
-			if drop_user(msg, cursor, schema):
-				msg[0] = 'The schema %s has been dropped successfully' % schema
-				module.exit_json(msg=msg[0], changed=True)
-		else:
-			module.exit_json(msg='The schema %s doesn\'t exist' % schema, changed=False)				
-	
-	module.exit_json(msg=msg[0], changed=False)
-
-
+    if state == 'present':
+        if not check_user_exists(msg, cursor, schema):
+            if create_user(msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, grants):
+                msg[0] = 'The schema %s has been created successfully' % schema
+                module.exit_json(msg=msg[0], changed=True)
+            else:
+                module.fail_json(msg=msg[0], changed=False)
+                
+    elif state == 'absent':
+        if check_user_exists(msg, cursor, schema):
+            if drop_user(msg, cursor, schema):
+                msg[0] = 'The schema %s has been dropped successfully' % schema
+                module.exit_json(msg=msg[0], changed=True)
+        else:
+            module.exit_json(msg='The schema %s doesn\'t exist' % schema, changed=False)                
+    
+    elif state == 'modify':
+        if check_user_exists(msg, cursor, schema):
+            if modify_user(msg, cursor, schema, schema_password, schema_password_hash) and (new_pw_hash == old_pw_hash):
+                msg[0] = 'The password for schema %s has not been been changed. Old and new passwords are the same (oh: %s, nh: %s) ' % (schema, old_pw_hash, new_pw_hash)
+                module.exit_json(msg=msg[0], changed=False)
+            else:
+                module.exit_json(msg='The password for schema %s has been changed successfully'% schema, changed=True)  
+    
+    module.exit_json(msg=msg[0], changed=False)
+    
 
 
 
 
 from ansible.module_utils.basic import *
 if __name__ == '__main__':
-	main()
+    main()
