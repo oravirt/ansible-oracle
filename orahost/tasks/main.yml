@@ -14,18 +14,22 @@
     when: install_os_packages
     tags: os_packages
 
+  - name: Disable iptables 
+    service: name=iptables state=stopped enabled=no
+    when: disable_iptables
+    tags: iptables
+    register: iptables
+
   - name: Disable selinux (permanently)
     selinux: state=disabled
     when: disable_selinux
-    tags:
-     - selinux
+    tags: selinux
     register: selinux
 
   - name: Disable selinux (runtime)
     shell: setenforce 0
     when: disable_selinux
-    tags:
-     - selinux
+    tags: selinux
     ignore_errors: true
 
   - name: Check dns for host
@@ -34,7 +38,7 @@
     ignore_errors: True
     tags: etchosts
 
-  - name: "Add host to /etc/hosts if needed"
+  - name: Add host to /etc/hosts if needed
     lineinfile: dest=/etc/hosts regexp='.*{{ ansible_fqdn }}$' line="{{ ansible_default_ipv4.address }} {{ ansible_hostname }} {{ ansible_fqdn }}" state=present
     when: "'find {{ ansible_hostname }}: NXDOMAIN' in ns.stdout"
     tags: etchosts
