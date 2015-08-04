@@ -14,4 +14,11 @@ pre-req: cx_Oracle
  - Creates & drops a user. 
  - Grants privileges
 
+<b> oracle_tablespace </b>
+
+pre-req: cx_Oracle
+
+ - Manages tablespaces (create, drop, make read only/read write, offline/online)
+ - Tablespaces can be created as bigfile, autoextended
+
 

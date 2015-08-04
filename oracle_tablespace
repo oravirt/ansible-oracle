@@ -1,0 +1,346 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+DOCUMENTATION = '''
+---
+module: oracle_tablespace
+short_description: Manage tablespaces in an Oracle database
+description:
+    - Manage tablespaces in an Oracle database (create, drop, put in read only/read write, offline/online)
+    - Can be run locally on the controlmachine or on a remote host
+version_added: "1.9.1"
+options:
+    hostname:
+        description:
+            - The Oracle database host
+        required: false
+        default: localhost
+    port:
+        description:
+            - The listener port number on the host
+        required: false
+        default: 1521
+    service_name:
+        description:
+            - The database service name to connect to
+        required: true
+    user:
+        description:
+            - The Oracle user name to connect to the database
+        required: true
+    mode:
+        description:
+            - The mode with which to connect to the database (normal/sysdba)
+        required: false
+        choices: ['normal','sysdba']
+        default: normal
+    password:
+        description:
+            - The Oracle user password for 'user'
+        required: true
+    tablespace:
+        description:
+            - The tablespace that should be managed
+        required: True
+    state:
+        description:
+            - The intended state of the tablespace 
+        default: present
+        choices: ['present','absent','online','offline','read_only','read_write']
+    bigfile:
+        description:
+            - Should the tablespace be created as a bigfile tablespace
+        default: false
+        choices: ['true','false']
+    path:
+        description:
+            - Where to put the datafile. Can be an ASM diskgroup or a filesystem path (i.e '+DATA', '/u01/oradata/testdb/test01.dbf')
+        required: false
+        aliases: ['datafile']
+    size:
+        description:
+            - The size of the datafile (10M, 10G, 150G etc)
+        required: false
+    autoextend:
+        description:
+            - Should the datafile be autoextended
+        default: false
+        choices: ['true','false']
+    nextsize:
+        description:
+            - If autoextend, the size of the next extent allocated (1M, 50M, 1G etc)
+        aliases: ['next']
+    maxsize:
+        description:
+            - If autoextend, the maximum size of the datafile (1M, 50M, 1G etc). If empty, defaults to database limits
+        aliases: ['max']
+    
+notes:
+    - cx_Oracle needs to be installed
+requirements: [ "cx_Oracle" ]
+author: Mikael Sandström, oravirt@gmail.com
+'''
+
+EXAMPLES = '''
+# Create a new normal tablespace
+oracle_tablespace: hostname=db-server-scan service_name=orcl user=system password=manager tablespace=test datafile='+DATA' size=100M state=present
+
+# Create a new bigfile tablespace with autoextend on and maxsize set
+oracle_tablespace: hostname=db-server service_name=orcl user=system password=manager tablespace=test datafile='+DATA' size=100M state=present bigfile=true autoextend=true next=100M maxsize=20G 
+
+# Drop a tablespace
+oracle_tablespace: hostname=localhost service_name=orcl user=system password=manager tablespace=test state=absent
+
+# Make a tablespace read only
+oracle_tablespace: hostname=localhost service_name=orcl user=system password=manager tablespace=test state=read_only
+
+# Make a tablespace read write
+oracle_tablespace: hostname=localhost service_name=orcl user=system password=manager tablespace=test state=read_write
+
+# Make a tablespace offline
+oracle_tablespace: hostname=localhost service_name=orcl user=system password=manager tablespace=test state=offline
+
+# Make a tablespace online
+oracle_tablespace: hostname=localhost service_name=orcl user=system password=manager tablespace=test state=online
+
+
+'''
+
+try:
+    import cx_Oracle
+except ImportError:
+    cx_oracle_exists = False
+else:
+    cx_oracle_exists = True
+
+
+# Check if the tablespace exists
+def check_tablespace_exists(module, msg, cursor, tablespace):
+    
+    sql = 'select tablespace_name, status from dba_tablespaces where tablespace_name = upper(\'%s\')' % tablespace
+    global tsname
+    global status
+    #global dbfa_list
+    try:
+            cursor.execute(sql)
+            #result = cursor.fetchone()[0]
+            result = cursor.fetchall()
+            count = cursor.rowcount
+    except cx_Oracle.DatabaseError, exc:
+            error, = exc.args
+            msg[0] = error.message+ 'sql: ' + sql
+            return False
+            
+    if count > 0:
+        list_of_dbfs = get_tablespace_files(module, msg, cursor, tablespace)
+        for tsname,status in result:
+            status = status
+        msg[0] = 'The tablespace %s already exists. Status: %s' % (tablespace,status)
+        return True, status, list_of_dbfs
+
+# Create the tablespace
+def create_tablespace(module, msg, cursor, tablespace, path, size, bigfile, autoextend, nextsize, maxsize):
+    '''
+    TODO
+    Manage multiple files per tablespace
+    '''
+    if not(tablespace) or not(path):
+        msg[0] = 'Error: Missing tablespace name and/or datafile path'
+        return False
+
+    if (bigfile):
+        sql = 'create bigfile tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
+    else:
+        sql = 'create tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
+
+    if (autoextend):
+        if not (nextsize):
+            msg[0] = 'Error: Missing NEXT size for autoextend'
+            return False
+        elif not (maxsize):
+            sql += ' autoextend on next %s ' % (nextsize)
+        else:
+            sql += ' autoextend on next %s maxsize %s' % (nextsize, maxsize)
+
+
+    try:
+        cursor.execute(sql)
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Blergh, something went wrong while creating the tablespace - %s sql: %s' % (error.message, sql)
+        return False
+    return True
+
+# Get the existing datafiles for the tablespace
+def get_tablespace_files(module, msg, cursor, tablespace):
+    
+    dbf_list=[]
+    sql = 'select f.file_name from dba_data_files f, dba_tablespaces d '
+    sql += 'where f.tablespace_name = d.tablespace_name '
+    sql += 'and d.tablespace_name = upper(\'%s\')' % tablespace
+    try:
+            cursor.execute(sql)
+            tbsfile_result = cursor.fetchall()
+    except cx_Oracle.DatabaseError, exc:
+            error, = exc.args
+            msg[0] = error.message+ ': sql: ' + sql
+            module.fail_json(msg=msg[0])
+    for dbf in tbsfile_result:
+        dbf_list.append(dbf)
+    return dbf_list
+
+# Make tablespace read only
+def manage_tablespace(msg, cursor, tablespace, state):
+    
+    if state == 'read_only':
+        sql = 'alter tablespace %s read only' % tablespace
+        msg[0] = 'Tablespace %s has been put in read only mode' % tablespace
+    elif state == 'read_write':
+        sql = 'alter tablespace %s read write' % tablespace
+        msg[0] = 'Tablespace %s has been put in read write mode' % tablespace
+    elif state == 'offline':
+        sql = 'alter tablespace %s offline' % tablespace
+        msg[0] = 'Tablespace %s has been put offline' % tablespace
+    elif state == 'online':
+        sql = 'alter tablespace %s online' % tablespace
+        msg[0] = 'Tablespace %s has been put online' % tablespace
+
+    try:
+        cursor.execute(sql)
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = error.message+ 'sql: ' + sql
+        return False
+    
+
+    return True, msg[0]
+
+    
+# Drop the tablespace
+def drop_tablespace(msg, cursor, tablespace):
+   
+    sql = 'drop tablespace %s including contents and datafiles' % tablespace
+
+    try:
+        cursor.execute(sql)
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Blergh, something went wrong while dropping the tablespace - %s sql: %s' % (error.message, sql)
+        return False
+
+    return True
+
+
+def main():
+
+    msg = ['']
+    module = AnsibleModule(
+        argument_spec = dict(
+            hostname      = dict(default='localhost'),
+            port          = dict(default=1521),
+            service_name  = dict(required=True),
+            mode          = dict(default='normal', choices=['normal', 'sysdba']),
+            user          = dict(required=True),
+            password      = dict(required=True),
+            tablespace    = dict(required=True),
+            state         = dict(default="present", choices=["present", "absent", "read_only", "read_write", "offline", "online" ]),
+            bigfile       = dict(default=False, choices=BOOLEANS),
+            path          = dict(required=False, aliases=['datafile']),
+            size          = dict(required=False),
+            autoextend    = dict(default=False, choices=BOOLEANS),
+            nextsize      = dict(required=False, aliases=['next']),
+            maxsize       = dict(required=False, aliases=['max'])
+        ),
+    )
+
+    hostname = module.params["hostname"]
+    port = module.params["port"]
+    service_name = module.params["service_name"]
+    user = module.params["user"]
+    password = module.params["password"]
+    mode = module.params["mode"]
+    tablespace = module.params["tablespace"]
+    state = module.params["state"]
+    bigfile = module.params["bigfile"]
+    path = module.params["path"]
+    size = module.params["size"]
+    autoextend = module.params["autoextend"]
+    nextsize = module.params["nextsize"]
+    maxsize = module.params["maxsize"]
+    
+    if not cx_oracle_exists:
+        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
+
+    dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+
+    try:
+        if mode == 'sysdba':
+            conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+        else:
+            conn = cx_Oracle.connect(user, password, dsn)
+    
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Could not connect to database - %s ' % (error.message)
+        module.fail_json(msg=msg[0], changed=False)
+
+    cursor = conn.cursor()
+
+    if state == 'present': 
+        if not check_tablespace_exists(module, msg, cursor, tablespace):
+            if create_tablespace(module, msg, cursor, tablespace, path, size, bigfile, autoextend, nextsize, maxsize):
+                #dbfa_list = get_tablespace_files(module, msg, cursor, tablespace)
+                msg[0] = 'The tablespace %s has been created successfully. Initial size: %s. Autoextend: %s' % (tablespace, size, autoextend)
+                module.exit_json(msg=msg[0], changed=True)
+            else:
+                module.fail_json(msg=msg[0], changed=False)
+        else:
+            module.exit_json(msg=msg[0], changed=False)
+                
+    elif state == 'absent':
+        if check_tablespace_exists(module, msg, cursor, tablespace):
+            if drop_tablespace(msg, cursor, tablespace):
+                msg[0] = 'The tablespace %s has been dropped successfully' % tablespace
+                module.exit_json(msg=msg[0], changed=True)
+        else:
+            module.exit_json(msg='The tablespace %s doesn\'t exist' % tablespace, changed=False)
+    
+    elif state == 'read_only':
+        if check_tablespace_exists(module, msg, cursor, tablespace): # and status == 'ONLINE':
+            if status == 'READ ONLY' : # return value from check_tablespace_exists
+                module.exit_json(msg='The tablespace %s is already in read only mode' % tablespace, changed=False)
+            elif manage_tablespace(msg, cursor, tablespace, state):
+                #msg[0] = 'The tablespace %s has been made read only' % tablespace
+                module.exit_json(msg=msg[0], changed=True)
+        
+    elif state == 'read_write':
+        if check_tablespace_exists(module, msg, cursor, tablespace): 
+            if status == 'ONLINE' : # return value from check_tablespace_exists
+                module.exit_json(msg='The tablespace %s is already in read write mode' % tablespace, changed=False)
+            elif manage_tablespace(msg, cursor, tablespace, state):
+                 module.exit_json(msg=msg[0], changed=True)
+
+    elif state == 'offline':
+        if check_tablespace_exists(module, msg, cursor, tablespace): 
+            if status == 'OFFLINE' : # return value from check_tablespace_exists
+                module.exit_json(msg='The tablespace %s is already offline' % tablespace, changed=False)
+            elif manage_tablespace(msg, cursor, tablespace, state):
+                 module.exit_json(msg=msg[0], changed=True)
+
+    elif state == 'online':
+        if check_tablespace_exists(module, msg, cursor, tablespace): 
+            if status == 'ONLINE' : # return value from check_tablespace_exists
+                module.exit_json(msg='The tablespace %s is already online' % tablespace, changed=False)
+            elif manage_tablespace(msg, cursor, tablespace, state):
+                 module.exit_json(msg=msg[0], changed=True)
+
+    #module.exit_json(msg=msg[0], changed=False)
+    module.exit_json(msg='The tablespace %s doesn\'t exist' % tablespace, changed=False)
+    
+
+
+
+
+from ansible.module_utils.basic import *
+if __name__ == '__main__':
+    main()
