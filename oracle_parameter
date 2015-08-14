@@ -1,0 +1,320 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+DOCUMENTATION = '''
+---
+module: oracle_parameter
+short_description: Manage users/roles in an Oracle database
+description:
+    - Manage parameters in an Oracle database
+    - Does not handel underscore parameters yet
+version_added: "1.9.1"
+options:
+    hostname:
+        description:
+            - The Oracle database host
+        required: false
+        default: localhost
+    port:
+        description:
+            - The listener port number on the host
+        required: false
+        default: 1521
+    service_name:
+        description:
+            - The database service name to connect to
+        required: true
+    user:
+        description:
+            - The Oracle user name to connect to the database
+        required: true
+    password:
+        description:
+            - The Oracle user password for 'user'
+        required: true
+    mode:
+        description:
+            - The mode with which to connect to the database
+        required: true
+        default: normal
+        choices: ['normal','sysdba']
+    name:
+        description:
+            - The parameter that is being changed
+        required: false
+        default: null
+    value:
+        description:
+            - The value of the parameter
+        required: false
+        default: null
+    state:
+        description:
+            - The intended state of the parameter (present=set to value, absent/reset=the value is reset to its default value).
+        default: present
+        choices: ['present','absent','reset']
+notes:
+    - cx_Oracle needs to be installed
+    - Does not handle underscore parameters yet
+requirements: [ "cx_Oracle" ]
+author: Mikael Sandström, oravirt@gmail.com, @oravirt
+'''
+
+EXAMPLES = '''
+# Set the value of db_recovery_file_dest
+oracle_parameter: hostname=remote-db-server service_name=orcl user=system password=manager name=db_recovery_file_dest value='+FRA' state=present scope=both sid='*'
+
+# Set the value of db_recovery_file_dest_size
+oracle_parameter: hostname=remote-db-server service_name=orcl user=system password=manager name=db_recovery_file_dest_size value=100G state=present scope=both
+
+# Reset the value of open_cursors
+oracle_parameter: hostname=remote-db-server service_name=orcl user=system password=manager name=db_recovery_file_dest_size state=reset scope=spfile
+
+
+'''
+
+try:
+    import cx_Oracle
+except ImportError:
+    cx_oracle_exists = False
+else:
+    cx_oracle_exists = True
+
+
+# Check if the parameter exists
+def check_parameter_exists(module, mode, msg, cursor, name):
+    
+    
+    if not(name):
+        module.fail_json(msg='Error: Missing parameter name', changed=False)
+        return False
+    
+    if name.startswith('_') and mode != 'sysdba':
+        module.fail_json(msg='You need sysdba privs to verify underscore parameters (%s), mode: (%s)' % (name, mode), changed=False)
+        sql = 'select lower(ksppinm) from sys.x$ksppi where ksppinm = lower(\'%s\')' % name
+
+    elif name.startswith('_') and mode == 'sysdba':
+        sql = 'select lower(ksppinm) from sys.x$ksppi where ksppinm = lower(\'%s\')' % name
+
+    else:    
+        sql = 'select lower(name) from v$parameter where name = lower(\'%s\')' % name
+
+    
+    try:
+            cursor.execute(sql)
+            result = (cursor.fetchone())
+    except cx_Oracle.DatabaseError, exc:
+            error, = exc.args
+            msg[0] = error.message+ 'sql: ' + sql
+            return False
+            
+    if result > 0:
+        return True
+    else:
+        msg[0] = 'The parameter (%s) doesn\'t exist' % name
+        return False
+    
+
+
+
+def modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
+
+
+    sql = 'alter system set '
+    starters = ('+','_','"','"_')
+
+    if not(name) or not (value) or name is None or value is None:
+        module.fail_json(msg='Error: Missing parameter name or value', changed=False)
+        return False
+
+
+
+    currval = get_curr_value(module, mode, msg, cursor, name)
+    #module.exit_json(msg='currvalue: %s, newvalue: %s' % (currval, val), changed=False)
+     
+
+    if currval == value:
+        module.exit_json(msg='The parameter (%s) is already set to %s' % (name, value), changed=False)
+        return True
+    
+
+    if name.startswith(starters):
+        name = quote_name(name)
+
+    if value.startswith(starters):
+        value = quote_value(value)
+        #sql = 'alter system set %s = %s scope=%s sid=\'%s\'' % (name, value, scope, sid)    
+        
+    else:
+        sql = 'alter system set %s = %s scope=%s sid=\'%s\'' % (name, value, scope, sid)    
+  
+
+    try:
+        cursor.execute(sql)
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Blergh, something went wrong while changing the value - %s sql: %s' % (error.message, sql)
+        return False
+
+    name = clean_string(name)
+    msg[0] = 'The parameter (%s) has been changed successfully, new: %s, old: %s' % (name, value, currval)
+    return True
+
+def quote_value(value):
+    
+    if len(value) > 0:
+        return "'%s'" % (value)
+    else:
+        return value
+
+
+def quote_name(value):
+    
+    if len(value) > 0:
+        return """\"%s\"""" % (value)
+    else:
+        return value
+
+def clean_string(item):
+    item = item.replace("""\"""","")
+
+    return item
+
+def reset_parameter(module, msg, cursor, name, value, scope, sid):
+
+    
+    if not(name):
+        module.fail_json(msg='Error: Missing parameter name', changed=False)
+        return False
+
+    sql = 'alter system reset %s scope=spfile sid=\'%s\'' % (name,sid)
+  
+    try:
+        cursor.execute(sql)
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        if error.code == 32010:
+            msg[0] = 'The parameter (%s) is already set to its default value' % (name)
+            module.exit_json(msg=msg[0], changed=False)
+            return True
+        
+        msg[0] = 'Blergh, something went wrong while resetting the parameter - %s sql: %s' % (error.message, sql)
+        return False
+
+    msg[0] = 'The parameter (%s) has been reset to its default value' % (name)
+    return True
+
+
+def get_curr_value(module, mode, msg, cursor, name):
+
+    
+    if mode == 'sysdba':
+        name = clean_string(name)
+        sql = 'select y.ksppstdvl from sys.x$ksppi x, sys.x$ksppcv y where x.indx = y.indx and x.ksppinm = lower(\'%s\')' % (name)
+    else:
+        sql = 'select display_value from v$parameter where name = lower(\'%s\')' % (name)
+    
+
+    try:
+        cursor.execute(sql)
+        result = (cursor.fetchall()[0][0])
+        
+        if result in ['TRUE','FALSE']:
+            result=result.lower()
+
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Blergh, something went wrong while getting current value - %s sql: %s' % (error.message, sql)
+        module.fail_json(msg=msg[0], changed=False)
+        return False
+    
+    
+    return result
+
+
+def main():
+
+    msg = ['']
+    module = AnsibleModule(
+        argument_spec = dict(
+            hostname      = dict(default='localhost'),
+            port          = dict(default=1521),
+            service_name  = dict(required=True),
+            user          = dict(required=True), 
+            password      = dict(required=True, no_log=True), 
+            mode          = dict(default='normal', choices=["normal","sysdba"]),
+            name          = dict(default=None, aliases = ['parameter']),
+            value         = dict(default=None), 
+            state         = dict(default="present", choices=["present", "absent","reset"]),
+            scope         = dict(default="both", choices=["both", "spfile", "memory"]),
+            sid           = dict(default="*"),
+            
+
+        ),
+        
+    )
+
+    hostname = module.params["hostname"]
+    port = module.params["port"]
+    service_name = module.params["service_name"]
+    user = module.params["user"]
+    password = module.params["password"]
+    mode = module.params["mode"]
+    name = module.params["name"]
+    value = module.params["value"]
+    state = module.params["state"]
+    scope = module.params["scope"]
+    sid = module.params["sid"]
+
+    
+    
+
+    if not cx_oracle_exists:
+        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
+
+    dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+
+    
+    try:
+        if mode == 'sysdba':
+            conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+        else:
+            conn = cx_Oracle.connect(user, password, dsn)
+    
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Could not connect to database - %s ' % (error.message)
+        module.fail_json(msg=msg[0], changed=False)
+
+    cursor = conn.cursor()
+
+    if state == 'present':
+        if check_parameter_exists(module, mode, msg, cursor, name):
+            if modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
+                module.exit_json(msg=msg[0], changed=True)
+            else:
+                module.fail_json(msg=msg[0], changed=False)
+        else:
+            module.fail_json(msg=msg[0], changed=False)
+
+    elif state == 'reset' or state == 'absent':
+        if check_parameter_exists(module, mode, msg, cursor, name):
+            if reset_parameter(module, mode, msg, cursor, name, value, scope, sid):
+                module.exit_json(msg=msg[0], changed=True)
+            else:
+                module.fail_json(msg=msg[0], changed=False)
+        else:
+            module.fail_json(msg=msg[0], changed=False)
+
+
+                
+    module.exit_json(msg=msg[0], changed=False)
+    
+    
+
+
+
+
+from ansible.module_utils.basic import *
+if __name__ == '__main__':
+    main()
