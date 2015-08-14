@@ -61,6 +61,11 @@ options:
         description:
             - The size of the datafile (10M, 10G, 150G etc)
         required: false
+    content:
+        description:
+            - The type of tablespace (permanent, temporary or undo)
+        default: permanent
+        choices: ['permanent','temp','undo']
     autoextend:
         description:
             - Should the datafile be autoextended
@@ -78,15 +83,15 @@ options:
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com
+author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
 EXAMPLES = '''
 # Create a new normal tablespace
 oracle_tablespace: hostname=db-server-scan service_name=orcl user=system password=manager tablespace=test datafile='+DATA' size=100M state=present
 
-# Create a new bigfile tablespace with autoextend on and maxsize set
-oracle_tablespace: hostname=db-server service_name=orcl user=system password=manager tablespace=test datafile='+DATA' size=100M state=present bigfile=true autoextend=true next=100M maxsize=20G 
+# Create a new bigfile temporary tablespace with autoextend on and maxsize set
+oracle_tablespace: hostname=db-server service_name=orcl user=system password=manager tablespace=test datafile='+DATA' content=temp size=100M state=present bigfile=true autoextend=true next=100M maxsize=20G 
 
 # Drop a tablespace
 oracle_tablespace: hostname=localhost service_name=orcl user=system password=manager tablespace=test state=absent
@@ -136,10 +141,10 @@ def check_tablespace_exists(module, msg, cursor, tablespace):
         for tsname,status in result:
             status = status
         msg[0] = 'The tablespace %s already exists. Status: %s' % (tablespace,status)
-        return True, status, list_of_dbfs
+        return True, status
 
 # Create the tablespace
-def create_tablespace(module, msg, cursor, tablespace, path, size, bigfile, autoextend, nextsize, maxsize):
+def create_tablespace(module, msg, cursor, tablespace, path, size, content, bigfile, autoextend, nextsize, maxsize):
     '''
     TODO
     Manage multiple files per tablespace
@@ -148,10 +153,23 @@ def create_tablespace(module, msg, cursor, tablespace, path, size, bigfile, auto
         msg[0] = 'Error: Missing tablespace name and/or datafile path'
         return False
 
-    if (bigfile):
-        sql = 'create bigfile tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
+    if content == 'undo':
+        if (bigfile):
+            sql = 'create bigfile undo tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
+        else:
+            sql = 'create undo tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
+    
+    elif content == 'temp':
+        if (bigfile):
+            sql = 'create bigfile temporary tablespace %s tempfile \'%s\' size %s' % (tablespace, path, size)
+        else:
+            sql = 'create temporary tablespace %s tempfile \'%s\' size %s' % (tablespace, path, size)
+
     else:
-        sql = 'create tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
+        if (bigfile):
+            sql = 'create bigfile tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
+        else:
+            sql = 'create tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
 
     if (autoextend):
         if not (nextsize):
@@ -161,7 +179,7 @@ def create_tablespace(module, msg, cursor, tablespace, path, size, bigfile, auto
             sql += ' autoextend on next %s ' % (nextsize)
         else:
             sql += ' autoextend on next %s maxsize %s' % (nextsize, maxsize)
-
+    
 
     try:
         cursor.execute(sql)
@@ -247,11 +265,13 @@ def main():
             bigfile       = dict(default=False, choices=BOOLEANS),
             path          = dict(required=False, aliases=['datafile']),
             size          = dict(required=False),
+            content       = dict(default='permanent', choices=['permanent', 'temp', 'undo']),
             autoextend    = dict(default=False, choices=BOOLEANS),
             nextsize      = dict(required=False, aliases=['next']),
-            maxsize       = dict(required=False, aliases=['max'])
+            maxsize       = dict(required=False, aliases=['max']),
         ),
     )
+     
 
     hostname = module.params["hostname"]
     port = module.params["port"]
@@ -264,9 +284,11 @@ def main():
     bigfile = module.params["bigfile"]
     path = module.params["path"]
     size = module.params["size"]
+    content = module.params["content"]
     autoextend = module.params["autoextend"]
     nextsize = module.params["nextsize"]
     maxsize = module.params["maxsize"]
+
     
     if not cx_oracle_exists:
         module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
@@ -288,7 +310,7 @@ def main():
 
     if state == 'present': 
         if not check_tablespace_exists(module, msg, cursor, tablespace):
-            if create_tablespace(module, msg, cursor, tablespace, path, size, bigfile, autoextend, nextsize, maxsize):
+            if create_tablespace(module, msg, cursor, tablespace, path, size, content, bigfile, autoextend, nextsize, maxsize):
                 #dbfa_list = get_tablespace_files(module, msg, cursor, tablespace)
                 msg[0] = 'The tablespace %s has been created successfully. Initial size: %s. Autoextend: %s' % (tablespace, size, autoextend)
                 module.exit_json(msg=msg[0], changed=True)

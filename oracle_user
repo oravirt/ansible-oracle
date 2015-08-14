@@ -32,6 +32,12 @@ options:
         description:
             - The Oracle user password for 'user'
         required: true
+    mode:
+        description:
+            - The mode with which to connect to the database
+        required: true
+        default: normal
+        choices: ['normal','sysdba']
     schema:
         description:
             - The schema that 
@@ -60,7 +66,7 @@ options:
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström
+author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
 EXAMPLES = '''
@@ -84,13 +90,22 @@ else:
     cx_oracle_exists = True
 
 
+def clean_string(item):
+    item = item.replace("'","").replace(", ",",").lstrip(" ").rstrip(",").replace("[","").replace("]","")
+
+    return item
+
+def clean_list(item):
+    item = [p.replace("'","").replace(", ",",").lstrip(" ").rstrip(",").replace("[","").replace("]","") for p in item]
+
+    return item
+
 # Check if the user/schema exists
 def check_user_exists(msg, cursor, schema):
     sql = 'select count(*) from dba_users where username = upper(\'%s\')' % schema
     
     try:
             cursor.execute(sql)
-            #result = cursor.fetchall()[0][0]
             result = cursor.fetchone()[0]
     except cx_Oracle.DatabaseError, exc:
             error, = exc.args
@@ -98,11 +113,12 @@ def check_user_exists(msg, cursor, schema):
             return False
             
     if result > 0:
-        msg[0] = 'The schema %s already exists' % schema
+        msg[0] = 'The schema (%s) already exists' % schema
         return True
 
 # Create the user/schema
-def create_user(msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, grants):
+def create_user(msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, grants):
+    grants_list=[]
     if not (schema):
         msg[0] = 'Error: Missing schema name'
         return False
@@ -122,6 +138,9 @@ def create_user(msg, cursor, schema, schema_password, schema_password_hash, defa
     if (default_tablespace):
         sql += 'default tablespace %s '% default_tablespace
         sql += 'quota unlimited on %s '% default_tablespace
+
+    if (default_temp_tablespace):
+    	sql += 'temporary tablespace %s '% default_temp_tablespace
         
     
     try:
@@ -133,7 +152,12 @@ def create_user(msg, cursor, schema, schema_password, schema_password_hash, defa
 
     # Add grants to user if explicitly set. If not, only 'create session' is granted
     if (grants):
-        grants=grants.replace("'","").replace(", ",",").lstrip(" ").rstrip(",")
+    	#grants=[p.replace("'","").replace(", ",",").lstrip(" ").rstrip(",").replace("[","").replace("]","") for p in grants]
+    	grants=clean_list(grants)
+    	for p in grants:
+    		grants_list.append(p)
+    	grants = ','.join(grants_list)
+
         sql = 'grant %s to %s '% (grants, schema)
     else:
         sql = 'grant create session to %s '% schema
@@ -149,7 +173,7 @@ def create_user(msg, cursor, schema, schema_password, schema_password_hash, defa
     return True
 
 # Get the current password hash for the user
-def get_user_password_hash(msg, cursor, schema):
+def get_user_password_hash(module, msg, cursor, schema):
     sql = 'select password from sys.user$ where name = upper(\'%s\')' % schema
     try:
             cursor.execute(sql)
@@ -157,17 +181,15 @@ def get_user_password_hash(msg, cursor, schema):
     except cx_Oracle.DatabaseError, exc:
             error, = exc.args
             msg[0] = error.message+ ': sql: ' + sql
-            print "msg: %s "% msg[0]
-            sys.exit(1)
+            module.fail_json(msg=msg[0])
 
     return pwhashresult
 
-
 # Modify the user/schema
-def modify_user(msg, cursor, schema, schema_password, schema_password_hash):
+def modify_user(module, msg, cursor, schema, schema_password, schema_password_hash):
     global old_pw_hash
     global new_pw_hash
-    old_pw_hash = get_user_password_hash(msg, cursor, schema)
+    old_pw_hash = get_user_password_hash(module, msg, cursor, schema)
     
     if (schema_password_hash):
         sql = 'alter user %s identified by values \'%s\' ' % (schema, schema_password_hash)
@@ -183,7 +205,7 @@ def modify_user(msg, cursor, schema, schema_password, schema_password_hash):
         msg[0] = error.message+ 'sql: ' + sql
         return False
 
-    new_pw_hash = get_user_password_hash(msg, cursor, schema)
+    new_pw_hash = get_user_password_hash(module, msg, cursor, schema)
     
     #if old_pw_hash == new_pw_hash:
     #   msg[0] = 'The password has not changed for user %s ' % schema
@@ -193,11 +215,12 @@ def modify_user(msg, cursor, schema, schema_password, schema_password_hash):
 
     
 # Drop the user
-def drop_user(msg, cursor, schema):
-    #black_list = ['sys','system']
+def drop_user(module, msg, cursor, schema):
+    black_list = ['sys','system']
+    if schema in black_list:
 
-    #   msg[0] = 'Trying to drop an internal user. Not allowed'
-    #   return False
+       msg[0] = 'Trying to drop an internal user: %s. Not allowed' % schema
+       return False
 
     sql = 'drop user %s cascade' % schema
 
@@ -226,9 +249,10 @@ def main():
             schema_password  = dict(default=None),
             schema_password_hash  = dict(default=None),
             state         = dict(default="present", choices=["present", "absent", "modify"]),
-            modify_type = dict(default='password'),
             default_tablespace = dict(default=None),
-            grants         = dict(default=None)
+            default_temp_tablespace = dict(default='temp'),
+            grants         = dict(default=None, type="list")
+            
         ),
         mutually_exclusive=[['schema_password', 'schema_password_hash']]
     )
@@ -243,8 +267,8 @@ def main():
     schema_password = module.params["schema_password"]
     schema_password_hash = module.params["schema_password_hash"]
     state = module.params["state"]
-    modify_type = module.params["modify_type"]
     default_tablespace = module.params["default_tablespace"]
+    default_temp_tablespace = module.params["default_temp_tablespace"]
     grants = module.params["grants"]
 
     if not cx_oracle_exists:
@@ -268,7 +292,7 @@ def main():
 
     if state == 'present':
         if not check_user_exists(msg, cursor, schema):
-            if create_user(msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, grants):
+            if create_user(msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, grants):
                 msg[0] = 'The schema %s has been created successfully' % schema
                 module.exit_json(msg=msg[0], changed=True)
             else:
@@ -276,7 +300,7 @@ def main():
                 
     elif state == 'absent':
         if check_user_exists(msg, cursor, schema):
-            if drop_user(msg, cursor, schema):
+            if drop_user(module, msg, cursor, schema):
                 msg[0] = 'The schema %s has been dropped successfully' % schema
                 module.exit_json(msg=msg[0], changed=True)
         else:
@@ -284,12 +308,13 @@ def main():
     
     elif state == 'modify':
         if check_user_exists(msg, cursor, schema):
-            if modify_user(msg, cursor, schema, schema_password, schema_password_hash) and (new_pw_hash == old_pw_hash):
-                msg[0] = 'The password for schema %s has not been been changed. Old and new passwords are the same (oh: %s, nh: %s) ' % (schema, old_pw_hash, new_pw_hash)
+            if modify_user(module, msg, cursor, schema, schema_password, schema_password_hash) and (new_pw_hash == old_pw_hash):
+                msg[0] = 'The password for schema %s has not been been changed. Old and new passwords are the same' % (schema)
                 module.exit_json(msg=msg[0], changed=False)
             else:
-                module.exit_json(msg='The password for schema %s has been changed successfully'% schema, changed=True)  
-    
+                module.exit_json(msg='The password for schema %s has been changed successfully'% schema, changed=True)
+        module.exit_json(msg='The schema %s doesn\'t exist'% schema, changed=False)
+                
     module.exit_json(msg=msg[0], changed=False)
     
 
