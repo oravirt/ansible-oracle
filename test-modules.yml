@@ -1,0 +1,133 @@
+# Test playbook to test all oracle modules
+---
+- hosts: labdb04
+  user: ansible
+  sudo: yes
+  sudo_user: oracle
+  gather_facts: false 
+  
+
+  vars:
+      oracle_home: /u01/app/oracle/11.2.0.4/rachome1
+      hostname: labdb-scan02
+      service_name: racdba
+      set_init_mode: sysdba
+      set_init_user: sys
+      user: system
+      password: Oracle123
+      oracle_env:
+             ORACLE_HOME: "{{ oracle_home }}"
+             LD_LIBRARY_PATH: "{{ oracle_home }}/lib"
+
+      set_init: False
+      restart_db: false
+      init_parameters:
+               - { name: db_recovery_file_dest_size, value: 4G, state: absent, scope: both } 
+               - { name: db_recovery_file_dest, value: '+FRA', state: absent, scope: both } 
+               - { name: pga_aggregate_target, value: 400M, state: absent, scope: both } 
+               - { name: _parallel_statement_queuing, value: "false", state: absent, scope: both } 
+               - { name: sga_target, value: 2G, state: absent, scope: spfile } 
+               - { name: sga_max_size, value: 2G, state: absent, scope: spfile } 
+               - { name: open_cursors, value: 400, state: absent, scope: both } 
+               - { name: processes, value: 700, state: absent, scope: spfile } 
+
+
+      tablespaces:
+               - { name: newtbs, datafile: '+DATA', size: 5M, autoextend: "true", next: 5M, maxsize: 500M, content: permanent, state: absent } 
+               - { name: newundo, datafile: '+DATA', size: 5M, autoextend: "true", next: 5M, maxsize: 500M, content: undo, state: absent } 
+               - { name: newtemp, datafile: '+DATA', size: 5M, autoextend: "true", next: 5M, maxsize: 500M, content: temp, state: absent } 
+
+      dba_user:
+           - schema: dbauser
+             schema_password_hash: B7C930D09B3AF263 # passwd = dbauser
+             state: absent
+             default_tablespace: users
+             grants: 
+                  - "dba"
+             state: absent
+
+      passw_user:
+           - schema: userpw 
+             schema_password: userpw 
+             state: absent
+             default_tablespace: newtbs
+             grants: 
+                  - "approle1"
+             state: absent
+
+      roles:
+           - name: approle1
+             role_grants: 
+                    - 'create session'
+                    - 'select any table'
+             state: absent
+
+      
+
+  tasks:
+
+
+  - name: Create tablespace
+    oracle_tablespace: hostname={{ hostname }} service_name={{ service_name }} user={{ user }} password={{ password }} tablespace={{ item.name }} datafile={{ item.datafile }} size={{ item.size }} autoextend={{ item.autoextend }} next={{ item.next }} maxsize={{ item.maxsize }} content={{ item.content }} state={{ item.state }}
+    environment: oracle_env
+    with_items: tablespaces
+
+  - name: Create application role
+    oracle_role: hostname={{ hostname }} service_name={{ service_name }} user={{ user }} password={{ password }} role={{ item.name }} state={{ item.state }}                 
+    environment: oracle_env
+    with_items: roles
+
+
+  - name: Add grants to role
+    oracle_grants: hostname={{ hostname }} service_name={{ service_name }} user={{ user }} password={{ password }} role={{ item.0.name }} grants="{{ item.1 }}" state={{ item.0.state }}
+    environment: oracle_env
+    with_subelements: 
+           - roles
+           - role_grants
+
+  - name: Create DBA user
+    oracle_user: hostname={{ hostname }} service_name={{ service_name }} user={{ user }} password={{ password }} schema={{ item.0.schema }} schema_password_hash={{ item.0.schema_password_hash }} state={{ item.0.state }} default_tablespace={{ item.0.default_tablespace }} grants={{ item.1 }}
+    environment: oracle_env
+    with_subelements: 
+       - dba_user
+       - grants
+
+
+  - name: Create Application user
+    oracle_user: hostname={{ hostname }} service_name={{ service_name }} user={{ user }} password={{ password }} schema={{ item.0.schema }} schema_password={{ item.0.schema_password }} state={{ item.0.state }} default_tablespace={{ item.0.default_tablespace }} grants={{ item.1 }}
+    environment: oracle_env
+    with_subelements: 
+       - passw_user
+       - grants
+
+  - name: Set parameters
+    oracle_parameter: hostname={{ hostname }} service_name={{ service_name }} user={{ set_init_user }} password={{ password }} mode={{ set_init_mode }} name={{ item.name }} value={{ item.value }} state={{ item.state }} scope={{ item.scope }}
+    environment: oracle_env
+    with_items: init_parameters
+    when: set_init
+    register: param_change
+
+  - name: Restart database (stop)
+    shell: "{{ oracle_home }}/bin/srvctl stop database -d {{ service_name }}"
+    environment: oracle_env
+    when: param_change.changed and set_init and restart_db
+
+  - name: Restart database (start)
+    shell: "{{ oracle_home }}/bin/srvctl start database -d {{ service_name }}"
+    environment: oracle_env
+    when: param_change.changed and set_init and restart_db
+
+  - name: Check if database is running
+    shell: "{{ oracle_home }}/bin/srvctl status database -d {{ service_name }}"
+    environment: oracle_env
+    register: check_db_up
+    tags: check
+
+  - name: Check if database is running
+    debug: msg={{ item }}
+    with_items: check_db_up.stdout_lines
+    tags: check
+
+
+
+
