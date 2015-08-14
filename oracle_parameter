@@ -120,7 +120,7 @@ def check_parameter_exists(module, mode, msg, cursor, name):
 def modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
 
 
-    sql = 'alter system set '
+    #sql = 'alter system set '
     starters = ('+','_','"','"_')
 
     if not(name) or not (value) or name is None or value is None:
@@ -143,10 +143,8 @@ def modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
 
     if value.startswith(starters):
         value = quote_value(value)
-        #sql = 'alter system set %s = %s scope=%s sid=\'%s\'' % (name, value, scope, sid)    
-        
-    else:
-        sql = 'alter system set %s = %s scope=%s sid=\'%s\'' % (name, value, scope, sid)    
+            
+    sql = 'alter system set %s = %s scope=%s sid=\'%s\'' % (name, value, scope, sid)    
   
 
     try:
@@ -180,12 +178,15 @@ def clean_string(item):
 
     return item
 
-def reset_parameter(module, msg, cursor, name, value, scope, sid):
+def reset_parameter(module, mode, msg, cursor, name, value, scope, sid):
 
-    
+    starters = ('+','_','"','"_')
     if not(name):
         module.fail_json(msg='Error: Missing parameter name', changed=False)
         return False
+
+    if name.startswith(starters):
+        name = quote_name(name)
 
     sql = 'alter system reset %s scope=spfile sid=\'%s\'' % (name,sid)
   
@@ -194,6 +195,7 @@ def reset_parameter(module, msg, cursor, name, value, scope, sid):
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
         if error.code == 32010:
+            name = clean_string(name)            
             msg[0] = 'The parameter (%s) is already set to its default value' % (name)
             module.exit_json(msg=msg[0], changed=False)
             return True
@@ -201,6 +203,7 @@ def reset_parameter(module, msg, cursor, name, value, scope, sid):
         msg[0] = 'Blergh, something went wrong while resetting the parameter - %s sql: %s' % (error.message, sql)
         return False
 
+    name = clean_string(name)
     msg[0] = 'The parameter (%s) has been reset to its default value' % (name)
     return True
 

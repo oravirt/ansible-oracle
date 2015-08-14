@@ -22,45 +22,45 @@
       set_init: False
       restart_db: false
       init_parameters:
-               - { name: db_recovery_file_dest_size, value: 4G, state: absent, scope: both } 
-               - { name: db_recovery_file_dest, value: '+FRA', state: absent, scope: both } 
-               - { name: pga_aggregate_target, value: 400M, state: absent, scope: both } 
-               - { name: _parallel_statement_queuing, value: "false", state: absent, scope: both } 
-               - { name: sga_target, value: 2G, state: absent, scope: spfile } 
-               - { name: sga_max_size, value: 2G, state: absent, scope: spfile } 
-               - { name: open_cursors, value: 400, state: absent, scope: both } 
-               - { name: processes, value: 700, state: absent, scope: spfile } 
+               - { name: db_recovery_file_dest_size, value: 4G, state: present, scope: both } 
+               - { name: db_recovery_file_dest, value: '+FRA', state: present, scope: both } 
+               - { name: pga_aggregate_target, value: 400M, state: present, scope: both } 
+               - { name: _parallel_statement_queuing, value: "false", state: present, scope: both } 
+               - { name: sga_target, value: 2G, state: present, scope: spfile } 
+               - { name: sga_max_size, value: 2G, state: present, scope: spfile } 
+               - { name: open_cursors, value: 400, state: present, scope: both } 
+               - { name: processes, value: 700, state: present, scope: spfile } 
 
 
       tablespaces:
-               - { name: newtbs, datafile: '+DATA', size: 5M, autoextend: "true", next: 5M, maxsize: 500M, content: permanent, state: absent } 
-               - { name: newundo, datafile: '+DATA', size: 5M, autoextend: "true", next: 5M, maxsize: 500M, content: undo, state: absent } 
-               - { name: newtemp, datafile: '+DATA', size: 5M, autoextend: "true", next: 5M, maxsize: 500M, content: temp, state: absent } 
+               - { name: newtbs, datafile: '+DATA', size: 5M, autoextend: "true", next: 5M, maxsize: 500M, content: permanent, state: present } 
+               - { name: newundo, datafile: '+DATA', size: 5M, autoextend: "true", next: 5M, maxsize: 500M, content: undo, state: present } 
+               - { name: newtemp, datafile: '+DATA', size: 5M, autoextend: "true", next: 5M, maxsize: 500M, content: temp, state: present } 
 
       dba_user:
            - schema: dbauser
              schema_password_hash: B7C930D09B3AF263 # passwd = dbauser
-             state: absent
+             state: present
              default_tablespace: users
              grants: 
                   - "dba"
-             state: absent
+             state: present
 
       passw_user:
            - schema: userpw 
              schema_password: userpw 
-             state: absent
+             state: present
              default_tablespace: newtbs
              grants: 
                   - "approle1"
-             state: absent
+             state: present
 
       roles:
            - name: approle1
              role_grants: 
                     - 'create session'
                     - 'select any table'
-             state: absent
+             state: present
 
       
 
