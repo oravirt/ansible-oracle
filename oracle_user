@@ -185,39 +185,97 @@ def get_user_password_hash(module, msg, cursor, schema):
 
     return pwhashresult
 
+# Get the current defaults for the user
+def get_user_current_defaults(module, msg, cursor, schema):
+    
+    curr_defaults = []
+    sql = 'select lower(account_status),lower(default_tablespace),lower(temporary_tablespace) from dba_users where username = upper(\'%s\')' % schema
+    try:
+            cursor.execute(sql)
+            defaults = cursor.fetchall()
+    except cx_Oracle.DatabaseError, exc:
+            error, = exc.args
+            msg[0] = error.message+ ': sql: ' + sql
+            module.fail_json(msg=msg[0])
+
+    #module.exit_json(msg='defaults: %s' % (defaults), changed=False)    
+    for account_status, default_tablespace, temporary_tablespace in defaults:
+        curr_defaults.append(defaults)
+    #module.exit_json(msg='defaults: %s' % (curr_defaults[0]), changed=False)    
+    return curr_defaults[0]
+
 # Modify the user/schema
-def modify_user(module, msg, cursor, schema, schema_password, schema_password_hash):
-    global old_pw_hash
-    global new_pw_hash
-    old_pw_hash = get_user_password_hash(module, msg, cursor, schema)
+def modify_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, state):
     
     if (schema_password_hash):
-        sql = 'alter user %s identified by values \'%s\' ' % (schema, schema_password_hash)
+        sql = 'alter user %s identified by values \'%s\'' % (schema, schema_password_hash)
 
     else:
-        sql = 'alter user %s identified by %s  '% (schema, schema_password)
+        sql = 'alter user %s identified by %s  ' % (schema, schema_password)
 
+
+    want_account_status = ''
+    if state == 'present' or state == 'unlocked':
+        want_account_status = 'open'
+        sql += ' default tablespace %s temporary tablespace %s account unlock' % (default_tablespace, default_temp_tablespace)
+
+    elif state == 'locked': 
+        want_account_status = state
+        sql += ' default tablespace %s temporary tablespace %s account lock' % (default_tablespace, default_temp_tablespace)
+    
+    wanted_list = []
+    wanted_list.append((want_account_status, default_tablespace, default_temp_tablespace))
+
+    old_pw_hash = get_user_password_hash(module, msg, cursor, schema)
+    curr_defaults = get_user_current_defaults(module, msg, cursor, schema)
+
+    
+    if (schema_password_hash):
+        if (wanted_list == curr_defaults) and (old_pw_hash == schema_password_hash):
+            # Everything is kosher, exit changed=False
+            module.exit_json(msg='The schema (%s) is in the intented state' % (schema), changed=False)    
+        else:
+            # Make the change and exit changed=True
+            execute_sql(module, msg, cursor, sql)
+            module.exit_json(msg='Successfully altered the user (%s), accstatus: %s, def tblsp: %s, def temptblsp: %s ' % (schema, want_account_status, default_tablespace, default_temp_tablespace), changed=True)
+    else: 
+        if (wanted_list == curr_defaults):
+            # change everything and compare hash pre/post. If same => exit change=False else exit change=True
+            execute_sql(module, msg, cursor, sql)
+            new_pw_hash = get_user_password_hash(module, msg, cursor, schema)
+            if new_pw_hash == old_pw_hash:
+                module.exit_json(msg='The schema (%s) is in the intented state' % (schema), changed=False)
+            else:
+                module.exit_json(msg='Successfully altered the user (%s), accstatus: %s, def tblsp: %s, def temptblsp: %s ' % (schema, want_account_status, default_tablespace, default_temp_tablespace), changed=True)
+        else:
+            # do the complete change -> exit with change=True
+            execute_sql(module, msg, cursor, sql)
+            module.exit_json(msg='Successfully altered the user (%s), accstatus: %s, def tblsp: %s, def temptblsp: %s ' % (schema, want_account_status, default_tablespace, default_temp_tablespace), changed=True)
+
+
+
+
+
+    return True
+
+# Run the actual modification 
+def execute_sql(module, msg, cursor, sql):
 
     try:
         cursor.execute(sql)
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
-        msg[0] = error.message+ 'sql: ' + sql
+        msg[0] = 'Blergh, something went wrong while altering the schema - %s sql: %s' % (error.message, sql)
+        module.fail_json(msg=msg[0], changed=False)    
         return False
-
-    new_pw_hash = get_user_password_hash(module, msg, cursor, schema)
-    
-    #if old_pw_hash == new_pw_hash:
-    #   msg[0] = 'The password has not changed for user %s ' % schema
-    #   return True
 
     return True
 
     
 # Drop the user
 def drop_user(module, msg, cursor, schema):
-    black_list = ['sys','system']
-    if schema in black_list:
+    black_list = ['sys','system','dbsnmp']
+    if schema.lower() in black_list:
 
        msg[0] = 'Trying to drop an internal user: %s. Not allowed' % schema
        return False
@@ -248,7 +306,7 @@ def main():
             schema        = dict(default=None),
             schema_password  = dict(default=None),
             schema_password_hash  = dict(default=None),
-            state         = dict(default="present", choices=["present", "absent", "modify"]),
+            state         = dict(default="present", choices=["present", "absent", "locked", "unlocked"]),
             default_tablespace = dict(default=None),
             default_temp_tablespace = dict(default='temp'),
             grants         = dict(default=None, type="list")
@@ -290,29 +348,30 @@ def main():
 
     cursor = conn.cursor()
 
-    if state == 'present':
+    if state == 'present' or state == 'unlocked':
         if not check_user_exists(msg, cursor, schema):
             if create_user(msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, grants):
                 msg[0] = 'The schema %s has been created successfully' % schema
                 module.exit_json(msg=msg[0], changed=True)
             else:
                 module.fail_json(msg=msg[0], changed=False)
-                
+        else:
+            modify_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, state)
+
     elif state == 'absent':
         if check_user_exists(msg, cursor, schema):
             if drop_user(module, msg, cursor, schema):
-                msg[0] = 'The schema %s has been dropped successfully' % schema
+                msg[0] = 'The schema (%s) has been dropped successfully' % schema
                 module.exit_json(msg=msg[0], changed=True)
         else:
-            module.exit_json(msg='The schema %s doesn\'t exist' % schema, changed=False)                
+            module.exit_json(msg='The schema (%s) doesn\'t exist' % schema, changed=False)                
     
-    elif state == 'modify':
+    elif state == 'locked':
         if check_user_exists(msg, cursor, schema):
-            if modify_user(module, msg, cursor, schema, schema_password, schema_password_hash) and (new_pw_hash == old_pw_hash):
-                msg[0] = 'The password for schema %s has not been been changed. Old and new passwords are the same' % (schema)
+            if modify_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, state):
                 module.exit_json(msg=msg[0], changed=False)
-            else:
-                module.exit_json(msg='The password for schema %s has been changed successfully'% schema, changed=True)
+            #else:
+            #    module.exit_json(msg='The password for schema %s has been changed successfully'% schema, changed=True)
         module.exit_json(msg='The schema %s doesn\'t exist'% schema, changed=False)
                 
     module.exit_json(msg=msg[0], changed=False)

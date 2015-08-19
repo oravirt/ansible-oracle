@@ -44,16 +44,14 @@
              default_tablespace: users
              grants: 
                   - "dba"
-             state: present
 
       passw_user:
            - schema: userpw 
-             schema_password: userpw 
+             schema_password: userpw
              state: present
              default_tablespace: newtbs
              grants: 
                   - "approle1"
-             state: present
 
       roles:
            - name: approle1
@@ -121,11 +119,13 @@
     shell: "{{ oracle_home }}/bin/srvctl status database -d {{ service_name }}"
     environment: oracle_env
     register: check_db_up
+    when: restart_db
     tags: check
 
   - name: Check if database is running
     debug: msg={{ item }}
     with_items: check_db_up.stdout_lines
+    when: restart_db
     tags: check
 
 
