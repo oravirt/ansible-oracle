@@ -50,7 +50,7 @@ options:
         default: null
     state:
         description:
-            - The intended state of the parameter (present=set to value, absent/reset=the value is reset to its default value).
+            - The intended state of the parameter (present means set to value, absent/reset means the value is reset to its default value).
         default: present
         choices: ['present','absent','reset']
 notes:
@@ -119,9 +119,10 @@ def check_parameter_exists(module, mode, msg, cursor, name):
 def modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
 
 
-    #sql = 'alter system set '
+    
     starters = ('+','_','"','"_')
-
+    contains = ('=')
+        
     if not(name) or not (value) or name is None or value is None:
         module.fail_json(msg='Error: Missing parameter name or value', changed=False)
         return False
@@ -129,20 +130,20 @@ def modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
 
 
     currval = get_curr_value(module, mode, msg, cursor, name)
-    #module.exit_json(msg='currvalue: %s, newvalue: %s' % (currval, val), changed=False)
      
 
-    if currval == value:
+    if currval.lower() == value.lower():
         module.exit_json(msg='The parameter (%s) is already set to %s' % (name, value), changed=False)
         return True
     
 
     if name.startswith(starters):
         name = quote_name(name)
+        #module.exit_json(msg='QUOTENAME: name: %s value: %s' % (name, value), changed=False)
 
-    if value.startswith(starters):
+    if value.startswith(starters) or contains in value:
         value = quote_value(value)
-            
+        
     sql = 'alter system set %s = %s scope=%s sid=\'%s\'' % (name, value, scope, sid)    
   
 
@@ -165,12 +166,12 @@ def quote_value(value):
         return value
 
 
-def quote_name(value):
+def quote_name(name):
     
-    if len(value) > 0:
-        return """\"%s\"""" % (value)
+    if len(name) > 0:
+        return """\"%s\"""" % (name)
     else:
-        return value
+        return name
 
 def clean_string(item):
     item = item.replace("""\"""","")

@@ -47,5 +47,11 @@ pre-req: cx_Oracle
 pre-req: cx_Oracle
 
  - Manages init parameters in the database (i.e alter system set parameter...)
- - Also handles underscore parameters. That will require using mode=sysdba, to be able to read the X$ tables needed
- to verify the existence of the parameter.
+ - Also handles underscore parameters. That will require using mode=sysdba, to be able to read the X$ tables needed to verify the existence of the parameter. 
+
+<b> Note: </b>
+ When specifying sga-parameters the database requests memory based on granules which are variable in size depending on the size requested, 
+ and that means the database may round the requested value to the nearest multiple of a granule. 
+ e.g sga_max_size=1500M will be rounded up to 1504 (which is 94 granules of 16MB). That will cause the displayed value to be 1504M, which has 
+ the effect that the next time the module is is run with a desired value of 1500M it will be changed again.
+ So that is something to consider when setting parameters that affects the SGA.
