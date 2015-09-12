@@ -1,0 +1,105 @@
+---
+
+#  - name: Check if EM is already installed
+#    shell: grep "{{ oracle_home_db  }}" "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" |wc -l
+#    with_dict: oracle_databases 
+#    tags: 
+#    - checkifdbinstall
+#    register: checkdbswinstall
+
+#  - debug: var=checkdbswinstall.stdout
+#    with_items: checkdbswinstall.results
+#    when: master_node
+#    tags:
+#     - checkifdbinstall
+
+  - name: Add new dotprofile (EM Agent)
+    template: src=dotprofile-agent.j2 dest={{ oracle_user_home }}/{{ oracle_profile_name }} owner={{ oracle_user }} group={{ oracle_group }} mode=775 backup=yes
+    tags: 
+    - dotprofileem
+
+  - name: Create EM stage directory (base)
+    file: dest={{ oracle_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directoriesdb
+  
+  - name: Create stage directory (version specific)
+    file: dest={{ oracle_stage }}/{{ item.version }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    with_items: oracle_sw_image_em_agent
+    when: em_agent_version == item.version
+    tags:
+      - directoriesem
+
+  - name: Create rsp stage directory
+    file: dest={{ oracle_rsp_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directoriesem
+
+  - name: Create ORACLE_INVENTORY directory
+    file: dest={{ oracle_inventory_loc }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directoriesem
+  
+  - name: Create ORACLE_BASE directory
+    file: dest={{ oracle_base }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags:
+      - directoriesem
+  
+
+  - name: Transfer oracle EM Agent installfiles to server (www)
+    get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
+    with_items: oracle_sw_image_em_agent
+    when: not is_sw_source_local and em_agent_version == item.version
+    sudo_user: "{{ oracle_user }}"
+    tags:
+      - oraemsw
+
+  - name: Transfer oracle EM Agent installfiles to server (local)
+    copy: src={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
+    with_items: oracle_sw_image_em_agent
+    when: is_sw_source_local and em_agent_version == item.version
+    sudo_user: "{{ oracle_user }}"
+    tags:
+      - oraemsw
+
+  - name: Extract files to stage-area
+    unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no 
+    with_items: oracle_sw_image_em_agent
+    when: em_agent_version == item.version
+    sudo_user: "{{ oracle_user }}"
+    tags:
+      - oradbswunpack
+
+  - name: Setup response file for install (EM Agent)
+    template: src=agent.rsp.{{ em_agent_version }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_em_responsefile }}
+    sudo_user: "{{ oracle_user }}"
+    tags:
+      - responsefileswem
+
+  - name: Install EM Agent (1)
+    shell: "{{ oracle_stage }}/{{ item.version }}/agentDeploy.sh AGENT_BASE_DIR={{ em_agent_base_dir }} RESPONSE_FILE={{ oracle_rsp_stage }}/{{ oracle_em_responsefile }}"
+    with_items: oracle_sw_image_em_agent
+    sudo_user: "{{ oracle_user }}"
+    when: em_agent_version == item.version
+    register: emagent_install
+
+  - name: Install EM Agent (2)
+    debug: var=emagent_install.stdout_lines
+    with_items: emagent_install.results
+    
+  - name: Run root.sh
+    shell: "{{ oracle_home_emag }}/root.sh"
+
+  - name: Wait for the agent to start
+    wait_for: host={{ ansible_fqdn }} port={{ em_agent_port }} timeout=120
+
+  - name: Check status for EM Agent
+    shell: "{{ oracle_home_emag }}/bin/emctl status agent"
+    sudo_user: "{{ oracle_user }}"
+    register: emctl_out
+    tags: emagent-status
+
+  - name: Print status
+    debug: var=emctl_out.stdout_lines
+    tags: emagent-status
+    

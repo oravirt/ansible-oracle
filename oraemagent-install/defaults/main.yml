@@ -1,0 +1,24 @@
+---
+  oracle_user: oracle                        # THe user that will own the installation
+  oracle_group: oinstall                          # Primary group for oracle_user.
+  oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user
+  oracle_em_responsefile: "emagent-{{ em_agent_version }}-{{ ansible_hostname }}.rsp"
+  oracle_stage: /u01/stage
+  oracle_rsp_stage: "{{ oracle_stage }}/rsp"
+  oracle_inventory_loc: /u01/app/oraInventory
+  oracle_base: /u01/app/oracle
+  oracle_home_emag: "{{ em_agent_base_dir }}/core/{{ em_agent_version }}"
+  oracle_profile_name: ".profile_agent"
+
+  em_agent_version: 12.1.0.4.0                          # Version of agent to install
+  em_oms_host: omshost.example.com                      # OMS host fqdn
+  em_em_upload_port: 4903                               # Upload port on the OMS
+  em_agent_registration_password: supersecretpassword   # Registration password on the OMS
+  em_agent_base_dir: /u01/app/oracle/agent
+  em_agent_instance_home: "{{ em_agent_base_dir }}/agent_inst"
+  em_agent_port: 3872                                   # Port on the agent
+  em_agent_home_name: agent12c1                         # Name on the Agent ORACLE_HOME ()
+
+  oracle_sw_image_em_agent:
+         - { filename: 12.1.0.4.0_AgentCore_226.zip, version: 12.1.0.4.0 }
+
