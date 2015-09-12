@@ -90,8 +90,7 @@ def check_parameter_exists(module, mode, msg, cursor, name):
     
     if name.startswith('_') and mode != 'sysdba':
         module.fail_json(msg='You need sysdba privs to verify underscore parameters (%s), mode: (%s)' % (name, mode), changed=False)
-        sql = 'select lower(ksppinm) from sys.x$ksppi where ksppinm = lower(\'%s\')' % name
-
+        
     elif name.startswith('_') and mode == 'sysdba':
         sql = 'select lower(ksppinm) from sys.x$ksppi where ksppinm = lower(\'%s\')' % name
 
@@ -132,14 +131,14 @@ def modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
     currval = get_curr_value(module, mode, msg, cursor, name)
      
 
-    if currval.lower() == value.lower():
+    if currval == value.lower():
         module.exit_json(msg='The parameter (%s) is already set to %s' % (name, value), changed=False)
         return True
     
 
     if name.startswith(starters):
         name = quote_name(name)
-        #module.exit_json(msg='QUOTENAME: name: %s value: %s' % (name, value), changed=False)
+        
 
     if value.startswith(starters) or contains in value:
         value = quote_value(value)
@@ -213,17 +212,15 @@ def get_curr_value(module, mode, msg, cursor, name):
     
     if mode == 'sysdba':
         name = clean_string(name)
-        sql = 'select y.ksppstdvl from sys.x$ksppi x, sys.x$ksppcv y where x.indx = y.indx and x.ksppinm = lower(\'%s\')' % (name)
+        sql = 'select lower(y.ksppstdvl) from sys.x$ksppi x, sys.x$ksppcv y where x.indx = y.indx and x.ksppinm = lower(\'%s\')' % (name)
     else:
-        sql = 'select display_value from v$parameter where name = lower(\'%s\')' % (name)
+        sql = 'select lower(display_value) from v$parameter where name = lower(\'%s\')' % (name)
     
 
     try:
         cursor.execute(sql)
         result = (cursor.fetchall()[0][0])
         
-        if result in ['TRUE','FALSE']:
-            result=result.lower()
 
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
