@@ -1,0 +1,11 @@
+---
+# The master_node variable is mostly relevant during RAC-installs, where certain tasks only have to performed on 1 node in the cluster, e.g dealing with shared storage, the actual installations,
+# both GI and DB. So in the case of RAC you pick one node to be the 'master_node' (master_node: true) during the installations. All other nodes should be set to master_node: false.
+# When installing Grid Infrastructure in a stand-alone configuration (or even when not installing GI), each server belonging to the hostgroup you're running against should have master_node: true.
+# It is also the default setting.
+  master_node: false
+
+# The following parameter can be used here as well as in group_vars. If you already have a specified ip that should be used it hould probably be put in host_vars instead
+# Using oracle_ic_net in group_vars is probably more likely to be ok if this is being run in a lab-environment
+#  oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(.)[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
+#  oracle_ic_net: 10.172.43.3

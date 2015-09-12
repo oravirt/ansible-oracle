@@ -1,0 +1,31 @@
+---
+ - name: Host configuration
+   hosts: vbox-rac-all
+   user: vagrant
+   sudo: yes
+   roles:
+      - common
+      - orahost
+
+ - name: Storage Configuration 
+   hosts: vbox-rac-hub
+   user: vagrant
+   sudo: yes
+   roles:
+      - orahost-storage
+
+ - name: Oracle Grid Infrastructure installation
+   hosts: vbox-rac
+   user: vagrant
+   sudo: yes
+   roles:
+      - oraswgi-install
+
+ - name: ASM Configuration, Database Server Installation & Database Creation
+   hosts: vbox-rac-hub
+   user: vagrant
+   sudo: yes
+   roles:
+      - oraasm-createdg
+      - oraswdb-install
+      - oradb-create
