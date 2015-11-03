@@ -56,6 +56,16 @@
     tags:
       - oragridpsuunpack
 
+#  - name: Extract files to stage-area (GI) (from remote location)
+#    unarchive: src={{ oracle_stage_remote }}/{{ item.0.filename }}  dest={{ oracle_psu_stage }}/{{ item.0.version }} copy=no
+#    with_together: 
+#       - oracle_sw_image_gi_psu
+#       - gi_applied_patches.results
+#    sudo: yes
+#    sudo_user: "{{ grid_install_user }}"
+#    tags:
+#    - oragridswunpack
+#    when: checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy|bool and oracle_sw_unpack|bool
 
   - name: Distribute latest opatch
     shell: rm -rf {{ oracle_home_gi }}/OPatch; cp -Rvp {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/OPatch {{ oracle_home_gi }}; chown -R {{ grid_install_user }}:{{ oracle_group }} {{ oracle_home_gi }}/OPatch
