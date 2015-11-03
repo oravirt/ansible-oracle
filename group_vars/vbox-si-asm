@@ -72,15 +72,28 @@
       u01:
         {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora, fstype: ext4}
 
-  asm_diskgroups:  
-     - crs
-     - data
-     - fra
-
-  asm_storage_layout:   
-   crs:
-     - {device: /dev/sdc, asmlabel: crs01}
-   data:
-     - {device: /dev/sdd, asmlabel: data01}
-   fra:
-     - {device: /dev/sde, asmlabel: fra01}
+  asm_diskgroups: 
+    - diskgroup: crs
+      properties: 
+        - {redundancy: normal, ausize: 4}
+      attributes: 
+        - {name: 'compatible.rdbms', value: 11.2.0.4.0}
+        - {name: 'compatible.asm', value: 12.1.0.2.0}
+      disk:
+        - {device: /dev/sdc, asmlabel: crs01}
+    - diskgroup: data
+      properties: 
+        - {redundancy: external, ausize: 4}
+      attributes: 
+        - {name: compatible.rdbms, value: 11.2.0.4.0}
+        - {name: compatible.asm, value: 12.1.0.2.0}
+      disk:
+        - {device: /dev/sde, asmlabel: data01}
+    - diskgroup: fra
+      properties: 
+        - {redundancy: external, ausize: 4}
+      attributes: 
+        - {name: compatible.rdbms, value: 11.2.0.4.0}
+        - {name: compatible.asm, value: 12.1.0.2.0}
+      disk:
+        - {device: /dev/sdf, asmlabel: fra01}
