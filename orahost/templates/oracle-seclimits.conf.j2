@@ -1,0 +1,18 @@
+# {{ ansible_managed }}
+# Oracle recommended security limits
+
+{% if role_separation==True %}
+{% for stuff in oracle_seclimits %}
+{{ grid_install_user }} {{ stuff.name }} {{ stuff.value }}
+{% endfor %}
+
+{% for stuff in oracle_seclimits %}
+{{ oracle_user }} {{ stuff.name }} {{ stuff.value }}
+{% endfor %}
+
+{% elif role_separation==False %}
+{% for stuff in oracle_seclimits %}
+{{ oracle_user }} {{ stuff.name }} {{ stuff.value }}
+{% endfor %}
+
+{% endif %}

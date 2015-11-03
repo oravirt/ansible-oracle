@@ -81,7 +81,7 @@
      - sudoadd
 
   - name: ssh-keys | Generate SSH keys 
-    local_action: shell /usr/bin/rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys
+    local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys
     ignore_errors: True
     when: configure_ssh and master_node and configure_cluster
     tags:
@@ -165,7 +165,7 @@
 #    tags: hostf
   
   - name: filesystem | Create vg
-    lvg: vg={{ item.value.vgname }} pvs={{ item.value.pvname }} state=present vg_options="-f" # "-f used as workaround for https://github.com/ansible/ansible/pull/6859"
+    lvg: vg={{ item.value.vgname }} pvs={{ item.value.pvname }} state=present #vg_options="-f" # "-f used as workaround for https://github.com/ansible/ansible/pull/6859"
     with_dict: host_fs_layout
     when: configure_host_disks
     tags: hostfs
@@ -204,10 +204,10 @@
     tags: pamconfig
 
   - name: Oracle-recommended security limits
-    lineinfile: dest=/etc/security/limits.conf state=present line="{{ item }}"
-    with_items: oracle_seclimits
+    template: src=oracle-seclimits.conf.j2 dest=/etc/security/limits.d/99-oracle-limits.conf backup=yes
     tags: seclimit
-  
+
+
   - name: Count number of kernel lines that needs to be changed (numa=off transparent_hugepage=never)
     shell: cat /etc/grub.conf | grep title |wc -l
     register: count
