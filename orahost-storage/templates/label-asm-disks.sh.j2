@@ -3,7 +3,12 @@
 while read -r asmlabel device
 do
 
+{% if multipath=='dm-multipath' %}
+partno=p1
+{% else %}
 partno=1
+{% endif %}
+
 
 
 #if [[ $# -ne 2 ]]; then
@@ -32,4 +37,4 @@ echo "Creating ASM Label ${asmlabel} on ${device}"
 service oracleasm createdisk ${asmlabel} ${device}${partno}
 service oracleasm querydisk  ${device}${partno}
 
-done < {{ oracle_rsp_stage }}/asm-label-device-mapping-{{ item }}.txt
+done < {{ oracle_rsp_stage }}/asm-label-device-mapping-{{ item.diskgroup }}.txt

@@ -1,5 +1,6 @@
 ---
 
+  multipath: none                   # dm-multipath (Linux device mapper multipath)
   device_persistence: asmlib
   oracle_asm_disk_string: "{% if device_persistence == 'asmlib' %}{% elif device_persistence == 'udev' %}/dev/oracle/{% else %}{% endif %}"
   oracle_stage: /u01/stage
@@ -13,19 +14,30 @@
 
 
 
-
-#  asm_diskgroups:        # ASM Diskgroups used for DB-storage. Should map to dict asm_storage_layout. 
-#     - crs
-#     - data
-#     - fra
-#
-#  asm_storage_layout:    # Mapping between device & ASMlib label. If storage_type=ASM under oracle_databases, this is where the mapping between device/asm-disk is described
-#   crs:
-#     - {device: /dev/sdc, asmlabel: CRS01}
-#   data:
-#     - {device: /dev/sdd, asmlabel: DATA01}
-#     - {device: /dev/sde, asmlabel: DATA02}
-#   fra:
-#     - {device: /dev/sdf, asmlabel: FRA01}
-#     - {device: /dev/sdg, asmlabel: FRA02}
-#     - {device: /dev/sdh, asmlabel: FRA03}
+  #asm_diskgroups: 
+  #  - diskgroup: crs
+  #    properties: 
+  #      - {redundancy: normal, ausize: 1}
+  #    attributes: 
+  #      - {name: 'compatible.rdbms', value: 11.2.0.4.0}
+  #      - {name: 'compatible.asm', value: 12.1.0.2.0}
+  #   disk:
+  #     - {device: /dev/sdc, asmlabel: crs01}
+  #     - {device: /dev/sdd, asmlabel: crs02}
+  #     - {device: /dev/sde, asmlabel: crs03}
+  # - diskgroup: data
+  #    properties: 
+  #      - {redundancy: external, ausize: 4}
+  #    attributes: 
+  #      - {name: compatible.rdbms, value: 11.2.0.4.0}
+  #      - {name: compatible.asm, value: 12.1.0.2.0}
+  #    disk:
+  #      - {device: /dev/sdf, asmlabel: data01}
+  #  - diskgroup: fra
+  #    properties: 
+  #      - {redundancy: external, ausize: 4}
+  #    attributes: 
+  #      - {name: compatible.rdbms, value: 11.2.0.4.0}
+  #      - {name: compatible.asm, value: 12.1.0.2.0}
+  #    disk:
+  #      - {device: /dev/sdg, asmlabel: fra01}

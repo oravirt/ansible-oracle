@@ -3,8 +3,14 @@
 while read -r label device
 do
 
+{% if multipath=='dm-multipath' %}
+device=${device}
+partno=1
+{% else %}
 device=${device%%[0-9]}
 partno=1
+{% endif %}
+
 #only new version parted supports -a
 if [ $(parted -h | grep -- -a | wc -l) -gt 0  ]; then
  partedcmd='parted -a optimal'
@@ -35,4 +41,4 @@ $partedcmd $device mkpart primary 0cyl ${ncyl}cyl
 partprobe > /dev/null 2>&1
 sleep 2
 
-done < {{ oracle_rsp_stage }}/asm-label-device-mapping-{{ item }}.txt
+done < {{ oracle_rsp_stage }}/asm-label-device-mapping-{{ item.diskgroup }}.txt

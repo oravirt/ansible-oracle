@@ -2,27 +2,22 @@
 #!/bin/bash
 
 {{ oracle_home_gi }}/bin/asmca -silent -createDiskGroup \
-       -diskGroupName {{ item }} \
+       -diskGroupName {{ item.diskgroup }} \
 {% if device_persistence == 'udev' %}
-     {% for disk in  asm_storage_layout[item]    %}
+     {% for disk in  item.disk    %}
        -disk '{{ oracle_asm_disk_string }}{{ disk.asmlabel }}' \
      {% endfor %}
 {% elif device_persistence == 'asmlib' %}
-     {% for disk in  asm_storage_layout[item]    %}
+     {% for disk in  item.disk    %}
        -disk 'ORCL:{{ disk.asmlabel|upper }}' \
+     {% endfor %}{% else %}
+     {% endif %}
+     {% for a in item.properties %}
+        -redundancy {{ a.redundancy }} \
+        -au_size {{ a.ausize}} \
+      {% endfor %}
+     {% for attr in item.attributes %}
+     -{{ attr.name }} '{{ attr.value }}' \
      {% endfor %}
-  {% else %}
-{% endif %}
-       -redundancy external \
-       -au_size 4 \
-       {% if oracle_install_version_gi=='11.2.0.4' %}
-       -compatible.asm '11.2.0.0.0' \
-       -compatible.rdbms '11.2.0.0.0' \
-       {% elif oracle_install_version_gi=='12.1.0.2'%}
-       -compatible.asm '12.1.0.0.0' \
-       -compatible.rdbms '11.2.0.0.0' \
-       -compatible.advm '12.1.0.0.0' \
-       {% elif oracle_install_version_gi=='12.1.0.1' %}
-       -compatible.asm '12.1.0.0.0' \
-       -compatible.rdbms '11.2.0.0.0' \
-       {% endif %}
+
+     
