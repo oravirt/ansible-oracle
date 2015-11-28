@@ -73,7 +73,7 @@
           oracle_db_mem_percent: 25                            # Amount of RAM to be used for SGA
           oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
           redolog_size_in_mb: 100
-          delete_db: false
+          state: present
 
 
   oracle_dbf_dir_asm: "DATA"
@@ -83,13 +83,22 @@
         {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora, fstype: ext4}
 
   asm_diskgroups:  
-     - data
-     - fra
-
-  asm_storage_layout:   
-   data:
-     - {device: /dev/sdc, asmlabel: asmdisk01}
-     - {device: /dev/sdd, asmlabel: asmdisk02}
-     - {device: /dev/sde, asmlabel: asmdisk03}
-   fra:
-     - {device: /dev/sdf, asmlabel: asmdisk04}
+    - diskgroup: data
+      properties: 
+        - {redundancy: external, ausize: 1}
+      attributes: 
+        - {name: compatible.rdbms, value: 11.2.0.3.0}
+        - {name: compatible.asm, value: "{{ oracle_install_version_gi }}"}
+      disk:
+        - {device: /dev/sdc, asmlabel: asmdisk01}
+        - {device: /dev/sdd, asmlabel: asmdisk02}
+        - {device: /dev/sde, asmlabel: asmdisk03}
+    - diskgroup: fra
+      properties: 
+        - {redundancy: external, ausize: 1}
+      attributes: 
+        - {name: compatible.rdbms, value: 11.2.0.3.0}
+        - {name: compatible.asm, value: "{{ oracle_install_version_gi }}"}
+      disk:
+        - {device: /dev/sdf, asmlabel: asmdisk04}
+  
