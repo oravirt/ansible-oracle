@@ -97,7 +97,11 @@ DATABASECONFTYPE  = "{{ item.0.oracle_db_type }}"
 # Default value : None
 # Mandatory     : No [required in case DATABASECONFTYPE is set to RACONENODE ]
 #-----------------------------------------------------------------------------
+{% if item.0.oracle_db_type|upper == 'RACONENODE' %}
 RACONENODESERVICENAME = "{{ item.0.service_name }}"
+{% else %}
+#RACONENODESERVICENAME = 
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : POLICYMANAGED
@@ -253,13 +257,12 @@ PDBADMINPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Default value : None
 # Mandatory     : No (Yes for RAC database-centric database )
 #-----------------------------------------------------------------------------
-{% if configure_cluster==True %}
-{% if oracle_gi_cluster_type |upper == 'FLEX' %}
+{% if configure_cluster==True and item.0.oracle_db_type|upper != "SI" and oracle_gi_cluster_type |upper == 'FLEX' %}
 NODELIST={% for host in groups[hostgroup_hub] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
-{% else %}
+{% elif configure_cluster==True and item.0.oracle_db_type|upper != "SI" and oracle_gi_cluster_type |upper != 'FLEX' %}
 NODELIST={% for host in groups[hostgroup] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
-{% endif %}
 {% else %}
+#NODELIST=
 {% endif %}
 
 #-----------------------------------------------------------------------------
@@ -472,7 +475,11 @@ DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Default value : $ORACLE_BASE/oradata
 # Mandatory     : No
 #-----------------------------------------------------------------------------
+{% if item.0.storage_type|upper == 'FS' %}
 DATAFILEDESTINATION = {{ oracle_dbf_dir_fs }}
+{% else %}
+#DATAFILEDESTINATION=
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : RECOVERYAREADESTINATION
@@ -482,7 +489,11 @@ DATAFILEDESTINATION = {{ oracle_dbf_dir_fs }}
 # Default value : $ORACLE_BASE/flash_recovery_area
 # Mandatory     : No
 #-----------------------------------------------------------------------------
+{% if item.0.storage_type|upper == 'FS' %}
 RECOVERYAREADESTINATION={{ oracle_reco_dir_fs }}
+{% else %}
+#RECOVERYAREADESTINATION=
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : STORAGETYPE
@@ -501,7 +512,11 @@ STORAGETYPE="{{ item.0.storage_type }}"
 # Default value : DATA
 # Mandatory     : No
 #-----------------------------------------------------------------------------
+{% if item.0.storage_type|upper == 'ASM' %}
 DISKGROUPNAME={{ oracle_dbf_dir_asm }}
+{% else %}
+#DISKGROUPNAME=
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : ASMSNMP_PASSWORD
@@ -519,7 +534,11 @@ ASMSNMP_PASSWORD="{{ item.0.oracle_db_passwd }}"
 # Default value : RECOVERY
 # Mandatory     : No
 #-----------------------------------------------------------------------------
+{% if item.0.storage_type|upper == 'ASM' %}
 RECOVERYGROUPNAME={{ oracle_reco_dir_asm }}
+{% else %}
+#RECOVERYGROUPNAME=
+{% endif %}
 
 
 #-----------------------------------------------------------------------------
@@ -607,7 +626,7 @@ NATIONALCHARACTERSET= "AL16UTF16"
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-#VARIABLES =
+#VARIABLES =s
 
 #-----------------------------------------------------------------------------
 # Name          : INITPARAMS
@@ -616,7 +635,11 @@ NATIONALCHARACTERSET= "AL16UTF16"
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-INITPARAMS = "{{ item.0.oracle_init_params }}"
+{% if item.0.oracle_init_params is defined %}
+INITPARAMS ="{{ item.0.oracle_init_params }}"
+{% else %}
+#INITPARAMS =
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : SAMPLESCHEMA
@@ -635,8 +658,11 @@ INITPARAMS = "{{ item.0.oracle_init_params }}"
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
+{% if item.0.oracle_init_params is defined %}
 MEMORYPERCENTAGE = "{{ item.0.oracle_db_mem_percent }}"
-
+{% else %}
+#MEMORYPERCENTAGE =
+{% endif %}
 #-----------------------------------------------------------------------------
 # Name          : DATABASETYPE
 # Datatype      : String

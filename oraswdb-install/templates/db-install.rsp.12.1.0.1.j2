@@ -187,14 +187,21 @@ oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host}} {%
 #
 # If left blank, it will be assumed to be false.
 #------------------------------------------------------------------------------
-oracle.install.db.isRACOneInstall={{ item.0.is_racone }}
-
+{% if item.0.oracle_db_type|upper == 'RACONENODE' %}
+oracle.install.db.isRACOneInstall= "true"
+{% else %}
+oracle.install.db.isRACOneInstall=
+{% endif %}
 #------------------------------------------------------------------------------
 # Value is required only if oracle.install.db.isRACOneInstall is true.
 # 
 # Specify the name for RAC One Node Service
 #------------------------------------------------------------------------------
+{% if item.0.oracle_db_type|upper == 'RACONENODE' %}
 oracle.install.db.racOneServiceName={{ item.0.service_name }}
+{% else %}
+oracle.install.db.racOneServiceName=
+{% endif %}
 
 #------------------------------------------------------------------------------
 # Value is required only if RAC database type is POLICY_MANAGED
