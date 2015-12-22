@@ -18,12 +18,6 @@
 #    tags:
 #     - keys
 
-
-  - name: Add motd
-    template: src=motd.j2 dest=/etc/motd 
-    tags: motd
-    when: configure_motd
-
   - name: Install EPEL Repo
     yum: name={{ epel_rpm }} state=installed
     when: configure_epel_repo 
@@ -43,8 +37,11 @@
     tags:
       - commonpackages
    
-
   - name: Start and enable NTP
     service: name=ntpd  state=started  enabled=yes
     when: configure_ntp
 
+  - name: Add motd
+    template: src=motd.j2 dest=/etc/motd 
+    tags: motd
+    when: configure_motd
