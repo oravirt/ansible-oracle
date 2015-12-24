@@ -1,6 +1,9 @@
 ---
    install_cx_oracle: true
+   use_proxy: false
+   http_proxy:
    oracle_home: "{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}"
    oracle_env:
          ORACLE_HOME: "{{ oracle_home }}"
+   extra_args: "{% if use_proxy==true %}--proxy={{ http_proxy }}{% else %}{% endif %}"
 
