@@ -257,9 +257,9 @@ PDBADMINPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Default value : None
 # Mandatory     : No (Yes for RAC database-centric database )
 #-----------------------------------------------------------------------------
-{% if configure_cluster==True and item.0.oracle_db_type|upper != "SI" and oracle_gi_cluster_type |upper == 'FLEX' %}
+{% if configure_cluster==True and item.0.oracle_db_type|upper != "SI" and item.0.oracle_db_type|upper != "SIFO"  and oracle_gi_cluster_type |upper == 'FLEX' %}
 NODELIST={% for host in groups[hostgroup_hub] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
-{% elif configure_cluster==True and item.0.oracle_db_type|upper != "SI" and oracle_gi_cluster_type |upper != 'FLEX' %}
+{% elif configure_cluster==True and item.0.oracle_db_type|upper != "SI" and item.0.oracle_db_type|upper != "SIFO"  and oracle_gi_cluster_type |upper != 'FLEX' %}
 NODELIST={% for host in groups[hostgroup] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% else %}
 #NODELIST=
