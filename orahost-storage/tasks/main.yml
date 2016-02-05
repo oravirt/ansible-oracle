@@ -51,7 +51,7 @@
     tags: asmlib
 
   - name: udev | Create device to label mappings for udev
-    template: src=udev-label-device-mapping.txt.j2 dest={{ oracle_stage }}/udev/udev-{{ item }}
+    template: src=udev-label-device-mapping.txt.j2 dest={{ oracle_stage }}/udev/udev-{{ item.diskgroup }}
     with_items: asm_diskgroups
     when: device_persistence == 'udev'
     tags: udev
