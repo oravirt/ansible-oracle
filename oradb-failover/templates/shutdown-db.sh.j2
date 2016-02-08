@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+#!/bin/bash
+
+
+source /home/oracle/.profile_{{ item.oracle_db_name }}
+$ORACLE_HOME/bin/sqlplus /nolog << EOFSQL
+connect / as sysdba
+shu immediate
+
+EOFSQL

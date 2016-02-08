@@ -1,0 +1,115 @@
+#!/usr/bin/perl
+#
+# $Header: act_db.pl 05-apr-2007.14:21:24 rvenkate Exp $
+#
+# act_db.pl
+#
+# Copyright (c) 2007, Oracle. All rights reserved.
+#
+# NAME
+# act_db.pl - <one-line expansion of the name>
+#
+# DESCRIPTION
+# This perl script is the action script for start / stop / check
+# the Oracle Instance in a cold failover configuration.
+#
+# Place this file in <CLUSTERWARE_HOME>/crs/public/
+#
+# NOTES
+# Edit the perl installation directory as appropriate.
+#
+# MODIFIED (MM/DD/YY)
+# pnewlan 09/03/07 – remove awk from check processing
+# pnewlan 05/25/07 – use grep -w
+# rvenkate 04/05/07 - checkin into demo dir
+# pnewlan 01/17/07 - Use Environment variables rather than hard code
+# - HOME & SID
+# pnewlan 11/23/06 - oracle OS user invoker
+# rknapp 05/22/06 - Creation
+#
+$ORACLE_HOME = "{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}";
+$ORACLE_SID = "{{ item.oracle_db_name }}";
+$ORA_USER = "{{ oracle_user }}";
+
+if ($#ARGV != 0 ) {
+print "usage: start stop check clean required \n";
+exit;
+}
+$command = $ARGV[0];
+# Database start stop check
+# Start database
+if ($command eq "start" ) {
+        system ("
+        export ORACLE_SID=$ORACLE_SID
+        export ORACLE_HOME=$ORACLE_HOME
+        export LD_LIBRARY_PATH=$ORACLE_HOME/lib:$LD_LIBRARY_PATH
+        # export TNS_ADMIN=$ORACLE_HOME/network/admin # optionally set TNS_ADMIN here
+        #su - $ORA_USER -c $ORACLE_HOME/bin/sqlplus /nolog <<EOF
+        $ORACLE_HOME/bin/sqlplus /nolog <<EOF
+        connect / as sysdba
+        startup
+        quit
+        EOF" );
+        $MYRET = check();
+        exit $MYRET;
+        }
+if ($command eq "stop" ) 
+{
+        system ("
+        export ORACLE_SID=$ORACLE_SID
+        export ORACLE_HOME=$ORACLE_HOME
+        export LD_LIBRARY_PATH=$ORACLE_HOME/lib:$LD_LIBRARY_PATH
+        # export TNS_ADMIN=$ORACLE_HOME/network/admin # optionally set TNS_ADMIN here
+        #su - $ORA_USER -c $ORACLE_HOME/bin/sqlplus /nolog <<EOF
+        $ORACLE_HOME/bin/sqlplus /nolog <<EOF
+        connect / as sysdba
+        shutdown immediate
+        quit
+        EOF" );
+        $MYRET = check();
+        if ($MYRET eq 1) {
+                exit 0;
+        }
+        else {
+                exit 1;
+        }
+}
+# Check database
+if ($command eq "check" ) {
+        $MYRET = check();
+        exit $MYRET;
+        }
+        sub check {
+        my($check_proc,$process) = @_;
+        $process = "ora_pmon_$ORACLE_SID";
+        $check_proc = qx(ps -ae -o cmd | grep -w ora_pmon_$ORACLE_SID | grep -v grep);
+        chomp($check_proc);
+        if ($process eq $check_proc) {
+                $RET=0;
+        } else {
+                $RET=1;
+        }
+        return $RET;
+}
+if ($command eq "clean" ) 
+{
+        system ("
+        export ORACLE_SID=$ORACLE_SID
+        export ORACLE_HOME=$ORACLE_HOME
+        export LD_LIBRARY_PATH=$ORACLE_HOME/lib:$LD_LIBRARY_PATH
+        # export TNS_ADMIN=$ORACLE_HOME/network/admin # optionally set TNS_ADMIN here
+        #su - $ORA_USER -c $ORACLE_HOME/bin/sqlplus /nolog <<EOF
+        $ORACLE_HOME/bin/sqlplus /nolog <<EOF
+        connect / as sysdba
+        shutdown abort
+        quit
+        EOF" );
+        $MYRET = check();
+        if ($MYRET eq 1) {
+                exit 0;
+        }
+        else {
+                exit 1;
+        }
+}
+
