@@ -14,6 +14,12 @@
     when: install_os_packages
     tags: os_packages
 
+  - name: Install packages required by Oracle for ASMlib
+    yum: name={{ item }} state=installed
+    with_items: oracle_asm_packages 
+    when: install_os_packages and device_persistence == 'asmlib'
+    tags: os_packages
+
   - name: Disable iptables 
     service: name=iptables state=stopped enabled=no
     when: disable_iptables
