@@ -154,24 +154,25 @@ def create_tablespace(module, msg, cursor, tablespace, path, size, content, bigf
         return False
 
     if content == 'undo':
-        if (bigfile):
+        if bigfile.lower() in  ['yes','on','true']:
             sql = 'create bigfile undo tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
         else:
             sql = 'create undo tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
     
     elif content == 'temp':
-        if (bigfile):
+        if bigfile.lower() in  ['yes','on','true']:
             sql = 'create bigfile temporary tablespace %s tempfile \'%s\' size %s' % (tablespace, path, size)
         else:
             sql = 'create temporary tablespace %s tempfile \'%s\' size %s' % (tablespace, path, size)
 
     else:
-        if (bigfile):
+        if bigfile.lower() in  ['yes','on','true']:
             sql = 'create bigfile tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
         else:
             sql = 'create tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
 
-    if (autoextend):
+    #if (autoextend):
+    if autoextend.lower() in  ['yes','on','true']:
         if not (nextsize):
             msg[0] = 'Error: Missing NEXT size for autoextend'
             return False
@@ -262,11 +263,13 @@ def main():
             password      = dict(required=True),
             tablespace    = dict(required=True),
             state         = dict(default="present", choices=["present", "absent", "read_only", "read_write", "offline", "online" ]),
-            bigfile       = dict(default=False, choices=BOOLEANS),
+            #bigfile       = dict(default=False, choices=BOOLEANS),
+            bigfile       = dict(default='false', choices=['yes','on','true','True', 'no','off','false','False']),
             path          = dict(required=False, aliases=['datafile']),
             size          = dict(required=False),
             content       = dict(default='permanent', choices=['permanent', 'temp', 'undo']),
-            autoextend    = dict(default=False, choices=BOOLEANS),
+            #autoextend    = dict(default=False, choices=BOOLEANS),
+            autoextend    = dict(default='false', choices=['yes','on','true','True', 'no','off','false','False']),
             nextsize      = dict(required=False, aliases=['next']),
             maxsize       = dict(required=False, aliases=['max']),
         ),
