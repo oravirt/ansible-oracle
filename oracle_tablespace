@@ -44,7 +44,7 @@ options:
         required: True
     state:
         description:
-            - The intended state of the tablespace 
+            - The intended state of the tablespace
         default: present
         choices: ['present','absent','online','offline','read_only','read_write']
     bigfile:
@@ -79,7 +79,7 @@ options:
         description:
             - If autoextend, the maximum size of the datafile (1M, 50M, 1G etc). If empty, defaults to database limits
         aliases: ['max']
-    
+
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
@@ -91,7 +91,7 @@ EXAMPLES = '''
 oracle_tablespace: hostname=db-server-scan service_name=orcl user=system password=manager tablespace=test datafile='+DATA' size=100M state=present
 
 # Create a new bigfile temporary tablespace with autoextend on and maxsize set
-oracle_tablespace: hostname=db-server service_name=orcl user=system password=manager tablespace=test datafile='+DATA' content=temp size=100M state=present bigfile=true autoextend=true next=100M maxsize=20G 
+oracle_tablespace: hostname=db-server service_name=orcl user=system password=manager tablespace=test datafile='+DATA' content=temp size=100M state=present bigfile=true autoextend=true next=100M maxsize=20G
 
 # Drop a tablespace
 oracle_tablespace: hostname=localhost service_name=orcl user=system password=manager tablespace=test state=absent
@@ -121,11 +121,12 @@ else:
 
 # Check if the tablespace exists
 def check_tablespace_exists(module, msg, cursor, tablespace):
-    
+
     sql = 'select tablespace_name, status from dba_tablespaces where tablespace_name = upper(\'%s\')' % tablespace
+
     global tsname
     global status
-    #global dbfa_list
+
     try:
             cursor.execute(sql)
             #result = cursor.fetchone()[0]
@@ -135,12 +136,15 @@ def check_tablespace_exists(module, msg, cursor, tablespace):
             error, = exc.args
             msg[0] = error.message+ 'sql: ' + sql
             return False
-            
+
     if count > 0:
         list_of_dbfs = get_tablespace_files(module, msg, cursor, tablespace)
+        #for tsname,status in result:
         for tsname,status in result:
-            status = status
+            status  = status
+
         msg[0] = 'The tablespace %s already exists. Status: %s' % (tablespace,status)
+        #return True, status
         return True, status
 
 # Create the tablespace
@@ -149,50 +153,130 @@ def create_tablespace(module, msg, cursor, tablespace, path, size, content, bigf
     TODO
     Manage multiple files per tablespace
     '''
-    if not(tablespace) or not(path):
-        msg[0] = 'Error: Missing tablespace name and/or datafile path'
+    # Check if OMF is enabled
+    checksql = 'select value from v$parameter where lower(name) = \'db_create_file_dest\''
+
+
+    try:
+            cursor.execute(checksql)
+            result = cursor.fetchall()
+    except cx_Oracle.DatabaseError, exc:
+            error, = exc.args
+            msg[0] = error.message+ 'sql: ' + checksql
+            return False
+
+    dbfc_value = result[0]
+
+    # Check if tuple is empty
+    if not all(dbfc_value):
+        skip_path = False
+    else:
+        skip_path = True
+
+    if not(tablespace):
+
+        # If we're missing the tablespace name, we exit.
+
+        msg[0] = 'Error: Missing tablespace name'
         return False
 
-    if content == 'undo':
-        if bigfile.lower() in  ['yes','on','true']:
-            sql = 'create bigfile undo tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
-        else:
-            sql = 'create undo tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
-    
-    elif content == 'temp':
-        if bigfile.lower() in  ['yes','on','true']:
-            sql = 'create bigfile temporary tablespace %s tempfile \'%s\' size %s' % (tablespace, path, size)
-        else:
-            sql = 'create temporary tablespace %s tempfile \'%s\' size %s' % (tablespace, path, size)
+    if not(path):
+         if skip_path:
+
+             # If db_create_file_dest IS set, and we're missing the datafile path we CAN continue because of OMF
+
+             if content == 'undo':
+                 if bigfile.lower() in  ['yes','on','true']:
+                     #if (bigfile):
+                     sql = 'create bigfile undo tablespace %s datafile  size %s' % (tablespace, size)
+                 else:
+                     sql = 'create undo tablespace %s datafile size %s' % (tablespace, size)
+
+             elif content == 'temp':
+                 if bigfile.lower() in  ['yes','on','true']:
+                 #if (bigfile):
+                     sql = 'create bigfile temporary tablespace %s tempfile size %s' % (tablespace,size)
+                 else:
+                     sql = 'create temporary tablespace %s tempfile size %s' % (tablespace, size)
+
+             else:
+                 if bigfile.lower() in  ['yes','on','true']:
+                 #if (bigfile):
+                     sql = 'create bigfile tablespace %s datafile size %s' % (tablespace, size)
+                 else:
+                     sql = 'create tablespace %s datafile size %s' % (tablespace, size)
+                 #if (autoextend):
+                 if autoextend.lower() in  ['yes','on','true']:
+                     if not (nextsize):
+                         msg[0] = 'Error: Missing NEXT size for autoextend'
+                         return False
+                     elif not (maxsize):
+                         sql += ' autoextend on next %s ' % (nextsize)
+                     else:
+                         sql += ' autoextend on next %s maxsize %s' % (nextsize, maxsize)
+
+             execute_sql(module, msg, cursor, sql)
+             module.exit_json(msg='The tablespace %s has been created successfully. Initial size: %s. Autoextend: %s' % (tablespace, size, autoextend), changed=True)
+
+         elif not skip_path:
+
+             # If db_create_file_dest is NOT set, and we're missing the datafile path we can't continue
+
+             msg[0] = 'Error: Missing datafile name/path'
+             return False
 
     else:
-        if bigfile.lower() in  ['yes','on','true']:
-            sql = 'create bigfile tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
-        else:
-            sql = 'create tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
 
-    #if (autoextend):
-    if autoextend.lower() in  ['yes','on','true']:
-        if not (nextsize):
-            msg[0] = 'Error: Missing NEXT size for autoextend'
-            return False
-        elif not (maxsize):
-            sql += ' autoextend on next %s ' % (nextsize)
-        else:
-            sql += ' autoextend on next %s maxsize %s' % (nextsize, maxsize)
-    
+        # Everything is ok, tablespace + datafile provided so just continue
 
+        if content == 'undo':
+            if bigfile.lower() in  ['yes','on','true']:
+        #if (bigfile):
+                sql = 'create bigfile undo tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
+            else:
+                sql = 'create undo tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
+
+        elif content == 'temp':
+            if bigfile.lower() in  ['yes','on','true']:
+    #if (bigfile):
+                sql = 'create bigfile temporary tablespace %s tempfile \'%s\' size %s' % (tablespace, path, size)
+            else:
+                sql = 'create temporary tablespace %s tempfile \'%s\' size %s' % (tablespace, path, size)
+
+        else:
+            if bigfile.lower() in  ['yes','on','true']:
+        #if (bigfile):
+                sql = 'create bigfile tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
+            else:
+                sql = 'create tablespace %s datafile \'%s\' size %s' % (tablespace, path, size)
+
+            #if (autoextend):
+        if autoextend.lower() in  ['yes','on','true']:
+            if not (nextsize):
+                msg[0] = 'Error: Missing NEXT size for autoextend'
+                return False
+            elif not (maxsize):
+                sql += ' autoextend on next %s ' % (nextsize)
+            else:
+                sql += ' autoextend on next %s maxsize %s' % (nextsize, maxsize)
+
+        execute_sql(module, msg, cursor, sql)
+        module.exit_json(msg='The tablespace %s has been created successfully. Initial size: %s. Autoextend: %s' % (tablespace, size, autoextend), changed=True)
+
+def execute_sql(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
-        msg[0] = 'Blergh, something went wrong while creating the tablespace - %s sql: %s' % (error.message, sql)
+        msg[0] = 'Blergh, something went wrong while managing the tablespace - %s sql: %s' % (error.message, sql)
+        module.fail_json(msg=msg[0], changed=False)
         return False
+
     return True
 
 # Get the existing datafiles for the tablespace
 def get_tablespace_files(module, msg, cursor, tablespace):
-    
+
     dbf_list=[]
     sql = 'select f.file_name from dba_data_files f, dba_tablespaces d '
     sql += 'where f.tablespace_name = d.tablespace_name '
@@ -210,7 +294,7 @@ def get_tablespace_files(module, msg, cursor, tablespace):
 
 # Make tablespace read only
 def manage_tablespace(msg, cursor, tablespace, state):
-    
+
     if state == 'read_only':
         sql = 'alter tablespace %s read only' % tablespace
         msg[0] = 'Tablespace %s has been put in read only mode' % tablespace
@@ -230,14 +314,14 @@ def manage_tablespace(msg, cursor, tablespace, state):
         error, = exc.args
         msg[0] = error.message+ 'sql: ' + sql
         return False
-    
+
 
     return True, msg[0]
 
-    
+
 # Drop the tablespace
 def drop_tablespace(msg, cursor, tablespace):
-   
+
     sql = 'drop tablespace %s including contents and datafiles' % tablespace
 
     try:
@@ -263,18 +347,18 @@ def main():
             password      = dict(required=True),
             tablespace    = dict(required=True),
             state         = dict(default="present", choices=["present", "absent", "read_only", "read_write", "offline", "online" ]),
-            #bigfile       = dict(default=False, choices=BOOLEANS),
+            #bigfile       = dict(default=False, choices=BOOLEANS, type=bool),
             bigfile       = dict(default='false', choices=['yes','on','true','True', 'no','off','false','False']),
             path          = dict(required=False, aliases=['datafile']),
             size          = dict(required=False),
             content       = dict(default='permanent', choices=['permanent', 'temp', 'undo']),
-            #autoextend    = dict(default=False, choices=BOOLEANS),
+            #autoextend    = dict(default=False, choices=BOOLEANS, type=bool),
             autoextend    = dict(default='false', choices=['yes','on','true','True', 'no','off','false','False']),
             nextsize      = dict(required=False, aliases=['next']),
             maxsize       = dict(required=False, aliases=['max']),
         ),
     )
-     
+
 
     hostname = module.params["hostname"]
     port = module.params["port"]
@@ -292,7 +376,7 @@ def main():
     nextsize = module.params["nextsize"]
     maxsize = module.params["maxsize"]
 
-    
+
     if not cx_oracle_exists:
         module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
 
@@ -303,7 +387,7 @@ def main():
             conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
         else:
             conn = cx_Oracle.connect(user, password, dsn)
-    
+
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
         msg[0] = 'Could not connect to database - %s ' % (error.message)
@@ -311,7 +395,7 @@ def main():
 
     cursor = conn.cursor()
 
-    if state == 'present': 
+    if state == 'present':
         if not check_tablespace_exists(module, msg, cursor, tablespace):
             if create_tablespace(module, msg, cursor, tablespace, path, size, content, bigfile, autoextend, nextsize, maxsize):
                 #dbfa_list = get_tablespace_files(module, msg, cursor, tablespace)
@@ -321,7 +405,7 @@ def main():
                 module.fail_json(msg=msg[0], changed=False)
         else:
             module.exit_json(msg=msg[0], changed=False)
-                
+
     elif state == 'absent':
         if check_tablespace_exists(module, msg, cursor, tablespace):
             if drop_tablespace(msg, cursor, tablespace):
@@ -329,7 +413,7 @@ def main():
                 module.exit_json(msg=msg[0], changed=True)
         else:
             module.exit_json(msg='The tablespace %s doesn\'t exist' % tablespace, changed=False)
-    
+
     elif state == 'read_only':
         if check_tablespace_exists(module, msg, cursor, tablespace): # and status == 'ONLINE':
             if status == 'READ ONLY' : # return value from check_tablespace_exists
@@ -337,23 +421,23 @@ def main():
             elif manage_tablespace(msg, cursor, tablespace, state):
                 #msg[0] = 'The tablespace %s has been made read only' % tablespace
                 module.exit_json(msg=msg[0], changed=True)
-        
+
     elif state == 'read_write':
-        if check_tablespace_exists(module, msg, cursor, tablespace): 
+        if check_tablespace_exists(module, msg, cursor, tablespace):
             if status == 'ONLINE' : # return value from check_tablespace_exists
                 module.exit_json(msg='The tablespace %s is already in read write mode' % tablespace, changed=False)
             elif manage_tablespace(msg, cursor, tablespace, state):
                  module.exit_json(msg=msg[0], changed=True)
 
     elif state == 'offline':
-        if check_tablespace_exists(module, msg, cursor, tablespace): 
+        if check_tablespace_exists(module, msg, cursor, tablespace):
             if status == 'OFFLINE' : # return value from check_tablespace_exists
                 module.exit_json(msg='The tablespace %s is already offline' % tablespace, changed=False)
             elif manage_tablespace(msg, cursor, tablespace, state):
                  module.exit_json(msg=msg[0], changed=True)
 
     elif state == 'online':
-        if check_tablespace_exists(module, msg, cursor, tablespace): 
+        if check_tablespace_exists(module, msg, cursor, tablespace):
             if status == 'ONLINE' : # return value from check_tablespace_exists
                 module.exit_json(msg='The tablespace %s is already online' % tablespace, changed=False)
             elif manage_tablespace(msg, cursor, tablespace, state):
@@ -361,7 +445,7 @@ def main():
 
     #module.exit_json(msg=msg[0], changed=False)
     module.exit_json(msg='The tablespace %s doesn\'t exist' % tablespace, changed=False)
-    
+
 
 
 
