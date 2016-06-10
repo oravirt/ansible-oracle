@@ -2,7 +2,7 @@
 
   master_node: true
   role_separation: false
-  hostgroup: default
+  hostgroup: "{{ group_names[0] }}"
   hostgroup_hub: "{{ hostgroup }}-hub"
   hostgroup_leaf: "{{ hostgroup }}-leaf"
 
@@ -53,7 +53,7 @@
   device_persistence: asmlib
   cvuqdisk_rpm: cvuqdisk-1.0.9-1.rpm
 
-  oracle_cluster_name: "{{ hostgroup }}-cl"      # Name of the cluster when setting up Clustered Grid Infrastructure
+  oracle_cluster_name: "{{ hostgroup }}"      # Name of the cluster when setting up Clustered Grid Infrastructure
   oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
   oracle_gi_nic_pub: eth0                        # Default interface for 'public' traffic. Only used in RAC
   oracle_gi_nic_priv: eth1                       # Default interface for interconnect traffic. Only used in RAC
