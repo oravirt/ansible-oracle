@@ -144,7 +144,7 @@
      - checkdbswinstall.results
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and item.1.stdout != "1" #and oracle_sw_unpack
+    when: master_node #and item.1.stdout != "1" #and oracle_sw_unpack
     tags:
       - oradbinstall
     register: oradbinstall
@@ -169,7 +169,7 @@
     with_together:
      - oracle_databases
      - checkdbswinstall.results
-    when: master_node and item.1.stdout != "1" 
+    when: master_node #and item.1.stdout != "1" 
     #with_items: oracle_databases
     #when: master_node
     tags:
