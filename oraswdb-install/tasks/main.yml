@@ -178,6 +178,7 @@
   - name: Add additional info to glogin.sql (1)
     lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line='set sqlprompt "_user @ _connect_identifier:>"' backup=yes
     with_items: oracle_databases
+    when: configure_gloginsql|bool
     sudo: yes
     sudo_user: "{{ oracle_user }}"
     tags: 
@@ -186,6 +187,7 @@
   - name: Add additional info to glogin.sql (2)
     lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line='set time on' backup=yes
     with_items: oracle_databases
+    when: configure_gloginsql|bool
     tags: 
       - glogin
   
