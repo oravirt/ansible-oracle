@@ -28,7 +28,7 @@
   #oracle_db_responsefile: "{% if item.0.oracle_db_name is defined %}{{ item.0.oracle_db_name }}_{{ ansible_hostname }}.rsp{% else %}nodbname_defined_{{ ansible_hostname }}.rsp{% endif %}"
   oracle_stage: /u01/stage
   oracle_stage_remote: "{{ oracle_stage }}"
-  oracle_stage_install: "{% if oracle_sw_copy=='false' and oracle_sw_unpack=='false'%}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
+  oracle_stage_install: "{% if oracle_sw_copy==False and oracle_sw_unpack==False%}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
   oracle_rsp_stage: "{{ oracle_stage }}/rsp"
   oracle_inventory_loc: /u01/app/oraInventory
   oracle_base: /u01/app/oracle
@@ -51,3 +51,11 @@
        - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4 }
        - { filename: p10404530_112030_Linux-x86-64_1of7.zip, version: 11.2.0.3 }
        - { filename: p10404530_112030_Linux-x86-64_2of7.zip, version: 11.2.0.3 }
+
+  oracle_databases:
+    - home: home1
+      oracle_version_db: 12.1.0.2
+      oracle_edition: EE
+      oracle_db_name: orcl
+      oracle_db_type: SI
+
