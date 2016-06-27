@@ -10,7 +10,7 @@
     mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=mounted
     tags:
       - nfsmountgi
-    when: not oracle_sw_copy|bool and not oracle_sw_unpack|bool
+    when: not oracle_sw_copy|bool and not oracle_sw_unpack|bool and install_from_nfs|bool
 
   - name: Add new dotprofile (GI)
     template: src=dotprofile-gi.j2 dest={{ grid_user_home }}/{{ oracle_profile_name_gi }} owner={{ grid_install_user }} group={{ oracle_group }} mode=755 backup=yes
