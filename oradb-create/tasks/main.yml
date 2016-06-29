@@ -1,12 +1,13 @@
 ---
 
   - name: Check if database is already created
-    shell: grep {{ item.oracle_db_name }}:{{ oracle_home_db }} /etc/oratab |wc -l
+    shell: grep ^{{ item.oracle_db_name }}:{{ oracle_home_db }} /etc/oratab |wc -l
     with_items: oracle_databases
     when: item.oracle_db_name is defined
     tags:
     - checkifdbexists
     - oradbcreate
+    - dbcaresponse
     register: checkdbexist
 
 #  - debug: var=checkdbexist.stdout
