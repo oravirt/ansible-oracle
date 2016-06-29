@@ -25,6 +25,8 @@
   hostgroup_hub: "{{ hostgroup }}-hub"
   hostgroup_leaf: "{{ hostgroup }}-leaf"
 
+  oracle_characterset: AL32UTF8                            # Use this characterset as default when no variable is set in oracle_databases
+  oracle_nationalcharacterset: AL16UTF8                    # Use this characterset as default when no variable is set in oracle_databases
 
 
 # This is an example layout of a database installation
@@ -42,6 +44,8 @@
           storage_type: FS                                     # Database storage to be used. ASM or FS. 
           service_name: orcl_serv                               # Inital service to be created (not in use yet)
           oracle_init_params: "open_cursors=300,processes=700" # Specific parameters to be set during installation. Comma-separated list
+          characterset: AL32UTF8                               # Characterset of the database
+          nationalcharacterset: AL16UTF16                      # National Characterset of the database
           oracle_db_mem_percent: 30                            # Amount of RAM to be used for SGA
           oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
           redolog_size_in_mb: 100

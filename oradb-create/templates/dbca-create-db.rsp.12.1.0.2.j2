@@ -549,7 +549,11 @@ RECOVERYGROUPNAME={{ oracle_reco_dir_asm }}
 # Default value : "US7ASCII"
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-CHARACTERSET = "AL32UTF8"
+{% if item.0.characterset is defined %}
+CHARACTERSET= "{{ item.0.characterset }}"
+{% else %}
+CHARACTERSET = "{{ oracle_characterset }}"
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : NATIONALCHARACTERSET
@@ -559,7 +563,11 @@ CHARACTERSET = "AL32UTF8"
 # Default value : "AL16UTF16"
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-NATIONALCHARACTERSET= "AL16UTF16"
+{% if item.0.nationalcharacterset is defined %}
+NATIONALCHARACTERSET= "{{ item.0.nationalcharacterset }}"
+{% else %}
+NATIONALCHARACTERSET= "{{ oracle_nationalcharacterset }}"
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : REGISTERWITHDIRSERVICE
