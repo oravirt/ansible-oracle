@@ -30,14 +30,14 @@
 #    debug: msg="memfree={{ ansible_memfree_mb }}M totalmem={{ ansible_memtotal_mb }}M need 616M free"
 #    failed_when: "{{ ansible_memfree_mb }} < 616"
 
-  - name: Create database(s)
+  - name: Create database(s) (1)
     shell: "time {{ oracle_home_db_install }}/bin/dbca -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent -redoLogFileSize {{ item.0.redolog_size_in_mb }} "
     with_together:
        - oracle_databases
        - checkdbexist.results
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and item.1.stdout != "1" and "{{ item.0.state }}"|upper == "PRESENT"
+    when: master_node and item.0.oracle_home is not defined and item.1.stdout != "1" and "{{ item.0.state }}"|upper == "PRESENT"
     tags:
       - oradbcreate
     register: oradbcreate
@@ -47,6 +47,25 @@
     tags:
      - oradbcreate
     when: oradbcreate.changed
+
+  - name: Create database(s) (2)
+    shell: "time {{ item.0.oracle_home }}/bin/dbca -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent -redoLogFileSize {{ item.0.redolog_size_in_mb }} "
+    with_together:
+       - oracle_databases
+       - checkdbexist.results
+    sudo: yes
+    sudo_user: "{{ oracle_user }}"
+    when: master_node and item.0.oracle_home is defined and item.1.stdout != "1" and "{{ item.0.state }}"|upper == "PRESENT"
+    tags:
+      - oradbcreate
+    register: oradbcreate
+
+  - debug: var=oradbcreate.stdout_lines
+    with_items: oradbcreate.results
+    tags:
+     - oradbcreate
+    when: oradbcreate.changed
+
 
 #  - name: Add default services to databases
 #    shell: "{{ oracle_home_db }}/bin/srvctl add service -db {{ item.value.oracle_database }} 
@@ -81,12 +100,20 @@
     - dbs.results
     tags: dotprofile_db
 
-  - name: Update oratab
+  - name: Update oratab (1)
     lineinfile: dest=/etc/oratab line="{{ item.1.stdout }}:{{ oracle_base }}/{{ item.0.oracle_version_db }}/{{ item.0.home }}:N" state=present
     with_together:
        - oracle_databases
        - dbs.results
-    when: item.0.oracle_db_type != "SI"
+    when: item.0.oracle_db_type == "SI" and item.0.oracle_home is not defined
+    tags: update_oratab
+    
+  - name: Update oratab (2)
+    lineinfile: dest=/etc/oratab line="{{ item.1.stdout }}:{{ item.0.oracle_home }}:N" state=present
+    with_together:
+       - oracle_databases
+       - dbs.results
+    when: item.0.oracle_db_type == "SI" and item.0.oracle_home is defined
     tags: update_oratab
     
   - name: Check if database is running

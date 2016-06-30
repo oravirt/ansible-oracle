@@ -5,6 +5,10 @@
     with_items: oracle_databases 
     tags: 
     - checkifdbinstall
+    - responsefileswdb
+    - responsefileswdb
+    - oradbinstall
+    - runroot
     register: checkdbswinstall
 
   - name: Mount nfs share with installation media
@@ -164,39 +168,64 @@
 #    tags:
 #      - runroot
 
-  - name: Run root script after installation
-    shell: "{{ oracle_home_db_install }}/root.sh"
+
+  - name: Run root script after installation (1)
+    shell: "{{ db_oracle_home_install }}/root.sh"
     with_together:
      - oracle_databases
      - checkdbswinstall.results
-    when: master_node #and item.1.stdout != "1" 
-    #with_items: oracle_databases
+    when: master_node and db_oracle_home_install is defined and item.1.stdout != "1"
     #when: master_node
     tags:
       - runroot
 
-  - name: Add additional info to glogin.sql (1)
+  - name: Run root script after installation (2)
+    shell: "{{ item.0.oracle_home }}/root.sh"
+    with_together:
+     - oracle_databases
+     - checkdbswinstall.results
+    when: master_node and item.0.oracle_home is defined and item.1.stdout != "1" 
+    tags:
+      - runroot
+
+  - name: Add additional info to glogin.sql (1.1)
     lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line='set sqlprompt "_user @ _connect_identifier:>"' backup=yes
     with_items: oracle_databases
-    when: configure_gloginsql|bool
+    when: configure_gloginsql|bool and oracle_home_db is defined and item.0.oracle_home is not defined
     sudo: yes
     sudo_user: "{{ oracle_user }}"
     tags: 
       - glogin
 
-  - name: Add additional info to glogin.sql (2)
+  - name: Add additional info to glogin.sql (1.2)
     lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line='set time on' backup=yes
     with_items: oracle_databases
-    when: configure_gloginsql|bool
+    when: configure_gloginsql|bool and oracle_home_db is defined and item.0.oracle_home is not defined
     tags: 
       - glogin
-  
-  - name: Check opatch lsinventory (DB)
+ 
+  - name: Add additional info to glogin.sql (2.2)
+    lineinfile: dest="{{ item.0.oracle_home }}/sqlplus/admin/glogin.sql" line='set sqlprompt "_user @ _connect_identifier:>"' backup=yes
+    with_items: oracle_databases
+    when: configure_gloginsql|bool and item.0.oracle_home is defined
+    sudo: yes
+    sudo_user: "{{ oracle_user }}"
+    tags:
+      - glogin
+
+  - name: Add additional info to glogin.sql (2.2)
+    lineinfile: dest="{{ item.0.oracle_home }}/sqlplus/admin/glogin.sql" line='set time on' backup=yes
+    with_items: oracle_databases
+    when: configure_gloginsql|bool and item.0.oracle_home is defined
+    tags:
+      - glogin
+ 
+  - name: Check opatch lsinventory (DB) (1)
     shell: "{{ oracle_home_db }}/OPatch/opatch lsinventory"
     with_items: oracle_databases
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node  
+    when: master_node and item.oracle_home is not defined
     register: opatchls
     tags:
      - opatchls
@@ -206,6 +235,23 @@
     when: master_node
     tags:
      - opatchls
+
+  - name: Check opatch lsinventory (DB) (2)
+    shell: "{{ item.oracle_home }}/OPatch/opatch lsinventory"
+    with_items: oracle_databases
+    sudo: yes
+    sudo_user: "{{ oracle_user }}"
+    when: master_node and item.oracle_home is defined
+    register: opatchls
+    tags:
+     - opatchls
+
+  - debug: var=opatchls.stdout_lines
+    with_items: opatchls.results
+    when: master_node and item.oracle_home is defined
+    tags:
+     - opatchls
+
 
   - name: Unmount nfs share with installation media
     mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=absent
