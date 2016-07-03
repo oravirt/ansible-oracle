@@ -34,21 +34,22 @@
     when: master_node and device_persistence == 'asmlib'
     tags: asmlib
 
+  # oracleasm scandisks is not possible with service module.
   - name: ASMlib | Rescan ASM disks
     shell: service oracleasm scandisks
     when: device_persistence == 'asmlib'
-    tags: asmlib
+    tags: asmlib, lsasmlib
 
   - name: ASMlib | List ASM disks
     shell: service oracleasm listdisks
     when: device_persistence == 'asmlib'
     register: listdisks
-    tags: asmlib
+    tags: asmlib, lsasmlib
 
   - name: List ASM disks
     debug: var=listdisks.stdout_lines
     when: device_persistence == 'asmlib'
-    tags: asmlib
+    tags: asmlib, lsasmlib
 
   - name: udev | Create device to label mappings for udev
     template: src=udev-label-device-mapping.txt.j2 dest={{ oracle_stage }}/udev/udev-{{ item.diskgroup }}
