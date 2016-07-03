@@ -3,7 +3,19 @@
   - name: Check if GI is already installed
     shell: grep "{{ oracle_home_gi }}" "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" |wc -l
     tags: 
+    - asmcaa
     - checkifgiinstall
+    - crsctl
+    - olsnodes
+    - opatchls
+    - oragridinstall
+    - responsefileconfigtool
+    - responsefilegi
+    - runconfigtool
+    - runroot
+    - srvctlasm
+    - updatenodelist
+    - srvctlasm
     register: checkgiinstall
 
   - name: Mount nfs share with installation media
@@ -236,4 +248,5 @@
     tags:
       - nfsunmount
     when: not oracle_sw_copy|bool and not oracle_sw_unpack|bool
-    tags: nfsunmountgi
+    tags:
+     - nfsunmountgi
