@@ -1,0 +1,15 @@
+---
+# tasks file for orahost-admin
+- name: Manage cron
+  cron: user={{ item.user }} name="{{ item.name }}" job="{{ item.job }}" hour={{ item.hour }} cron_file={{ item.cron_file }} state={{ item.state }}
+  with_items:
+        - "{{ cron_config }}"
+  when: cron_config is defined
+  tags: cron
+
+- name: Manage logrotate
+  template: src=logrotate.j2 dest=/etc/logrotate.d/{{ item.name }}
+  with_items:
+        - "{{ logrotate_config }}"
+  when: logrotate_config is defined
+  tags: logrotate

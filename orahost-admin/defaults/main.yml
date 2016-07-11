@@ -1,0 +1,25 @@
+---
+# defaults file for orahost-admin
+#cron_config:
+#     - {user: oracle, name: "clean-up job", job: "some fancy thing", hour: "1", cron_file: oracle-cleanup, state: present  }
+
+logrotate_config:
+        - name: oracle_alert
+          file: "/u01/app/oracle/diag/rdbms/*/*/trace/*alert*.log"
+          options:
+            - missingok
+            - notifempty
+            - weekly
+            - rotate 3
+            - copytruncate
+            - dateext
+        - name: oracle_listener
+          file: "/u01/app/oracle/diag/tnslsnr/*/*/trace/*listener*.log"
+          options:
+            - missingok
+            - notifempty
+            - weekly
+            - rotate 3
+            - copytruncate
+            - dateext
+            - compress
