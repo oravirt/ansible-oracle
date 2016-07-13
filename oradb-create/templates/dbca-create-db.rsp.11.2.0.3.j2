@@ -63,7 +63,7 @@ OPERATION_TYPE = "createDatabase"
 #-----------------------*** End of GENERAL section ***------------------------
 
 #-----------------------------------------------------------------------------
-# CREATEDATABASE section is used when OPERATION_TYPE is defined as "createDatabase". 
+# CREATEDATABASE section is used when OPERATION_TYPE is defined as "createDatabase".
 #-----------------------------------------------------------------------------
 [CREATEDATABASE]
 
@@ -91,7 +91,7 @@ RACONENODE  = "{{ item.0.is_racone }}"
 #-----------------------------------------------------------------------------
 # Name          : RACONENODESERVICENAME
 # Datatype      : String
-# Description   : Service is required by application to connect to RAC One 
+# Description   : Service is required by application to connect to RAC One
 #		  Node Database
 # Valid values  : Service Name
 # Default value : None
@@ -100,12 +100,12 @@ RACONENODE  = "{{ item.0.is_racone }}"
 {% if item.0.oracle_db_type|upper == 'RACONENODE' %}
 RACONENODESERVICENAME = "{{ item.0.service_name }}"
 {% else %}
-#RACONENODESERVICENAME = 
+#RACONENODESERVICENAME =
 {% endif %}
 #-----------------------------------------------------------------------------
 # Name          : POLICYMANAGED
 # Datatype      : Boolean
-# Description   : Set to true if Database is policy managed and 
+# Description   : Set to true if Database is policy managed and
 #		  set to false if  Database is admin managed
 # Valid values  : TRUE\FALSE
 # Default value : FALSE
@@ -116,9 +116,9 @@ POLICYMANAGED = "false"
 #-----------------------------------------------------------------------------
 # Name          : CREATESERVERPOOL
 # Datatype      : Boolean
-# Description   : Set to true if new server pool need to be created for database 
-#		  if this option is specified then the newly created database 
-#		  will use this newly created serverpool. 
+# Description   : Set to true if new server pool need to be created for database
+#		  if this option is specified then the newly created database
+#		  will use this newly created serverpool.
 #		  Multiple serverpoolname can not be specified for database
 # Valid values  : TRUE\FALSE
 # Default value : FALSE
@@ -129,7 +129,7 @@ POLICYMANAGED = "false"
 #-----------------------------------------------------------------------------
 # Name          : FORCE
 # Datatype      : Boolean
-# Description   : Set to true if new server pool need to be created by force 
+# Description   : Set to true if new server pool need to be created by force
 #		  if this option is specified then the newly created serverpool
 #		  will be assigned server even if no free servers are available.
 #		  This may affect already running database.
@@ -143,15 +143,15 @@ POLICYMANAGED = "false"
 #-----------------------------------------------------------------------------
 # Name          : SERVERPOOLNAME
 # Datatype      : String
-# Description   : Only one serverpool name need to be specified 
-#		   if Create Server Pool option is specified. 
+# Description   : Only one serverpool name need to be specified
+#		   if Create Server Pool option is specified.
 #		   Comma-separated list of Serverpool names if db need to use
 #		   multiple Server pool
 # Valid values  : ServerPool name
 # Default value : None
 # Mandatory     : No [required in case of RAC service centric database]
 #-----------------------------------------------------------------------------
-#SERVERPOOLNAME = 
+#SERVERPOOLNAME =
 
 #-----------------------------------------------------------------------------
 # Name          : CARDINALITY
@@ -161,7 +161,7 @@ POLICYMANAGED = "false"
 # Default value : Number of qualified nodes on cluster
 # Mandatory     : No [Required when a new serverpool need to be created]
 #-----------------------------------------------------------------------------
-#CARDINALITY = 
+#CARDINALITY =
 
 #-----------------------------------------------------------------------------
 # Name          : SID
@@ -281,7 +281,7 @@ DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Default value : None
 # Mandatory     : Yes, if CENTRAL is specified for EMCONFIGURATION
 #-----------------------------------------------------------------------------
-#CENTRALAGENT = 
+#CENTRALAGENT =
 
 #-----------------------------------------------------------------------------
 # Name          : HOSTUSERNAME
@@ -290,7 +290,7 @@ DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Default value : None
 # Mandatory     : Yes, if ALL is specified for EMCONFIGURATION
 #-----------------------------------------------------------------------------
-#HOSTUSERNAME = 
+#HOSTUSERNAME =
 
 #-----------------------------------------------------------------------------
 # Name          : HOSTUSERPASSWORD
@@ -299,7 +299,7 @@ DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Default value : None
 # Mandatory     : Yes, if ALL is specified for EMCONFIGURATION
 #-----------------------------------------------------------------------------
-#HOSTUSERPASSWORD= 
+#HOSTUSERPASSWORD=
 
 #-----------------------------------------------------------------------------
 # Name          : BACKUPSCHEDULE
@@ -353,9 +353,9 @@ DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
 
 
 #-----------------------------------------------------------------------------
-# Name          : DATAFILEJARLOCATION 
+# Name          : DATAFILEJARLOCATION
 # Datatype      : String
-# Description   : Location of the data file jar 
+# Description   : Location of the data file jar
 # Valid values  : Directory containing compressed datafile jar
 # Default value : None
 # Mandatory     : No
@@ -363,7 +363,7 @@ DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
 #DATAFILEJARLOCATION =
 
 #-----------------------------------------------------------------------------
-# Name          : DATAFILEDESTINATION 
+# Name          : DATAFILEDESTINATION
 # Datatype      : String
 # Description   : Location of the data file's
 # Valid values  : Directory for all the database files
@@ -494,18 +494,18 @@ NATIONALCHARACTERSET= "AL16UTF16"
 # Name          : LISTENERS
 # Datatype      : String
 # Description   : Specifies list of listeners to register the database with.
-#		  By default the database is configured for all the listeners specified in the 
-#		  $ORACLE_HOME/network/admin/listener.ora 	
+#		  By default the database is configured for all the listeners specified in the
+#		  $ORACLE_HOME/network/admin/listener.ora
 # Valid values  : The list should be space separated names like "listener1 listener2".
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
 #LISTENERS = "listener1 listener2"
 
 #-----------------------------------------------------------------------------
-# Name          : VARIABLESFILE 
+# Name          : VARIABLESFILE
 # Datatype      : String
 # Description   : Location of the file containing variable value pair
-# Valid values  : A valid file-system file. The variable value pair format in this file 
+# Valid values  : A valid file-system file. The variable value pair format in this file
 #		  is <variable>=<value>. Each pair should be in a new line.
 # Default value : None
 # Mandatory     : NO
@@ -552,7 +552,11 @@ SAMPLESCHEMA=FALSE
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
+{% if item.0.oracle_db_mem_percent is defined %}
 MEMORYPERCENTAGE = "{{ item.0.oracle_db_mem_percent }}"
+{% else %}
+#MEMORYPERCENTAGE =
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : DATABASETYPE
@@ -578,21 +582,26 @@ AUTOMATICMEMORYMANAGEMENT = "FALSE"
 # Name          : TOTALMEMORY
 # Datatype      : String
 # Description   : total memory in MB to allocate to Oracle
-# Valid values  : 
-# Default value : 
+# Valid values  :
+# Default value :
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-#TOTALMEMORY = "800"
+{% if item.0.oracle_db_mem_totalmb is defined %}
+TOTALMEMORY = "{{ item.0.oracle_db_mem_totalmb }}"
+{% else %}
+#TOTALMEMORY =
+{% endif %}
+
 
 
 #-----------------------*** End of CREATEDATABASE section ***------------------------
 
 #-----------------------------------------------------------------------------
-# createTemplateFromDB section is used when OPERATION_TYPE is defined as "createTemplateFromDB". 
+# createTemplateFromDB section is used when OPERATION_TYPE is defined as "createTemplateFromDB".
 #-----------------------------------------------------------------------------
 [createTemplateFromDB]
 #-----------------------------------------------------------------------------
-# Name          : SOURCEDB 
+# Name          : SOURCEDB
 # Datatype      : String
 # Description   : The source database from which to create the template
 # Valid values  : The format is <host>:<port>:<sid>
@@ -602,7 +611,7 @@ AUTOMATICMEMORYMANAGEMENT = "FALSE"
 SOURCEDB = "myhost:1521:orcl"
 
 #-----------------------------------------------------------------------------
-# Name          : SYSDBAUSERNAME 
+# Name          : SYSDBAUSERNAME
 # Datatype      : String
 # Description   : A user with DBA role.
 # Default value : none
@@ -611,7 +620,7 @@ SOURCEDB = "myhost:1521:orcl"
 SYSDBAUSERNAME = "system"
 
 #-----------------------------------------------------------------------------
-# Name          : SYSDBAPASSWORD 
+# Name          : SYSDBAPASSWORD
 # Datatype      : String
 # Description   : The password of the DBA user.
 #		  You can also specify the password at the command prompt instead of here.
@@ -632,13 +641,13 @@ TEMPLATENAME = "My Copy TEMPLATE"
 #-----------------------*** End of createTemplateFromDB section ***------------------------
 
 #-----------------------------------------------------------------------------
-# createCloneTemplate section is used when OPERATION_TYPE is defined as "createCloneTemplate". 
+# createCloneTemplate section is used when OPERATION_TYPE is defined as "createCloneTemplate".
 #-----------------------------------------------------------------------------
 [createCloneTemplate]
 #-----------------------------------------------------------------------------
 # Name          : SOURCEDB
 # Datatype      : String
-# Description   : The source database is the SID from which to create the template. 
+# Description   : The source database is the SID from which to create the template.
 #		  This database must be local and on the same ORACLE_HOME.
 # Default value : none
 # Mandatory     : YES
@@ -676,23 +685,23 @@ TEMPLATENAME = "My Clone TEMPLATE"
 #-----------------------------------------------------------------------------
 # Name          : DATAFILEJARLOCATION
 # Datatype      : String
-# Description   : Location of the data file jar 
+# Description   : Location of the data file jar
 # Valid values  : Directory where the new compressed datafile jar will be placed
 # Default value : $ORACLE_HOME/assistants/dbca/templates
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-#DATAFILEJARLOCATION = 
+#DATAFILEJARLOCATION =
 
 #-----------------------*** End of createCloneTemplate section ***------------------------
 
 #-----------------------------------------------------------------------------
-# DELETEDATABASE section is used when DELETE_TYPE is defined as "deleteDatabase". 
+# DELETEDATABASE section is used when DELETE_TYPE is defined as "deleteDatabase".
 #-----------------------------------------------------------------------------
 [DELETEDATABASE]
 #-----------------------------------------------------------------------------
 # Name          : SOURCEDB
 # Datatype      : String
-# Description   : The source database is the SID 
+# Description   : The source database is the SID
 #		  This database must be local and on the same ORACLE_HOME.
 # Default value : none
 # Mandatory     : YES
@@ -720,7 +729,7 @@ SOURCEDB = "orcl"
 #-----------------------*** End of deleteDatabase section ***------------------------
 
 #-----------------------------------------------------------------------------
-# GENERATESCRIPTS section 
+# GENERATESCRIPTS section
 #-----------------------------------------------------------------------------
 [generateScripts]
 #-----------------------------------------------------------------------------
@@ -745,7 +754,7 @@ TEMPLATENAME = "New Database"
 GDBNAME = "orcl11.us.oracle.com"
 
 #-----------------------------------------------------------------------------
-# Name          : SCRIPTDESTINATION 
+# Name          : SCRIPTDESTINATION
 # Datatype      : String
 # Description   : Location of the scripts
 # Valid values  : Directory for all the scripts
@@ -757,14 +766,14 @@ GDBNAME = "orcl11.us.oracle.com"
 #-----------------------*** End of deleteDatabase section ***------------------------
 
 #-----------------------------------------------------------------------------
-# CONFIGUREDATABASE section is used when OPERATION_TYPE is defined as "configureDatabase". 
+# CONFIGUREDATABASE section is used when OPERATION_TYPE is defined as "configureDatabase".
 #-----------------------------------------------------------------------------
 [CONFIGUREDATABASE]
 
 #-----------------------------------------------------------------------------
 # Name          : SOURCEDB
 # Datatype      : String
-# Description   : The source database is the SID 
+# Description   : The source database is the SID
 #		  This database must be local and on the same ORACLE_HOME.
 # Default value : none
 # Mandatory     : YES
@@ -907,7 +916,7 @@ GDBNAME = "orcl11.us.oracle.com"
 # Default value : None
 # Mandatory     : Yes, if CENTRAL is specified for EMCONFIGURATION
 #-----------------------------------------------------------------------------
-#CENTRALAGENT = 
+#CENTRALAGENT =
 
 #-----------------------------------------------------------------------------
 # Name          : HOSTUSERNAME
@@ -916,7 +925,7 @@ GDBNAME = "orcl11.us.oracle.com"
 # Default value : None
 # Mandatory     : Yes, if ALL is specified for EMCONFIGURATION
 #-----------------------------------------------------------------------------
-#HOSTUSERNAME = 
+#HOSTUSERNAME =
 
 #-----------------------------------------------------------------------------
 # Name          : HOSTUSERPASSWORD
@@ -925,7 +934,7 @@ GDBNAME = "orcl11.us.oracle.com"
 # Default value : None
 # Mandatory     : Yes, if ALL is specified for EMCONFIGURATION
 #-----------------------------------------------------------------------------
-#HOSTUSERPASSWORD= 
+#HOSTUSERPASSWORD=
 
 #-----------------------------------------------------------------------------
 # Name          : BACKUPSCHEDULE
@@ -940,7 +949,7 @@ GDBNAME = "orcl11.us.oracle.com"
 
 
 #-----------------------------------------------------------------------------
-# ADDINSTANCE section is used when OPERATION_TYPE is defined as "addInstance". 
+# ADDINSTANCE section is used when OPERATION_TYPE is defined as "addInstance".
 #-----------------------------------------------------------------------------
 [ADDINSTANCE]
 
@@ -967,7 +976,7 @@ DB_UNIQUE_NAME = "orcl11g.us.oracle.com"
 #-----------------------------------------------------------------------------
 # Name          : NODELIST
 # Datatype      : String
-# Description   : Node on which to add new instance 
+# Description   : Node on which to add new instance
 #                 (in 10gR2, instance addition is supported on 1 node at a time)
 # Valid values  : Cluster node name
 # Default value : None
@@ -986,7 +995,7 @@ NODELIST=
 #OBFUSCATEDPASSWORDS = FALSE
 
 #-----------------------------------------------------------------------------
-# Name          : SYSDBAUSERNAME 
+# Name          : SYSDBAUSERNAME
 # Datatype      : String
 # Description   : A user with DBA role.
 # Default value : none
@@ -995,7 +1004,7 @@ NODELIST=
 SYSDBAUSERNAME = "sys"
 
 #-----------------------------------------------------------------------------
-# Name          : SYSDBAPASSWORD 
+# Name          : SYSDBAPASSWORD
 # Datatype      : String
 # Description   : The password of the DBA user.
 # Default value : none
@@ -1007,7 +1016,7 @@ SYSDBAUSERNAME = "sys"
 
 
 #-----------------------------------------------------------------------------
-# DELETEINSTANCE section is used when OPERATION_TYPE is defined as "deleteInstance". 
+# DELETEINSTANCE section is used when OPERATION_TYPE is defined as "deleteInstance".
 #-----------------------------------------------------------------------------
 [DELETEINSTANCE]
 
@@ -1052,7 +1061,7 @@ INSTANCENAME = "orcl11g"
 #OBFUSCATEDPASSWORDS = FALSE
 
 #-----------------------------------------------------------------------------
-# Name          : SYSDBAUSERNAME 
+# Name          : SYSDBAUSERNAME
 # Datatype      : String
 # Description   : A user with DBA role.
 # Default value : none
@@ -1061,7 +1070,7 @@ INSTANCENAME = "orcl11g"
 SYSDBAUSERNAME = "sys"
 
 #-----------------------------------------------------------------------------
-# Name          : SYSDBAPASSWORD 
+# Name          : SYSDBAPASSWORD
 # Datatype      : String
 # Description   : The password of the DBA user.
 # Default value : none

@@ -63,7 +63,7 @@ OPERATION_TYPE = "createDatabase"
 #-----------------------*** End of GENERAL section ***------------------------
 
 #-----------------------------------------------------------------------------
-# CREATEDATABASE section is used when OPERATION_TYPE is defined as "createDatabase". 
+# CREATEDATABASE section is used when OPERATION_TYPE is defined as "createDatabase".
 #-----------------------------------------------------------------------------
 [CREATEDATABASE]
 
@@ -91,7 +91,7 @@ DATABASECONFTYPE  = "{{ item.0.oracle_db_type }}"
 #-----------------------------------------------------------------------------
 # Name          : RACONENODESERVICENAME
 # Datatype      : String
-# Description   : Service is required by application to connect to RAC One 
+# Description   : Service is required by application to connect to RAC One
 #		  Node Database
 # Valid values  : Service Name
 # Default value : None
@@ -100,13 +100,13 @@ DATABASECONFTYPE  = "{{ item.0.oracle_db_type }}"
 {% if item.0.oracle_db_type|upper == 'RACONENODE' %}
 RACONENODESERVICENAME = "{{ item.0.service_name }}"
 {% else %}
-#RACONENODESERVICENAME = 
+#RACONENODESERVICENAME =
 {% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : POLICYMANAGED
 # Datatype      : Boolean
-# Description   : Set to true if Database is policy managed and 
+# Description   : Set to true if Database is policy managed and
 #		  set to false if  Database is admin managed
 # Valid values  : TRUE\FALSE
 # Default value : FALSE
@@ -117,9 +117,9 @@ RACONENODESERVICENAME = "{{ item.0.service_name }}"
 #-----------------------------------------------------------------------------
 # Name          : CREATESERVERPOOL
 # Datatype      : Boolean
-# Description   : Set to true if new server pool need to be created for database 
-#		  if this option is specified then the newly created database 
-#		  will use this newly created serverpool. 
+# Description   : Set to true if new server pool need to be created for database
+#		  if this option is specified then the newly created database
+#		  will use this newly created serverpool.
 #		  Multiple serverpoolname can not be specified for database
 # Valid values  : TRUE\FALSE
 # Default value : FALSE
@@ -130,8 +130,8 @@ RACONENODESERVICENAME = "{{ item.0.service_name }}"
 #-----------------------------------------------------------------------------
 # Name          : SERVERPOOLNAME
 # Datatype      : String
-# Description   : Only one serverpool name need to be specified 
-#		   if Create Server Pool option is specified. 
+# Description   : Only one serverpool name need to be specified
+#		   if Create Server Pool option is specified.
 #		   Comma-separated list of Serverpool names if db need to use
 #		   multiple Server pool
 # Valid values  : ServerPool name
@@ -139,7 +139,7 @@ RACONENODESERVICENAME = "{{ item.0.service_name }}"
 # Default value : None
 # Mandatory     : No [required in case of RAC service centric database]
 #-----------------------------------------------------------------------------
-#SERVERPOOLNAME = 
+#SERVERPOOLNAME =
 
 #-----------------------------------------------------------------------------
 # Name          : CARDINALITY
@@ -150,7 +150,7 @@ RACONENODESERVICENAME = "{{ item.0.service_name }}"
 # Default value : Number of qualified nodes on cluster
 # Mandatory     : No [Required when a new serverpool need to be created]
 #-----------------------------------------------------------------------------
-#CARDINALITY = 
+#CARDINALITY =
 
 
 
@@ -158,7 +158,7 @@ RACONENODESERVICENAME = "{{ item.0.service_name }}"
 #-----------------------------------------------------------------------------
 # Name          : FORCE
 # Datatype      : Boolean
-# Description   : Set to true if new server pool need to be created by force 
+# Description   : Set to true if new server pool need to be created by force
 #		  if this option is specified then the newly created serverpool
 #		  will be assigned server even if no free servers are available.
 #		  This may affect already running database.
@@ -174,27 +174,27 @@ RACONENODESERVICENAME = "{{ item.0.service_name }}"
 #-----------------------------------------------------------------------------
 # Name          : PQPOOLNAME
 # Datatype      : String
-# Description   : Only one serverpool name needs to be specified 
-#		   if create server pool option is specified. 
+# Description   : Only one serverpool name needs to be specified
+#		   if create server pool option is specified.
 #		   Comma-separated list of serverpool names if use
-#		   server pool. This is required to 
+#		   server pool. This is required to
 #                  create Parallel Query (PQ) database. Applicable to Big Cluster
 # Valid values  :  Parallel Query (PQ) pool name
 # Default value : None
 # Mandatory     : No [required in case of RAC service centric database]
 #-----------------------------------------------------------------------------
-#PQPOOLNAME = 
+#PQPOOLNAME =
 
 #-----------------------------------------------------------------------------
 # Name          : PQCARDINALITY
 # Datatype      : Number
 # Description   : Specify Cardinality for create server pool operation.
-#                 Applicable to Big Cluster 
+#                 Applicable to Big Cluster
 # Valid values  : any positive Integer value
 # Default value : Number of qualified nodes on cluster
 # Mandatory     : No [Required when a new serverpool need to be created]
 #-----------------------------------------------------------------------------
-#PQCARDINALITY = 
+#PQCARDINALITY =
 
 
 
@@ -210,9 +210,9 @@ RACONENODESERVICENAME = "{{ item.0.service_name }}"
 SID = "{{ item.0.oracle_db_name }}"
 
 #-----------------------------------------------------------------------------
-# Name          : CREATEASCONTAINERDATABASE 
+# Name          : CREATEASCONTAINERDATABASE
 # Datatype      : boolean
-# Description   : flag to create database as container database 
+# Description   : flag to create database as container database
 # Valid values  : Check Oracle12c Administrator's Guide
 # Default value : false
 # Mandatory     : No
@@ -230,7 +230,7 @@ CREATEASCONTAINERDATABASE = "{{ item.0.is_container }}"
 NUMBEROFPDBS = "{{ item.0.num_pdbs }}"
 
 #-----------------------------------------------------------------------------
-# Name          : PDBNAME 
+# Name          : PDBNAME
 # Datatype      : String
 # Description   : Specify the pdbname/pdbanme prefix if one or more pdb need to be created
 # Valid values  : Check Oracle12c Administrator's Guide
@@ -367,7 +367,7 @@ DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Default value : None
 # Mandatory     : Yes, if CENTRAL is specified for EMCONFIGURATION
 #-----------------------------------------------------------------------------
-#OMSHOST = 
+#OMSHOST =
 
 #-----------------------------------------------------------------------------
 # Name          : OMSPORT
@@ -376,7 +376,7 @@ DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Default value : None
 # Mandatory     : Yes, if CENTRAL is specified for EMCONFIGURATION
 #-----------------------------------------------------------------------------
-#OMSPORT = 
+#OMSPORT =
 
 #-----------------------------------------------------------------------------
 # Name          : EMUSER
@@ -385,7 +385,7 @@ DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Default value : None
 # Mandatory     : Yes, if CENTRAL is specified for EMCONFIGURATION
 #-----------------------------------------------------------------------------
-#EMUSER = 
+#EMUSER =
 
 #-----------------------------------------------------------------------------
 # Name          : EMPASSWORD
@@ -394,7 +394,7 @@ DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Default value : None
 # Mandatory     : Yes, if CENTRAL is specified for EMCONFIGURATION
 #-----------------------------------------------------------------------------
-#EMPASSWORD= 
+#EMPASSWORD=
 
 
 #-----------------------------------------------------------------------------
@@ -458,9 +458,9 @@ DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
 #OLSCONFIGURATION = "false"
 
 #-----------------------------------------------------------------------------
-# Name          : DATAFILEJARLOCATION 
+# Name          : DATAFILEJARLOCATION
 # Datatype      : String
-# Description   : Location of the data file jar 
+# Description   : Location of the data file jar
 # Valid values  : Directory containing compressed datafile jar
 # Default value : None
 # Mandatory     : No
@@ -468,7 +468,7 @@ DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
 #DATAFILEJARLOCATION =
 
 #-----------------------------------------------------------------------------
-# Name          : DATAFILEDESTINATION 
+# Name          : DATAFILEDESTINATION
 # Datatype      : String
 # Description   : Location of the data file's
 # Valid values  : Directory for all the database files
@@ -601,18 +601,18 @@ NATIONALCHARACTERSET= "AL16UTF16"
 # Name          : LISTENERS
 # Datatype      : String
 # Description   : Specifies list of listeners to register the database with.
-#		  By default the database is configured for all the listeners specified in the 
-#		  $ORACLE_HOME/network/admin/listener.ora 	
+#		  By default the database is configured for all the listeners specified in the
+#		  $ORACLE_HOME/network/admin/listener.ora
 # Valid values  : The list should be comma separated like "listener1,listener2".
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
 #LISTENERS = "listener1,listener2"
 
 #-----------------------------------------------------------------------------
-# Name          : VARIABLESFILE 
+# Name          : VARIABLESFILE
 # Datatype      : String
 # Description   : Location of the file containing variable value pair
-# Valid values  : A valid file-system file. The variable value pair format in this file 
+# Valid values  : A valid file-system file. The variable value pair format in this file
 #		  is <variable>=<value>. Each pair should be in a new line.
 # Default value : None
 # Mandatory     : NO
@@ -658,7 +658,7 @@ INITPARAMS ="{{ item.0.oracle_init_params }}"
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-{% if item.0.oracle_init_params is defined %}
+{% if item.0.oracle_db_mem_percent is defined %}
 MEMORYPERCENTAGE = "{{ item.0.oracle_db_mem_percent }}"
 {% else %}
 #MEMORYPERCENTAGE =
@@ -687,21 +687,26 @@ AUTOMATICMEMORYMANAGEMENT = "FALSE"
 # Name          : TOTALMEMORY
 # Datatype      : String
 # Description   : total memory in MB to allocate to Oracle
-# Valid values  : 
-# Default value : 
+# Valid values  :
+# Default value :
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-#TOTALMEMORY = "800"
+{% if item.0.oracle_db_mem_totalmb is defined %}
+TOTALMEMORY = "{{ item.0.oracle_db_mem_totalmb }}"
+{% else %}
+#TOTALMEMORY =
+{% endif %}
+
 
 
 #-----------------------*** End of CREATEDATABASE section ***------------------------
 
 #-----------------------------------------------------------------------------
-# createTemplateFromDB section is used when OPERATION_TYPE is defined as "createTemplateFromDB". 
+# createTemplateFromDB section is used when OPERATION_TYPE is defined as "createTemplateFromDB".
 #-----------------------------------------------------------------------------
 [createTemplateFromDB]
 #-----------------------------------------------------------------------------
-# Name          : SOURCEDB 
+# Name          : SOURCEDB
 # Datatype      : String
 # Description   : The source database from which to create the template
 # Valid values  : The format is <host>:<port>:<sid>
@@ -711,7 +716,7 @@ AUTOMATICMEMORYMANAGEMENT = "FALSE"
 SOURCEDB = "myhost:1521:orcl"
 
 #-----------------------------------------------------------------------------
-# Name          : SYSDBAUSERNAME 
+# Name          : SYSDBAUSERNAME
 # Datatype      : String
 # Description   : A user with DBA role.
 # Default value : none
@@ -720,7 +725,7 @@ SOURCEDB = "myhost:1521:orcl"
 SYSDBAUSERNAME = "system"
 
 #-----------------------------------------------------------------------------
-# Name          : SYSDBAPASSWORD 
+# Name          : SYSDBAPASSWORD
 # Datatype      : String
 # Description   : The password of the DBA user.
 #		  You can also specify the password at the command prompt instead of here.
@@ -741,13 +746,13 @@ TEMPLATENAME = "My Copy TEMPLATE"
 #-----------------------*** End of createTemplateFromDB section ***------------------------
 
 #-----------------------------------------------------------------------------
-# createCloneTemplate section is used when OPERATION_TYPE is defined as "createCloneTemplate". 
+# createCloneTemplate section is used when OPERATION_TYPE is defined as "createCloneTemplate".
 #-----------------------------------------------------------------------------
 [createCloneTemplate]
 #-----------------------------------------------------------------------------
 # Name          : SOURCEDB
 # Datatype      : String
-# Description   : The source database is the SID from which to create the template. 
+# Description   : The source database is the SID from which to create the template.
 #		  This database must be local and on the same ORACLE_HOME.
 # Default value : none
 # Mandatory     : YES
@@ -785,23 +790,23 @@ TEMPLATENAME = "My Clone TEMPLATE"
 #-----------------------------------------------------------------------------
 # Name          : DATAFILEJARLOCATION
 # Datatype      : String
-# Description   : Location of the data file jar 
+# Description   : Location of the data file jar
 # Valid values  : Directory where the new compressed datafile jar will be placed
 # Default value : $ORACLE_HOME/assistants/dbca/templates
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-#DATAFILEJARLOCATION = 
+#DATAFILEJARLOCATION =
 
 #-----------------------*** End of createCloneTemplate section ***------------------------
 
 #-----------------------------------------------------------------------------
-# DELETEDATABASE section is used when DELETE_TYPE is defined as "deleteDatabase". 
+# DELETEDATABASE section is used when DELETE_TYPE is defined as "deleteDatabase".
 #-----------------------------------------------------------------------------
 [DELETEDATABASE]
 #-----------------------------------------------------------------------------
 # Name          : SOURCEDB
 # Datatype      : String
-# Description   : The source database is the SID 
+# Description   : The source database is the SID
 #		  This database must be local and on the same ORACLE_HOME.
 # Default value : none
 # Mandatory     : YES
@@ -829,7 +834,7 @@ SOURCEDB = "orcl"
 #-----------------------*** End of deleteDatabase section ***------------------------
 
 #-----------------------------------------------------------------------------
-# GENERATESCRIPTS section 
+# GENERATESCRIPTS section
 #-----------------------------------------------------------------------------
 [generateScripts]
 #-----------------------------------------------------------------------------
@@ -854,7 +859,7 @@ TEMPLATENAME = "New Database"
 GDBNAME = "orcl12.us.oracle.com"
 
 #-----------------------------------------------------------------------------
-# Name          : SCRIPTDESTINATION 
+# Name          : SCRIPTDESTINATION
 # Datatype      : String
 # Description   : Location of the scripts
 # Valid values  : Directory for all the scripts
@@ -881,7 +886,7 @@ GDBNAME = "orcl12.us.oracle.com"
 # Default value : None
 # Mandatory     : Yes, if CENTRAL is specified for EMCONFIGURATION
 #-----------------------------------------------------------------------------
-#OMSHOST = 
+#OMSHOST =
 
 #-----------------------------------------------------------------------------
 # Name          : OMSPORT
@@ -890,7 +895,7 @@ GDBNAME = "orcl12.us.oracle.com"
 # Default value : None
 # Mandatory     : Yes, if CENTRAL is specified for EMCONFIGURATION
 #-----------------------------------------------------------------------------
-#OMSPORT = 
+#OMSPORT =
 
 #-----------------------------------------------------------------------------
 # Name          : EMUSER
@@ -899,7 +904,7 @@ GDBNAME = "orcl12.us.oracle.com"
 # Default value : None
 # Mandatory     : Yes, if CENTRAL is specified for EMCONFIGURATION
 #-----------------------------------------------------------------------------
-#EMUSER = 
+#EMUSER =
 
 #-----------------------------------------------------------------------------
 # Name          : EMPASSWORD
@@ -908,19 +913,19 @@ GDBNAME = "orcl12.us.oracle.com"
 # Default value : None
 # Mandatory     : Yes, if CENTRAL is specified for EMCONFIGURATION
 #-----------------------------------------------------------------------------
-#EMPASSWORD= 
+#EMPASSWORD=
 
 #-----------------------*** End of deleteDatabase section ***------------------------
 
 #-----------------------------------------------------------------------------
-# CONFIGUREDATABASE section is used when OPERATION_TYPE is defined as "configureDatabase". 
+# CONFIGUREDATABASE section is used when OPERATION_TYPE is defined as "configureDatabase".
 #-----------------------------------------------------------------------------
 [CONFIGUREDATABASE]
 
 #-----------------------------------------------------------------------------
 # Name          : SOURCEDB
 # Datatype      : String
-# Description   : The source database is the SID 
+# Description   : The source database is the SID
 #		  This database must be local and on the same ORACLE_HOME.
 # Default value : none
 # Mandatory     : YES
@@ -1080,7 +1085,7 @@ GDBNAME = "orcl12.us.oracle.com"
 
 
 #-----------------------------------------------------------------------------
-# ADDINSTANCE section is used when OPERATION_TYPE is defined as "addInstance". 
+# ADDINSTANCE section is used when OPERATION_TYPE is defined as "addInstance".
 #-----------------------------------------------------------------------------
 [ADDINSTANCE]
 
@@ -1107,7 +1112,7 @@ DB_UNIQUE_NAME = "orcl12c.us.oracle.com"
 #-----------------------------------------------------------------------------
 # Name          : NODENAME
 # Datatype      : String
-# Description   : Node on which to add new instance 
+# Description   : Node on which to add new instance
 #                 (in 10gR2, instance addition is supported on 1 node at a time)
 # Valid values  : Cluster node name
 # Default value : None
@@ -1126,7 +1131,7 @@ NODENAME=
 #OBFUSCATEDPASSWORDS = FALSE
 
 #-----------------------------------------------------------------------------
-# Name          : SYSDBAUSERNAME 
+# Name          : SYSDBAUSERNAME
 # Datatype      : String
 # Description   : A user with DBA role.
 # Default value : none
@@ -1135,7 +1140,7 @@ NODENAME=
 SYSDBAUSERNAME = "sys"
 
 #-----------------------------------------------------------------------------
-# Name          : SYSDBAPASSWORD 
+# Name          : SYSDBAPASSWORD
 # Datatype      : String
 # Description   : The password of the DBA user.
 # Default value : none
@@ -1156,7 +1161,7 @@ SYSDBAUSERNAME = "sys"
 
 
 #-----------------------------------------------------------------------------
-# DELETEINSTANCE section is used when OPERATION_TYPE is defined as "deleteInstance". 
+# DELETEINSTANCE section is used when OPERATION_TYPE is defined as "deleteInstance".
 #-----------------------------------------------------------------------------
 [DELETEINSTANCE]
 
@@ -1201,7 +1206,7 @@ INSTANCENAME = "orcl12c"
 #OBFUSCATEDPASSWORDS = FALSE
 
 #-----------------------------------------------------------------------------
-# Name          : SYSDBAUSERNAME 
+# Name          : SYSDBAUSERNAME
 # Datatype      : String
 # Description   : A user with DBA role.
 # Default value : none
@@ -1210,7 +1215,7 @@ INSTANCENAME = "orcl12c"
 SYSDBAUSERNAME = "sys"
 
 #-----------------------------------------------------------------------------
-# Name          : SYSDBAPASSWORD 
+# Name          : SYSDBAPASSWORD
 # Datatype      : String
 # Description   : The password of the DBA user.
 # Default value : none
@@ -1222,13 +1227,13 @@ SYSDBAUSERNAME = "sys"
 #-----------------------*** End of DELETEINSTANCE section ***------------------------
 
 #----------------------------------------------------------------------------------
-# CREATEPLUGGABLEDATABASE section is used when OPERATION_TYPE is defined as "createPluggableDatabase". 
+# CREATEPLUGGABLEDATABASE section is used when OPERATION_TYPE is defined as "createPluggableDatabase".
 #----------------------------------------------------------------------------------
 [CREATEPLUGGABLEDATABASE]
 #----------------------------------------------------------------------------------
 # Name          : SOURCEDB
 # Datatype      : String
-# Description   : The source database is the SID 
+# Description   : The source database is the SID
 #		  This database must be local and on the same ORACLE_HOME.
 # Default value : none
 # Mandatory     : YES
@@ -1238,7 +1243,7 @@ SOURCEDB = "orcl"
 #----------------------------------------------------------------------------------
 # Name          : PDBNAME
 # Datatype      : String
-# Description   : The name of new pluggable database 
+# Description   : The name of new pluggable database
 #		  This pdb name must not be same as sourcedb name.
 # Default value : none
 # Mandatory     : YES
@@ -1279,7 +1284,7 @@ PDBNAME = "PDB1"
 #----------------------------------------------------------------------------------
 # Name          : PDBBACKUPFILE
 # Datatype      : String
-# Description   : Full path and name for pdb back up file 
+# Description   : Full path and name for pdb back up file
 # Default value : None
 # Mandatory     : Mandatory when creating new PDB using RMANBACKUP
 #-----------------------------------------------------------------------------
@@ -1324,7 +1329,7 @@ PDBNAME = "PDB1"
 #----------------------------------------------------------------------------------
 # Name          : CREATENEWPDBADMINUSER
 # Datatype      : String
-# Description   : When Plugging a pdb from FILEARCHIVE or RMANBACKUP 
+# Description   : When Plugging a pdb from FILEARCHIVE or RMANBACKUP
 #		  a new PDB Administrator user can be created using this option
 #		  This option should be given along with pdbadmin username and password
 # Default value : False
@@ -1335,8 +1340,8 @@ PDBNAME = "PDB1"
 #----------------------------------------------------------------------------------
 # Name          : SOURCEFILENAMECONVERT
 # Datatype      : String
-# Description   : This clause specifies how to locate files listed in an XML file 
-#		  describing a Pluggable Database if they reside in a location different 
+# Description   : This clause specifies how to locate files listed in an XML file
+#		  describing a Pluggable Database if they reside in a location different
 #		  from that specified in the XML file.
 #		  This clause is valid when creating Pluggable database in USINGXML option
 # Valid values  : (<filename_pattern>, <replacement_filename_pattern>,....)
@@ -1381,7 +1386,7 @@ PDBNAME = "PDB1"
 #----------------------------------------------------------------------------------
 # Name          : USEMETADATAFILELOCATION
 # Datatype      : Boolean
-# Description   : Specify true if datafile path defined in Meta datafile within PDB 
+# Description   : Specify true if datafile path defined in Meta datafile within PDB
 #		  archive file is to be used to un-archive datafile.
 # Valid values  : TRUE \ FALSE
 # Default value : FALSE
@@ -1438,7 +1443,7 @@ PDBNAME = "PDB1"
 # Name          : CREATEUSERTABLESPACE
 # Datatype      : Boolean
 # Description   : Specify true if a default user tablespace need to be created in new PDB
-#		  
+#
 # Valid values  : TRUE \ FALSE
 # Default value : TRUE
 # Mandatory     : NO
@@ -1498,13 +1503,13 @@ PDBNAME = "PDB1"
 #-----------------------*** End of createPluggableDatabase section ***------------------------
 
 #----------------------------------------------------------------------------------
-# UNPLUGDATABASE section is used when OPERATION_TYPE is defined as "unplugDatabase". 
+# UNPLUGDATABASE section is used when OPERATION_TYPE is defined as "unplugDatabase".
 #----------------------------------------------------------------------------------
 [UNPLUGDATABASE]
 #----------------------------------------------------------------------------------
 # Name          : SOURCEDB
 # Datatype      : String
-# Description   : The source database is the SID 
+# Description   : The source database is the SID
 #		  This database must be local and on the same ORACLE_HOME.
 # Default value : none
 # Mandatory     : YES
@@ -1514,7 +1519,7 @@ SOURCEDB = "orcl"
 #----------------------------------------------------------------------------------
 # Name          : PDBNAME
 # Datatype      : String
-# Description   : The name of new pluggable database 
+# Description   : The name of new pluggable database
 #		  This pdb name must not be same as sourcedb name.
 # Default value : none
 # Mandatory     : YES
@@ -1544,7 +1549,7 @@ ARCHIVETYPE = "TAR"
 #----------------------------------------------------------------------------------
 # Name          : PDBBACKUPFILE
 # Datatype      : String
-# Description   : Full path and name for pdb back up file 
+# Description   : Full path and name for pdb back up file
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
@@ -1598,13 +1603,13 @@ ARCHIVETYPE = "TAR"
 #-----------------------*** End of unplugDatabase section ***------------------------
 
 #----------------------------------------------------------------------------------
-# DELETEPLUGGABLEDATABASE section is used when OPERATION_TYPE is defined as "deletePluggableDatabase". 
+# DELETEPLUGGABLEDATABASE section is used when OPERATION_TYPE is defined as "deletePluggableDatabase".
 #----------------------------------------------------------------------------------
 [DELETEPLUGGABLEDATABASE]
 #----------------------------------------------------------------------------------
 # Name          : SOURCEDB
 # Datatype      : String
-# Description   : The source database is the SID 
+# Description   : The source database is the SID
 #		  This database must be local and on the same ORACLE_HOME.
 # Default value : none
 # Mandatory     : YES
@@ -1614,7 +1619,7 @@ SOURCEDB = "orcl"
 #----------------------------------------------------------------------------------
 # Name          : PDBNAME
 # Datatype      : String
-# Description   : The name of new pluggable database 
+# Description   : The name of new pluggable database
 #		  This pdb name must not be same as sourcedb name.
 # Default value : none
 # Mandatory     : YES
@@ -1624,13 +1629,13 @@ PDBNAME = "PDB1"
 #-----------------------*** End of deletePluggableDatabase section ***------------------------
 
 #----------------------------------------------------------------------------------
-# CONFIGUREPLUGGABLEDATABASE section is used when OPERATION_TYPE is defined as "configurePluggableDatabase". 
+# CONFIGUREPLUGGABLEDATABASE section is used when OPERATION_TYPE is defined as "configurePluggableDatabase".
 #----------------------------------------------------------------------------------
 [CONFIGUREPLUGGABLEDATABASE]
 #----------------------------------------------------------------------------------
 # Name          : SOURCEDB
 # Datatype      : String
-# Description   : The source database is the SID 
+# Description   : The source database is the SID
 #		  This database must be local and on the same ORACLE_HOME.
 # Default value : none
 # Mandatory     : YES
@@ -1640,7 +1645,7 @@ SOURCEDB = "orcl"
 #----------------------------------------------------------------------------------
 # Name          : PDBNAME
 # Datatype      : String
-# Description   : The name of new pluggable database 
+# Description   : The name of new pluggable database
 #		  This pdb name must not be same as sourcedb name.
 # Default value : none
 # Mandatory     : YES
