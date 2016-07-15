@@ -46,7 +46,7 @@
 
   - name: Add host to /etc/hosts if needed
     lineinfile: dest=/etc/hosts regexp='.*{{ ansible_fqdn }}$' line="{{ ansible_default_ipv4.address }} {{ ansible_hostname }} {{ ansible_fqdn }}" state=present
-    when: "'find {{ ansible_hostname }}: NXDOMAIN' in ns.stdout"
+    when: "'find {{ ansible_hostname }}: NXDOMAIN' in ns.stdout or 'find {{ ansible_hostname }}: SERVFAIL' in ns.stdout "
     tags: etchosts
 
 #  - name: Add local node's ip & hostname to /etc/hosts
@@ -177,7 +177,7 @@
     tags: hostfs
 
   - name: filesystem | create lv
-    lvol: vg={{ item.value.vgname }} lv={{ item.value.lvname }} size=100%FREE state=present
+    lvol: vg={{ item.value.vgname }} lv={{ item.value.lvname }} size=100%FREE state=present shrink=no
     with_dict: host_fs_layout
     when: configure_host_disks
     tags: hostfs
