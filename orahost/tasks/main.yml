@@ -202,8 +202,8 @@
 
   - name: Oracle-recommended kernel settings
     sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes ignoreerrors=yes
-    with_items: oracle_sysconfig
-    tags: sysconfig
+    with_items: oracle_sysctl
+    tags: sysctl
 
   - name: Oracle-recommended PAM config
     lineinfile: dest=/etc/pam.d/login state=present line="session required pam_limits.so"
