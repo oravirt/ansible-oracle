@@ -32,8 +32,8 @@
   oracle_rsp_stage: "{{ oracle_stage }}/rsp"
   oracle_inventory_loc: /u01/app/oraInventory
   oracle_base: /u01/app/oracle
-  oracle_home_db: "{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}"      # ORACLE_HOME path
-  oracle_home_db_install: "{{ oracle_base }}/{{ item.0.oracle_version_db }}/{{ item.0.home }}" # This is only used when installing the db server and creating the databases
+  oracle_home_db: "{% if item.0 is defined %}{% if item.0.oracle_home is defined %}{{ item.0.oracle_home}}{% else %}{{ oracle_base }}/{{ item.0.oracle_version_db }}/{{ item.0.home }}{% endif %}{% else %}{% if item.oracle_home is defined %}{{ item.oracle_home }}{% else %}{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}{% endif %}{% endif %}"
+  oracle_home_db_install: "{{ oracle_home_db }}"     # This variable should be removed at a later time
 
   oracle_profile_name: "{% if item.oracle_db_name is defined %}.profile_{{ item.oracle_db_name }}{% else %}.profile_{{ item.home }}{% endif %}"    # Name of profile-file. Sets up the environment for that database. One per database
   oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
