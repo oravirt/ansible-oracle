@@ -1,23 +1,22 @@
 ---
 # defaults file for orahost-logrotate
+oracle_base: /u01/app/oracle
 
 logrotate_config:
         - name: oracle_alert
-          file: "/u01/app/oracle/diag/rdbms/*/*/trace/*alert*.log"
+          file: "{{ oracle_base }}/diag/rdbms/*/*/trace/*alert*.log {{ oracle_base }}/diag/asm/*/*/trace/alert*+ASM*.log"
           options:
             - missingok
             - notifempty
             - weekly
             - rotate 3
-            - copytruncate
             - dateext
         - name: oracle_listener
-          file: "/u01/app/oracle/diag/tnslsnr/*/*/trace/*listener*.log"
+          file: "{{ oracle_base }}/diag/tnslsnr/*/*/trace/*listener*.log"
           options:
             - missingok
             - notifempty
             - weekly
             - rotate 3
-            - copytruncate
             - dateext
             - compress
