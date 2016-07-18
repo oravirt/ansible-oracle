@@ -4,9 +4,9 @@
 
   oracle_user: oracle                        # User that will own the Oracle Installations.
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-  oracle_group: oinstall                          # Primary group for oracle_user. 
-  oracle_dba_group: dba                          # Primary group for oracle_user. 
-  grid_dba_group: asmdba                          # Primary group for oracle_user. 
+  oracle_group: oinstall                          # Primary group for oracle_user.
+  oracle_dba_group: dba                          # Primary group for oracle_user.
+  grid_dba_group: asmdba                          # Primary group for oracle_user.
 
   oracle_home_db: "{% if item.0 is defined %}{% if item.0.oracle_home is defined %}{{ item.0.oracle_home}}{% else %}{{ oracle_base }}/{{ item.0.oracle_version_db }}/{{ item.0.home }}{% endif %}{% else %}{% if item.oracle_home is defined %}{{ item.oracle_home }}{% else %}{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}{% endif %}{% endif %}"
 
@@ -40,12 +40,10 @@
           pdb_prefix: pdb
           num_pdbs: 1
           is_racone: "false"                                   # (true/false) Is the database a RAC ONE NODE Database
-          storage_type: FS                                     # Database storage to be used. ASM or FS. 
+          storage_type: FS                                     # Database storage to be used. ASM or FS.
           service_name: orcl_serv                               # Inital service to be created (not in use yet)
           oracle_init_params: "open_cursors=300,processes=700" # Specific parameters to be set during installation. Comma-separated list
-          oracle_db_mem_percent: 30                            # Amount of RAM to be used for SGA
+          oracle_db_mem_totalmb: 1024                           # Amount of RAM to be used for SGA + PGA
           oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
           redolog_size_in_mb: 100
           state: present                                        # present | absent
-
-
