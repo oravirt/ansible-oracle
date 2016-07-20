@@ -157,7 +157,7 @@
      - sshkeys
 
   - name: filesystem | Create partition and pv
-    shell:  parted -a optimal {{ item.1.device }} "mklabel gpt mkpart primary 1 -1" 
+    shell:  parted -a optimal {{ item.1.device }} "mklabel gpt mkpart primary 1 -1"
     args:
        creates: "{{ item.1.pvname }}"
     with_subelements:
@@ -173,7 +173,7 @@
     tags: hostfs
 
   - name: filesystem | create lv
-    lvol: vg={{ item.0.vgname }} lv={{ item.1.lvname }} size={{ item.1.lvsize }} state=present #shrink=no
+    lvol: vg={{ item.0.vgname }} lv={{ item.1.lvname }} size={{ item.1.lvsize }} state=present shrink=no
     with_subelements:
         - host_fs_layout
         - filesystem
