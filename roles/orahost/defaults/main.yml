@@ -31,12 +31,12 @@
 
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
   grid_user_home: "/home/{{ grid_install_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-  oracle_group: oinstall                          # Primary group for oracle_user. 
+  oracle_group: oinstall                          # Primary group for oracle_user.
   oper_group: oper
-  dba_group: dba                          
+  dba_group: dba
   asmoper_group: asmoper
-  asmdba_group: asmdba                   
-  asmadmin_group: asmadmin              
+  asmdba_group: asmdba
+  asmadmin_group: asmadmin
 
   ssh_keys:
    - /tmp/id_rsa
@@ -50,11 +50,11 @@
   repo_dir: /etc/yum.repos.d/
 
   disable_numa_boot: true                    # (true/false) Sets numa=off in grub.conf
-  percent_hugepages: 50                      # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages & memlock settings 
+  percent_hugepages: 50                      # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages & memlock settings
   configure_interconnect: false               # (true/false) Should the Interconnect network be configured by Ansible (setup IP-address. IP-address configurable by variable oracle_ic_net). Only applicable to RAC-installs
   oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
   configure_ssh: false                        # (true/false). Should passwordless ssh be configured between clusternodes. Only applicable to RAC-installs
-  configure_host_disks: false                 # (true/false). Should the specified directories be on their on devices -> (true), or do they live in the root-filesystem (/) -> (false). 
+  configure_host_disks: false                 # (true/false). Should the specified directories be on their on devices -> (true), or do they live in the root-filesystem (/) -> (false).
                                              # mountpoints are described in host_fs_layout
   configure_etc_hosts: false
   configure_cluster: false
@@ -65,17 +65,23 @@
   disable_selinux: true
   disable_iptables: true
 
-                                             
-  host_fs_layout:    # Sets up filesystem on host. If storage_type=FS under oracle_databases, this is where the mapping between device/fs is described
-      u01:
-        {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora, fstype: ext4}
 
 
-  #asm_diskgroups: 
+  host_fs_layout:
+   - vgname: vgora
+     state: present
+     filesystem:
+       - {mntp: /u01, lvname: lvora, lvsize: 100%FREE, fstype: ext4}
+     disk:
+       - {device: /dev/sdb, pvname: /dev/sdb1}
+
+  host_fs_layout_vgdisks: "{%- for disk in item.disk -%} {{disk.pvname}} {%- if not loop.last -%},{%- endif -%}{% endfor %}"
+
+  #asm_diskgroups:
   #  - diskgroup: crs
-  #    properties: 
+  #    properties:
   #      - {redundancy: normal, ausize: 4}
-  #    attributes: 
+  #    attributes:
   #      - {name: 'compatible.rdbms', value: 11.2.0.4.0}
   #      - {name: 'compatible.asm', value: 12.1.0.2.0}
   #    disk:
@@ -83,21 +89,21 @@
   #      - {device: /dev/sdd, asmlabel: crs02}
   #      - {device: /dev/sde, asmlabel: crs03}
   #  - diskgroup: data
-  #    properties: 
+  #    properties:
   #      - {redundancy: external, ausize: 4}
-  #    attributes: 
+  #    attributes:
   #      - {name: compatible.rdbms, value: 11.2.0.4.0}
   #      - {name: compatible.asm, value: 12.1.0.2.0}
   #    disk:
   #      - {device: /dev/sdf, asmlabel: data01}
   #  - diskgroup: fra
-  #    properties: 
+  #    properties:
   #     - {redundancy: external, ausize: 4}
-  #   attributes: 
+  #   attributes:
   #      - {name: compatible.rdbms, value: 11.2.0.4.0}
   #      - {name: compatible.asm, value: 12.1.0.2.0}
   #    disk:
-  #      - {device: /dev/sdg, asmlabel: fra01}  
+  #      - {device: /dev/sdg, asmlabel: fra01}
 
 
 
@@ -151,7 +157,7 @@
       - oracleasm-support
       - kmod-oracleasm
 
-     
+
   oracle_sysctl:
       - { name: kernel.shmall, value: 4294967296 }
       - { name: kernel.shmmax, value: 68719476736 }
@@ -174,4 +180,3 @@
       - { name: 'hard nofile', value: 65536 }
       - { name: 'soft memlock', value: "{{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }}" }
       - { name: 'hard memlock', value: "{{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }}" }
-

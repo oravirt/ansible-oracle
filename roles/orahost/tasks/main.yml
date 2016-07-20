@@ -1,26 +1,26 @@
-# orahost playbook 
+# orahost playbook
 ---
 
   - name: Check for correct OS family & min version
-    assert: 
+    assert:
       that: "ansible_os_family == '{{ os_family_supported }}'"
       that: "ansible_distribution_version >= '{{ os_min_supported_version }}'"
-    tags: 
+    tags:
      - oscheck
 
   - name: Install packages required by Oracle
     yum: name={{ item }} state=installed
-    with_items: oracle_packages 
+    with_items: oracle_packages
     when: install_os_packages
     tags: os_packages
 
   - name: Install packages required by Oracle for ASMlib
     yum: name={{ item }} state=installed
-    with_items: oracle_asm_packages 
+    with_items: oracle_asm_packages
     when: install_os_packages and device_persistence == 'asmlib'
     tags: os_packages
 
-  - name: Disable iptables 
+  - name: Disable iptables
     service: name=iptables state=stopped enabled=no
     when: disable_iptables
     tags: iptables
@@ -54,7 +54,7 @@
 #    when: configure_etc_hosts and ansible_default_ipv4.address is defined
 
   - name: User | Add group(s)
-    group: name={{ item.group }} gid={{ item.gid }} state=present 
+    group: name={{ item.group }} gid={{ item.gid }} state=present
     with_items: oracle_groups
     tags:
      - group
@@ -86,7 +86,7 @@
     tags:
      - sudoadd
 
-  - name: ssh-keys | Generate SSH keys 
+  - name: ssh-keys | Generate SSH keys
     local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys
     ignore_errors: True
     when: configure_ssh and master_node and configure_cluster
@@ -95,7 +95,7 @@
 
   - name: ssh-keys | Add ssh-keys & authorized_keys to oracle user
     copy: src={{ item[1] }} dest=/home/{{ item[0].username }}/.ssh  owner={{ item[0].username }} group={{ item[0].primgroup }} force=yes mode=600
-    when: configure_ssh and configure_cluster 
+    when: configure_ssh and configure_cluster
     with_nested:
         - oracle_users
         - ssh_keys
@@ -104,7 +104,7 @@
 
   - name: ssh-keys | Add ssh-keys & authorized_keys to grid user
     copy: src={{ item[1] }} dest=/home/{{ item[0].username }}/.ssh  owner={{ item[0].username }} group={{ item[0].primgroup }} force=yes mode=600
-    when: configure_ssh and configure_cluster and role_separation 
+    when: configure_ssh and configure_cluster and role_separation
     with_nested:
         - grid_users
         - ssh_keys
@@ -157,46 +157,49 @@
      - sshkeys
 
   - name: filesystem | Create partition and pv
-    shell:  parted -a optimal {{ item.value.device }} "mklabel gpt mkpart primary 1 -1"; pvcreate {{ item.value.pvname }}
+    shell:  parted -a optimal {{ item.1.device }} "mklabel gpt mkpart primary 1 -1" 
     args:
-     creates: "{{ item.value.pvname }}"
-    with_dict: host_fs_layout
+       creates: "{{ item.1.pvname }}"
+    with_subelements:
+        - host_fs_layout
+        - disk
     when: configure_host_disks
     tags: hostfs
 
-#  - name: filesystem | Create partition and pv
-#    script: disks.sh {{ item.value.device }}
-#    with_dict: host_fs_layout
-#    when: configure_host_disks
-#    tags: hostf
-  
   - name: filesystem | Create vg
-    lvg: vg={{ item.value.vgname }} pvs={{ item.value.pvname }} state=present #vg_options="-f" # "-f used as workaround for https://github.com/ansible/ansible/pull/6859"
-    with_dict: host_fs_layout
+    lvg: vg={{ item.vgname }} pvs={{ host_fs_layout_vgdisks }} state={{ item.state }}
+    with_items: host_fs_layout
     when: configure_host_disks
     tags: hostfs
 
   - name: filesystem | create lv
-    lvol: vg={{ item.value.vgname }} lv={{ item.value.lvname }} size=100%FREE state=present #shrink=no
-    with_dict: host_fs_layout
+    lvol: vg={{ item.0.vgname }} lv={{ item.1.lvname }} size={{ item.1.lvsize }} state=present #shrink=no
+    with_subelements:
+        - host_fs_layout
+        - filesystem
     when: configure_host_disks
     tags: hostfs
 
   - name: filesystem | create fs
-    filesystem: fstype={{ item.value.fstype }} dev=/dev/{{ item.value.vgname }}/{{ item.value.lvname }} 
-    with_dict: host_fs_layout
+    filesystem: fstype={{ item.1.fstype }} dev=/dev/{{ item.0.vgname }}/{{ item.1.lvname }}
+    with_subelements:
+        - host_fs_layout
+        - filesystem
     when: configure_host_disks
     tags: hostfs
 
   - name: filesytem | mount dir
-    mount: name={{ item.value.mntp }} src=/dev/{{ item.value.vgname }}/{{ item.value.lvname }} dump=1 passno=2 fstype={{ item.value.fstype }} state=mounted
-    with_dict: host_fs_layout
-    when: configure_host_disks
+    mount: name={{ item.1.mntp }} src=/dev/{{ item.0.vgname }}/{{ item.1.lvname }} dump=1 passno=2 fstype={{ item.1.fstype }} state=mounted
+    with_subelements:
+        - host_fs_layout
+        - filesystem
     tags: hostfs
 
   - name: filesystem | Change permission on directories
-    file: path={{ item.value.mntp }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=775
-    with_dict: host_fs_layout
+    file: path={{ item.1.mntp }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=775
+    with_subelements:
+        - host_fs_layout
+        - filesystem
     tags: hostfs
 
 
@@ -250,7 +253,7 @@
     tags:
      - eth1
     register: ic
-  
+
   - name: Network | Bring up eth1
     service: name=network  state=restarted
     when: configure_interconnect and configure_cluster and ic.changed
@@ -282,10 +285,10 @@
 
   - name: Asmlib | Enable and start Oracle Asmlib
     service: name=oracleasm  state=started  enabled=yes
-    when: device_persistence == 'asmlib' 
+    when: device_persistence == 'asmlib'
     tags:
       - asmlibconfig
-  
+
   - name: Asmlib | Restart Asmlib
     service: name=oracleasm  state=restarted
     when: device_persistence == 'asmlib' and asmlib_expect_config.changed
@@ -296,7 +299,7 @@
 #    file: name=/home/{{ oracle_user }}/.vnc  state=directory owner={{ oracle_user }}  group={{ oracle_group }}
 #    tags:
 #      - vnc
-  
+
 #  - name: VNC | Copy passwd file
 #    copy: src=passwd  dest=/home/{{ oracle_user }}/.vnc/passwd  owner={{ oracle_user }}  group={{ oracle_group }} backup=yes
 #    tags:
@@ -306,4 +309,3 @@
 #    shell: su - oracle -c vncserver start
 #    tags:
 #      - vnc
-
