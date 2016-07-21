@@ -7,14 +7,14 @@
   grid_install_user: "{% if role_separation==true %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
   grid_user_home: "/home/{{ grid_install_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-  oracle_group: oinstall                          # Primary group for oracle_user. 
+  oracle_group: oinstall                          # Primary group for oracle_user.
   oper_group: oper
-  dba_group: dba                          # Primary group for oracle_user. 
+  dba_group: dba                          # Primary group for oracle_user.
   asmoper_group: asmoper
-  asmdba_group: asmdba                          # Primary group for oracle_user. 
-  asmadmin_group: asmadmin                          # Primary group for oracle_user. 
-  
-  hostgroup: 
+  asmdba_group: asmdba                          # Primary group for oracle_user.
+  asmadmin_group: asmadmin                          # Primary group for oracle_user.
+
+  hostgroup:
   hostgroup_hub: "{{ hostgroup }}-hub"
   hostgroup_leaf: "{{ hostgroup }}-leaf"
 
@@ -23,8 +23,8 @@
   nfs_server_sw_path: /path/to/orasw
   oracle_sw_copy: "{% if install_from_nfs==true %}false{% else %}true{% endif %}"
   oracle_sw_unpack: "{% if install_from_nfs==true %}false{% else %}true{% endif %}"
-  oracle_db_responsefile: "{{ item.0.home}}_{{ ansible_hostname }}.rsp"
-  oracle_db_run_install: "install_{{ item.0.home }}_{{ ansible_hostname }}.sh"
+  oracle_db_responsefile: "{{ item.0.home}}_{{ item.0.oracle_version_db }}_{{ ansible_hostname }}.rsp"
+  oracle_db_run_install: "install_{{ item.0.home }}_{{ item.0.oracle_version_db }}_{{ ansible_hostname }}.sh"
   #oracle_db_responsefile: "{% if item.0.oracle_db_name is defined %}{{ item.0.oracle_db_name }}_{{ ansible_hostname }}.rsp{% else %}nodbname_defined_{{ ansible_hostname }}.rsp{% endif %}"
   oracle_stage: /u01/stage
   oracle_stage_remote: "{{ oracle_stage }}"
@@ -33,8 +33,7 @@
   oracle_inventory_loc: /u01/app/oraInventory
   oracle_base: /u01/app/oracle
   oracle_home_db: "{% if item.0 is defined %}{% if item.0.oracle_home is defined %}{{ item.0.oracle_home}}{% else %}{{ oracle_base }}/{{ item.0.oracle_version_db }}/{{ item.0.home }}{% endif %}{% else %}{% if item.oracle_home is defined %}{{ item.oracle_home }}{% else %}{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}{% endif %}{% endif %}"
-  oracle_home_db_install: "{{ oracle_home_db }}"     # This variable should be removed at a later time
-
+  
   oracle_profile_name: "{% if item.oracle_db_name is defined %}.profile_{{ item.oracle_db_name }}{% else %}.profile_{{ item.home }}{% endif %}"    # Name of profile-file. Sets up the environment for that database. One per database
   oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
   oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
@@ -42,7 +41,7 @@
   is_sw_source_local: true
   configure_cluster: false
 
-  oracle_sw_image_db: 
+  oracle_sw_image_db:
        - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2 }
        - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2 }
        - { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1 }
@@ -58,4 +57,3 @@
       oracle_edition: EE
       oracle_db_name: orcl
       oracle_db_type: SI
-

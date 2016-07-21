@@ -29,7 +29,7 @@
 #    failed_when: "{{ ansible_memfree_mb }} < 616"
 
   - name: Create database(s)
-    shell: "time {{ oracle_home_db_install }}/bin/dbca -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent -redoLogFileSize {{ item.0.redolog_size_in_mb }} "
+    shell: "time {{ oracle_home_db }}/bin/dbca -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent -redoLogFileSize {{ item.0.redolog_size_in_mb }} "
     with_together:
        - oracle_databases
        - checkdbexist.results

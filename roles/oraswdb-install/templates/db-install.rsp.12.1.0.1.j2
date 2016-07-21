@@ -18,7 +18,7 @@
 
 
 #-------------------------------------------------------------------------------
-# Do not change the following system generated value. 
+# Do not change the following system generated value.
 #-------------------------------------------------------------------------------
 oracle.install.responseFileVersion=/oracle/install/rspfmt_dbinstall_response_schema_v12.1.0
 
@@ -34,13 +34,13 @@ oracle.install.option=INSTALL_DB_SWONLY
 #-------------------------------------------------------------------------------
 # Specify the hostname of the system as set during the install. It can be used
 # to force the installation to use an alternative hostname rather than using the
-# first hostname found on the system. (e.g., for systems with multiple hostnames 
+# first hostname found on the system. (e.g., for systems with multiple hostnames
 # and network interfaces)
 #-------------------------------------------------------------------------------
 ORACLE_HOSTNAME={{ ansible_hostname }}
 
 #-------------------------------------------------------------------------------
-# Specify the Unix group to be set for the inventory directory.  
+# Specify the Unix group to be set for the inventory directory.
 #-------------------------------------------------------------------------------
 UNIX_GROUP_NAME={{ oracle_group }}
 
@@ -51,31 +51,31 @@ UNIX_GROUP_NAME={{ oracle_group }}
 #-------------------------------------------------------------------------------
 INVENTORY_LOCATION={{ oracle_inventory_loc }}
 #-------------------------------------------------------------------------------
-# Specify the languages in which the components will be installed.             
-# 
-# en   : English                  ja   : Japanese                  
-# fr   : French                   ko   : Korean                    
-# ar   : Arabic                   es   : Latin American Spanish    
-# bn   : Bengali                  lv   : Latvian                   
-# pt_BR: Brazilian Portuguese     lt   : Lithuanian                
-# bg   : Bulgarian                ms   : Malay                     
-# fr_CA: Canadian French          es_MX: Mexican Spanish           
-# ca   : Catalan                  no   : Norwegian                 
-# hr   : Croatian                 pl   : Polish                    
-# cs   : Czech                    pt   : Portuguese                
-# da   : Danish                   ro   : Romanian                  
-# nl   : Dutch                    ru   : Russian                   
-# ar_EG: Egyptian                 zh_CN: Simplified Chinese        
-# en_GB: English (Great Britain)  sk   : Slovak                    
-# et   : Estonian                 sl   : Slovenian                 
-# fi   : Finnish                  es_ES: Spanish                   
-# de   : German                   sv   : Swedish                   
-# el   : Greek                    th   : Thai                      
-# iw   : Hebrew                   zh_TW: Traditional Chinese       
-# hu   : Hungarian                tr   : Turkish                   
-# is   : Icelandic                uk   : Ukrainian                 
-# in   : Indonesian               vi   : Vietnamese                
-# it   : Italian                                                   
+# Specify the languages in which the components will be installed.
+#
+# en   : English                  ja   : Japanese
+# fr   : French                   ko   : Korean
+# ar   : Arabic                   es   : Latin American Spanish
+# bn   : Bengali                  lv   : Latvian
+# pt_BR: Brazilian Portuguese     lt   : Lithuanian
+# bg   : Bulgarian                ms   : Malay
+# fr_CA: Canadian French          es_MX: Mexican Spanish
+# ca   : Catalan                  no   : Norwegian
+# hr   : Croatian                 pl   : Polish
+# cs   : Czech                    pt   : Portuguese
+# da   : Danish                   ro   : Romanian
+# nl   : Dutch                    ru   : Russian
+# ar_EG: Egyptian                 zh_CN: Simplified Chinese
+# en_GB: English (Great Britain)  sk   : Slovak
+# et   : Estonian                 sl   : Slovenian
+# fi   : Finnish                  es_ES: Spanish
+# de   : German                   sv   : Swedish
+# el   : Greek                    th   : Thai
+# iw   : Hebrew                   zh_TW: Traditional Chinese
+# hu   : Hungarian                tr   : Turkish
+# is   : Icelandic                uk   : Ukrainian
+# in   : Indonesian               vi   : Vietnamese
+# it   : Italian
 #
 # all_langs   : All languages
 #
@@ -83,25 +83,25 @@ INVENTORY_LOCATION={{ oracle_inventory_loc }}
 # Example : SELECTED_LANGUAGES=en,fr,ja
 #
 # Specify value as the following to select all the languages.
-# Example : SELECTED_LANGUAGES=all_langs  
+# Example : SELECTED_LANGUAGES=all_langs
 #-------------------------------------------------------------------------------
 SELECTED_LANGUAGES=en
 
 #-------------------------------------------------------------------------------
-# Specify the complete path of the Oracle Home. 
+# Specify the complete path of the Oracle Home.
 #-------------------------------------------------------------------------------
-ORACLE_HOME={{ oracle_home_db_install }}
+ORACLE_HOME={{ oracle_home_db }}
 
 #-------------------------------------------------------------------------------
-# Specify the complete path of the Oracle Base. 
+# Specify the complete path of the Oracle Base.
 #-------------------------------------------------------------------------------
 ORACLE_BASE={{ oracle_base }}
 
 #-------------------------------------------------------------------------------
-# Specify the installation edition of the component.                     
-#                                                             
-# The value should contain only one of these choices.  
-#   - EE     : Enterprise Edition 
+# Specify the installation edition of the component.
+#
+# The value should contain only one of these choices.
+#   - EE     : Enterprise Edition
 
 #-------------------------------------------------------------------------------
 oracle.install.db.InstallEdition={{ item.0.oracle_edition }}
@@ -152,20 +152,20 @@ oracle.install.db.KMDBA_GROUP={{ oracle_group }}
 ###############################################################################
 #------------------------------------------------------------------------------
 # Specify the type of Real Application Cluster Database
-# 
+#
 #   - ADMIN_MANAGED: Admin-Managed
 #   - POLICY_MANAGED: Policy-Managed
-# 
-# If left unspecified, default will be ADMIN_MANAGED 
+#
+# If left unspecified, default will be ADMIN_MANAGED
 #------------------------------------------------------------------------------
 oracle.install.db.rac.configurationType=ADMIN_MANAGED
 
 #------------------------------------------------------------------------------
 # Value is required only if RAC database type is ADMIN_MANAGED
-# 
+#
 # Specify the cluster node names selected during the installation.
 # Leaving it blank will result in install on local server only (Single Instance)
-# 
+#
 # Example : oracle.install.db.CLUSTER_NODES=node1,node2
 #------------------------------------------------------------------------------
 {% if configure_cluster==True %}
@@ -194,7 +194,7 @@ oracle.install.db.isRACOneInstall=
 {% endif %}
 #------------------------------------------------------------------------------
 # Value is required only if oracle.install.db.isRACOneInstall is true.
-# 
+#
 # Specify the name for RAC One Node Service
 #------------------------------------------------------------------------------
 {% if item.0.oracle_db_type|upper == 'RACONENODE' %}
@@ -205,7 +205,7 @@ oracle.install.db.racOneServiceName=
 
 #------------------------------------------------------------------------------
 # Value is required only if RAC database type is POLICY_MANAGED
-# 
+#
 # Specify a name for the new Server pool that will be configured
 # Example : oracle.install.db.rac.serverpoolName=pool1
 #------------------------------------------------------------------------------
@@ -213,7 +213,7 @@ oracle.install.db.rac.serverpoolName=
 
 #------------------------------------------------------------------------------
 # Value is required only if RAC database type is POLICY_MANAGED
-# 
+#
 # Specify a number as cardinality for the new Server pool that will be configured
 # Example : oracle.install.db.rac.serverpoolCardinality=2
 #------------------------------------------------------------------------------
@@ -228,15 +228,15 @@ oracle.install.db.rac.serverpoolCardinality=
 #-------------------------------------------------------------------------------
 # Specify the type of database to create.
 # It can be one of the following:
-#   - GENERAL_PURPOSE                       
-#   - DATA_WAREHOUSE 
+#   - GENERAL_PURPOSE
+#   - DATA_WAREHOUSE
 # GENERAL_PURPOSE: A starter database designed for general purpose use or transaction-heavy applications.
 # DATA_WAREHOUSE : A starter database optimized for data warehousing applications.
 #-------------------------------------------------------------------------------
 oracle.install.db.config.starterdb.type=
 
 #-------------------------------------------------------------------------------
-# Specify the Starter Database Global Database Name. 
+# Specify the Starter Database Global Database Name.
 #-------------------------------------------------------------------------------
 oracle.install.db.config.starterdb.globalDBName=
 
@@ -259,7 +259,7 @@ oracle.install.db.config.PDBName=
 
 #-------------------------------------------------------------------------------
 # Specify the Starter Database character set.
-#                                               
+#
 #  One of the following
 #  AL32UTF8, WE8ISO8859P15, WE8MSWIN1252, EE8ISO8859P2,
 #  EE8MSWIN1250, NE8ISO8859P10, NEE8ISO8859P4, BLT8MSWIN1257,
@@ -272,7 +272,7 @@ oracle.install.db.config.PDBName=
 oracle.install.db.config.starterdb.characterSet=
 
 #------------------------------------------------------------------------------
-# This variable should be set to true if Automatic Memory Management 
+# This variable should be set to true if Automatic Memory Management
 # in Database is desired.
 # If Automatic Memory Management is not desired, and memory allocation
 # is to be done manually, then set it to false.
@@ -281,7 +281,7 @@ oracle.install.db.config.starterdb.memoryOption=
 
 #-------------------------------------------------------------------------------
 # Specify the total memory allocation for the database. Value(in MB) should be
-# at least 256 MB, and should not exceed the total physical memory available 
+# at least 256 MB, and should not exceed the total physical memory available
 # on the system.
 # Example: oracle.install.db.config.starterdb.memoryLimit=512
 #-------------------------------------------------------------------------------
@@ -375,7 +375,7 @@ oracle.install.db.config.starterdb.emAdminPassword=
 ###############################################################################
 
 #------------------------------------------------------------------------------
-# This variable is to be set to false if database recovery is not required. Else 
+# This variable is to be set to false if database recovery is not required. Else
 # this can be set to true.
 #-------------------------------------------------------------------------------
 oracle.install.db.config.starterdb.enableRecovery=
@@ -390,16 +390,16 @@ oracle.install.db.config.starterdb.storageType=
 
 #-------------------------------------------------------------------------------
 # Specify the database file location which is a directory for datafiles, control
-# files, redo logs.         
+# files, redo logs.
 #
-# Applicable only when oracle.install.db.config.starterdb.storage=FILE_SYSTEM_STORAGE 
+# Applicable only when oracle.install.db.config.starterdb.storage=FILE_SYSTEM_STORAGE
 #-------------------------------------------------------------------------------
 oracle.install.db.config.starterdb.fileSystemStorage.dataLocation=
 
 #-------------------------------------------------------------------------------
 # Specify the recovery location.
 #
-# Applicable only when oracle.install.db.config.starterdb.storage=FILE_SYSTEM_STORAGE 
+# Applicable only when oracle.install.db.config.starterdb.storage=FILE_SYSTEM_STORAGE
 #-------------------------------------------------------------------------------
 oracle.install.db.config.starterdb.fileSystemStorage.recoveryLocation=
 
@@ -411,9 +411,9 @@ oracle.install.db.config.starterdb.fileSystemStorage.recoveryLocation=
 oracle.install.db.config.asm.diskGroup=
 
 #-------------------------------------------------------------------------------
-# Specify the password for ASMSNMP user of the ASM instance.                 
+# Specify the password for ASMSNMP user of the ASM instance.
 #
-# Applicable only when oracle.install.db.config.starterdb.storage=ASM_STORAGE 
+# Applicable only when oracle.install.db.config.starterdb.storage=ASM_STORAGE
 #-------------------------------------------------------------------------------
 oracle.install.db.config.asm.ASMSNMPPassword=
 
@@ -455,7 +455,7 @@ DECLINE_SECURITY_UPDATES=true
 #------------------------------------------------------------------------------
 # Specify the Proxy server name. Length should be greater than zero.
 #
-# Example    : PROXY_HOST=proxy.domain.com 
+# Example    : PROXY_HOST=proxy.domain.com
 #------------------------------------------------------------------------------
 PROXY_HOST=
 
@@ -475,7 +475,7 @@ PROXY_PORT=
 PROXY_USER=
 
 #------------------------------------------------------------------------------
-# Specify the proxy password. Leave PROXY_USER and PROXY_PWD  
+# Specify the proxy password. Leave PROXY_USER and PROXY_PWD
 # blank if your proxy server requires no authentication.
 #
 # Example    : PROXY_PWD=password
@@ -483,8 +483,8 @@ PROXY_USER=
 PROXY_PWD=
 
 #------------------------------------------------------------------------------
-# Specify the Oracle Support Hub URL. 
-# 
+# Specify the Oracle Support Hub URL.
+#
 # Example    : COLLECTOR_SUPPORTHUB_URL=https://orasupporthub.company.com:8080/
 #------------------------------------------------------------------------------
 COLLECTOR_SUPPORTHUB_URL=

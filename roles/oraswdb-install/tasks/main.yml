@@ -2,8 +2,8 @@
 
   - name: Check if DB-server is already installed
     shell: grep "{{ oracle_home_db  }}" "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" |wc -l
-    with_items: oracle_databases 
-    tags: 
+    with_items: oracle_databases
+    tags:
     - checkifdbinstall
     register: checkdbswinstall
 
@@ -16,19 +16,19 @@
   - name: Add new dotprofile (DB)
     template: src=dotprofile-db.j2 dest={{ oracle_user_home }}/{{oracle_profile_name }} owner={{ oracle_user }} group={{ oracle_group }} mode=775 backup=yes
     with_items: oracle_databases
-    tags: 
+    tags:
     - dotprofiledb
 
   - name: Add oraInst.loc
     template: src=oraInst.loc.j2 dest=/etc/oraInst.loc owner={{ oracle_user }} group={{ oracle_group }} mode=644 backup=yes
-    tags: 
+    tags:
     - orainst
 
   - name: Create stage directory (base)
     file: dest={{ oracle_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
       - directoriesdb
-  
+
   - name: Create stage directory (version specific)
     file: dest={{ oracle_stage }}/{{ item.version }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     with_items: oracle_sw_image_db
@@ -44,13 +44,13 @@
     file: dest={{ oracle_base }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
       - directoriesdb
-  
+
   - name: Create cfgtoollogs directory
     file: dest={{ oracle_base }}/cfgtoollogs mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory recurse=yes
     sudo: yes
     tags:
       - directoriesdb
-  
+
   - name: Create admin directory
     file: dest={{ oracle_base }}/admin mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     sudo: yes
@@ -62,7 +62,7 @@
     sudo: yes
     tags:
       - directoriesdb
-  
+
   - name: Create ORACLE_HOME directory
     file: dest={{ oracle_home_db }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     with_items: oracle_databases
@@ -71,45 +71,45 @@
 
   - name: Transfer oracle installfiles to server (www)
     get_url: url={{ oracle_sw_source_www }}/{{ item[0].filename }} dest={{ oracle_stage }} mode=775
-    with_nested: 
+    with_nested:
       - oracle_sw_image_db
       - oracle_databases
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and item[0].version == item[1].oracle_version_db and not is_sw_source_local and oracle_sw_copy|bool 
+    when: master_node and item[0].version == item[1].oracle_version_db and not is_sw_source_local and oracle_sw_copy|bool
     tags:
       - oradbsw
 
   - name: Transfer oracle installfiles to server (local)
     copy: src={{ oracle_sw_source_local }}/{{ item[0].filename }} dest={{ oracle_stage }} mode=775
-    with_nested: 
+    with_nested:
       - oracle_sw_image_db
       - oracle_databases
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and item[0].version == item[1].oracle_version_db and is_sw_source_local and oracle_sw_copy|bool 
+    when: master_node and item[0].version == item[1].oracle_version_db and is_sw_source_local and oracle_sw_copy|bool
     tags:
       - oradbsw
 
   - name: Extract files to stage-area
-    unarchive: src={{ oracle_stage }}/{{ item[0].filename }}  dest={{ oracle_stage }}/{{ item[0].version }} copy=no 
-    with_nested: 
+    unarchive: src={{ oracle_stage }}/{{ item[0].filename }}  dest={{ oracle_stage }}/{{ item[0].version }} copy=no
+    with_nested:
       - oracle_sw_image_db
       - oracle_databases
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and item[0].version == item[1].oracle_version_db and oracle_sw_copy|bool and oracle_sw_unpack|bool 
+    when: master_node and item[0].version == item[1].oracle_version_db and oracle_sw_copy|bool and oracle_sw_unpack|bool
     tags:
       - oradbswunpack
 
   - name: Extract files to stage-area (from remote location)
-    unarchive: src={{ oracle_stage_remote }}/{{ item[0].filename }}  dest={{ oracle_stage }}/{{ item[0].version }} copy=no 
-    with_nested: 
+    unarchive: src={{ oracle_stage_remote }}/{{ item[0].filename }}  dest={{ oracle_stage }}/{{ item[0].version }} copy=no
+    with_nested:
       - oracle_sw_image_db
       - oracle_databases
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and item[0].version == item[1].oracle_version_db and not oracle_sw_copy|bool and oracle_sw_unpack|bool 
+    when: master_node and item[0].version == item[1].oracle_version_db and not oracle_sw_copy|bool and oracle_sw_unpack|bool
     tags:
       - oradbswunpack
 
@@ -121,7 +121,7 @@
      - checkdbswinstall.results
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node #and item.1.stdout != "1" 
+    when: master_node #and item.1.stdout != "1"
     tags:
       - responsefileswdb
 
@@ -132,7 +132,7 @@
      - checkdbswinstall.results
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node #and item.1.stdout != "1" 
+    when: master_node #and item.1.stdout != "1"
     tags:
       - responsefileswdb
 
@@ -152,7 +152,7 @@
 
   - debug: var=oradbinstall.stdout_lines
     with_items: oradbinstall.results
-    when: master_node 
+    when: master_node
     tags:
      - oradbinstall
 
@@ -165,11 +165,11 @@
 #      - runroot
 
   - name: Run root script after installation
-    shell: "{{ oracle_home_db_install }}/root.sh"
+    shell: "{{ oracle_home_db }}/root.sh"
     with_together:
      - oracle_databases
      - checkdbswinstall.results
-    when: master_node and item.1.stdout != "1" 
+    when: master_node and item.1.stdout != "1"
     #with_items: oracle_databases
     #when: master_node
     tags:
@@ -180,25 +180,25 @@
     with_items: oracle_databases
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    tags: 
+    tags:
       - glogin
 
   - name: Add additional info to glogin.sql (2)
     lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line='set time on' backup=yes
     with_items: oracle_databases
-    tags: 
+    tags:
       - glogin
-  
+
   - name: Check opatch lsinventory (DB)
     shell: "{{ oracle_home_db }}/OPatch/opatch lsinventory"
     with_items: oracle_databases
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node  
+    when: master_node
     register: opatchls
     tags:
      - opatchls
-    
+
   - debug: var=opatchls.stdout_lines
     with_items: opatchls.results
     when: master_node
@@ -210,5 +210,3 @@
     when: install_from_nfs|bool
     tags:
       - nfsunmountdb
-    
-
