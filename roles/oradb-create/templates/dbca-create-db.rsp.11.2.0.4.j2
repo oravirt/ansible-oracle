@@ -376,7 +376,11 @@ DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Mandatory     : No
 #-----------------------------------------------------------------------------
 {% if item.0.storage_type|upper == 'FS' %}
-DATAFILEDESTINATION = {{ oracle_dbf_dir_fs }}
+{% if item.0.datafile_dest is defined %}
+DATAFILEDESTINATION={{ item.0.datafile_dest }}
+{% else %}
+DATAFILEDESTINATION={{ oracle_dbf_dir_fs }}
+{% endif %}
 {% else %}
 #DATAFILEDESTINATION=
 {% endif %}
@@ -389,10 +393,15 @@ DATAFILEDESTINATION = {{ oracle_dbf_dir_fs }}
 # Mandatory     : No
 #-----------------------------------------------------------------------------
 {% if item.0.storage_type|upper == 'FS' %}
+{% if item.0.recoveryfile_dest is defined %}
+RECOVERYAREADESTINATION={{ item.0.recoveryfile_dest }}
+{% else %}
 RECOVERYAREADESTINATION={{ oracle_reco_dir_fs }}
+{% endif %}
 {% else %}
 #RECOVERYAREADESTINATION=
 {% endif %}
+
 #-----------------------------------------------------------------------------
 # Name          : STORAGETYPE
 # Datatype      : String
@@ -411,7 +420,11 @@ STORAGETYPE="{{ item.0.storage_type }}"
 # Mandatory     : No
 #-----------------------------------------------------------------------------
 {% if item.0.storage_type|upper == 'ASM' %}
+{% if item.0.datafile_dest is defined %}
+DISKGROUPNAME={{ item.0.datafile_dest }}
+{% else %}
 DISKGROUPNAME={{ oracle_dbf_dir_asm }}
+{% endif %}
 {% else %}
 #DISKGROUPNAME=
 {% endif %}
@@ -433,11 +446,14 @@ ASMSNMP_PASSWORD="{{ item.0.oracle_db_passwd }}"
 # Mandatory     : No
 #-----------------------------------------------------------------------------
 {% if item.0.storage_type|upper == 'ASM' %}
+{% if item.0.recoveryfile_dest is defined %}
+RECOVERYGROUPNAME={{ item.0.recoveryfile_dest }}
+{% else %}
 RECOVERYGROUPNAME={{ oracle_reco_dir_asm }}
+{% endif %}
 {% else %}
 #RECOVERYGROUPNAME=
 {% endif %}
-
 
 #-----------------------------------------------------------------------------
 # Name          : CHARACTERSET
