@@ -30,8 +30,11 @@
       - directoriesdb
 
   - name: Create stage directory (version specific)
-    file: dest={{ oracle_stage }}/{{ item.version }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
-    with_items: oracle_sw_image_db
+    file: dest={{ oracle_stage }}/{{ item[0].version }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    with_nested:
+       - "{{ oracle_sw_image_db }}"
+       - "{{ oracle_databases }}"
+    when: master_node and item[0].version == item[1].oracle_version_db
     tags:
       - directoriesdb
 
