@@ -50,7 +50,6 @@
   repo_dir: /etc/yum.repos.d/
 
   disable_numa_boot: true                    # (true/false) Sets numa=off in grub.conf
-  percent_hugepages: 50                      # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages & memlock settings
   configure_interconnect: false               # (true/false) Should the Interconnect network be configured by Ansible (setup IP-address. IP-address configurable by variable oracle_ic_net). Only applicable to RAC-installs
   oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
   configure_ssh: false                        # (true/false). Should passwordless ssh be configured between clusternodes. Only applicable to RAC-installs
@@ -65,7 +64,13 @@
   disable_selinux: true
   disable_iptables: true
 
-
+  configure_hugepages: true
+  configure_hugepages_by: percentage          # percentage/memory
+  percent_hugepages: 50                       # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages
+  size_in_gb_hugepages: 1                     # The amount of RAM in GB to dedicate to hugepages
+  nr_hugepages_percent: "{{((((percent_hugepages/100) * ansible_memtotal_mb)/2)+2)|round|int }}"
+  nr_hugepages_memory: "{{ (((size_in_gb_hugepages*1024)/2)+2)|round|int }}"
+  nr_hugepages: "{% if configure_hugepages==True%}{% if configure_hugepages_by|lower == 'percentage'%}{{ nr_hugepages_percent }}{%elif configure_hugepages_by|lower == 'memory' %}{{ nr_hugepages_memory }}{% endif %}{% else %}0{% endif %}"
 
   host_fs_layout:
    - vgname: vgora
@@ -170,7 +175,9 @@
       - { name: net.core.rmem_max, value: 4194304 }
       - { name: net.core.wmem_default, value: 262144 }
       - { name: net.core.wmem_max, value: 1048576 }
-      - { name: vm.nr_hugepages, value: "{{ (((percent_hugepages/100) * ansible_memtotal_mb)/2)|round|int  }}" }
+
+  oracle_hugepages:
+      - { name: vm.nr_hugepages, value: "{{ nr_hugepages }}" }
 
 
   oracle_seclimits:
