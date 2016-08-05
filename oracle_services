@@ -1,0 +1,225 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+DOCUMENTATION = '''
+---
+module: oracle_services
+short_description: Manage services in an Oracle database
+description:
+    - Manage services in an Oracle database (using srvctl)
+version_added: "2.1.0.0"
+options:
+    name:
+        description:
+            - The name of the service
+        required: true
+        default: None
+
+    oracle_home:
+        description:
+            - The name of the service
+        required: true
+        default: None
+
+    database:
+        description:
+            - The database in which the service will run
+    state:
+        description:
+            - The intended state of the service.
+        default: present
+        choices: ['present','absent','started','stopped']
+notes:
+author: Mikael Sandström, oravirt@gmail.com, @oravirt
+'''
+
+EXAMPLES = '''
+# Create a service
+oracle_services: name=service1 database=db1 state=present
+
+# Start a service
+oracle_services: name=service1 database=db1 state=started
+
+# Stop a service
+oracle_services: name=service1 database=db1 state=stopped
+
+# Remove a service
+oracle_services: name=service1 database=db1 state=absent
+
+
+'''
+import os
+
+# Check if the service exists
+def check_service_exists(module, msg, oracle_home, name, database_name):
+
+
+    if not(name) or not(database_name):
+        module.fail_json(msg='Error: Missing name of service or name of database', changed=False)
+        return False
+
+    command = "%s/bin/srvctl config service -d %s -s %s" % (oracle_home, database_name, name)
+    (rc, stdout, stderr) = module.run_command(command)
+    if rc != 0:
+        if 'PRCR-1001' in stdout: #<-- service doesn't exist
+            return False
+        else:
+            msg[0] = 'Error: command is  %s. stdout is %s' % (command, stdout)
+            return False
+    elif 'Service name: %s' % (name) in stdout: #<-- service already exist
+            msg[0] = 'Service %s already exists in database %s' % (name, database_name)
+            return True
+    else:
+        msg[0] = '%s' % (stdout)
+        return True, msg[0], stderr
+
+def create_service(module, msg, oracle_home, name, database_name):
+
+
+    command = "%s/bin/srvctl add service -d %s -s %s" % (oracle_home, database_name, name)
+    (rc, stdout, stderr) = module.run_command(command)
+    if rc != 0:
+        if 'PRKO-3117' in stdout: #<-- service already exist
+            msg[0] = 'Service %s already exists in database %s' % (name, database_name)
+            #module.exit_json(msg=msg[0], changed=False)
+        else:
+            msg[0] = 'Error: %s, command is %s' % (stdout, command)
+            return False
+    else:
+        return True
+
+def remove_service(module, msg, oracle_home, name, database_name):
+
+    command = "%s/bin/srvctl remove service -d %s -s %s" % (oracle_home, database_name, name)
+
+    (rc, stdout, stderr) = module.run_command(command)
+    if rc != 0:
+        if 'PRCR-1001' in stdout:
+            msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
+            module.exit_json(msg=msg[0], changed=False)
+        else:
+            msg[0] = 'Removal of service %s in database %s failed: %s' % (name,database_name,stdout)
+            module.fail_json(msg=msg[0], changed=False)
+    else:
+        msg[0] = 'Service %s in database %s successfully removed' % (name,database_name)
+        return True
+
+
+def check_service_status(module, msg, oracle_home, name, database_name):
+
+    command = "%s/bin/srvctl status service -d %s -s %s" % (oracle_home, database_name, name)
+    (rc, stdout, stderr) = module.run_command(command)
+    if rc != 0:
+        msg[0] = 'Checking status of service %s in database %s failed: %s' % (name,database_name,stdout)
+        module.fail_json(msg=msg[0], changed=False)
+    elif 'is not running' in stdout:
+        return False
+    else:
+        #msg[0] = 'service %s already running in database %s' % (name,database_name)
+        return True
+
+def start_service(module, msg, oracle_home, name, database_name):
+
+    command = "%s/bin/srvctl start service -d %s -s %s" % (oracle_home, database_name, name)
+    (rc, stdout, stderr) = module.run_command(command)
+    if rc != 0:
+        if 'PRCC-1014' in stdout:
+            msg[0] = "Service %s already running in database %s" % (name, database_name)
+            module.exit_json(msg=msg[0], changed=False)
+        elif 'PRCR-1001' in stdout:
+            msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
+            module.exit_json(msg=msg[0], changed=False)
+        else:
+            msg[0] = 'Starting service %s in database %s failed: %s' % (name,database_name,stdout)
+            module.fail_json(msg=msg[0], changed=False)
+
+    else:
+        msg[0] = "Service %s started successfully in database %s" % (name, database_name)
+        return True,msg[0]
+
+
+def stop_service(module, msg, oracle_home, name, database_name):
+
+    command = "%s/bin/srvctl stop service -d %s -s %s" % (oracle_home, database_name, name)
+    (rc, stdout, stderr) = module.run_command(command)
+
+    if rc != 0:
+        if 'PRCR-1005' in stdout:
+            msg[0] = "Service %s already stopped in database %s" % (name, database_name)
+            module.exit_json(msg=msg[0], changed=False)
+        elif 'PRCR-1001' in stdout:
+            msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
+            module.exit_json(msg=msg[0], changed=False)
+        else:
+            msg[0] = 'Stopping service %s in database %s failed: %s' % (name,database_name,stdout)
+            module.fail_json(msg=msg[0], changed=False)
+    else:
+        msg[0] = "Service %s stopped successfully in database %s" % (name, database_name)
+        return True
+
+def main():
+
+    msg = ['']
+    module = AnsibleModule(
+        argument_spec = dict(
+            name          = dict(required=True, aliases = ['service']),
+            oracle_home   = dict(default=None, aliases = ['oh']),
+            database_name = dict(default=None, aliases = ['db']),
+            state         = dict(default="present", choices=["present", "absent", "started", "stopped"]),
+            force         = dict(default=False, type='bool'),
+
+
+        ),
+
+    )
+
+    name = module.params["name"]
+    oracle_home = module.params["oracle_home"]
+    database_name = module.params["database_name"]
+    state = module.params["state"]
+    force = module.params["force"]
+
+    if oracle_home is not None:
+        os.environ['ORACLE_HOME'] = oracle_home
+    elif 'ORACLE_HOME' in os.environ:
+        oracle_home = os.environ['ORACLE_HOME']
+    else:
+        msg[0] = 'ORACLE_HOME variable not set. Please set it and re-run the command'
+        module.fail_json(msg=msg[0], changed=False)
+
+
+    if state == 'present':
+        if not check_service_exists(module, msg, oracle_home, name, database_name):
+            if create_service(module, msg, oracle_home, name, database_name):
+                msg[0] = 'Successfully created service %s in database %s' % (name, database_name)
+                module.exit_json(msg=msg[0], changed=True)
+            else:
+                module.fail_json(msg=msg[0], changed=False)
+
+    elif state == 'absent' :
+        if remove_service(module, msg, oracle_home, name, database_name):
+            msg[0] = 'Service %s successfully removed from database %s' % (name,database_name)
+            module.exit_json(msg=msg[0], changed=True)
+
+    elif state == 'started':
+        if start_service(module, msg, oracle_home, name, database_name):
+            msg[0] = "Service %s started successfully in database %s" % (name, database_name)
+            module.exit_json(msg=msg[0], changed=True)
+
+    elif state == 'stopped':
+        if stop_service(module, msg, oracle_home, name, database_name):
+            msg[0] = "Service %s stopped successfully in database %s" % (name, database_name)
+            module.exit_json(msg=msg[0], changed=True)
+
+    else:
+        module.exit_json(msg=msg[0], changed=False)
+
+
+    module.exit_json(msg=msg[0], changed=False)
+
+
+
+
+from ansible.module_utils.basic import *
+if __name__ == '__main__':
+    main()
