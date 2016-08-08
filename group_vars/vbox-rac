@@ -21,7 +21,9 @@
 
   oracle_user: oracle
   oracle_group: oinstall
-  oracle_sw_copy: false 
+
+  install_from_nfs: false
+  oracle_sw_copy: false
   oracle_sw_unpack: true
   oracle_stage: /u01/stage
   oracle_stage_remote: /media/swrepo
@@ -31,21 +33,21 @@
   configure_interconnect: false
   configure_ssh: true
   configure_host_disks: true
-                                          
+
   install_os_packages: false
   configure_epel_repo: false
   configure_public_yum_repo: false
   disable_selinux: false
-  
+
 ################ Grid Infrastructure specifics ################
   configure_cluster: true
-  oracle_install_option_gi: CRS_CONFIG  
+  oracle_install_option_gi: CRS_CONFIG
   oracle_install_version_gi: 11.2.0.4
 
   oracle_password: oracle123
-  oracle_scan: dbnode-cluster-scan.internal.lab                     
-  oracle_vip: -vip                                                
-  oracle_scan_port: 1521                                          
+  oracle_scan: dbnode-cluster-scan.internal.lab
+  oracle_vip: -vip
+  oracle_scan_port: 1521
   oracle_asm_init_dg: crs
   oracle_gi_nic_pub: eth1
   oracle_gi_nic_priv: eth2
@@ -53,58 +55,54 @@
   oracle_gi_gns_vip: dbnode-cluster-gns.internal.lab.
 
 
-  oracle_databases:                                               # Dictionary describing the databases to be installed
-        - home: rachome1                                                   # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
-          oracle_version_db: 11.2.0.4                         # Oracle versiono
+  oracle_databases:                                            # Dictionary describing the databases to be installed
+        - home: db1                                            # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
+          oracle_version_db: 11.2.0.4                          # Oracle versiono
           oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
-          oracle_db_name: racdba                                 # Database name
+          oracle_db_name: racdba                               # Database name
           oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
-          oracle_db_type: RAC                                   # Type of database (RAC,RACONENODE,SI)
+          oracle_db_type: RAC                                  # Type of database (RAC,RACONENODE,SI)
           is_container: "false"                                # (true/false) Is the database a container database
           pdb_prefix: pdb
           num_pdbs: 1
           is_racone: "false"                                   # (true/false) Is the database a RAC ONE NODE Database
-          storage_type: ASM                                     # Database storage to be used. ASM or FS.
-          service_name: racdb_serv                               # Inital service to be created (not in use yet)
-          oracle_init_params: "open_cursors=300,processes=500" # Specific parameters to be set during installation. Comma-separated list
-          oracle_db_mem_percent: 25                            # Amount of RAM to be used for SGA
+          storage_type: ASM                                    # Database storage to be used. ASM or FS.
+          service_name: racdb_serv                             # Inital service to be created (not in use yet)
+          oracle_db_mem_totalmb: 1024                          # Amount of RAM to be used for SGA
           oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
           redolog_size_in_mb: 100
           state: present
 
 
-  oracle_dbf_dir_asm: "DATA"
-  oracle_reco_dir_asm: "FRA"                                                                                                                                                                                                               
-  host_fs_layout:
-      u01:
-        {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora, fstype: ext4}
+  datafile_dest: DATA
+  recoveryfile_dest: FRA
+
 
   asm_diskgroups:
     - diskgroup: crs
       properties:
-        - {redundancy: normal, ausize: 4}
+        - {redundancy: external, ausize: 4}
       attributes:
         - {name: 'compatible.rdbms', value: 11.2.0.4.0}
-        - {name: 'compatible.asm', value: 12.1.0.2.0}
+        - {name: 'compatible.asm', value: {{ oracle_install_version_gi }}}
       disk:
         - {device: /dev/sdc, asmlabel: crs01}
-        - {device: /dev/sdd, asmlabel: crs01}
+        - {device: /dev/sdd, asmlabel: crs02}
+        - {device: /dev/sde, asmlabel: crs03}
     - diskgroup: data
       properties:
         - {redundancy: external, ausize: 4}
       attributes:
         - {name: compatible.rdbms, value: 11.2.0.4.0}
-        - {name: compatible.asm, value: 12.1.0.2.0}
+        - {name: 'compatible.asm', value: {{ oracle_install_version_gi }}}
       disk:
         - {device: /dev/sde, asmlabel: data01}
-        - {device: /dev/sdf, asmlabel: data01}
+        - {device: /dev/sdf, asmlabel: data02}
     - diskgroup: fra
       properties:
         - {redundancy: external, ausize: 4}
       attributes:
         - {name: compatible.rdbms, value: 11.2.0.4.0}
-        - {name: compatible.asm, value: 12.1.0.2.0}
+        - {name: 'compatible.asm', value: {{ oracle_install_version_gi }}}
       disk:
         - {device: /dev/sdg, asmlabel: fra01}
-        - {device: /dev/sdh, asmlabel: fra01}
-
