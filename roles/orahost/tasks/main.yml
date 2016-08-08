@@ -90,6 +90,7 @@
     local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys
     ignore_errors: True
     when: configure_ssh and master_node and configure_cluster
+    become: false
     tags:
      - sshkeys
 
@@ -114,6 +115,7 @@
   - name: ssh-keys | Add short name to known_hosts
     local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{inventory_hostname}} 2> /dev/null >> {{keyfile}}
     ignore_errors: True
+    become: false
     when: configure_ssh and configure_cluster
     tags:
      - sshkeys
@@ -121,6 +123,7 @@
   - name: ssh-keys | Add FQDN to known_hosts
     local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_fqdn}} 2> /dev/null >> {{keyfile}}
     ignore_errors: True
+    become: false
     when: configure_ssh and configure_cluster
     tags:
      - sshkeys
@@ -128,6 +131,7 @@
   - name: ssh-keys | Add IPv4 to known_hosts
     local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_default_ipv4.address}} 2> /dev/null >> {{keyfile}}
     ignore_errors: True
+    become: false
     when: configure_ssh and configure_cluster
     tags:
      - sshkeys
@@ -153,6 +157,7 @@
         - "{{ keyfile }}"
     when: master_node and configure_ssh and configure_cluster
     ignore_errors: true
+    become: false
     tags:
      - sshkeys
 
