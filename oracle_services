@@ -20,15 +20,47 @@ options:
             - The name of the service
         required: true
         default: None
+        aliases: ['oh']
 
     database:
         description:
             - The database in which the service will run
+        required: True
+        default: None
+        aliases: ['db']
+
     state:
         description:
-            - The intended state of the service.
+            - The intended state of the service. 'status' will just show the status of the service
         default: present
-        choices: ['present','absent','started','stopped']
+        choices: ['present','absent','started','stopped', 'status']
+
+    preferred_instances:
+        description:
+            - The RAC instances on which the service will actively run. Comma-separated list
+        required: false
+        default: None
+        aliases: ['pi']
+
+    available_instances:
+        description:
+            - The RAC instances on which the service can run in case of failure of preferred_instances. Comma-separated list
+        required: false
+        default: None
+        aliases: ['ai']
+
+    pdb:
+        description:
+            - The pdb which the service is attached to
+        required: false
+        default: None
+
+    force:
+        description:
+            - Adds the 'force' flag to the srvctl command
+        default: False
+        choices: ['true','false']
+
 notes:
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
@@ -46,13 +78,17 @@ oracle_services: name=service1 database=db1 state=stopped
 # Remove a service
 oracle_services: name=service1 database=db1 state=absent
 
+# Create a service in a RAC pdb and run it on a subset of nodes/instances
+oracle_services: name=service1 database=raccdb pdb=mypdb pi=raccdb1 ai=raccdb2,raccdb3 state=present
 
 '''
 import os
 
+
+
+
 # Check if the service exists
 def check_service_exists(module, msg, oracle_home, name, database_name):
-
 
     if not(name) or not(database_name):
         module.fail_json(msg='Error: Missing name of service or name of database', changed=False)
@@ -67,117 +103,163 @@ def check_service_exists(module, msg, oracle_home, name, database_name):
             msg[0] = 'Error: command is  %s. stdout is %s' % (command, stdout)
             return False
     elif 'Service name: %s' % (name) in stdout: #<-- service already exist
-            msg[0] = 'Service %s already exists in database %s' % (name, database_name)
+            #msg[0] = 'Service %s already exists in database %s' % (name, database_name)
             return True
     else:
         msg[0] = '%s' % (stdout)
-        return True, msg[0], stderr
-
-def create_service(module, msg, oracle_home, name, database_name):
-
-
-    command = "%s/bin/srvctl add service -d %s -s %s" % (oracle_home, database_name, name)
-    (rc, stdout, stderr) = module.run_command(command)
-    if rc != 0:
-        if 'PRKO-3117' in stdout: #<-- service already exist
-            msg[0] = 'Service %s already exists in database %s' % (name, database_name)
-            #module.exit_json(msg=msg[0], changed=False)
-        else:
-            msg[0] = 'Error: %s, command is %s' % (stdout, command)
-            return False
-    else:
         return True
 
-def remove_service(module, msg, oracle_home, name, database_name):
 
-    command = "%s/bin/srvctl remove service -d %s -s %s" % (oracle_home, database_name, name)
+def create_service(module, msg, oracle_home, name, database_name, preferred_instances, available_instances, pdb):
 
-    (rc, stdout, stderr) = module.run_command(command)
-    if rc != 0:
-        if 'PRCR-1001' in stdout:
-            msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
-            module.exit_json(msg=msg[0], changed=False)
+
+    if gimanaged:
+        command = "%s/bin/srvctl add service -d %s -s %s" % (oracle_home, database_name, name)
+        if preferred_instances != None:
+            command += ' -r %s' % (preferred_instances)
+
+        if available_instances != None:
+            command += ' -a %s' % (available_instances)
+
+        if pdb != None:
+            command += ' -pdb %s' % (pdb)
+
+        (rc, stdout, stderr) = module.run_command(command)
+        if rc != 0:
+            if 'PRKO-3117' in stdout: #<-- service already exist
+                msg[0] = 'Service %s already exists in database %s' % (name, database_name)
+                module.exit_json(msg=msg[0], changed=False)
+            else:
+                msg[0] = 'Error: %s, command is %s' % (stdout, command)
+                return False
         else:
-            msg[0] = 'Removal of service %s in database %s failed: %s' % (name,database_name,stdout)
+            return True
+    else:
+        module.exit_json(msg='Running sqlplus', changed=False)
+
+def remove_service(module, msg, oracle_home, name, database_name, force):
+
+    if gimanaged:
+        command = "%s/bin/srvctl remove service -d %s -s %s" % (oracle_home, database_name, name)
+        if force:
+            command += ' -f'
+
+        (rc, stdout, stderr) = module.run_command(command)
+        if rc != 0:
+            if 'PRCR-1001' in stdout: #<-- service doesn' exist
+                return False
+            else:
+                msg[0] = 'Removal of service %s in database %s failed: %s' % (name,database_name,stdout)
+                module.fail_json(msg=msg[0], changed=False)
+        else:
+            return True
+    else:
+        module.exit_json(msg='Running sqlplus', changed=False)
+
+
+def check_service_status(module, msg, oracle_home, name, database_name, state):
+
+    if gimanaged:
+        command = "%s/bin/srvctl status service -d %s -s %s" % (oracle_home, database_name, name)
+        (rc, stdout, stderr) = module.run_command(command)
+
+        if rc != 0:
+            msg[0] = 'Checking status of service %s in database %s failed: %s' % (name,database_name,stdout)
             module.fail_json(msg=msg[0], changed=False)
+
+        elif state == "status":
+            module.exit_json(msg=stdout.rstrip('\n'), changed=False)
+
+        elif 'is not running' in stdout:
+            return False
+        else:
+            #msg[0] = 'service %s already running in database %s' % (name,database_name)
+            return True
     else:
-        msg[0] = 'Service %s in database %s successfully removed' % (name,database_name)
-        return True
+        module.exit_json(msg='Running sqlplus', changed=False)
 
-
-def check_service_status(module, msg, oracle_home, name, database_name):
-
-    command = "%s/bin/srvctl status service -d %s -s %s" % (oracle_home, database_name, name)
-    (rc, stdout, stderr) = module.run_command(command)
-    if rc != 0:
-        msg[0] = 'Checking status of service %s in database %s failed: %s' % (name,database_name,stdout)
-        module.fail_json(msg=msg[0], changed=False)
-    elif 'is not running' in stdout:
-        return False
-    else:
-        #msg[0] = 'service %s already running in database %s' % (name,database_name)
-        return True
 
 def start_service(module, msg, oracle_home, name, database_name):
 
-    command = "%s/bin/srvctl start service -d %s -s %s" % (oracle_home, database_name, name)
-    (rc, stdout, stderr) = module.run_command(command)
-    if rc != 0:
-        if 'PRCC-1014' in stdout:
-            msg[0] = "Service %s already running in database %s" % (name, database_name)
-            module.exit_json(msg=msg[0], changed=False)
-        elif 'PRCR-1001' in stdout:
-            msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
-            module.exit_json(msg=msg[0], changed=False)
-        else:
-            msg[0] = 'Starting service %s in database %s failed: %s' % (name,database_name,stdout)
-            module.fail_json(msg=msg[0], changed=False)
+    if gimanaged:
+        command = "%s/bin/srvctl start service -d %s -s %s" % (oracle_home, database_name, name)
+        (rc, stdout, stderr) = module.run_command(command)
+        if rc != 0:
+            if 'PRCR-1001' in stdout:
+                msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
+                module.exit_json(msg=msg[0], changed=False)
+            elif 'PRCC-1014' in stdout: #<-- service already running
+                return False
+            else:
+                msg[0] = 'Starting service %s in database %s failed: %s' % (name,database_name,stdout)
+                module.fail_json(msg=msg[0], changed=False)
 
+        else:
+            return True
     else:
-        msg[0] = "Service %s started successfully in database %s" % (name, database_name)
-        return True,msg[0]
+        module.exit_json(msg='Running sqlplus', changed=False)
 
 
 def stop_service(module, msg, oracle_home, name, database_name):
 
-    command = "%s/bin/srvctl stop service -d %s -s %s" % (oracle_home, database_name, name)
-    (rc, stdout, stderr) = module.run_command(command)
 
-    if rc != 0:
-        if 'PRCR-1005' in stdout:
-            msg[0] = "Service %s already stopped in database %s" % (name, database_name)
-            module.exit_json(msg=msg[0], changed=False)
-        elif 'PRCR-1001' in stdout:
-            msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
-            module.exit_json(msg=msg[0], changed=False)
+    if gimanaged:
+        command = "%s/bin/srvctl stop service -d %s -s %s" % (oracle_home, database_name, name)
+        (rc, stdout, stderr) = module.run_command(command)
+
+        if rc != 0:
+            if 'PRCR-1005' in stdout or 'CRS-2500' in stdout:
+                msg[0] = "Service %s already stopped in database %s" % (name, database_name)
+                module.exit_json(msg=msg[0], changed=False)
+            elif 'PRCR-1001' in stdout:
+                msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
+                module.exit_json(msg=msg[0], changed=False)
+            else:
+                msg[0] = 'Stopping service %s in database %s failed: %s' % (name,database_name,stdout)
+                module.fail_json(msg=msg[0], changed=False)
         else:
-            msg[0] = 'Stopping service %s in database %s failed: %s' % (name,database_name,stdout)
-            module.fail_json(msg=msg[0], changed=False)
+            return True
     else:
-        msg[0] = "Service %s stopped successfully in database %s" % (name, database_name)
-        return True
+        module.exit_json(msg='Running sqlplus', changed=False)
+
+
 
 def main():
 
     msg = ['']
+    global gimanaged
     module = AnsibleModule(
         argument_spec = dict(
-            name          = dict(required=True, aliases = ['service']),
-            oracle_home   = dict(default=None, aliases = ['oh']),
-            database_name = dict(default=None, aliases = ['db']),
-            state         = dict(default="present", choices=["present", "absent", "started", "stopped"]),
-            force         = dict(default=False, type='bool'),
+            name                = dict(required=True, aliases = ['service']),
+            oracle_home         = dict(default=None, aliases = ['oh']),
+            database_name       = dict(required=True, aliases = ['db']),
+            state               = dict(default="present", choices=["present", "absent", "started", "stopped", "status"]),
+            preferred_instances = dict(required=False, aliases = ['pi']),
+            available_instances = dict(required=False, aliases = ['ai']),
+            pdb                 = dict(required=False),
+            force               = dict(default=False, type='bool'),
 
 
         ),
 
     )
 
-    name = module.params["name"]
-    oracle_home = module.params["oracle_home"]
-    database_name = module.params["database_name"]
-    state = module.params["state"]
-    force = module.params["force"]
+    name                = module.params["name"]
+    oracle_home         = module.params["oracle_home"]
+    database_name       = module.params["database_name"]
+    state               = module.params["state"]
+    preferred_instances = module.params["preferred_instances"]
+    available_instances = module.params["available_instances"]
+    pdb                 = module.params["pdb"]
+    force               = module.params["force"]
+
+
+    # Decide whether to use srvctl or sqlplus
+    if os.path.exists('/etc/oracle/olr.loc'):
+        gimanaged = True
+    else:
+        gimanaged = False
+
 
     if oracle_home is not None:
         os.environ['ORACLE_HOME'] = oracle_home
@@ -190,29 +272,47 @@ def main():
 
     if state == 'present':
         if not check_service_exists(module, msg, oracle_home, name, database_name):
-            if create_service(module, msg, oracle_home, name, database_name):
+            if create_service(module, msg, oracle_home, name, database_name, preferred_instances,available_instances, pdb):
                 msg[0] = 'Successfully created service %s in database %s' % (name, database_name)
                 module.exit_json(msg=msg[0], changed=True)
             else:
                 module.fail_json(msg=msg[0], changed=False)
+        else:
+            msg[0] = 'Service %s already exists in database %s' % (name, database_name)
+            module.exit_json(msg=msg[0], changed=False)
 
     elif state == 'absent' :
-        if remove_service(module, msg, oracle_home, name, database_name):
-            msg[0] = 'Service %s successfully removed from database %s' % (name,database_name)
-            module.exit_json(msg=msg[0], changed=True)
+        if check_service_exists(module, msg, oracle_home, name, database_name):
+            if remove_service(module, msg, oracle_home, name, database_name, force):
+                msg[0] = 'Service %s successfully removed from database %s' % (name,database_name)
+                module.exit_json(msg=msg[0], changed=True)
+            else:
+                module.exit_json(msg=msg[0], changed=False)
+        else:
+            msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
+            module.exit_json(msg=msg[0], changed=False)
+
 
     elif state == 'started':
         if start_service(module, msg, oracle_home, name, database_name):
             msg[0] = "Service %s started successfully in database %s" % (name, database_name)
             module.exit_json(msg=msg[0], changed=True)
+        else:
+            msg[0] = "Service %s already running in database %s" % (name, database_name)
+            module.exit_json(msg=msg[0], changed=False)
 
     elif state == 'stopped':
         if stop_service(module, msg, oracle_home, name, database_name):
             msg[0] = "Service %s stopped successfully in database %s" % (name, database_name)
             module.exit_json(msg=msg[0], changed=True)
 
-    else:
-        module.exit_json(msg=msg[0], changed=False)
+    elif state == 'status':
+        if check_service_exists(module, msg, oracle_home, name, database_name):
+            check_service_status(module, msg, oracle_home, name, database_name,state)
+        else:
+            msg[0] = "Service %s doesn\'t exist in database %s" % (name, database_name)
+            module.exit_json(msg=msg[0], changed=False)
+
 
 
     module.exit_json(msg=msg[0], changed=False)
