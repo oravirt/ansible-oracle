@@ -14,53 +14,79 @@ options:
             - The name of the service
         required: true
         default: None
-
     oracle_home:
         description:
             - The name of the service
         required: true
         default: None
         aliases: ['oh']
-
     database:
         description:
             - The database in which the service will run
         required: True
         default: None
         aliases: ['db']
-
     state:
         description:
             - The intended state of the service. 'status' will just show the status of the service
         default: present
         choices: ['present','absent','started','stopped', 'status']
-
     preferred_instances:
         description:
             - The RAC instances on which the service will actively run. Comma-separated list
         required: false
         default: None
         aliases: ['pi']
-
     available_instances:
         description:
             - The RAC instances on which the service can run in case of failure of preferred_instances. Comma-separated list
         required: false
         default: None
         aliases: ['ai']
-
     pdb:
         description:
             - The pdb which the service is attached to
         required: false
         default: None
-
     force:
         description:
             - Adds the 'force' flag to the srvctl command
+            force:
         default: False
         choices: ['true','false']
+    username:
+        description:
+            - The database username to connect to the database if using dbms_service
+        required: false
+        default: None
+        aliases: ['un']
+    password:
+        description:
+            - The password to connect to the database if using dbms_service
+        required: false
+        default: None
+        aliases: ['pw']
+    service_name:
+        description:
+            - The service_name to connect to the database if using dbms_service
+        required: false
+        default: None
+        aliases: ['sn']
+    hostname:
+        description:
+            - The host of the database if using dbms_service
+        required: false
+        default: None
+        aliases: ['host']
+    port:
+        description:
+            - The listener port to connect to the database if using dbms_service
+        required: false
+        default: None
+        aliases: ['pw']
 
+
+requires: cx_Oracle
 notes:
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
@@ -79,39 +105,49 @@ oracle_services: name=service1 database=db1 state=stopped
 oracle_services: name=service1 database=db1 state=absent
 
 # Create a service in a RAC pdb and run it on a subset of nodes/instances
-oracle_services: name=service1 database=raccdb pdb=mypdb pi=raccdb1 ai=raccdb2,raccdb3 state=present
+oracle_services: name=service1 database=raccdb oh=/u01/app/oracle/12.1.0.2/db1 pdb=mypdb pi=raccdb1 ai=raccdb2,raccdb3 state=present
 
 '''
 import os
 
-
+try:
+    import cx_Oracle
+except ImportError:
+    cx_oracle_exists = False
+else:
+    cx_oracle_exists = True
 
 
 # Check if the service exists
-def check_service_exists(module, msg, oracle_home, name, database_name):
+def check_service_exists(cursor, module, msg, oracle_home, name, database_name):
 
-    if not(name) or not(database_name):
-        module.fail_json(msg='Error: Missing name of service or name of database', changed=False)
-        return False
-
-    command = "%s/bin/srvctl config service -d %s -s %s" % (oracle_home, database_name, name)
-    (rc, stdout, stderr) = module.run_command(command)
-    if rc != 0:
-        if 'PRCR-1001' in stdout: #<-- service doesn't exist
-            return False
-        else:
-            msg[0] = 'Error: command is  %s. stdout is %s' % (command, stdout)
-            return False
-    elif 'Service name: %s' % (name) in stdout: #<-- service already exist
+    if gimanaged:
+        command = "%s/bin/srvctl config service -d %s -s %s" % (oracle_home, database_name, name)
+        (rc, stdout, stderr) = module.run_command(command)
+        if rc != 0:
+            if 'PRCR-1001' in stdout: #<-- service doesn't exist
+                return False
+            else:
+                msg[0] = 'Error: command is  %s. stdout is %s' % (command, stdout)
+                return False
+        elif 'Service name: %s' % (name) in stdout: #<-- service already exist
             #msg[0] = 'Service %s already exists in database %s' % (name, database_name)
             return True
+        else:
+            msg[0] = '%s' % (stdout)
+            return True
     else:
-        msg[0] = '%s' % (stdout)
-        return True
+        sql = 'select lower(name) from dba_services where lower (name) = \'%s\'' % (name.lower())
+        if execute_sql_get(module, msg, cursor, sql):
+            return True
+        else:
+            return False
 
 
-def create_service(module, msg, oracle_home, name, database_name, preferred_instances, available_instances, pdb):
 
+
+
+def create_service(cursor, module, msg, oracle_home, name, database_name, preferred_instances, available_instances, pdb):
 
     if gimanaged:
         command = "%s/bin/srvctl add service -d %s -s %s" % (oracle_home, database_name, name)
@@ -135,9 +171,19 @@ def create_service(module, msg, oracle_home, name, database_name, preferred_inst
         else:
             return True
     else:
-        module.exit_json(msg='Running sqlplus', changed=False)
 
-def remove_service(module, msg, oracle_home, name, database_name, force):
+        sql = 'BEGIN dbms_service.create_service('
+        sql_end = '); END;'
+        sql += 'service_name => \'%s\', network_name => \'%s\'' % (name, name)
+        sql += sql_end
+
+        if execute_sql(module, msg, cursor, sql):
+            return True
+        else:
+            return False
+
+
+def remove_service(cursor, module, msg, oracle_home, name, database_name, force):
 
     if gimanaged:
         command = "%s/bin/srvctl remove service -d %s -s %s" % (oracle_home, database_name, name)
@@ -154,10 +200,19 @@ def remove_service(module, msg, oracle_home, name, database_name, force):
         else:
             return True
     else:
-        module.exit_json(msg='Running sqlplus', changed=False)
+        sql = 'BEGIN dbms_service.delete_service('
+        sql_end = '); END;'
+        sql += 'service_name => \'%s\'' % (name)
+        sql += sql_end
+
+        if execute_sql(module, msg, cursor, sql):
+            return True
+        else:
+            return False
 
 
-def check_service_status(module, msg, oracle_home, name, database_name, state):
+
+def check_service_status(cursor, module, msg, oracle_home, name, database_name, state):
 
     if gimanaged:
         command = "%s/bin/srvctl status service -d %s -s %s" % (oracle_home, database_name, name)
@@ -176,10 +231,21 @@ def check_service_status(module, msg, oracle_home, name, database_name, state):
             #msg[0] = 'service %s already running in database %s' % (name,database_name)
             return True
     else:
-        module.exit_json(msg='Running sqlplus', changed=False)
+        sql = '''
+            select lower(s.name)
+            from v$active_services s
+            where lower(s.name) = \'%s\'
+              ''' % (name.lower())
+        #if execute_sql_get(module, msg, cursor, sql):
+        if execute_sql_get(module, msg, cursor, sql):
+            return True
+        else:
+            return False
 
 
-def start_service(module, msg, oracle_home, name, database_name):
+
+
+def start_service(cursor, module, msg, oracle_home, name, database_name):
 
     if gimanaged:
         command = "%s/bin/srvctl start service -d %s -s %s" % (oracle_home, database_name, name)
@@ -197,10 +263,25 @@ def start_service(module, msg, oracle_home, name, database_name):
         else:
             return True
     else:
-        module.exit_json(msg='Running sqlplus', changed=False)
+        if check_service_exists(cursor, module, msg, oracle_home, name, database_name):
+            if not check_service_status(cursor, module, msg, oracle_home, name, database_name, 'status'):
+                sql = 'BEGIN dbms_service.start_service('
+                sql_end = '); END;'
+                sql += 'service_name => \'%s\'' % (name)
+                sql += sql_end
+
+                if execute_sql(module, msg, cursor, sql):
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        else:
+            msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
+            module.exit_json(msg=msg[0], changed=False)
 
 
-def stop_service(module, msg, oracle_home, name, database_name):
+def stop_service(cursor, module, msg, oracle_home, name, database_name):
 
 
     if gimanaged:
@@ -220,24 +301,76 @@ def stop_service(module, msg, oracle_home, name, database_name):
         else:
             return True
     else:
-        module.exit_json(msg='Running sqlplus', changed=False)
+        if check_service_exists(cursor, module, msg, oracle_home, name, database_name):
+            if check_service_status(cursor, module, msg, oracle_home, name, database_name, 'status'):
+                sql = 'BEGIN dbms_service.stop_service('
+                sql_end = '); END;'
+                sql += 'service_name => \'%s\'' % (name)
+                sql += sql_end
+
+                if execute_sql(module, msg, cursor, sql):
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        else:
+            msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
+            module.exit_json(msg=msg[0], changed=False)
+
+
+
+def execute_sql_get(module, msg, cursor, sql):
+
+    #module.exit_json(msg="In execute_sql_get", changed=False)
+    try:
+        cursor.execute(sql)
+        result = (cursor.fetchone())
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
+        module.fail_json(msg=msg[0], changed=False)
+        return False
+
+    if result > 0:
+        return True
+    else:
+        return False
+
+def execute_sql(module, msg, cursor, sql):
+
+    try:
+        cursor.execute(sql)
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
+        module.fail_json(msg=msg[0], changed=False)
+        return False
+    return True
 
 
 
 def main():
 
     msg = ['']
+    cursor = None
     global gimanaged
     module = AnsibleModule(
         argument_spec = dict(
             name                = dict(required=True, aliases = ['service']),
             oracle_home         = dict(default=None, aliases = ['oh']),
             database_name       = dict(required=True, aliases = ['db']),
-            state               = dict(default="present", choices=["present", "absent", "started", "stopped", "status"]),
+            state               = dict(default="present", choices = ["present", "absent", "started", "stopped", "status", "restarted"]),
             preferred_instances = dict(required=False, aliases = ['pi']),
             available_instances = dict(required=False, aliases = ['ai']),
             pdb                 = dict(required=False),
-            force               = dict(default=False, type='bool'),
+            force               = dict(default=False, type = 'bool'),
+            username            = dict(required=False, aliases = ['un']),
+            password            = dict(required=False, no_log=True, aliases = ['pw']),
+            service_name        = dict(required=False, aliases = ['sn']),
+            hostname            = dict(required=False, aliases = ['host']),
+            port                = dict(required=False),
+
 
 
         ),
@@ -252,6 +385,26 @@ def main():
     available_instances = module.params["available_instances"]
     pdb                 = module.params["pdb"]
     force               = module.params["force"]
+    username            = module.params["username"]
+    password            = module.params["password"]
+    service_name        = module.params["service_name"]
+    hostname            = module.params["hostname"]
+    port                = module.params["port"]
+
+
+    #ld_library_path = '%s/lib' % (oracle_home)
+    if oracle_home is not None:
+        os.environ['ORACLE_HOME'] = oracle_home
+        #os.environ['LD_LIBRARY_PATH'] = ld_library_path
+    elif 'ORACLE_HOME' in os.environ:
+        oracle_home     = os.environ['ORACLE_HOME']
+        #ld_library_path = os.environ['LD_LIBRARY_PATH']
+    else:
+        msg[0] = 'ORACLE_HOME variable not set. Please set it and re-run the command'
+        module.fail_json(msg=msg[0], changed=False)
+
+
+    #cx_oracle_exists = True
 
 
     # Decide whether to use srvctl or sqlplus
@@ -259,20 +412,28 @@ def main():
         gimanaged = True
     else:
         gimanaged = False
+        if not cx_oracle_exists:
+            msg[0] = "System doesn\'t seem to be managed by GI, so the cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
+            module.fail_json(msg=msg[0])
 
-
-    if oracle_home is not None:
-        os.environ['ORACLE_HOME'] = oracle_home
-    elif 'ORACLE_HOME' in os.environ:
-        oracle_home = os.environ['ORACLE_HOME']
-    else:
-        msg[0] = 'ORACLE_HOME variable not set. Please set it and re-run the command'
-        module.fail_json(msg=msg[0], changed=False)
+        else:
+            if not(service_name) or not(username) or not(password) or not(hostname) or not(port):
+                msg[0] = "Missing one or more of these for cx_Oracle: service_name,username,password,host,port"
+                module.fail_json(msg=msg[0], changed=False)
+            #import cx_Oracle
+            dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+            try:
+                conn = cx_Oracle.connect(username, password, dsn)
+            except cx_Oracle.DatabaseError, exc:
+                error, = exc.args
+                msg[0] = 'Could not connect to database - %s ' % (error.message)
+                module.fail_json(msg=msg[0], changed=False)
+            cursor = conn.cursor()
 
 
     if state == 'present':
-        if not check_service_exists(module, msg, oracle_home, name, database_name):
-            if create_service(module, msg, oracle_home, name, database_name, preferred_instances,available_instances, pdb):
+        if not check_service_exists(cursor, module, msg, oracle_home, name, database_name):
+            if create_service(cursor, module, msg, oracle_home, name, database_name, preferred_instances,available_instances, pdb):
                 msg[0] = 'Successfully created service %s in database %s' % (name, database_name)
                 module.exit_json(msg=msg[0], changed=True)
             else:
@@ -282,8 +443,8 @@ def main():
             module.exit_json(msg=msg[0], changed=False)
 
     elif state == 'absent' :
-        if check_service_exists(module, msg, oracle_home, name, database_name):
-            if remove_service(module, msg, oracle_home, name, database_name, force):
+        if check_service_exists(cursor, module, msg, oracle_home, name, database_name):
+            if remove_service(cursor, module, msg, oracle_home, name, database_name, force):
                 msg[0] = 'Service %s successfully removed from database %s' % (name,database_name)
                 module.exit_json(msg=msg[0], changed=True)
             else:
@@ -292,9 +453,8 @@ def main():
             msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
             module.exit_json(msg=msg[0], changed=False)
 
-
     elif state == 'started':
-        if start_service(module, msg, oracle_home, name, database_name):
+        if start_service(cursor, module, msg, oracle_home, name, database_name):
             msg[0] = "Service %s started successfully in database %s" % (name, database_name)
             module.exit_json(msg=msg[0], changed=True)
         else:
@@ -302,20 +462,39 @@ def main():
             module.exit_json(msg=msg[0], changed=False)
 
     elif state == 'stopped':
-        if stop_service(module, msg, oracle_home, name, database_name):
+        if stop_service(cursor, module, msg, oracle_home, name, database_name):
             msg[0] = "Service %s stopped successfully in database %s" % (name, database_name)
             module.exit_json(msg=msg[0], changed=True)
+        else:
+            msg[0] = "Service %s already stopped in database %s" % (name, database_name)
+            module.exit_json(msg=msg[0], changed=False)
+
+    elif state == 'restarted':
+        if stop_service(cursor, module, msg, oracle_home, name, database_name):
+            if start_service(cursor, module, msg, oracle_home, name, database_name):
+                msg[0]="Service %s restarted in database %s" % (name, database_name)
+                module.exit_json(msg=msg[0], changed=True)
+            else:
+                module.fail_json(msg=msg[0], changed=True)
+        else:
+            module.fail_json(msg=msg[0], changed=True)
+
 
     elif state == 'status':
-        if check_service_exists(module, msg, oracle_home, name, database_name):
-            check_service_status(module, msg, oracle_home, name, database_name,state)
+        if check_service_exists(cursor, module, msg, oracle_home, name, database_name):
+            if check_service_status(cursor, module, msg, oracle_home, name, database_name,state):
+                msg[0] = 'Service %s is running in database %s' % (name, database_name)
+                module.exit_json(msg=msg[0], changed=False)
+            else:
+                msg[0] = 'Service %s is not running in database %s' % (name, database_name)
+                module.exit_json(msg=msg[0], changed=False)
         else:
             msg[0] = "Service %s doesn\'t exist in database %s" % (name, database_name)
             module.exit_json(msg=msg[0], changed=False)
 
 
 
-    module.exit_json(msg=msg[0], changed=False)
+    module.exit_json(msg="Unhandled exit", changed=False)
 
 
 
