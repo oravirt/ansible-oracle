@@ -61,6 +61,7 @@ pre-req: cx_Oracle
   - Manages services in an Oracle database (RAC/Single instance)
 
  <b> Note: </b>
-  At the moment:
-  - Idempotence only applies to the state (present,absent,started, stopped). No other options are considered.
-  - Only GI-managed environments are supported 
+At the moment, Idempotence only applies to the state (present,absent,started, stopped). No other options are considered.
+
+
+  
