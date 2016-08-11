@@ -20,7 +20,7 @@ options:
         required: true
         default: None
         aliases: ['oh']
-    database:
+    database_name:
         description:
             - The database in which the service will run
         required: True
@@ -68,44 +68,45 @@ options:
         aliases: ['pw']
     service_name:
         description:
-            - The service_name to connect to the database if using dbms_service
+            - The service_name to connect to the database if using dbms_service.
         required: false
-        default: None
+        default: database_name. Will be set to the pdb-name if pdb is set
         aliases: ['sn']
     hostname:
         description:
             - The host of the database if using dbms_service
         required: false
-        default: None
+        default: localhost
         aliases: ['host']
     port:
         description:
             - The listener port to connect to the database if using dbms_service
         required: false
-        default: None
+        default: 1521
         aliases: ['pw']
 
 
-requires: cx_Oracle
 notes:
+    - cx_Oracle needs to be installed
+requirements: [ "cx_Oracle" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
 EXAMPLES = '''
 # Create a service
-oracle_services: name=service1 database=db1 state=present
+oracle_services: name=service1 database_name=db1 state=present
 
 # Start a service
-oracle_services: name=service1 database=db1 state=started
+oracle_services: name=service1 database_name=db1 state=started
 
 # Stop a service
-oracle_services: name=service1 database=db1 state=stopped
+oracle_services: name=service1 database_name=db1 state=stopped
 
 # Remove a service
-oracle_services: name=service1 database=db1 state=absent
+oracle_services: name=service1 database_name=db1 state=absent
 
 # Create a service in a RAC pdb and run it on a subset of nodes/instances
-oracle_services: name=service1 database=raccdb oh=/u01/app/oracle/12.1.0.2/db1 pdb=mypdb pi=raccdb1 ai=raccdb2,raccdb3 state=present
+oracle_services: name=service1 database_name=raccdb oh=/u01/app/oracle/12.1.0.2/db1 pdb=mypdb pi=raccdb1 ai=raccdb2,raccdb3 state=present
 
 '''
 import os
@@ -171,6 +172,9 @@ def create_service(cursor, module, msg, oracle_home, name, database_name, prefer
         else:
             return True
     else:
+
+        #if pdb != None:
+        #    database_name = pdb:
 
         sql = 'BEGIN dbms_service.create_service('
         sql_end = '); END;'
@@ -253,7 +257,7 @@ def start_service(cursor, module, msg, oracle_home, name, database_name):
         if rc != 0:
             if 'PRCR-1001' in stdout:
                 msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
-                module.exit_json(msg=msg[0], changed=False)
+                module.fail_json(msg=msg[0], changed=False)
             elif 'PRCC-1014' in stdout: #<-- service already running
                 return False
             else:
@@ -278,7 +282,7 @@ def start_service(cursor, module, msg, oracle_home, name, database_name):
                 return False
         else:
             msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
-            module.exit_json(msg=msg[0], changed=False)
+            module.fail_json(msg=msg[0], changed=False)
 
 
 def stop_service(cursor, module, msg, oracle_home, name, database_name):
@@ -368,8 +372,8 @@ def main():
             username            = dict(required=False, aliases = ['un']),
             password            = dict(required=False, no_log=True, aliases = ['pw']),
             service_name        = dict(required=False, aliases = ['sn']),
-            hostname            = dict(required=False, aliases = ['host']),
-            port                = dict(required=False),
+            hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
+            port                = dict(required=False, default = 1521),
 
 
 
@@ -404,9 +408,6 @@ def main():
         module.fail_json(msg=msg[0], changed=False)
 
 
-    #cx_oracle_exists = True
-
-
     # Decide whether to use srvctl or sqlplus
     if os.path.exists('/etc/oracle/olr.loc'):
         gimanaged = True
@@ -417,16 +418,25 @@ def main():
             module.fail_json(msg=msg[0])
 
         else:
-            if not(service_name) or not(username) or not(password) or not(hostname) or not(port):
-                msg[0] = "Missing one or more of these for cx_Oracle: service_name,username,password,host,port"
+            #if not(service_name) or not(username) or not(password) or not(hostname) or not(port):
+            if not(username) or not(password):
+                #msg[0] = "Missing one or more of these for cx_Oracle: service_name,username,password,host,port"
+                msg[0] = "Missing username or password for cx_Oracle"
                 module.fail_json(msg=msg[0], changed=False)
-            #import cx_Oracle
+
+            if service_name == None:
+                service_name = database_name
+
+            if pdb != None:
+                service_name  = pdb
+                database_name = pdb
+
             dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
             try:
                 conn = cx_Oracle.connect(username, password, dsn)
             except cx_Oracle.DatabaseError, exc:
                 error, = exc.args
-                msg[0] = 'Could not connect to database - %s ' % (error.message)
+                msg[0] = 'Could not connect to database: %s, dsn: %s ' % (error.message, dsn)
                 module.fail_json(msg=msg[0], changed=False)
             cursor = conn.cursor()
 
