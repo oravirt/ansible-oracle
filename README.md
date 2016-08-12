@@ -58,10 +58,21 @@ pre-req: cx_Oracle
 
  <b> oracle_services </b>
 
+pre-req: cx_Oracle (if GI is not running)
+
   - Manages services in an Oracle database (RAC/Single instance)
 
- <b> Note: </b>
+<b> Note: </b>
 At the moment, Idempotence only applies to the state (present,absent,started, stopped). No other options are considered.
 
 
-  
+<b> oracle_pdb </b>
+
+pre-req: cx_Oracle
+
+ - Manages pluggable databases in an Oracle container database
+ - Creates/deletes the pdb
+ - saves the state if you want it to
+ - Can place the datafiles in a separate location
+
+ate (present,absent,started, stopped). No other options are considered.

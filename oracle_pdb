@@ -1,0 +1,277 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+DOCUMENTATION = '''
+---
+module: oracle_pdb
+short_description: Manage pluggable databases in Oracle
+description:
+    - Manage pluggable databases in Oracle.
+version_added: "2.1.0.0"
+options:
+    name:
+        description:
+            - The name of the service
+        required: true
+        default: None
+    oracle_home:
+        description:
+            - The name of the service
+        required: true
+        default: None
+        aliases: ['oh']
+    sourcedb:
+        description:
+            - The database in which the service will run
+        required: True
+        default: None
+        aliases: ['db']
+    state:
+        description:
+            - The intended state of the service. 'status' will just show the status of the pdb
+        default: present
+        choices: ['present','absent','started','stopped', 'status']
+    pdb:
+        description:
+            - The pdb which the service is attached to
+        required: false
+        default: None
+    pdb_admin_username:
+        description:
+            - The database username to connect to the database if using dbms_service
+        required: false
+        default: None
+        aliases: ['un']
+    pdb_admin_password:
+        description:
+            - The password to connect to the database if using dbms_service
+        required: false
+        default: None
+        aliases: ['pw']
+    datafile_dest:
+        description:
+            - The service_name to connect to the database if using dbms_service.
+        required: false
+        default: database_name. Will be set to the pdb-name if pdb is set
+        aliases: ['dfd']
+
+notes:
+    - cx_Oracle needs to be installed
+requirements: [ "cx_Oracle" ]
+author: Mikael Sandström, oravirt@gmail.com, @oravirt
+'''
+
+EXAMPLES = '''
+
+'''
+import os
+
+try:
+    import cx_Oracle
+except ImportError:
+    cx_oracle_exists = False
+else:
+    cx_oracle_exists = True
+
+
+# Check if the pdb exists
+def check_pdb_exists(cursor, module, msg, name):
+
+    sql = 'select lower(pdb_name) from dba_pdbs where lower (pdb_name) = \'%s\'' % (name.lower())
+
+    result = execute_sql_get(module, msg, cursor, sql)
+    if len(result) > 0:
+        return True
+    else:
+        return False
+
+
+def create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username, pdb_admin_password, datafile_dest, save_state):
+
+    command = '%s/bin/dbca -silent -createPluggableDatabase -pdbName %s -sourceDB %s' % (oracle_home, name, sourcedb)
+    command += ' -pdbAdminUserName %s -pdbAdminPassword %s ' % (pdb_admin_username, pdb_admin_password)
+
+    if datafile_dest != None:
+        command += ' -pdbDatafileDestination %s' % (datafile_dest)
+
+    (rc, stdout, stderr) = module.run_command(command)
+    if rc != 0:
+        msg[0] = 'Error: %s, command is %s' % (stdout, command)
+        return False
+    else:
+        if save_state:
+            sql = 'alter pluggable database %s save state' % (name)
+            execute_sql(module, msg, cursor, sql)
+
+        return True #<-- all is well
+
+def remove_pdb(cursor, module, msg, oracle_home, name, sourcedb):
+
+    command = '%s/bin/dbca -silent -deletePluggableDatabase -pdbName %s -sourceDB %s' % (oracle_home, name, sourcedb)
+
+    (rc, stdout, stderr) = module.run_command(command)
+    if rc != 0:
+        msg[0] = 'Error: %s, command is %s' % (stdout, command)
+        return False
+    else:
+        return True
+
+def check_pdb_status(cursor, module, msg, name):
+
+    sql = 'select name, con_id, con_uid, open_mode,to_char(open_time,\'HH24:MI:SS YYYY-MM-DD\'),recovery_status from v$pdbs where lower(name) = \'%s\'' % (name)
+    result = execute_sql_get(module, msg, cursor, sql)
+    if len(result) > 0:
+        for a in result:
+            msg[0] = 'pdb name: %s, con_id: %s, con_uid: %s, open_mode: %s, open_time: %s' % (a[0].lower(), a[1], a[2], a[3], a[4])
+        module.exit_json(msg=msg[0], changed=False)
+
+
+
+def execute_sql_get(module, msg, cursor, sql):
+
+    try:
+        cursor.execute(sql)
+        result = (cursor.fetchall())
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
+        module.fail_json(msg=msg[0], changed=False)
+        return False
+    return result
+
+def execute_sql(module, msg, cursor, sql):
+
+    try:
+        cursor.execute(sql)
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
+        module.fail_json(msg=msg[0], changed=False)
+        return False
+    return True
+
+
+
+def main():
+
+    msg = ['']
+
+    module = AnsibleModule(
+        argument_spec = dict(
+            name                = dict(required=True, aliases = ['pdb','pdb_name']),
+            oracle_home         = dict(default=None, aliases = ['oh']),
+            sourcedb            = dict(required=True, aliases = ['db','container']),
+            state               = dict(default="present", choices = ["present", "absent", "started", "stopped", "status"]),
+            save_state          = dict(default=True, type = 'bool'),
+            pdb_admin_username  = dict(required=False, default = 'pdb_admin', aliases = ['pdbadmun']),
+            pdb_admin_password  = dict(required=False, default = 'pdb_admin', aliases = ['pdbadmpw']),
+            datafile_dest       = dict(required=False, aliases = ['dfd']),
+            username            = dict(required=False, aliases = ['un']),
+            password            = dict(required=False, no_log=True, aliases = ['pw']),
+            service_name        = dict(required=False, aliases = ['sn']),
+            hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
+            port                = dict(required=False, default = 1521),
+
+
+
+
+        ),
+
+    )
+
+    name                = module.params["name"]
+    oracle_home         = module.params["oracle_home"]
+    sourcedb            = module.params["sourcedb"]
+    state               = module.params["state"]
+    save_state          = module.params["save_state"]
+    pdb_admin_username  = module.params["pdb_admin_username"]
+    pdb_admin_password  = module.params["pdb_admin_password"]
+    datafile_dest       = module.params["datafile_dest"]
+    username            = module.params["username"]
+    password            = module.params["password"]
+    service_name        = module.params["service_name"]
+    hostname            = module.params["hostname"]
+    port                = module.params["port"]
+
+
+    if oracle_home is not None:
+        os.environ['ORACLE_HOME'] = oracle_home
+    elif 'ORACLE_HOME' in os.environ:
+        oracle_home = os.environ['ORACLE_HOME']
+    else:
+        msg[0] = 'ORACLE_HOME variable not set. Please set it and re-run the command'
+        module.fail_json(msg=msg[0], changed=False)
+
+
+    if not cx_oracle_exists:
+        msg[0] = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
+        module.fail_json(msg=msg[0])
+
+    if not(username) or not(password):
+            msg[0] = "Missing username or password for cx_Oracle"
+            module.fail_json(msg=msg[0], changed=False)
+
+    if service_name == None:
+        service_name = sourcedb
+
+    dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+    try:
+        conn = cx_Oracle.connect(username, password, dsn)
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Could not connect to database: %s, dsn: %s ' % (error.message, dsn)
+        module.fail_json(msg=msg[0], changed=False)
+    cursor = conn.cursor()
+
+
+
+    if state == 'present':
+        if not check_pdb_exists(cursor, module, msg, name):
+            if create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username, pdb_admin_password, datafile_dest, save_state):
+                msg[0] = 'Successfully created pluggable database %s ' % (name)
+                module.exit_json(msg=msg[0], changed=True)
+            else:
+                module.fail_json(msg=msg[0], changed=False)
+        else:
+            msg[0] = 'Pluggable database %s already exists' % (name)
+            module.exit_json(msg=msg[0], changed=False)
+
+    elif state == 'absent' :
+        if check_pdb_exists(cursor, module, msg, name):
+            if remove_pdb(cursor, module, msg, oracle_home, name, sourcedb):
+                msg[0] = 'Pluggable database %s successfully removed' % (name)
+                module.exit_json(msg=msg[0], changed=True)
+            else:
+                module.exit_json(msg=msg[0], changed=False)
+        else:
+            msg[0] = 'Pluggable database %s doesn\'t exist' % (name)
+            module.exit_json(msg=msg[0], changed=False)
+
+    elif state == 'status':
+        if check_pdb_exists(cursor, module, msg, name):
+            check_pdb_status(cursor, module, msg, name)
+        else:
+            msg[0] = 'Pluggable database %s doesn\'t exist' % (name)
+            module.exit_json(msg=msg[0], changed=False)
+
+    module.exit_json(msg="Unhandled exit", changed=False)
+'''
+        else:
+            msg[0] = "Service %s already running in database %s" % (name, database_name)
+            module.exit_json(msg=msg[0], changed=False)
+
+    elif state == 'stopped':
+        if stop_service(cursor, module, msg, oracle_home, name, database_name):
+            msg[0] = "Service %s stopped successfully in database %s" % (name, database_name)
+            module.exit_json(msg=msg[0], changed=True)
+        else:
+            msg[0] = "Service %s already stopped in database %s" % (name, database_name)
+            module.exit_json(msg=msg[0], changed=False)
+
+
+
+'''
+
+from ansible.module_utils.basic import *
+if __name__ == '__main__':
+    main()
