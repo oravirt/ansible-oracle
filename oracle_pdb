@@ -11,49 +11,67 @@ version_added: "2.1.0.0"
 options:
     name:
         description:
-            - The name of the service
-        required: true
+            - The name of the pdb
+        required: True
         default: None
-    oracle_home:
-        description:
-            - The name of the service
-        required: true
-        default: None
-        aliases: ['oh']
     sourcedb:
         description:
-            - The database in which the service will run
+            - The container database which will house the pdb
         required: True
         default: None
         aliases: ['db']
     state:
         description:
-            - The intended state of the service. 'status' will just show the status of the pdb
+            - The intended state of the pdb. 'status' will just show the status of the pdb
         default: present
-        choices: ['present','absent','started','stopped', 'status']
-    pdb:
-        description:
-            - The pdb which the service is attached to
-        required: false
-        default: None
+        choices: ['present','absent', 'status']
     pdb_admin_username:
         description:
-            - The database username to connect to the database if using dbms_service
+            - The username for the pdb admin user
         required: false
-        default: None
+        default: pdb_admin
         aliases: ['un']
     pdb_admin_password:
         description:
-            - The password to connect to the database if using dbms_service
+            - The password for the pdb admin user
         required: false
-        default: None
+        default: pdb_admin
         aliases: ['pw']
     datafile_dest:
         description:
-            - The service_name to connect to the database if using dbms_service.
+            - The path where the datafiles will be placed
         required: false
-        default: database_name. Will be set to the pdb-name if pdb is set
+        default: None
         aliases: ['dfd']
+    username:
+        description:
+            - The database username to connect to the database
+        required: false
+        default: None
+        aliases: ['un']
+    password:
+        description:
+            - The password to connect to the database
+        required: false
+        default: None
+        aliases: ['pw']
+    service_name:
+        description:
+            - The service_name to connect to the database
+        required: false
+        default: database_name
+        aliases: ['sn']
+    hostname:
+        description:
+            - The host of the database
+        required: false
+        default: localhost
+        aliases: ['host']
+    port:
+        description:
+            - The listener port to connect to the database
+        required: false
+        default: 1521
 
 notes:
     - cx_Oracle needs to be installed
@@ -263,7 +281,6 @@ def main():
             module.exit_json(msg=msg[0], changed=False)
 
     module.exit_json(msg="Unhandled exit", changed=False)
-
 
 from ansible.module_utils.basic import *
 if __name__ == '__main__':
