@@ -62,6 +62,14 @@ author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
 EXAMPLES = '''
+# Creates a pdb on a different filesystem
+oracle_pdb: name=pdb1 sourcedb=cdb1 dfd=/u02/oradata/pdb1 state=present un=system pw=Oracle123
+
+# Remove a pdb
+oracle_pdb: name=pdb1 sourcedb=cdb1 state=absent un=system pw=Oracle123
+
+# Check the status for a pdb
+oracle_pdb: name=pdb1 sourcedb=cdb1 state=status un=system pw=Oracle123
 
 '''
 import os
@@ -255,22 +263,7 @@ def main():
             module.exit_json(msg=msg[0], changed=False)
 
     module.exit_json(msg="Unhandled exit", changed=False)
-'''
-        else:
-            msg[0] = "Service %s already running in database %s" % (name, database_name)
-            module.exit_json(msg=msg[0], changed=False)
 
-    elif state == 'stopped':
-        if stop_service(cursor, module, msg, oracle_home, name, database_name):
-            msg[0] = "Service %s stopped successfully in database %s" % (name, database_name)
-            module.exit_json(msg=msg[0], changed=True)
-        else:
-            msg[0] = "Service %s already stopped in database %s" % (name, database_name)
-            module.exit_json(msg=msg[0], changed=False)
-
-
-
-'''
 
 from ansible.module_utils.basic import *
 if __name__ == '__main__':
