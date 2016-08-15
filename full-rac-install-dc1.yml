@@ -1,0 +1,35 @@
+---
+
+
+ - name: Host configuration
+   hosts: orarac-dc1
+   user: ansible
+   sudo: yes
+   roles:
+      - common
+      - orahost
+      - orahost-storage
+
+ - name: Oracle Grid Infrastructure installation & ASM Configuration
+   hosts: orarac-dc1
+   user: ansible
+   sudo: yes
+   roles:
+      - oraswgi-install
+      - oraasm-createdg
+
+ - name: Database Server Installation & Database Creation
+   hosts: orarac-dc1
+   user: ansible
+   sudo: yes
+   roles:
+      - oraswdb-install
+      - oradb-create
+
+ - name: Tweaks
+   hosts: orarac-dc1
+   user: ansible
+   sudo: yes
+   roles:
+      - cxoracle
+      - orahost-logrotate
