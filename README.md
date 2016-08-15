@@ -71,8 +71,6 @@ At the moment, Idempotence only applies to the state (present,absent,started, st
 pre-req: cx_Oracle
 
  - Manages pluggable databases in an Oracle container database
- - Creates/deletes the pdb
- - saves the state if you want it to
+ - Creates/deletes/opens/closes the pdb
+ - saves the state if you want it to. Default is yes
  - Can place the datafiles in a separate location
-
-ate (present,absent,started, stopped). No other options are considered.

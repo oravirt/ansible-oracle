@@ -102,13 +102,15 @@ else:
 
 # Check if the pdb exists
 def check_pdb_exists(cursor, module, msg, name):
-
+    global newpdb
     sql = 'select lower(pdb_name) from dba_pdbs where lower (pdb_name) = \'%s\'' % (name.lower())
 
     result = execute_sql_get(module, msg, cursor, sql)
     if len(result) > 0:
+        newpdb = False
         return True
     else:
+        newpdb = True
         return False
 
 
@@ -122,7 +124,7 @@ def create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_usern
 
     (rc, stdout, stderr) = module.run_command(command)
     if rc != 0:
-        msg[0] = 'Error: %s, command is %s' % (stdout, command)
+        msg[0] = 'Error, stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
         return False
     else:
         if save_state:
@@ -137,19 +139,58 @@ def remove_pdb(cursor, module, msg, oracle_home, name, sourcedb):
 
     (rc, stdout, stderr) = module.run_command(command)
     if rc != 0:
-        msg[0] = 'Error: %s, command is %s' % (stdout, command)
+        msg[0] = 'Error, stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
         return False
     else:
         return True
 
 def check_pdb_status(cursor, module, msg, name):
 
-    sql = 'select name, con_id, con_uid, open_mode,to_char(open_time,\'HH24:MI:SS YYYY-MM-DD\'),recovery_status from v$pdbs where lower(name) = \'%s\'' % (name)
+    sql = 'select name, con_id, con_uid, open_mode,restricted,to_char(open_time,\'HH24:MI:SS YYYY-MM-DD\'),recovery_status from v$pdbs where lower(name) = \'%s\'' % (name)
     result = execute_sql_get(module, msg, cursor, sql)
     if len(result) > 0:
         for a in result:
-            msg[0] = 'pdb name: %s, con_id: %s, con_uid: %s, open_mode: %s, open_time: %s' % (a[0].lower(), a[1], a[2], a[3], a[4])
+            msg[0] = 'pdb name: %s, con_id: %s, con_uid: %s, open_mode: %s, restricted: %s,  open_time: %s' % (a[0].lower(), a[1], a[2], a[3], a[4], a[5])
+
+def ensure_pdb_state(cursor, module, msg, name, state, newpdb):
+
+    current_state = []
+    wanted_state = []
+    sql = 'select lower(open_mode), lower(restricted) from v$pdbs where lower(name) = \'%s\'' % (name.lower())
+
+    state_now = execute_sql_get(module, msg, cursor, sql)
+
+    ensure_sql = 'alter pluggable database %s ' % (name)
+
+    if state in ('present','open','read_write'):
+        wanted_state = [('read write','no')]
+        ensure_sql += ' open force'
+    elif state == 'closed':
+        wanted_state = [('mounted', None)]
+        ensure_sql += ' close immediate'
+    elif state == 'read_only':
+        wanted_state = [('read only','no')]
+        ensure_sql += 'open read only force'
+    elif state == 'restricted':
+        wanted_state = [('read write','yes')]
+        ensure_sql += 'open restricted force'
+
+
+    if wanted_state == state_now:
+        if newpdb:
+            msg[0] = 'Successfully created pluggable database %s ' % (name)
+            module.exit_json(msg=msg[0], changed=True)
+        msg[0] = 'Pluggable database %s already in the intended state' % (name)
         module.exit_json(msg=msg[0], changed=False)
+
+    if execute_sql(module, msg, cursor, ensure_sql):
+        msg[0] = 'Pluggable database %s has been put in the intended state: %s' % (name, state)
+        module.exit_json(msg=msg[0], changed=True)
+    else:
+        return False
+
+
+
 
 
 
@@ -187,13 +228,14 @@ def main():
             name                = dict(required=True, aliases = ['pdb','pdb_name']),
             oracle_home         = dict(default=None, aliases = ['oh']),
             sourcedb            = dict(required=True, aliases = ['db','container']),
-            state               = dict(default="present", choices = ["present", "absent", "started", "stopped", "status"]),
+            state               = dict(default="present", choices = ["present", "absent", "open", "closed", "read_write", "read_only", "restricted", "status"]),
             save_state          = dict(default=True, type = 'bool'),
             pdb_admin_username  = dict(required=False, default = 'pdb_admin', aliases = ['pdbadmun']),
             pdb_admin_password  = dict(required=False, default = 'pdb_admin', aliases = ['pdbadmpw']),
             datafile_dest       = dict(required=False, aliases = ['dfd']),
             username            = dict(required=False, aliases = ['un']),
             password            = dict(required=False, no_log=True, aliases = ['pw']),
+            mode                = dict(default="normal", choices = ["sysdba", "normal"]),
             service_name        = dict(required=False, aliases = ['sn']),
             hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
             port                = dict(required=False, default = 1521),
@@ -215,6 +257,7 @@ def main():
     datafile_dest       = module.params["datafile_dest"]
     username            = module.params["username"]
     password            = module.params["password"]
+    mode                = module.params["mode"]
     service_name        = module.params["service_name"]
     hostname            = module.params["hostname"]
     port                = module.params["port"]
@@ -242,7 +285,10 @@ def main():
 
     dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
     try:
-        conn = cx_Oracle.connect(username, password, dsn)
+        if mode == 'sysdba':
+            conn = cx_Oracle.connect(username, password, dsn, mode=cx_Oracle.SYSDBA)
+        else:
+            conn = cx_Oracle.connect(username, password, dsn)
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
         msg[0] = 'Could not connect to database: %s, dsn: %s ' % (error.message, dsn)
@@ -251,16 +297,16 @@ def main():
 
 
 
-    if state == 'present':
+    #if state == 'present':
+    if state in ('present','closed', 'open', 'restricted','read_only','read_write'):
         if not check_pdb_exists(cursor, module, msg, name):
             if create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username, pdb_admin_password, datafile_dest, save_state):
-                msg[0] = 'Successfully created pluggable database %s ' % (name)
+                ensure_pdb_state(cursor, module, msg, name, state, newpdb)
                 module.exit_json(msg=msg[0], changed=True)
             else:
                 module.fail_json(msg=msg[0], changed=False)
         else:
-            msg[0] = 'Pluggable database %s already exists' % (name)
-            module.exit_json(msg=msg[0], changed=False)
+            ensure_pdb_state(cursor, module, msg, name, state, newpdb)
 
     elif state == 'absent' :
         if check_pdb_exists(cursor, module, msg, name):
@@ -268,7 +314,7 @@ def main():
                 msg[0] = 'Pluggable database %s successfully removed' % (name)
                 module.exit_json(msg=msg[0], changed=True)
             else:
-                module.exit_json(msg=msg[0], changed=False)
+                module.fail_json(msg=msg[0], changed=False)
         else:
             msg[0] = 'Pluggable database %s doesn\'t exist' % (name)
             module.exit_json(msg=msg[0], changed=False)
@@ -276,11 +322,17 @@ def main():
     elif state == 'status':
         if check_pdb_exists(cursor, module, msg, name):
             check_pdb_status(cursor, module, msg, name)
+            module.exit_json(msg=msg[0], changed=False)
         else:
             msg[0] = 'Pluggable database %s doesn\'t exist' % (name)
             module.exit_json(msg=msg[0], changed=False)
 
+
     module.exit_json(msg="Unhandled exit", changed=False)
+
+
+
+
 
 from ansible.module_utils.basic import *
 if __name__ == '__main__':
