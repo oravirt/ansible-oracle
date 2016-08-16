@@ -83,7 +83,7 @@ options:
             - The listener port to connect to the database if using dbms_service
         required: false
         default: 1521
-        aliases: ['pw']
+
 
 
 notes:
@@ -170,6 +170,8 @@ def create_service(cursor, module, msg, oracle_home, name, database_name, prefer
                 msg[0] = 'Error: %s, command is %s' % (stdout, command)
                 return False
         else:
+            if pdb != None:
+                database_name = pdb
             return True
     else:
 
