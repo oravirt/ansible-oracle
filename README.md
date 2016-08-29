@@ -74,3 +74,11 @@ pre-req: cx_Oracle
  - Creates/deletes/opens/closes the pdb
  - saves the state if you want it to. Default is yes
  - Can place the datafiles in a separate location
+
+
+<b> oracle_sql </b>
+
+pre-req: cx_Oracle
+
+- 2 modes: sql or script
+- Executes arbitrary sql or runs a script
