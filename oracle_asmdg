@@ -1,0 +1,362 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+DOCUMENTATION = '''
+---
+module: oracle_asmdg
+short_description: Manage diskgroups in an Oracle database
+description:
+    - Manage diskgroups in an Oracle database
+version_added: "2.1.0.0"
+options:
+    name:
+        description:
+            - The name of the diskgroup
+        required: true
+        default: None
+        aliases: ['diskgroup','dg']
+    state:
+        description:
+            - The intended state of the diskgroup. 'status' will just show the status of the diskgroup
+        default: present
+        choices: ['present','absent','status']
+    username:
+        description:
+            - The ASM username
+        required: false
+        default: sys
+        aliases: ['un']
+    password:
+        description:
+            - The password for the ASM user
+        required: false
+        default: None
+        aliases: ['pw']
+    service_name:
+        description:
+            - The diskgroup_name to connect to the database if using dbms_diskgroup.
+        required: false
+        default: +ASM
+        aliases: ['sn']
+    hostname:
+        description:
+            - The host of the database if using dbms_diskgroup
+        required: false
+        default: localhost
+        aliases: ['host']
+    port:
+        description:
+            - The listener port to connect to the database if using dbms_diskgroup
+        required: false
+        default: 1521
+    oracle_home:
+        description:
+            - The GI ORACLE_HOME
+        required: false
+        default: None
+        aliases: ['oh']
+
+
+
+notes:
+    - cx_Oracle needs to be installed
+requirements: [ "cx_Oracle" ]
+author: Mikael Sandström, oravirt@gmail.com, @oravirt
+'''
+
+EXAMPLES = '''
+# Create a diskgroup
+oracle_diskgroups: name=diskgroup1 database_name=db1 state=present
+
+# Start a diskgroup
+oracle_diskgroups: name=diskgroup1 database_name=db1 state=started
+
+# Stop a diskgroup
+oracle_diskgroups: name=diskgroup1 database_name=db1 state=stopped
+
+# Remove a diskgroup
+oracle_diskgroups: name=diskgroup1 database_name=db1 state=absent
+
+# Create a diskgroup in a RAC pdb and run it on a subset of nodes/instances
+oracle_diskgroups: name=diskgroup1 database_name=raccdb oh=/u01/app/oracle/12.1.0.2/db1 pdb=mypdb pi=raccdb1 ai=raccdb2,raccdb3 state=present
+
+'''
+import os
+
+try:
+    import cx_Oracle
+except ImportError:
+    cx_oracle_exists = False
+else:
+    cx_oracle_exists = True
+
+
+# Check if the diskgroup exists
+def check_diskgroup_exists(cursor, module, msg, name):
+
+    sql = 'select count(*) from gv$asm_diskgroup where lower (name) = \'%s\'' % (name.lower())
+    result = execute_sql_get(module, msg, cursor, sql)
+    #msg[0] = 'Normal Result is: %s, [0] is: %s, [0][0] is: %s, len is: %s, type is: %s' % (result,result[0],result[0][0],len(result), type(result))
+    #module.exit_json(msg=msg[0])
+    if result[0][0] > 0:
+        return True
+    else:
+        return False
+
+def create_diskgroup(cursor, module, msg, oracle_home, name, disks, redundancy):
+
+
+
+    disklist = "','".join(disks)
+
+    sql = 'create diskgroup %s ' % (name)
+    sql += '%s redundancy ' % (redundancy)
+    sql += 'disk \'%s\' ' % (disklist)
+
+    if execute_sql(module, msg, cursor, sql):
+        if rac:
+            command = '%s/bin/srvctl start diskgroup -g %s' % (oracle_home, name.lower())
+            (rc, stdout, stderr) = module.run_command(command)
+            if rc != 0:
+                msg[0] = 'Error, couldn\'t mount the dg on all nodes. stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
+                return False
+            else:
+                return True
+        else:
+            return True
+    else:
+        return False
+
+
+def remove_diskgroup(cursor, module, msg, oracle_home, name):
+
+
+    mountsql = 'alter diskgroup %s mount' % (name.lower())
+    dropsql = 'drop diskgroup %s' % (name.lower())
+
+    # If in a rac config, we need to unmount the dg on all nodes, then mount
+    if rac:
+        command = '%s/bin/srvctl stop diskgroup -g %s' % (oracle_home, name.lower())
+        (rc, stdout, stderr) = module.run_command(command)
+        if rc != 0:
+            msg[0] = 'Error, couldn\'t unmount the dg. stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
+            return False
+
+        if execute_sql(module, msg, cursor, mountsql):
+            if execute_sql(module, msg, cursor, dropsql):
+                return True
+            else:
+                return False
+        else:
+            return False
+    else:
+        if execute_sql(module, msg, cursor, dropsql):
+            return True
+        else:
+            return False
+
+def ensure_diskgroup_state(cursor, module, msg, name, state, disks):
+
+    disk_sql = 'alter diskgroup %s ' % (name.upper())
+
+    list_current_name = []
+    list_current_path = []
+    list_wanted = [x.upper() for x in disks]
+    list_current = get_current_disks(cursor, module, msg, name)
+
+    for p,n in list_current:
+        list_current_name.append(n)
+        list_current_path.append(p)
+
+    # List of disks to add
+    list_add=set(list_wanted).difference(list_current_path)
+    # List of disks to remove
+    list_remove=set(list_current_path).difference(list_wanted)
+    # Pick out the v$asm_disk.name from the diskgroup
+    remove_disks = [a[1] for a in list_current if a[0] in list_remove ]
+
+    add_disk =  "','".join(list_add)
+    remove_disk=  "','".join(remove_disks)
+    if sorted(list_current_path) == sorted(list_wanted):
+    	msg[0] = "Diskgroup %s is in the intended state" % (name)
+    	module.exit_json(msg=msg[0], changed=False)
+
+    if len(list_add)>= 1:
+    	disk_sql += ' add disk '
+    	disk_sql += "'%s'" % add_disk
+
+    if len(list_remove) >= 1:
+    	disk_sql += ' drop disk '
+    	disk_sql += "'%s'" % remove_disk
+
+    if execute_sql(module, msg, cursor, disk_sql):
+        msg[0] = 'Diskgroup %s has been put in the intended state' % (name)
+        module.exit_json(msg=msg[0], changed=True)
+    else:
+        return False
+
+
+
+def get_current_disks(cursor, module, msg, name):
+
+
+    sql = 'select upper(d.path),upper(d.name) from v$asm_disk d, v$asm_diskgroup dg '
+    sql += 'where dg.group_number = d.group_number '
+    sql += 'and upper(dg.name) = \'%s\'' % (name.upper())
+
+    result = execute_sql_get(module, msg, cursor, sql)
+    return result
+
+def get_current_properties(cursor, module, msg, name):
+
+
+    sql = 'select lower(a.name),lower(a.value) from v$asm_attribute a, v$asm_diskgroup dg '
+    sql += 'where dg.group_number = d.group_number '
+    sql += 'and upper(dg.name) = \'%s\'' % (name.upper())
+
+    result = execute_sql_get(module, msg, cursor, sql)
+    return result
+
+def execute_sql_get(module, msg, cursor, sql):
+
+    #module.exit_json(msg="In execute_sql_get", changed=False)
+    try:
+        cursor.execute(sql)
+        result = (cursor.fetchall())
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
+        module.fail_json(msg=msg[0], changed=False)
+        return False
+
+    return result
+
+
+def execute_sql(module, msg, cursor, sql):
+
+    try:
+        cursor.execute(sql)
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
+        module.fail_json(msg=msg[0], changed=False)
+        return False
+    return True
+
+
+
+def main():
+
+    msg = ['']
+    cursor = None
+    mode = 'sysasm'
+    global rac
+
+    module = AnsibleModule(
+        argument_spec = dict(
+            name                = dict(required=True, aliases = ['diskgroup','dg']),
+            disks               = dict(required=False, type='list'),
+            redundancy          = dict(default="external", choices = ["external","normal","high"]),
+            state               = dict(default="present", choices = ["present", "absent", "status"]),
+            username            = dict(required=False, aliases = ['un']),
+            password            = dict(required=False, no_log=True, aliases = ['pw']),
+            hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
+            port                = dict(required=False, default = 1521),
+            service_name        = dict(required=False, default = '+ASM', aliases = ['sn']),
+            oracle_home         = dict(required=False, aliases = ['oh']),
+
+
+
+        ),
+
+    )
+
+    name                = module.params["name"]
+    disks               = module.params["disks"]
+    redundancy          = module.params["redundancy"]
+    state               = module.params["state"]
+    username            = module.params["username"]
+    password            = module.params["password"]
+    hostname            = module.params["hostname"]
+    port                = module.params["port"]
+    service_name        = module.params["service_name"]
+    oracle_home         = module.params["oracle_home"]
+
+
+    if not cx_oracle_exists:
+        msg[0] = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
+        module.fail_json(msg=msg[0])
+
+    else:
+            #if not(diskgroup_name) or not(username) or not(password) or not(hostname) or not(port):
+        if not(username) or not(password):
+                #msg[0] = "Missing one or more of these for cx_Oracle: diskgroup_name,username,password,host,port"
+            msg[0] = "Missing username or password for cx_Oracle"
+            module.fail_json(msg=msg[0], changed=False)
+
+    dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+    try:
+        if mode == 'sysasm':
+            conn = cx_Oracle.connect(username, password, dsn, mode=cx_Oracle.SYSASM)
+        else:
+            conn = cx_Oracle.connect(username, password, dsn)
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Could not connect to ASM: %s, dsn: %s ' % (error.message, dsn)
+        module.fail_json(msg=msg[0], changed=False)
+    cursor = conn.cursor()
+
+    checkifracsql = 'select count(*) from gv$instance'
+    checkifrac = execute_sql_get(module, msg, cursor, checkifracsql)
+    if checkifrac[0][0] > 1:
+        rac = True
+        if oracle_home is not None:
+            os.environ['ORACLE_HOME'] = oracle_home
+        elif 'ORACLE_HOME' in os.environ:
+            oracle_home = os.environ['ORACLE_HOME']
+        else:
+            msg[0] = 'ORACLE_HOME variable not set. Please set it and re-run the command'
+            module.fail_json(msg=msg[0], changed=False)
+    else:
+        rac = False
+
+
+    if state == 'present':
+        if not check_diskgroup_exists(cursor, module, msg, name):
+             if create_diskgroup(cursor, module, msg, oracle_home, name, disks, redundancy):
+                 msg[0] = 'Successfully created diskgroup %s ' % (name)
+                 module.exit_json(msg=msg[0], changed=True)
+             else:
+                 module.fail_json(msg=msg[0], changed=False)
+        else:
+            ensure_diskgroup_state(cursor, module, msg, name, state, disks)
+
+
+    elif state == 'absent' :
+        if check_diskgroup_exists(cursor, module, msg, name):
+            if remove_diskgroup(cursor, module, msg, oracle_home, name):
+                msg[0] = 'Diskgroup %s successfully removed' % (name)
+                module.exit_json(msg=msg[0], changed=True)
+            else:
+                module.exit_json(msg=msg[0], changed=False)
+        else:
+            msg[0] = 'Diskgroup %s doesn\'t exist' % (name)
+            module.exit_json(msg=msg[0], changed=False)
+
+    elif state == 'status' :
+        if check_diskgroup_exists(cursor, module, msg, name):
+            result = get_current_disks(cursor, module, msg, name)
+                #msg[0] = 'Diskgroup %s successfully removed' % (name)
+            module.exit_json(msg=result, changed=False)
+        else:
+            module.exit_json(msg=msg[0], changed=False)
+
+
+    module.exit_json(msg="Unhandled exit", changed=False)
+
+
+
+
+from ansible.module_utils.basic import *
+if __name__ == '__main__':
+    main()

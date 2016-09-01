@@ -82,3 +82,21 @@ pre-req: cx_Oracle
 
 - 2 modes: sql or script
 - Executes arbitrary sql or runs a script
+
+
+<b> oracle_asmdg </b>
+
+pre-req: cx_Oracle
+
+- Manages ASM diskgroup state. (absent/present)
+- Takes a list of disks and makes sure those disks are part of the DG.
+If the disk is removed from the disk it will be removed from the DG.
+i.e:
+- disks:
+   - ORCL:DISK1
+   - ORCL:DISK3
+   - ORCL:DISK3
+ 
+<b> Note: </b>
+- Supports redundancy levels, but does not yet handle specifying failuregroups
+- Does not yet handle attributes
