@@ -2,7 +2,7 @@
 
   - name: Delete database(s)
     shell: "{{ oracle_home_db }}/bin/dbca -deleteDatabase -sourceDB {{ item.oracle_db_name }} -sysDBAUserName sys -sysDBAPassword {{ item.oracle_db_passwd }} -silent"
-    with_items: oracle_databases
+    with_items: "{{oracle_databases}}"
     when: master_node and "{{ item.state }}"|upper == 'ABSENT'
     tags:
       - oradbdelete
@@ -12,4 +12,3 @@
     with_items: oradbdelete.results
     tags:
      - oradbdelete
-

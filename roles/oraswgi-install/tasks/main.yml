@@ -2,7 +2,7 @@
 
   - name: Check if GI is already installed
     shell: grep "{{ oracle_home_gi }}" "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" |wc -l
-    tags: 
+    tags:
     - checkifgiinstall
     register: checkgiinstall
 
@@ -14,22 +14,22 @@
 
   - name: Add new dotprofile (GI)
     template: src=dotprofile-gi.j2 dest={{ grid_user_home }}/{{ oracle_profile_name_gi }} owner={{ grid_install_user }} group={{ oracle_group }} mode=755 backup=yes
-    tags: 
+    tags:
     - dotprofilegi
 
   - name: Create stage directory (base)
     file: dest={{ oracle_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
       - directories
- 
+
   - name: Create stage directory (version specific)
     file: dest={{ oracle_stage }}/{{ item.version }} mode=775 owner="{{ oracle_user }}" group={{ oracle_group }} state=directory
     sudo: yes
-    with_items: oracle_sw_image_gi
-    when:  oracle_install_version_gi  ==  item.version 
+    with_items: "{{oracle_sw_image_gi}}"
+    when:  oracle_install_version_gi  ==  item.version
     tags:
       - directories
-  
+
   - name: Create rsp stage directory
     file: dest={{ oracle_rsp_stage }} mode=775 owner="{{ oracle_user }}" group={{ oracle_group }} state=directory
     tags:
@@ -39,12 +39,12 @@
     file: dest={{ oracle_base }}/cfgtoollogs owner={{ oracle_user }} group={{ oracle_group }} mode=775 state=directory
     tags:
       - directories
-  
+
   - name: Create ORACLE_BASE directory
     file: dest={{ oracle_base }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
       - directories
-  
+
   - name: Create admin directory
     file: dest={{ oracle_base }}/admin mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
@@ -54,17 +54,17 @@
     file: dest={{ oracle_base }}/cfgtoollogs mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags:
       - directories
-  
+
   - name: Create ORACLE_HOME directory (GI)
     file: dest={{ oracle_home_gi }} owner="{{ grid_install_user }}" group={{ oracle_group }} state=directory mode=775
     sudo: yes
     tags:
       - directories
-    when: checkgiinstall.stdout != "1" 
+    when: checkgiinstall.stdout != "1"
 
   - name: Copy oracle installfiles to server (GI) (web)
     get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
-    with_items:  oracle_sw_image_gi 
+    with_items: "{{oracle_sw_image_gi}}"
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
     tags:
@@ -73,7 +73,7 @@
 
   - name: Copy oracle installfiles to server (GI) (local)
     copy: src={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
-    with_items:  oracle_sw_image_gi 
+    with_items: "{{oracle_sw_image_gi}}"
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
     tags:
@@ -81,8 +81,8 @@
     when: checkgiinstall.stdout != "1" and is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool
 
   - name: Extract files to stage-area (GI)
-    unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no 
-    with_items: oracle_sw_image_gi
+    unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no
+    with_items: "{{oracle_sw_image_gi}}"
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
     tags:
@@ -91,7 +91,7 @@
 
   - name: Extract files to stage-area (GI) (from remote location)
     unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no
-    with_items: oracle_sw_image_gi
+    with_items: "{{oracle_sw_image_gi}}"
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
     tags:
@@ -103,14 +103,14 @@
     when: configure_cluster
     tags: cvuqdisk
     ignore_errors: true
-    
+
   - name: Setup response file for install (GI)
     template: src=grid-install.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner="{{ grid_install_user }}" group={{ oracle_group }} mode=775 backup=yes
-    with_items: asm_diskgroups
+    with_items: "{{asm_diskgroups}}"
     tags:
       - responsefilegi
     when: master_node and checkgiinstall.stdout != "1" and item.diskgroup == oracle_asm_init_dg
-    
+
   - name: Install Grid Infrastructure
     shell: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -ignoreSysPrereqs -showProgress -silent"
     sudo: yes
@@ -144,12 +144,12 @@
   - name: Run root script after installation (Other Nodes)
     shell: "sleep {{ item.0 * 60 }}; {{ oracle_home_gi }}/root.sh"
     sudo: yes
-    with_indexed_items: groups[hostgroup]
+    with_indexed_items: "{{groups[hostgroup]}}"
     tags:
       - runroot
     when: not master_node and checkgiinstall.stdout != "1" and inventory_hostname == item.1
     register: rootother
-  
+
   - debug: var=rootother.stdout_lines
     when: not master_node and checkgiinstall.stdout != "1"
 
@@ -175,7 +175,7 @@
      - crsctl
     register: crsctl
     when: master_node and checkgiinstall.stdout != "1"
-  
+
   - debug: var=crsctl.stdout_lines
     tags:
      - crsctl
@@ -209,7 +209,7 @@
     tags:
      - opatchls
     when: checkgiinstall.stdout != "1"
-    
+
   - name: Check opatch lsinventory (GI)
     debug: var=opatchls.stdout_lines
     tags:

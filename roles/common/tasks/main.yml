@@ -20,7 +20,7 @@
 
   - name: Install EPEL Repo
     yum: name={{ epel_rpm }} state=installed
-    when: configure_epel_repo 
+    when: configure_epel_repo
     tags:
      - epelrepo
 
@@ -32,16 +32,16 @@
 
   - name: Install common packages
     yum: name={{ item }} state=installed
-    with_items: common_packages 
+    with_items: "{{common_packages }}"
     when: install_os_packages
     tags:
       - commonpackages
-   
+
   - name: Start and enable NTP
     service: name=ntpd  state=started  enabled=yes
     when: configure_ntp
 
   - name: Add motd
-    template: src=motd.j2 dest=/etc/motd 
+    template: src=motd.j2 dest=/etc/motd
     tags: motd
     when: configure_motd

@@ -2,7 +2,7 @@
 
   - name: Check if database is already created
     shell: grep {{ item.oracle_db_name }}:{{ oracle_home_db }} /etc/oratab |wc -l
-    with_items: oracle_databases
+    with_items: "{{oracle_databases}}"
     when: item.oracle_db_name is defined
     tags:
     - checkifdbexists
@@ -18,8 +18,8 @@
     template: src=dbca-create-db.rsp.{{ item.0.oracle_version_db }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}  owner={{ oracle_user }} group={{ oracle_group }} mode=644 backup=no
     #debug: var=msg
     with_together:
-       - oracle_databases
-       - checkdbexist.results
+       - "{{oracle_databases}}"
+       - "{{checkdbexist.results}}"
     when: master_node and item.1.stdout != "1"
     tags:
     - dbcaresponse
@@ -31,8 +31,8 @@
   - name: Create database(s)
     shell: "time {{ oracle_home_db }}/bin/dbca -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent -redoLogFileSize {{ item.0.redolog_size_in_mb }} "
     with_together:
-       - oracle_databases
-       - checkdbexist.results
+       - "{{oracle_databases}}"
+       - "{{checkdbexist.results}}"
     sudo: yes
     sudo_user: "{{ oracle_user }}"
     when: master_node and item.1.stdout != "1" and "{{ item.0.state }}"|upper == "PRESENT"
@@ -41,7 +41,7 @@
     register: oradbcreate
 
   - debug: var=oradbcreate.stdout_lines
-    with_items: oradbcreate.results
+    with_items: "{{oradbcreate.results}}"
     tags:
      - oradbcreate
     when: oradbcreate.changed
@@ -68,7 +68,7 @@
 #     - srvctlconfig
   - name: Add dotprofile (1)
     shell:  ps -ef | grep "ora_pmon_{{ item.oracle_db_name }}" |grep -v grep | sed 's/^.*pmon_//g'
-    with_items: oracle_databases
+    with_items: "{{oracle_databases}}"
     register: dbs
     tags:
       - dotprofile_db
@@ -77,15 +77,15 @@
   - name: Add dotprofile (2)
     template: src=dotprofile-db.j2 dest={{ oracle_user_home }}/.profile_{{ item.0.oracle_db_name }} owner={{ oracle_user }} group={{ oracle_group }} mode=775 backup=yes
     with_together:
-    - oracle_databases
-    - dbs.results
+    - "{{oracle_databases}}"
+    - "{{dbs.results}}"
     tags: dotprofile_db
 
   - name: Update oratab
     lineinfile: dest=/etc/oratab line="{{ item.1.stdout }}:{{ oracle_home_db }}:N" state=present
     with_together:
-       - oracle_databases
-       - dbs.results
+    - "{{oracle_databases}}"
+    - "{{dbs.results}}"
     when: item.0.oracle_db_type != "SI"
     tags: update_oratab
 

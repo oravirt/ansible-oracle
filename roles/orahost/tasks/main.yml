@@ -10,13 +10,13 @@
 
   - name: Install packages required by Oracle
     yum: name={{ item }} state=installed
-    with_items: oracle_packages
+    with_items: "{{oracle_packages}}"
     when: install_os_packages
     tags: os_packages
 
   - name: Install packages required by Oracle for ASMlib
     yum: name={{ item }} state=installed
-    with_items: oracle_asm_packages
+    with_items: "{{oracle_asm_packages}}"
     when: install_os_packages and device_persistence == 'asmlib'
     tags: os_packages
 
@@ -55,33 +55,33 @@
 
   - name: User | Add group(s)
     group: name={{ item.group }} gid={{ item.gid }} state=present
-    with_items: oracle_groups
+    with_items: "{{oracle_groups}}"
     tags:
      - group
 
   - name: User | Add Oracle user
     user: name={{ item.username }}  group={{ item.primgroup }} groups={{ item.othergroups }} uid={{ item.uid }} generate_ssh_key=yes append=yes state=present password={{ item.passwd }}
-    with_items: oracle_users
+    with_items: "{{oracle_users}}"
     tags:
      - user
 
   - name: User | Add Grid user
     user: name={{ item.username }}  group={{ item.primgroup }} groups={{ item.othergroups }} uid={{ item.uid }} generate_ssh_key=yes append=yes state=present password={{ item.passwd }}
     when: role_separation
-    with_items: grid_users
+    with_items: "{{grid_users}}"
     tags:
      - user
 
   - name: User | Add Oracle user to sudoers
     template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0600
-    with_items: oracle_users
+    with_items: "{{oracle_users}}"
     when: configure_oracle_sudo
     tags:
      - sudoadd
 
   - name: User | Add Grid user to sudoers
     template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0600
-    with_items: grid_users
+    with_items: "{{grid_users}}"
     when: role_separation and configure_oracle_sudo
     tags:
      - sudoadd
@@ -98,17 +98,17 @@
     copy: src={{ item[1] }} dest=/home/{{ item[0].username }}/.ssh  owner={{ item[0].username }} group={{ item[0].primgroup }} force=yes mode=600
     when: configure_ssh and configure_cluster
     with_nested:
-        - oracle_users
-        - ssh_keys
+        - "{{oracle_users}}"
+        - "{{ssh_keys}}"
     tags:
-     - sshkeys
+       - sshkeys
 
   - name: ssh-keys | Add ssh-keys & authorized_keys to grid user
     copy: src={{ item[1] }} dest=/home/{{ item[0].username }}/.ssh  owner={{ item[0].username }} group={{ item[0].primgroup }} force=yes mode=600
     when: configure_ssh and configure_cluster and role_separation
     with_nested:
-        - grid_users
-        - ssh_keys
+        - "{{grid_users}}"
+        - "{{ssh_keys}}"
     tags:
      - sshkeys
 
@@ -138,14 +138,14 @@
 
   - name: ssh-keys | Copy known_hosts to oracle user
     copy: src={{keyfile}} dest=/home/{{ item.username }}/.ssh/known_hosts owner={{ item.username }} group={{ item.primgroup }}
-    with_items: oracle_users
+    with_items: "{{oracle_users}}"
     when: configure_ssh and configure_cluster
     tags:
      - sshkeys
 
   - name: ssh-keys | Copy known_hosts to grid user
     copy: src={{keyfile}} dest=/home/{{ item.username }}/.ssh/known_hosts owner={{ item.username }} group={{ item.primgroup }}
-    with_items: grid_users
+    with_items: "{{grid_users}}"
     when: configure_ssh and configure_cluster and role_separation
     tags:
      - sshkeys
@@ -164,7 +164,7 @@
   - name: filesystem | Create directories
     file: path={{ item.1.mntp }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=775
     with_subelements:
-        - host_fs_layout
+        - "{{host_fs_layout}}"
         - filesystem
     tags: hostfs
 
@@ -173,21 +173,21 @@
     args:
        creates: "{{ item.1.pvname }}"
     with_subelements:
-        - host_fs_layout
+        - "{{host_fs_layout}}"
         - disk
     when: configure_host_disks
     tags: hostfs
 
   - name: filesystem | Create vg
     lvg: vg={{ item.vgname }} pvs={{ host_fs_layout_vgdisks }} state={{ item.state }}
-    with_items: host_fs_layout
+    with_items: "{{host_fs_layout}}"
     when: configure_host_disks
     tags: hostfs
 
   - name: filesystem | create lv
     lvol: vg={{ item.0.vgname }} lv={{ item.1.lvname }} size={{ item.1.lvsize }} state=present shrink=no
     with_subelements:
-        - host_fs_layout
+        - "{{host_fs_layout}}"
         - filesystem
     when: configure_host_disks
     tags: hostfs
@@ -195,7 +195,7 @@
   - name: filesystem | create fs
     filesystem: fstype={{ item.1.fstype }} dev=/dev/{{ item.0.vgname }}/{{ item.1.lvname }}
     with_subelements:
-        - host_fs_layout
+        - "{{host_fs_layout}}"
         - filesystem
     when: configure_host_disks
     tags: hostfs
@@ -203,7 +203,7 @@
   - name: filesytem | mount dir
     mount: name={{ item.1.mntp }} src=/dev/{{ item.0.vgname }}/{{ item.1.lvname }} dump=1 passno=2 fstype={{ item.1.fstype }} state=mounted
     with_subelements:
-        - host_fs_layout
+        - "{{host_fs_layout}}"
         - filesystem
     when: configure_host_disks
     tags: hostfs
@@ -211,18 +211,18 @@
   - name: filesystem | Change permission on directories
     file: path={{ item.1.mntp }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=775
     with_subelements:
-        - host_fs_layout
+        - "{{host_fs_layout}}"
         - filesystem
     tags: hostfs
 
   - name: Oracle-recommended kernel settings
     sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes ignoreerrors=yes
-    with_items: oracle_sysctl
+    with_items: "{{oracle_sysctl}}"
     tags: sysctl
 
   - name: Oracle hugepages
     sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes ignoreerrors=yes
-    with_items: oracle_hugepages
+    with_items: "{{oracle_hugepages}}"
     tags: sysctl,hugepages
 
 

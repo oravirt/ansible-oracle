@@ -1,21 +1,21 @@
 # Partition & ASM-Label Shared disks
 ---
-  
+
   - name: ASMlib | Create device to label mappings for asm
     template: src=asm-label-device-mapping.txt.j2 dest={{ oracle_rsp_stage }}/asm-label-device-mapping-{{ item.diskgroup }}.txt
-    with_items: asm_diskgroups
+    with_items: "{{asm_diskgroups}}"
     when: master_node
     tags: asmlib
 
-  - name: ASM-storage | Build script to create partitions 
+  - name: ASM-storage | Build script to create partitions
     template: src=part-device.sh.j2 dest={{ oracle_rsp_stage }}/part-device-{{ item.diskgroup }}.sh mode=775
-    with_items: asm_diskgroups
-    when: master_node 
+    with_items: "{{asm_diskgroups}}"
+    when: master_node
     tags: asmlib
 
   - name: ASM-storage | Run script to create partitions
     shell: sh {{ oracle_rsp_stage }}/part-device-{{ item.diskgroup }}.sh
-    with_items: asm_diskgroups
+    with_items: "{{asm_diskgroups}}"
     when: master_node
     tags: asmlib
 
@@ -24,13 +24,13 @@
 
   - name: ASMlib | Build script to create asmlib-labels
     template: src=label-asm-disks.sh.j2 dest={{ oracle_rsp_stage }}/label-asm-disks-{{ item.diskgroup }}.sh mode=775
-    with_items: asm_diskgroups
-    when: master_node and device_persistence == 'asmlib' 
+    with_items: "{{asm_diskgroups}}"
+    when: master_node and device_persistence == 'asmlib'
     tags: asmlib
 
   - name: ASMlib | Run script to create asmlib-labels
     shell: sh {{ oracle_rsp_stage }}/label-asm-disks-{{ item.diskgroup }}.sh
-    with_items: asm_diskgroups
+    with_items: "{{asm_diskgroups}}"
     when: master_node and device_persistence == 'asmlib'
     tags: asmlib
 
@@ -52,7 +52,7 @@
 
   - name: udev | Create device to label mappings for udev
     template: src=udev-label-device-mapping.txt.j2 dest={{ oracle_stage }}/udev/udev-{{ item.diskgroup }}
-    with_items: asm_diskgroups
+    with_items: "{{asm_diskgroups}}"
     when: device_persistence == 'udev'
     tags: udev
 
@@ -68,22 +68,21 @@
 
   - name: udev | Run script to create udev rules
     shell: "{{ oracle_rsp_stage }}/setup-udev-rules.sh"
-    when: device_persistence == 'udev' 
+    when: device_persistence == 'udev'
     tags: udev
 
   - name: udev | Reload rules
     shell: partprobe; start_udev
-    when: device_persistence == 'udev' 
+    when: device_persistence == 'udev'
     tags: udev
 
   - name: udev | List device aliases (register)
     shell: ls -l {{ oracle_asm_disk_string }}
-    when: device_persistence == 'udev' 
+    when: device_persistence == 'udev'
     tags: udev
     register: lsdevice
- 
+
   - name: List device aliases
     debug: var=lsdevice.stdout_lines
-    when: device_persistence == 'udev' 
+    when: device_persistence == 'udev'
     tags: udev
-   
