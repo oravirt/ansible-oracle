@@ -213,3 +213,32 @@
     when: install_from_nfs|bool
     tags:
       - nfsunmountdb
+
+  - name: Check if systemd or init.d is used
+    shell: ps -e|grep " 1 ?"|cut -d " " -f15
+    tags:
+    - checkinitdaemons
+    register: checkinitdaemons
+    when: autostartup_service
+
+  - name: Configure DB instances auto-startup service (init.d)
+    template: src=dbora.j2 dest=/etc/init.d/dbora owner=root mode=750
+    become: true
+    with_items: "{{oracle_databases}}"
+    when: autostartup_service and checkinitdaemons.stdout == "init"
+
+  - name: Register dbora service (init.d)
+    command: "chkconfig --add dbora"
+    become: true
+    when: autostartup_service and checkinitdaemons.stdout == "init"
+
+  # Prepare for Linux 7
+  #- name: Configure oracle-rdbms auto-startup service (systemd.d)
+    #template: src=oracle-rdbms-service.j2 dest=/etc/systemd/system/oracle-rdbms.service owner=root
+    #become: true
+    #with_items: "{{oracle_databases}}"
+    #when: autostartup_service  and checkinitdaemons.stdout == "systemd"
+
+  #- name: Register oracle-rdbms service (system.d)
+    #systemd: name=oracle-rdbms daemon_reload=yes enabled=yes
+    #when: autostartup_service and checkinitdaemons.stdout == "systemd"
