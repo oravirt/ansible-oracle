@@ -8,10 +8,10 @@
 
   oracle_user: oracle                        # User that will own the Oracle Installations.
   grid_user: grid
-  grid_install_user: "{% if role_separation==true %}{{ grid_user }} {% else %}{{ oracle_user }}{% endif %}" 
+  grid_install_user: "{% if role_separation==true %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
   grid_user_home: "/home/{{ grid_install_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-  oracle_group: oinstall                          # Primary group for oracle_user. 
+  oracle_group: oinstall                          # Primary group for oracle_user.
 
   oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
   oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
@@ -19,7 +19,6 @@
   install_from_nfs: false
   oracle_sw_copy: "{% if install_from_nfs==True %}False{% else %}True{% endif %}"
   oracle_sw_unpack: "{% if install_from_nfs==True %}False{% else %}True{% endif %}"
-  install_from_nfs: false
   nfs_server_sw: nfsserver
   nfs_server_sw_path: /path/to/orasw
 
@@ -37,19 +36,18 @@
   oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
 
 
-  oracle_sw_image_gi_psu:                                              # Files containing the installation media for Grid Infrastructure 
+  oracle_sw_image_gi_psu:                                              # Files containing the installation media for Grid Infrastructure
        #- { filename: p19392646_121020_Linux-x86-64.zip, patchid: 19392646, version: 12.1.0.2, patchversion: 12.1.0.2.1, description: GI-PSU-Oct-2014 }
        #- { filename: p20485724_121020_Linux-x86-64.zip, patchid: 20485724, version: 12.1.0.2, patchversion: 12.1.0.2.3, description: GI-PSU-Apr-2015 }
-       - { filename: p21523234_121020_Linux-x86-64.zip, patchid: 21523234, version: 12.1.0.2, patchversion: 12.1.0.2.5, description: GI-PSU-Oct-2015 }
+       #- { filename: p21523234_121020_Linux-x86-64.zip, patchid: 21523234, version: 12.1.0.2, patchversion: 12.1.0.2.5, description: GI-PSU-Oct-2015 }
+       - { filename: p24412235_121020_Linux-x86-64.zip, patchid: 24412235, version: 12.1.0.2, patchversion: 12.1.0.2.161018, description: GI-PSU-Oct-2016 }
        #- { filename: p19380115_112040_Linux-x86-64.zip, patchid: 19380115, version: 11.2.0.4, patchversion: 11.2.0.4.4, description: GI-PSU-Oct-2014 }
        #- { filename: p20485808_112040_Linux-x86-64.zip, patchid: 20485808, version: 11.2.0.4, patchversion: 11.2.0.4.6, description: GI-PSU-Apr-2015 }
        - { filename: p21523375_112040_Linux-x86-64.zip, patchid: 21523375, version: 11.2.0.4, patchversion: 11.2.0.4.8, description: GI-PSU-Oct-2015 }
-       
 
 
   oracle_opatch_patch:
-       - { filename: p6880880_121010_Linux-x86-64.zip, version: 12.1.0.2 }
+       - { filename: p6880880_122010_Linux-x86-64.zip, version: 12.1.0.2 }
        - { filename: p6880880_121010_Linux-x86-64.zip, version: 12.1.0.1 }
        - { filename: p6880880_112000_Linux-x86-64.zip, version: 11.2.0.4 }
        - { filename: p6880880_112000_Linux-x86-64.zip, version: 11.2.0.3 }
-
