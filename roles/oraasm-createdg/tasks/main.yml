@@ -1,14 +1,14 @@
---- 
+---
 
   - name: ASMCA | Create script to build asm-diskgroups
     template: src=asmca-createdg.sh.j2 dest="{{ oracle_rsp_stage }}/asmca-createdg-{{ item.diskgroup }}.sh"  owner="{{ grid_install_user }}" group={{ oracle_group }} mode=744 backup=yes
-    with_items: asm_diskgroups
+    with_items: "{{asm_diskgroups}}"
     when: master_node and item.diskgroup != oracle_asm_init_dg
     tags: asmcaa
 
   - name: ASMCA | Create ASM diskgroups
     shell: "{{ oracle_rsp_stage }}/asmca-createdg-{{ item.diskgroup }}.sh"
-    with_items: asm_diskgroups
+    with_items: "{{asm_diskgroups}}"
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
     when: master_node and item.diskgroup != oracle_asm_init_dg
@@ -23,24 +23,24 @@
 
   - name: ASMCA | List ASM diskgroups (11.2)
     shell: "{{ oracle_home_gi }}/bin/srvctl status diskgroup -g {{ item.diskgroup }}"
-    with_items: asm_diskgroups
+    with_items: "{{asm_diskgroups}}"
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
-    when: master_node and '11.2' in oracle_install_version_gi 
+    when: master_node and '11.2' in oracle_install_version_gi
     tags: srvctlasm
     register: srvctlasm
 
   - name: ASMCA | List ASM diskgroups (12.1)
     shell: "{{ oracle_home_gi }}/bin/srvctl status diskgroup -diskgroup {{ item.diskgroup }}"
-    with_items: asm_diskgroups
+    with_items: "{{asm_diskgroups}}"
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
-    when: master_node and '12.1' in oracle_install_version_gi 
+    when: master_node and '12.1' in oracle_install_version_gi
     tags: srvctlasm
     register: srvctlasm
 
 
   - name: list diskgroups
     debug: var=srvctlasm.stdout_lines
-    with_items: srvctlasm.results
+    with_items: "{{srvctlasm.results}}"
     tags: srvctlasm
