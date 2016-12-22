@@ -375,14 +375,11 @@ DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Default value : $ORACLE_BASE/oradata
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-{% if item.0.storage_type|upper == 'FS' %}
+
 {% if item.0.datafile_dest is defined %}
 DATAFILEDESTINATION={{ item.0.datafile_dest }}
 {% else %}
-DATAFILEDESTINATION={{ oracle_dbf_dir_fs }}
-{% endif %}
-{% else %}
-#DATAFILEDESTINATION=
+DATAFILEDESTINATION={{ datafile_dest }}
 {% endif %}
 #-----------------------------------------------------------------------------
 # Name          : RECOVERYAREADESTINATION
@@ -392,15 +389,13 @@ DATAFILEDESTINATION={{ oracle_dbf_dir_fs }}
 # Default value : $ORACLE_BASE/flash_recovery_area
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-{% if item.0.storage_type|upper == 'FS' %}
+
 {% if item.0.recoveryfile_dest is defined %}
 RECOVERYAREADESTINATION={{ item.0.recoveryfile_dest }}
 {% else %}
-RECOVERYAREADESTINATION={{ oracle_reco_dir_fs }}
+RECOVERYAREADESTINATION={{ recoveryfile_dest }}
 {% endif %}
-{% else %}
-#RECOVERYAREADESTINATION=
-{% endif %}
+
 
 #-----------------------------------------------------------------------------
 # Name          : STORAGETYPE
@@ -419,15 +414,13 @@ STORAGETYPE="{{ item.0.storage_type }}"
 # Default value : DATA
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-{% if item.0.storage_type|upper == 'ASM' %}
+
 {% if item.0.datafile_dest is defined %}
 DISKGROUPNAME={{ item.0.datafile_dest }}
 {% else %}
-DISKGROUPNAME={{ oracle_dbf_dir_asm }}
+DISKGROUPNAME={{ datafile_dest }}
 {% endif %}
-{% else %}
-#DISKGROUPNAME=
-{% endif %}
+
 
 #-----------------------------------------------------------------------------
 # Name          : ASMSNMP_PASSWORD
@@ -445,14 +438,11 @@ ASMSNMP_PASSWORD="{{ item.0.oracle_db_passwd }}"
 # Default value : RECOVERY
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-{% if item.0.storage_type|upper == 'ASM' %}
+
 {% if item.0.recoveryfile_dest is defined %}
 RECOVERYGROUPNAME={{ item.0.recoveryfile_dest }}
 {% else %}
-RECOVERYGROUPNAME={{ oracle_reco_dir_asm }}
-{% endif %}
-{% else %}
-#RECOVERYGROUPNAME=
+RECOVERYGROUPNAME={{ recoveryfile_dest }}
 {% endif %}
 
 #-----------------------------------------------------------------------------
