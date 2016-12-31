@@ -1,7 +1,12 @@
 # Lab playbook - sets up the host specific shit
 ---
-  epel_rpm: "http://download.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm"
+
+  epel_rpm: "{% if ansible_distribution_major_version|int==6%}{{ epel6_rpm }}{%elif ansible_distribution_major_version|int==7 %}{{ epel7_rpm }}{% else %}None{% endif %}"
+  epel7_rpm: http://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-8.noarch.rpm
+  epel6_rpm: http://download.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
+  ol_repo_file: "{% if ansible_distribution_major_version|int==6%}{{ ol6_repo_file }}{%elif ansible_distribution_major_version|int==7 %}{{ ol7_repo_file }}{% else %}None{% endif %}"
   ol6_repo_file: public-yum-ol6.repo
+  ol7_repo_file: public-yum-ol7.repo
   repo_dir: /etc/yum.repos.d/
 #  default_user: ansible
   install_os_packages: true
@@ -9,8 +14,8 @@
   configure_public_yum_repo: true
   configure_motd: true
   configure_ntp: true
-
-  common_packages:
+  common_packages: "{% if ansible_distribution_major_version|int==6%}{{ common_packages_el6 }}{%elif ansible_distribution_major_version|int==7 %}{{ common_packages_el7 }}{% else %}None{% endif %}"
+  common_packages_el6:
       - screen
       - facter
       - procps
@@ -25,7 +30,6 @@
       - unzip
       - openssh-clients
       - compat-libcap1
-      - twm
       - collectl
       - rlwrap
       - tigervnc-server
@@ -36,6 +40,34 @@
       - xfsprogs
       - btrfs-progs
       - tmux
+      - python-devel
+      - python-pip
+      - libselinux-python
+      - twm
+  common_packages_el7:
+      - screen
+      - facter
+      - procps
+      - module-init-tools
+      - ethtool
+      - bc
+      - nc
+      - bind-utils
+      - nfs-utils
+      - make
+      - sysstat
+      - unzip
+      - openssh-clients
+      - compat-libcap1
+      - collectl
+      - rlwrap
+      - tigervnc-server
+      - ntp
+      - expect
+      - git
+      - lvm2
+      - xfsprogs
+      - btrfs-progs
       - python-devel
       - python-pip
       - libselinux-python

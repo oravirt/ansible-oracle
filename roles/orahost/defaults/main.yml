@@ -23,6 +23,7 @@
   grid_users:
    - { username: grid, uid: 54320, primgroup: oinstall, othergroups: "asmadmin,asmdba,asmoper,dba", passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0" }
 
+  firewall_service: "{% if ansible_distribution_major_version|int==6%}iptables{%elif ansible_distribution_major_version|int==7 %}firewalld{% else %}0{% endif %}"
   role_separation: false
   oracle_user: oracle                        # User that will own the Oracle Installations.
   grid_user: grid
@@ -44,9 +45,12 @@
    - /tmp/authorized_keys
   keyfile: /tmp/known_hosts
 
-  epel_rpm: "http://download.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm"
-  asmlib_rpm: "http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.4-1.el6.x86_64.rpm"
-  ol6_repo_file: public-yum-ol6.repo
+
+  #epel_rpm: "http://download.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm"
+  asmlib_rpm: "{% if ansible_distribution_major_version|int==6%}{{asmlib_rpm_el6}}{%elif ansible_distribution_major_version|int==7 %}{{asmlib_rpm_el7}}{% else %}None{% endif %}"
+  asmlib_rpm_el6: "http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.4-1.el6.x86_64.rpm"
+  asmlib_rpm_el7: "http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.12-1.el7.x86_64.rpm"
+  #ol6_repo_file: public-yum-ol6.repo
   repo_dir: /etc/yum.repos.d/
 
   disable_numa_boot: true                    # (true/false) Sets numa=off in grub.conf
@@ -62,7 +66,7 @@
   device_persistence: udev
   install_os_packages: true
   disable_selinux: true
-  disable_iptables: true
+  disable_firewall: true
 
   configure_hugepages: true
   configure_hugepages_by: percentage          # percentage/memory
@@ -139,7 +143,7 @@
       - sysstat
       - openssh-clients
       - compat-libcap1
-      - twm
+      #- twm
       - xorg-x11-xauth
       - xorg-x11-xinit
       - libXtst

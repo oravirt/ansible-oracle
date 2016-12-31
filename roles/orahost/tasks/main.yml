@@ -23,18 +23,18 @@
   - name: Install packages required by Oracle for ASMlib on OL/RHEL
     yum: name={{ item }} state=installed
     with_items: "{{oracle_asm_packages}}"
-    when: install_os_packages and device_persistence == 'asmlib' and  ansible_os_family == 'RedHat'
+    when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'RedHat'
     tags: os_packages, oscheck
 
   - name: Install packages required by Oracle for ASMlib on SLES
     zypper: name={{ item }} state=installed
     with_items: "{{ oracle_asm_packages_sles }}"
-    when: install_os_packages and device_persistence == 'asmlib' and  ansible_os_family == 'Suse'
+    when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'Suse'
     tags: os_packages, oscheck, asm1
 
-  - name: Disable iptables
-    service: name=iptables state=stopped enabled=no
-    when: disable_iptables and ansible_os_family == 'RedHat'
+  - name: Disable firewall
+    service: name={{ firewall_service }} state=stopped enabled=no
+    when: disable_firewall and ansible_os_family == 'RedHat'
     tags: iptables
     register: iptables
 
