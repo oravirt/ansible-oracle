@@ -1,0 +1,121 @@
+---
+
+  - name: Check for valid  configuration of oracle_databases
+    no_log: true
+    assert:
+      that:
+        - item.1 is defined
+    with_subelements:
+       - "{{oracle_databases}}"
+       - rman_jobs
+    tags:
+      - assert
+
+  - name: Default Destinations for RMAN
+    no_log: true
+    assert:
+      that:
+        - rman_controlfile_autobackup_disk_default
+        - rman_channel_disk_default
+    tags:
+      - assert
+
+  # autofs is configured in a special way to mount the shares with needed parameters
+  - name: configure autofs for RMAN
+    lineinfile: dest=/etc/auto.master regexp="^{{rmanautofsmount}} " line="{{rmanautofsmount}} /etc/auto.net --timeout=60 rw,hard,rsize=32768,wsize=32768,proto=tcp,nfsvers=3"
+    when: "rmanautofs|bool == true"
+    tags: autofs
+
+  - name: Create Mountpoint
+    file: dest={{rmanautofsmount}} state=directory
+    when: "rmanautofs|bool == true"
+    tags: autofs
+
+  - name: Restart autofs
+    service: name=autofs enabled=yes state=restarted
+    when: "rmanautofs|bool == true"
+    tags: autofs
+
+  - name: Create bin-Directory for rman_backup
+    file: path={{oracle_base}}/bin state=directory mode=0755
+    tags:
+      - rmancopy
+
+  - name: Create log-Directory for cron output
+    file: path={{rman_cron_logdir}} state=directory mode=0755 owner={{oracle_user}}
+    tags:
+      - rmancron
+      - rmancopy
+
+  # dummy with_together for item.0.db_name in default/main.yml 
+  - name: Create Directory for rman-scripts
+    file: path={{oracle_admin_db}}/rman state=directory mode=0755 owner={{oracle_user}}
+    with_together:
+       - "{{oracle_databases}}"
+       - ""
+    tags:
+      - rmancopy
+
+  - name: copy rman_backup.sh
+    copy: dest={{oracle_base}}/bin src=rman_backup.sh backup=yes mode=755
+    tags:
+      - rmancopy
+
+  - name: copy RMAN scipts
+    template: dest={{oracle_admin_db}}/rman/{{item.1.name}}.rman src={{item.1.name}}.rman.j2 backup=yes mode=644 owner={{oracle_user}}
+    with_subelements:
+       - "{{oracle_databases}}"
+       - rman_jobs
+    tags:
+      - rmancopy
+
+  # the following task is usefull for configuration of rman-parameters during setup of RMAN
+  # It's also possible to execute the 1st Level0-Backup after setup, but be aware to configure the RMAN before starting a backup
+  # The execution isn't done in async mode!
+  # The task is only execute once on master_node when GI is installed!
+  - name: Execute RMAN-Script at playbook
+    shell: "{{oracle_base}}/bin/rman_backup.sh -a {{item.1.name}} -s {{item.0.oracle_db_name}} -r {{oracle_admin_db}}/rman -l {{oracle_admin_db}}/rman | tee -a {{rman_cron_logdir}}/rman_{{item.1.name}}.log"
+    environment:
+      - PATH: /bin:/usr/bin
+    become: yes
+    become_user: "{{ oracle_user }}"
+    when: "'parameter' in item.1.name"
+    register: rmanexecimmediate
+    with_subelements:
+       - "{{oracle_databases}}"
+       - rman_jobs
+    when: item.1.immediate | default(false) == true and ((oracle_install_option_gi | default('SI') == 'CRS_CONFIG' and master_node) or oracle_install_option_gi != 'CRS_CONFIG')
+    tags:
+      - rmanexecute
+
+  - debug: msg={{item.results[0].stdout_lines}}
+    with_items:
+      - "{{rmanexecimmediate}}"
+    tags:
+      - rmanexecute
+
+  - name: Create crontab entries for RMAN Backup
+    cron: 
+      name: rman_backup_{{item.0.oracle_db_name}}_{{item.1.name}}
+      cron_file: "{{rman_cronfile}}"
+      user: "{{oracle_user}}"
+      disabled: "{{item.1.disabled}}"
+      day: "{{item.1.day}}"
+      weekday: "{{item.1.weekday}}"
+      hour: "{{item.1.hour}}"
+      minute: "{{item.1.minute}}"
+      job: "{{oracle_base}}/bin/rman_backup.sh -a {{item.1.name}} -s {{item.0.oracle_db_name}} -r {{oracle_admin_db}}/rman -l {{oracle_admin_db}}/rman {{rman_service_param}} >> {{rman_cron_logdir}}/rman_{{item.1.name}}.log 2>&1"
+    with_subelements:
+       - "{{oracle_databases}}"
+       - rman_jobs
+    when: 
+      - item.1 is defined 
+      - item.1.disabled is defined
+      - item.1.day is defined
+      - item.1.weekday is defined
+      - item.1.hour is defined
+      - item.1.minute is defined
+      - item.1.name is defined
+      - item.0.oracle_install_option_gi | default('SI') != ('CRS_CONFIG')
+    tags:
+      - rmancron
