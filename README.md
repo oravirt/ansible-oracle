@@ -100,3 +100,8 @@ If the disk is removed from the disk it will be removed from the DG.
 
 - Manages ASM volumes. (absent/present)
  
+**oracle_ldapuser**
+
+pre-req: cx_Oracle, ldap, re
+
+- Syncronises users/role grants from LDAP/Active Directory to the database
