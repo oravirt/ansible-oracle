@@ -10,6 +10,69 @@ description:
     - Can be run locally on the controlmachine or on a remote host
 version_added: "2.2.1"
 options:
+    hostname:
+        description:
+            - The Oracle database host
+        required: false
+        default: localhost
+    port:
+        description:
+            - The listener port number on the host
+        required: false
+        default: 1521
+    service_name:
+        description:
+            - The database service name to connect to
+        required: true
+    user:
+        description:
+            - The Oracle user name to connect to the database, must have DBA privilege
+        required: true
+    password:
+        description:
+            - The Oracle user password for 'user'
+        required: true
+    mode:
+        description:
+            - The mode with which to connect to the database
+        required: true
+        default: normal
+        choices: ['normal','sysdba']
+    state:
+        description:
+            - If present, then privileges are granted, if absent then privileges are revoked
+        required: true
+        choices: ['present','absent']
+    privs:
+        description:
+            - Privileges to grant or revoke
+            - Can be either system privileges (then objs parameter must not be specified) or object privileges (objs parameter must also be set)
+        required: true
+        type: list
+        aliases: priv
+    objs:
+        description:
+            - When setting object privileges, list the objects the privileges are set for.
+            - Use format: SCHEMA_NAME.OBJECT_NAME
+            - Wildcard (%) can be used in OBJECT_NAME part, for example HR.% to set privileges for all objects (with type objecttype) in schema HR.
+            - Object names are CASE SENSITIVE, so by default use UPPER CASE.
+        required: false
+        type: list
+        aliases: obj
+    objtypes:
+        description:
+            - When using object privileges, list also the object types (from OBJECT_TYPE column from DBA_OBJECTS).
+        required: false
+        default: ['TABLE','VIEW']
+        type: list
+    roles:
+        description:
+            - List of user names and role names to set permissions to.
+            - Names are CASE SENSITIVE! So by default use UPPER CASE.
+        required: true
+        type: list
+        aliases: role
+
 notes:
     - cx_Oracle needs to be installed
     - Oracle RDBMS 11g2R or later required
@@ -18,6 +81,92 @@ author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
 '''
 
 EXAMPLES = '''
+---
+- hosts: localhost
+  vars:
+    oraclehost: 192.168.56.101
+    oracleport: 1521
+    oracleservice: orcl
+    oracleuser: system
+    oraclepassword: oracle
+    oracle_env:
+      ORACLE_HOME: /usr/lib/oracle/12.1/client64
+      LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
+  tasks:
+    - name: grant oracle system privileges
+      oracle_privs:
+        hostname: "{{ oraclehost }}"
+        port: "{{ oracleport }}"
+        service_name: "{{ oracleservice }}"
+        user: "{{ oracleuser }}"
+        password: "{{ oraclepassword }}"
+        state: present
+        privs:
+          - CREATE TABLE
+          - CREATE VIEW
+          - CREATE TYPE
+          - CREATE PROCEDURE
+          - CREATE SESSION
+        roles:
+          - ILMAR
+          - HR
+          - READER_ROLE
+      environment: "{{ oracle_env }}"
+
+    - name: revoke oracle system privileges
+      oracle_privs:
+        hostname: "{{ oraclehost }}"
+        port: "{{ oracleport }}"
+        service_name: "{{ oracleservice }}"
+        user: "{{ oracleuser }}"
+        password: "{{ oraclepassword }}"
+        state: absent
+        privs:
+          - CREATE ANY TABLE TABLE
+          - SELECT ANY TABLE
+        roles:
+          - ILMAR
+          - READER_ROLE
+      environment: "{{ oracle_env }}"
+
+    - name: grant oracle object privileges
+      oracle_privs:
+        hostname: "{{ oraclehost }}"
+        port: "{{ oracleport }}"
+        service_name: "{{ oracleservice }}"
+        user: "{{ oracleuser }}"
+        password: "{{ oraclepassword }}"
+        state: present
+        privs:
+          - SELECT
+          - FLASHBACK
+        objs:
+          - HR.%
+          - FINANCE.%
+        roles:
+          - ILMAR
+          - READER_ROLE
+      environment: "{{ oracle_env }}"
+
+    - name: revoke oracle object privileges
+      oracle_privs:
+        hostname: "{{ oraclehost }}"
+        port: "{{ oracleport }}"
+        service_name: "{{ oracleservice }}"
+        user: "{{ oracleuser }}"
+        password: "{{ oraclepassword }}"
+        state: absent
+        privs:
+          - INSERT
+          - UPDATE
+          - DELETE
+        objs:
+          - HR.%
+        objtypes:
+          - TABLE
+        roles:
+          - READER_ROLE
+      environment: "{{ oracle_env }}"
 '''
 
 import re
@@ -28,28 +177,6 @@ except ImportError:
     cx_oracle_exists = False
 else:
     cx_oracle_exists = True
-
-# Helper code
-oraclepattern = None
-
-def quote_string(s):
-    # This function should uppercase and clean all strings sent as identifiers to Oracle
-    # raise exception if string cannot be cleaned
-    global oraclepattern
-#    supper = s.upper()
-    if oraclepattern is None:
-        oraclepattern = re.compile('^[A-Z]+[A-Z0-9_]*[A-Z0-9]+$')
-    if (len(s) > 32) or not oraclepattern.match(s):
-        raise
-    return "\"%s\"" % s
-
-def parse_objects(objs):
-    parsed_list = []
-    for o in objs:
-        if o.count(".") != 1 or len(o) < 3:
-            module.fail_json(msg="Invalid object name %s. Object name must be in form SCHEMANAME.OBJECTNAME." % o)
-        parsed_list.extend(o.split("."))
-    return parsed_list
 
 # Ansible code
 def main():
@@ -66,7 +193,8 @@ def main():
             state         = dict(default="present", choices=["present", "absent"]),
             privs         = dict(required=True, type='list', aliases=['priv']),
             objs          = dict(required=False, type='list', aliases=['obj']), # CASE SENSITIVE! Can use wildcard %
-            roles         = dict(required=True, type='list', aliases=['role']),
+            objtypes      = dict(required=False, default=['TABLE','VIEW'], type='list'),
+            roles         = dict(required=True, type='list', aliases=['role'])
         ),
         supports_check_mode=True
     )
@@ -87,6 +215,10 @@ def main():
         for p in module.params['objs']:
             if not re_obj.match(p):
                 module.fail_json(msg="Invalid object '%s'" % p)
+    for p in module.params['objtypes']:
+        if not re_priv.match(p):
+            module.fail_json(msg="Invalid object type '%s'" % p)
+    objtypes = ",%s," % ",".join(module.params['objtypes'])
     # Connect to database
     dsn = cx_Oracle.makedsn(host=module.params['hostname'], port=module.params['port'], service_name=module.params['service_name'])
     try:
@@ -117,15 +249,15 @@ def main():
         -- output
         v_changes NUMBER:= 0;
         v_error NUMBER:= 0;
-        v_errstr VARCHAR2(4000);
+        v_errstr VARCHAR2(32267);
         -- input
         v_state VARCHAR2(10);
         v_objects str_array;
+        v_objtype VARCHAR2(4000);
         v_privs str_array;
         v_roles str_array;
         v_report_error NUMBER:= 1;
         v_privs_sql sys.DBMS_DEBUG_VC2COLL:= sys.DBMS_DEBUG_VC2COLL();
-        --v_roles_sql_tmp sys.DBMS_DEBUG_VC2COLL:= sys.DBMS_DEBUG_VC2COLL();
         v_roles_sql sys.DBMS_DEBUG_VC2COLL:= sys.DBMS_DEBUG_VC2COLL();
         v_objs_sql sys.DBMS_DEBUG_VC2COLL:= sys.DBMS_DEBUG_VC2COLL();
 
@@ -145,6 +277,7 @@ def main():
         -- assign input
         v_state:= :var_state;
         v_objects:= :var_objs;
+        v_objtype:= :var_objtype;
         v_privs:= :var_privs;
         v_roles:= :var_roles;
         -- Copy to a new array that can be used in SQL
@@ -158,11 +291,6 @@ def main():
             v_roles_sql(v_roles_sql.count):= v_roles(i);
         END LOOP;
         v_roles.delete;
-        /*FOR rec IN (SELECT column_value FROM table(v_roles_sql_tmp) INTERSECT (SELECT username FROM dba_users WHERE oracle_maintained='N' UNION ALL SELECT role FROM dba_roles WHERE oracle_maintained='N')) LOOP
-            v_roles_sql.extend();
-            v_roles_sql(v_roles_sql.count):= rec.column_value;
-        END LOOP;
-        v_roles_sql_tmp.delete;*/
         IF v_objects.COUNT > 0 THEN
             FOR i IN v_objects.FIRST..v_objects.LAST LOOP
                 v_objs_sql.extend();
@@ -176,8 +304,9 @@ def main():
                 -- Object privileges
                 IF v_state = 'present' THEN
                     FOR rec IN (
-                        WITH objs AS (SELECT o.owner, o.object_name FROM dba_objects o JOIN table(v_objs_sql) s ON o.owner||'.'||o.object_name LIKE s.column_value ESCAPE '\\' WHERE o.object_type IN ('TABLE','VIEW')),
-                             rp AS (SELECT r.column_value role, p.column_value priv FROM table(v_roles_sql) r CROSS JOIN table(v_privs_sql) p),
+                        WITH objs AS (SELECT DISTINCT o.owner, o.object_name FROM dba_objects o JOIN table(v_objs_sql) s ON o.owner||'.'||o.object_name LIKE s.column_value ESCAPE '\\' AND v_objtype LIKE '%,'||o.object_type||',%' ),
+                             rs AS (SELECT username role FROM dba_users WHERE oracle_maintained='N' UNION ALL SELECT role FROM dba_roles WHERE oracle_maintained='N' INTERSECT SELECT column_value name FROM table(v_roles_sql)),
+                             rp AS (SELECT rs.role, p.column_value priv FROM rs CROSS JOIN table(v_privs_sql) p),
                              objpr AS (SELECT o.owner, o.object_name, rp.priv, rp.role FROM objs o CROSS JOIN rp)
                         SELECT owner, object_name, role, LISTAGG(priv,',') WITHIN GROUP (ORDER BY priv) privs FROM (
                             SELECT owner, object_name, priv, role FROM objpr
@@ -189,8 +318,9 @@ def main():
                     END LOOP;
                 ELSIF v_state = 'absent' THEN
                     FOR rec IN (
-                        WITH objs AS (SELECT o.owner, o.object_name FROM dba_objects o JOIN table(v_objs_sql) s ON o.owner||'.'||o.object_name LIKE s.column_value),
-                             rp AS (SELECT r.column_value role, p.column_value priv FROM table(v_roles_sql) r CROSS JOIN table(v_privs_sql) p),
+                        WITH objs AS (SELECT DISTINCT o.owner, o.object_name FROM dba_objects o JOIN table(v_objs_sql) s ON o.owner||'.'||o.object_name LIKE s.column_value ESCAPE '\\' AND v_objtype LIKE '%,'||o.object_type||',%'),
+                             rs AS (SELECT username role FROM dba_users WHERE oracle_maintained='N' UNION ALL SELECT role FROM dba_roles WHERE oracle_maintained='N' INTERSECT SELECT column_value name FROM table(v_roles_sql)),
+                             rp AS (SELECT rs.role, p.column_value priv FROM rs CROSS JOIN table(v_privs_sql) p),
                              objpr AS (SELECT o.owner, o.object_name, rp.priv, rp.role FROM objs o CROSS JOIN rp)
                         SELECT t.owner, t.table_name, t.grantee, LISTAGG(t.privilege,',') WITHIN GROUP (ORDER BY t.privilege) privs
                         FROM dba_tab_privs t JOIN objpr o ON t.owner=o.owner AND t.table_name=o.object_name AND t.privilege=o.priv AND t.grantee=o.role
@@ -202,13 +332,9 @@ def main():
             ELSE
                 -- System/role grants
                 IF v_state = 'present' THEN
---                v_errstr:= v_state;
                     FOR rec IN (
-                        WITH rp AS (
-                            SELECT r.role, p.column_value priv FROM (
-                                SELECT r.column_value role
-                                FROM table(v_roles_sql) r
-                            ) r CROSS JOIN table(v_privs_sql) p)
+                        WITH rs AS (SELECT username role FROM dba_users WHERE oracle_maintained='N' UNION ALL SELECT role FROM dba_roles WHERE oracle_maintained='N' INTERSECT SELECT column_value name FROM table(v_roles_sql)),
+                             rp AS (SELECT rs.role, p.column_value priv FROM rs CROSS JOIN table(v_privs_sql) p)
                         SELECT role, LISTAGG(priv, ',') WITHIN GROUP (ORDER BY priv) privs FROM (
                             SELECT rp.role, rp.priv FROM rp
                             MINUS
@@ -221,7 +347,8 @@ def main():
                     END LOOP;
                 ELSIF v_state = 'absent' THEN
                     FOR rec IN (
-                        WITH rp AS (SELECT r.column_value role, p.column_value priv FROM table(v_roles_sql) r CROSS JOIN table(v_privs_sql) p)
+                        WITH rs AS (SELECT username role FROM dba_users WHERE oracle_maintained='N' UNION ALL SELECT role FROM dba_roles WHERE oracle_maintained='N' INTERSECT SELECT column_value name FROM table(v_roles_sql)),
+                             rp AS (SELECT rs.role, p.column_value priv FROM rs CROSS JOIN table(v_privs_sql) p)
                         SELECT s.role, LISTAGG(s.priv, ',') WITHIN GROUP (ORDER BY s.priv) privs FROM
                             (SELECT grantee role, privilege priv FROM dba_sys_privs
                              UNION ALL
@@ -232,9 +359,9 @@ def main():
                     END LOOP;
                 END IF;
             END IF;
-        /*EXCEPTION
+        EXCEPTION
             WHEN others THEN
-                NULL;*/
+                NULL;
         END;
         -- assign output
         :var_error:= v_error;
@@ -247,6 +374,7 @@ def main():
         'var_errstr': var_errstr,
         'var_privs': var_privs,
         'var_objs': var_objs,
+        'var_objtype': objtypes.upper(),
         'var_roles': var_roles,
         'var_state': module.params['state']
     })
