@@ -371,7 +371,7 @@ def main():
             available_instances = dict(required=False, aliases = ['ai']),
             pdb                 = dict(required=False),
             force               = dict(default=False, type = 'bool'),
-            username            = dict(required=False, aliases = ['un']),
+            user                = dict(required=False, aliases = ['un','username']),
             password            = dict(required=False, no_log=True, aliases = ['pw']),
             service_name        = dict(required=False, aliases = ['sn']),
             hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
@@ -391,7 +391,7 @@ def main():
     available_instances = module.params["available_instances"]
     pdb                 = module.params["pdb"]
     force               = module.params["force"]
-    username            = module.params["username"]
+    user                = module.params["user"]
     password            = module.params["password"]
     service_name        = module.params["service_name"]
     hostname            = module.params["hostname"]
@@ -420,28 +420,31 @@ def main():
             module.fail_json(msg=msg[0])
 
         else:
-            #if not(service_name) or not(username) or not(password) or not(hostname) or not(port):
-            if not(username) or not(password):
-                #msg[0] = "Missing one or more of these for cx_Oracle: service_name,username,password,host,port"
-                msg[0] = "Missing username or password for cx_Oracle"
-                module.fail_json(msg=msg[0], changed=False)
-
-            if service_name == None:
+            if not service_name :
                 service_name = database_name
 
-            if pdb != None:
+            if pdb and not service_name:
                 service_name  = pdb
                 database_name = pdb
 
-            dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+            wallet_connect = '/@%s' % service_name
             try:
-                conn = cx_Oracle.connect(username, password, dsn)
-            except cx_Oracle.DatabaseError, exc:
-                error, = exc.args
-                msg[0] = 'Could not connect to database: %s, dsn: %s ' % (error.message, dsn)
-                module.fail_json(msg=msg[0], changed=False)
-            cursor = conn.cursor()
+                if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
+                    connect = wallet_connect
+                    conn = cx_Oracle.connect(wallet_connect)
+                elif (user and password ):
+                    dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                    connect = dsn
+                    conn = cx_Oracle.connect(user, password, dsn)
+                elif (not(user) or not(password)):
+                    module.fail_json(msg='Missing username or password for cx_Oracle')
 
+            except cx_Oracle.DatabaseError, exc:
+                    error, = exc.args
+                    msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
+                    module.fail_json(msg=msg[0], changed=False)
+
+            cursor = conn.cursor()
 
     if state == 'present':
         if not check_service_exists(cursor, module, msg, oracle_home, name, database_name):

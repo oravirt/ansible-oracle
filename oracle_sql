@@ -132,7 +132,7 @@ def main():
 
     module = AnsibleModule(
         argument_spec = dict(
-            username            = dict(required=False, aliases = ['un']),
+            user                = dict(required=False, aliases = ['un','username']),
             password            = dict(required=False, no_log=True, aliases = ['pw']),
             mode                = dict(default="normal", choices = ["sysdba", "normal"]),
             service_name        = dict(required=False, aliases = ['sn']),
@@ -145,7 +145,7 @@ def main():
         mutually_exclusive=[['sql', 'script']]
     )
 
-    username            = module.params["username"]
+    user                = module.params["user"]
     password            = module.params["password"]
     mode                = module.params["mode"]
     service_name        = module.params["service_name"]
@@ -159,20 +159,34 @@ def main():
         msg[0] = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
         module.fail_json(msg=msg[0])
 
-    if not(username) or not(password):
-            msg[0] = "Missing username or password for cx_Oracle"
-            module.fail_json(msg=msg[0], changed=False)
-
-    dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+    wallet_connect = '/@%s' % service_name
     try:
-        if mode == 'sysdba':
-            conn = cx_Oracle.connect(username, password, dsn, mode=cx_Oracle.SYSDBA)
-        else:
-            conn = cx_Oracle.connect(username, password, dsn)
+        if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
+            if mode == 'sysdba':
+                connect = wallet_connect
+                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+            else:
+                connect = wallet_connect
+                conn = cx_Oracle.connect(wallet_connect)
+
+        elif (user and password ):
+            if mode == 'sysdba':
+                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
+                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+            else:
+                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
+                conn = cx_Oracle.connect(user, password, dsn)
+
+        elif (not(user) or not(password)):
+            module.fail_json(msg='Missing username or password for cx_Oracle')
+
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
-        msg[0] = 'Could not connect to database: %s, dsn: %s ' % (error.message, dsn)
+        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg[0], changed=False)
+
     cursor = conn.cursor()
 
     if sql:
