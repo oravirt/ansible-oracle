@@ -27,11 +27,11 @@ options:
     user:
         description:
             - The Oracle user name to connect to the database, must have DBA privilege
-        required: true
+        required: False
     password:
         description:
             - The Oracle user password for 'user'
-        required: true
+        required: False
     mode:
         description:
             - The mode with which to connect to the database
@@ -83,7 +83,7 @@ options:
             - If set to False, all executed commands are returned as Ansible output message
         required: False
         default: True
-        type: bool 
+        type: bool
 
 notes:
     - cx_Oracle needs to be installed
@@ -200,8 +200,8 @@ def main():
             hostname      = dict(default='localhost'),
             port          = dict(default=1521, type='int'),
             service_name  = dict(required=True),
-            user          = dict(required=True),
-            password      = dict(required=True),
+            user          = dict(required=False),
+            password      = dict(required=False),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
             state         = dict(default="present", choices=["present", "absent"]),
             privs         = dict(required=True, type='list', aliases=['priv']),
@@ -235,15 +235,38 @@ def main():
             module.fail_json(msg="Invalid object type '%s'" % p)
     objtypes = ",%s," % ",".join(module.params['objtypes'])
     # Connect to database
-    dsn = cx_Oracle.makedsn(host=module.params['hostname'], port=module.params['port'], service_name=module.params['service_name'])
+    hostname = module.params["hostname"]
+    port = module.params["port"]
+    service_name = module.params["service_name"]
+    user = module.params["user"]
+    password = module.params["password"]
+    mode = module.params["mode"]
+    wallet_connect = '/@%s' % service_name
     try:
-        if module.params['mode'] == 'sysdba':
-            conn = cx_Oracle.connect(module.params['user'], module.params['password'], dsn, mode=cx_Oracle.SYSDBA)
-        else:
-            conn = cx_Oracle.connect(module.params['user'], module.params['password'], dsn)
+        if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
+            if mode == 'sysdba':
+                connect = wallet_connect
+                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+            else:
+                connect = wallet_connect
+                conn = cx_Oracle.connect(wallet_connect)
+
+        elif (user and password ):
+            if mode == 'sysdba':
+                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
+                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+            else:
+                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
+                conn = cx_Oracle.connect(user, password, dsn)
+
+        elif (not(user) or not(password)):
+            module.fail_json(msg='Missing username or password for cx_Oracle')
+
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
-        msg[0] = 'Could not connect to database - %s ' % (error.message)
+        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg[0], changed=False)
     if conn.version < "11.2":
         module.fail_json(msg="Database version must be 11gR2 or greater", changed=False)
