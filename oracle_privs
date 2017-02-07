@@ -27,11 +27,11 @@ options:
     user:
         description:
             - The Oracle user name to connect to the database, must have DBA privilege
-        required: true
+        required: False
     password:
         description:
             - The Oracle user password for 'user'
-        required: true
+        required: False
     mode:
         description:
             - The mode with which to connect to the database
@@ -200,8 +200,8 @@ def main():
             hostname      = dict(default='localhost'),
             port          = dict(default=1521, type='int'),
             service_name  = dict(required=True),
-            user          = dict(required=True),
-            password      = dict(required=True),
+            user          = dict(required=False),
+            password      = dict(required=False),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
             state         = dict(default="present", choices=["present", "absent"]),
             privs         = dict(required=True, type='list', aliases=['priv']),
