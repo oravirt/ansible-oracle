@@ -72,6 +72,12 @@ options:
         required: true
         type: list
         aliases: role
+    convert_to_upper:
+        description:
+            - Converts all entries for role and objs parameters silently to upper case to simulate case insensitivity
+        required: False
+        default: True
+        type: bool
 
 notes:
     - cx_Oracle needs to be installed
@@ -194,7 +200,8 @@ def main():
             privs         = dict(required=True, type='list', aliases=['priv']),
             objs          = dict(required=False, type='list', aliases=['obj']), # CASE SENSITIVE! Can use wildcard %
             objtypes      = dict(required=False, default=['TABLE','VIEW'], type='list'),
-            roles         = dict(required=True, type='list', aliases=['role'])
+            roles         = dict(required=True, type='list', aliases=['role']),
+            convert_to_upper = dict(default=True, type='bool')
         ),
         supports_check_mode=True
     )
@@ -241,8 +248,9 @@ def main():
     var_error = c.var(cx_Oracle.NUMBER)
     var_errstr = c.var(cx_Oracle.STRING)
     var_privs = c.arrayvar(cx_Oracle.STRING, [p.upper() for p in module.params['privs']])
-    var_objs = c.arrayvar(cx_Oracle.STRING, [p.replace("_", "\_") for p in module.params['objs']] if module.params['objs'] is not None else [], 100)
-    var_roles = c.arrayvar(cx_Oracle.STRING, module.params['roles'], 50)
+    objectslist = [p.replace("_", "\_") for p in module.params['objs']] if module.params['objs'] is not None else []
+    var_objs = c.arrayvar(cx_Oracle.STRING, objectslist if not module.params['convert_to_upper'] else [p.upper() for p in objectslist], 100)
+    var_roles = c.arrayvar(cx_Oracle.STRING, module.params['roles'] if not module.params['convert_to_upper'] else [p.upper() for p in module.params['roles']], 50)
     c.execute("""
     DECLARE
         TYPE str_array IS TABLE OF VARCHAR2(50) INDEX BY BINARY_INTEGER;
