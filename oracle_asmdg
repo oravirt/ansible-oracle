@@ -66,19 +66,7 @@ author: Mikael Sandström, oravirt@gmail.com, @oravirt
 
 EXAMPLES = '''
 # Create a diskgroup
-oracle_diskgroups: name=diskgroup1 database_name=db1 state=present
-
-# Start a diskgroup
-oracle_diskgroups: name=diskgroup1 database_name=db1 state=started
-
-# Stop a diskgroup
-oracle_diskgroups: name=diskgroup1 database_name=db1 state=stopped
-
-# Remove a diskgroup
-oracle_diskgroups: name=diskgroup1 database_name=db1 state=absent
-
-# Create a diskgroup in a RAC pdb and run it on a subset of nodes/instances
-oracle_diskgroups: name=diskgroup1 database_name=raccdb oh=/u01/app/oracle/12.1.0.2/db1 pdb=mypdb pi=raccdb1 ai=raccdb2,raccdb3 state=present
+oracle_asmdg: un=sys pw=oracle123 sn='+ASM' host=localhost oh=/u01/app/oracle/12.1.2.0/grid name=MYDG1 disks=ORCL:MYDG1,ORCL:MYDG2 redundancy=external state=present
 
 '''
 import os
@@ -258,7 +246,7 @@ def main():
             disks               = dict(required=False, type='list'),
             redundancy          = dict(default="external", choices = ["external","normal","high"]),
             state               = dict(default="present", choices = ["present", "absent", "status"]),
-            username            = dict(required=False, aliases = ['un']),
+            user                = dict(required=False, aliases = ['un','username']),
             password            = dict(required=False, no_log=True, aliases = ['pw']),
             hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
             port                = dict(required=False, default = 1521),
@@ -275,7 +263,7 @@ def main():
     disks               = module.params["disks"]
     redundancy          = module.params["redundancy"]
     state               = module.params["state"]
-    username            = module.params["username"]
+    user                = module.params["user"]
     password            = module.params["password"]
     hostname            = module.params["hostname"]
     port                = module.params["port"]
@@ -287,28 +275,28 @@ def main():
         msg[0] = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
         module.fail_json(msg=msg[0])
 
-    else:
-            #if not(diskgroup_name) or not(username) or not(password) or not(hostname) or not(port):
-        if not(username) or not(password):
-                #msg[0] = "Missing one or more of these for cx_Oracle: diskgroup_name,username,password,host,port"
-            msg[0] = "Missing username or password for cx_Oracle"
-            module.fail_json(msg=msg[0], changed=False)
-
-    dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+    wallet_connect = '/@%s' % service_name
     try:
-        if mode == 'sysasm':
-            conn = cx_Oracle.connect(username, password, dsn, mode=cx_Oracle.SYSASM)
-        else:
-            conn = cx_Oracle.connect(username, password, dsn)
+        if (not user and not password) : # If neither user or password is supplied, the use of an oracle wallet is assumed
+            connect = wallet_connect
+            conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSASM)
+        elif (user and password):
+            dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+            connect = dsn
+            conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSASM)
+        elif (not(user) or not(password)):
+            module.fail_json(msg='Missing username or password for cx_Oracle')
+
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
-        msg[0] = 'Could not connect to ASM: %s, dsn: %s ' % (error.message, dsn)
+        msg[0] = 'Could not connect to ASM: %s, connect descriptor: %s, username: %s, pass: %s' % (error.message, connect,user,password)
         module.fail_json(msg=msg[0], changed=False)
+
     cursor = conn.cursor()
 
-    checkifracsql = 'select count(*) from gv$instance'
+    checkifracsql = 'select parallel from v$instance'
     checkifrac = execute_sql_get(module, msg, cursor, checkifracsql)
-    if checkifrac[0][0] > 1:
+    if checkifrac[0][0] == 'YES':
         rac = True
         if oracle_home is not None:
             os.environ['ORACLE_HOME'] = oracle_home

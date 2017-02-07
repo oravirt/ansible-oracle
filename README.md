@@ -8,7 +8,14 @@ To use the modules, create a 'library' directory next to your top level playbook
 For more information, check out: http://docs.ansible.com/developing_modules.html
 
 
-Most (if not all) requires cx_Oracle either on your controlmachine or on the managed node
+Most (if not all) requires cx_Oracle either on your controlmachine or on the managed node.
+
+The default behaviour for the modules using cx_Oracle is this:
+
+- If neither username or password is passed as input to the module(s), the use of an Oracle wallet is assumed.
+- In that case, the cx_Oracle.makedsn step is skipped, and the connection will use the '/@<service_name>' format instead.
+- You then need to make sure that you're using the correct tns-entry (service_name) to match the credential stored in the wallet.
+
 
 These are the different modules:
 
@@ -91,7 +98,7 @@ pre-req: cx_Oracle
 - Manages ASM diskgroup state. (absent/present)
 - Takes a list of disks and makes sure those disks are part of the DG.
 If the disk is removed from the disk it will be removed from the DG.
- 
+
 <b> Note: </b>
 - Supports redundancy levels, but does not yet handle specifying failuregroups
 - Does not yet handle attributes
@@ -99,7 +106,7 @@ If the disk is removed from the disk it will be removed from the DG.
 <b> oracle_asmvol </b>
 
 - Manages ASM volumes. (absent/present)
- 
+
 **oracle_ldapuser**
 
 pre-req: cx_Oracle, ldap, re
