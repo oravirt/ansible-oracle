@@ -51,7 +51,7 @@ options:
         default: null
     state:
         description:
-            - The intended state of the priv (present=added to the user, absent=removed from the user). REMOVEALL will remove ALL role/sys privileges 
+            - The intended state of the priv (present=added to the user, absent=removed from the user). REMOVEALL will remove ALL role/sys privileges
         default: present
         choices: ['present','absent','REMOVEALL']
 notes:
@@ -62,9 +62,9 @@ author: Mikael Sandström, oravirt@gmail.com, @oravirt
 
 EXAMPLES = '''
 # Add grants to the user
-oracle_grants: hostname=remote-db-server service_name=orcl user=system password=manager schema=myschema state=present grants='create session','create any table',connect,resource 
+oracle_grants: hostname=remote-db-server service_name=orcl user=system password=manager schema=myschema state=present grants='create session','create any table',connect,resource
 
-# Revoke the 'create any table' grant 
+# Revoke the 'create any table' grant
 oracle_grants: hostname=localhost service_name=orcl user=system password=manager schema=myschema state=absent grants='create any table'
 
 # Remove all grants from a user
@@ -95,15 +95,15 @@ def clean_list(item):
 
 # Check if the user/schema exists
 def check_user_exists(module, msg, cursor, schema):
-    
+
     if not(schema):
         module.fail_json(msg='Error: Missing schema name (User)', changed=False)
         return False
-    
+
     schema = clean_string(schema)
     sql = 'select count(*) from dba_users where username = upper(\'%s\')' % schema
 
-    
+
     try:
             cursor.execute(sql)
             result = cursor.fetchone()[0]
@@ -111,7 +111,7 @@ def check_user_exists(module, msg, cursor, schema):
             error, = exc.args
             msg[0] = error.message+ 'sql: ' + sql
             return False
-         
+
     if result > 0:
         return True
     else:
@@ -120,15 +120,15 @@ def check_user_exists(module, msg, cursor, schema):
 
 # Check if the user/role exists
 def check_role_exists(module, msg, cursor, role):
-           
+
     if not(role):
         module.fail_json(msg='Error: Missing role name', changed=False)
         return False
-    
+
     role = clean_string(role)
     sql = 'select role from dba_roles where role = upper(\'%s\')' % role
-      
-    
+
+
     try:
             cursor.execute(sql)
             result = (cursor.fetchone())
@@ -136,7 +136,7 @@ def check_role_exists(module, msg, cursor, role):
             error, = exc.args
             msg[0] = error.message+ 'sql: ' + sql
             return False
-            
+
     if result > 0:
         #module.exit_json(msg='(role) sql %s'% sql, changed=False)
         return True
@@ -162,22 +162,22 @@ def add_grants(module, msg, cursor, schema, wanted_grants_list):
     wanted_grants_list = clean_list(wanted_grants_list)
     schema = clean_string(schema)
 
-    # Get the current role grants for the schema. If any are present, add them to the total 
+    # Get the current role grants for the schema. If any are present, add them to the total
     curr_role_grants=get_current_role_grants(module, msg, cursor, schema)
     if any(curr_role_grants):
         total_current.extend(curr_role_grants)
-    
+
     # Get the current sys privs for the schema. If any are present, add them to the total
     curr_sys_grants=get_current_sys_grants(module, msg, cursor, schema)
     if any(curr_sys_grants):
         total_current.extend(curr_sys_grants)
-    
+
 
 
     # Get the difference between current grants and wanted grants
     grants_to_add=set(wanted_grants_list).difference(total_current)
 
-    # if there are differences, they will be added. 
+    # if there are differences, they will be added.
     if not any(grants_to_add):
         module.exit_json(msg="Grants already present", changed=False)
     else:
@@ -186,7 +186,7 @@ def add_grants(module, msg, cursor, schema, wanted_grants_list):
         grants_to_add = clean_string(grants_to_add)
         sql += 'grant %s to %s' % (grants_to_add, schema)
         msg[0] = 'The grant(s) (%s) successfully added to the schema/role %s' % (grants_to_add, schema)
-        
+
 
         try:
             cursor.execute(sql)
@@ -195,12 +195,12 @@ def add_grants(module, msg, cursor, schema, wanted_grants_list):
             msg[0] = 'Blergh, something went wrong while adding grants to the schema/role - %s sql: %s' % (error.message, sql)
             return False
 
-    
+
     return True
 
 # Remove grants to the schema
 def remove_grants(module, msg, cursor, schema, remove_grants_list, state):
-    
+
     sql = ''
 
     # This list will hold all grants/privs the user currently has
@@ -215,28 +215,28 @@ def remove_grants(module, msg, cursor, schema, remove_grants_list, state):
     schema = clean_string(schema)
 
     # Get the current role grants for the schema.
-    # If any are present, add them to the total 
+    # If any are present, add them to the total
     curr_role_grants=get_current_role_grants(module, msg, cursor, schema)
     if any(curr_role_grants):
         total_current.extend(curr_role_grants)
-    
-    # Get the current sys privs for the schema 
+
+    # Get the current sys privs for the schema
     # If any are present, add them to the total
     curr_sys_grants=get_current_sys_grants(module, msg, cursor, schema)
     if any(curr_sys_grants):
         total_current.extend(curr_sys_grants)
-    
+
 
 
     # Get the difference between current grants and wanted grants
     grants_to_remove=set(remove_grants_list).intersection(total_current)
-    
+
     # If state=REMOVEALL is used, all grants/privs will be removed
     if state == 'REMOVEALL'  and any(total_current):
         remove_all = ','.join(total_current)
         sql += 'revoke %s from %s' % (remove_all, schema)
         msg[0] = 'All privileges/grants (%s) are removed from schema/role %s' % (remove_all, schema)
-        
+
         try:
             cursor.execute(sql)
         except cx_Oracle.DatabaseError, exc:
@@ -244,8 +244,8 @@ def remove_grants(module, msg, cursor, schema, remove_grants_list, state):
             msg[0] = 'Something went wrong while removing all grants from the schema/role - %s sql: %s' % (error.message, sql)
             return False
 
-    # if there are differences, they will be removed. 
-    elif not any(grants_to_remove): 
+    # if there are differences, they will be removed.
+    elif not any(grants_to_remove):
         module.exit_json(msg="The schema/role (%s) doesn\'t have the grant(s) you want to remove" % schema, changed=False)
 
     else:
@@ -254,8 +254,8 @@ def remove_grants(module, msg, cursor, schema, remove_grants_list, state):
         grants_to_remove = clean_string(grants_to_remove)
         sql += 'revoke %s from %s' % (grants_to_remove, schema)
         msg[0] = 'The grant(s) (%s) successfully removed from the schema/role %s' % (grants_to_remove, schema)
-        
-  
+
+
 
         try:
             cursor.execute(sql)
@@ -263,14 +263,14 @@ def remove_grants(module, msg, cursor, schema, remove_grants_list, state):
             error, = exc.args
             msg[0] = 'Blergh, something went wrong while removing grants from the schema/role - %s sql: %s' % (error.message, sql)
             return False
-    
+
     return True
 
 # Get the current role/sys grants
 def get_current_role_grants(module, msg, cursor, schema):
 
     curr_role_grants=[]
-    
+
     sql = 'select granted_role from dba_role_privs where grantee = upper(\'%s\') '% schema
 
 
@@ -284,15 +284,15 @@ def get_current_role_grants(module, msg, cursor, schema):
     #if result > 0:
     for item in result:
         curr_role_grants.append(item[0].lower())
-    
-    
+
+
     return curr_role_grants
 
 # Get the current sys grants
 def get_current_sys_grants(module, msg, cursor, schema):
 
     curr_sys_grants=[]
-    
+
     sql = 'select privilege from dba_sys_privs where grantee = upper(\'%s\') '% schema
 
 
@@ -306,11 +306,11 @@ def get_current_sys_grants(module, msg, cursor, schema):
     #if result > 0:
     for item in result:
         curr_sys_grants.append(item[0].lower())
-        
-    
+
+
     return curr_sys_grants
 
-    
+
 
 
 
@@ -322,14 +322,14 @@ def main():
             hostname      = dict(default='localhost'),
             port          = dict(default=1521),
             service_name  = dict(required=True),
-            user          = dict(required=True), 
-            password      = dict(required=True, no_log=True), 
+            user          = dict(required=False),
+            password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
             schema        = dict(default=None),
             role        = dict(default=None),
             grants         = dict(default=None, type="list"),
             state         = dict(default="present", choices=["present", "absent", "REMOVEALL"])
-                
+
         ),
         mutually_exclusive=[['schema', 'role']]
     )
@@ -344,24 +344,38 @@ def main():
     role = module.params["role"]
     grants = module.params["grants"]
     state = module.params["state"]
-    
-    
+
+
 
     if not cx_oracle_exists:
         module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
 
-    dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
-
-    
+    wallet_connect = '/@%s' % service_name
     try:
-        if mode == 'sysdba':
-            conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
-        else:
-            conn = cx_Oracle.connect(user, password, dsn)
-    
+        if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
+            if mode == 'sysdba':
+                connect = wallet_connect
+                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+            else:
+                connect = wallet_connect
+                conn = cx_Oracle.connect(wallet_connect)
+
+        elif (user and password ):
+            if mode == 'sysdba':
+                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
+                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+            else:
+                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
+                conn = cx_Oracle.connect(user, password, dsn)
+
+        elif (not(user) or not(password)):
+            module.fail_json(msg='Missing username or password for cx_Oracle')
+            
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
-        msg[0] = 'Could not connect to database - %s ' % (error.message)
+        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg[0], changed=False)
 
     cursor = conn.cursor()
@@ -384,8 +398,8 @@ def main():
             else:
                 module.fail_json(msg=msg[0], changed=False)
         else:
-            module.fail_json(msg=msg[0], changed=False)                
-                
+            module.fail_json(msg=msg[0], changed=False)
+
     elif (state == 'absent' or state == 'REMOVEALL') and schema:
         #module.exit_json(msg='absent & schema', changed=False)
         if check_user_exists(module, msg, cursor, schema):
@@ -393,8 +407,8 @@ def main():
                 #msg[0] = 'The schema %s has been dropped successfully' % schema
                 module.exit_json(msg=msg[0], changed=True)
         else:
-            module.exit_json(msg='The schema (%s) doesn\'t exist' % schema, changed=False)                
-    
+            module.exit_json(msg='The schema (%s) doesn\'t exist' % schema, changed=False)
+
     elif (state == 'absent' or state == 'REMOVEALL') and role:
         #module.exit_json(msg='absent & role', changed=False)
         if check_role_exists(module, msg, cursor, role):
@@ -402,14 +416,14 @@ def main():
                 #msg[0] = 'The schema %s has been dropped successfully' % schema
                 module.exit_json(msg=msg[0], changed=True)
         else:
-            module.exit_json(msg='The role (%s) doesn\'t exist' % role, changed=False)                
+            module.exit_json(msg='The role (%s) doesn\'t exist' % role, changed=False)
     else:
-        module.fail_json(msg='Missing schema or role', changed=False)                
+        module.fail_json(msg='Missing schema or role', changed=False)
 
-                
+
     module.fail_json(msg='Unknown object', changed=False)
-    
-    
+
+
 
 
 

@@ -51,7 +51,7 @@ options:
         default: null
     state:
         description:
-            - The intended state of the priv (present=added to the user, absent=removed from the user). REMOVEALL will remove ALL role/sys privileges 
+            - The intended state of the priv (present=added to the user, absent=removed from the user). REMOVEALL will remove ALL role/sys privileges
         default: present
         choices: ['present','absent','REMOVEALL']
 notes:
@@ -62,9 +62,9 @@ author: Mikael Sandström, oravirt@gmail.com, @oravirt
 
 EXAMPLES = '''
 # Add grants to the user
-oracle_role: hostname=remote-db-server service_name=orcl user=system password=manager role=myrole state=present grants='create session','create any table',connect,resource 
+oracle_role: hostname=remote-db-server service_name=orcl user=system password=manager role=myrole state=present grants='create session','create any table',connect,resource
 
-# Revoke the 'create any table' grant 
+# Revoke the 'create any table' grant
 oracle_role: hostname=localhost service_name=orcl user=system password=manager role=myrole state=absent grants='create any table'
 
 # Remove all grants from a user
@@ -95,16 +95,16 @@ def clean_list(item):
 
 # Check if the user/role exists
 def check_role_exists(module, msg, cursor, role, auth):
-    
+
     if not(role):
         module.fail_json(msg='Error: Missing role name', changed=False)
         return False
-    
+
     role = clean_string(role)
     #sql = 'select count(*) from dba_roles where role = upper(\'%s\')' % role
     sql = 'select lower(role), lower(authentication_type) from dba_roles where role = upper(\'%s\')' % role
 
-    
+
     try:
             cursor.execute(sql)
             result = (cursor.fetchone())
@@ -112,12 +112,12 @@ def check_role_exists(module, msg, cursor, role, auth):
             error, = exc.args
             msg[0] = error.message+ 'sql: ' + sql
             return False
-            
+
     if result > 0:
 
         msg[0] = 'The role (%s) already exists' % role
         return True
-    
+
 
 # Create the role
 def create_role(module, msg, cursor, role, auth, auth_conf):
@@ -126,10 +126,10 @@ def create_role(module, msg, cursor, role, auth, auth_conf):
         module.fail_json(msg='Error: Missing role name', changed=False)
         return False
 
-        
+
     # This is the default role creation
     sql = 'create role %s ' % role
-    
+
 
     if auth == 'password':
         if not auth_conf:
@@ -153,7 +153,7 @@ def create_role(module, msg, cursor, role, auth, auth_conf):
 
 
 
-    
+
     try:
         cursor.execute(sql)
     except cx_Oracle.DatabaseError, exc:
@@ -174,7 +174,7 @@ def modify_role(module, msg, cursor, role, auth, auth_conf):
     sql = 'alter role %s ' % (role)
 
     currauth = get_role_specs(module, msg, cursor, role)
-    
+
     if currauth.lower() == auth.lower():
         module.exit_json(msg='The role (%s) already exists' % role, changed=False)
 
@@ -202,7 +202,7 @@ def modify_role(module, msg, cursor, role, auth, auth_conf):
         if auth == 'global':
             sql += 'identified globally'
 
-  
+
         try:
             cursor.execute(sql)
         except cx_Oracle.DatabaseError, exc:
@@ -218,7 +218,7 @@ def modify_role(module, msg, cursor, role, auth, auth_conf):
 def get_role_specs(module, msg, cursor, role):
 
     sql = 'select lower(authentication_type) from dba_roles where role = upper(\'%s\')' % role
-    
+
 
     try:
         cursor.execute(sql)
@@ -228,7 +228,7 @@ def get_role_specs(module, msg, cursor, role):
         msg[0] = 'Blergh, something went wrong while getting the role auth scheme - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg[0], changed=False)
         return False
-    
+
     #module.exit_json(msg='Result: %s, sql: %s' % (result, sql), changed=False)
     return result
 
@@ -242,7 +242,7 @@ def drop_role(module, msg, cursor, role):
 
 
     sql = 'drop role %s' % role
-    
+
     try:
         cursor.execute(sql)
     except cx_Oracle.DatabaseError, exc:
@@ -262,8 +262,8 @@ def main():
             hostname      = dict(default='localhost'),
             port          = dict(default=1521),
             service_name  = dict(required=True),
-            user          = dict(required=True), 
-            password      = dict(required=True, no_log=True), 
+            user          = dict(required=False),
+            password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
             role          = dict(default=None),
             state         = dict(default="present", choices=["present", "absent"]),
@@ -271,7 +271,7 @@ def main():
             auth_conf     = dict(default=None)
 
         ),
-        
+
     )
 
     hostname = module.params["hostname"]
@@ -284,24 +284,38 @@ def main():
     state = module.params["state"]
     auth = module.params["auth"]
     auth_conf = module.params["auth_conf"]
-    
-    
+
+
 
     if not cx_oracle_exists:
         module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
 
-    dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
-
-    
+    wallet_connect = '/@%s' % service_name
     try:
-        if mode == 'sysdba':
-            conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
-        else:
-            conn = cx_Oracle.connect(user, password, dsn)
-    
+        if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
+            if mode == 'sysdba':
+                connect = wallet_connect
+                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+            else:
+                connect = wallet_connect
+                conn = cx_Oracle.connect(wallet_connect)
+
+        elif (user and password ):
+            if mode == 'sysdba':
+                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
+                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+            else:
+                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
+                conn = cx_Oracle.connect(user, password, dsn)
+
+        elif (not(user) or not(password)):
+            module.fail_json(msg='Missing username or password for cx_Oracle')
+
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
-        msg[0] = 'Could not connect to database - %s ' % (error.message)
+        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg[0], changed=False)
 
     cursor = conn.cursor()
@@ -315,7 +329,7 @@ def main():
 
         elif modify_role(module, msg, cursor, role, auth, auth_conf):
             module.exit_json(msg=msg[0], changed=True)
-        
+
         else:
             module.fail_json(msg=msg[0], changed=False)
 
@@ -325,14 +339,14 @@ def main():
             if drop_role(module, msg, cursor, role):
                 module.exit_json(msg=msg[0], changed=True)
         else:
-            module.exit_json(msg='The role (%s) doesn\'t exist' % role, changed=False)                
-    
+            module.exit_json(msg='The role (%s) doesn\'t exist' % role, changed=False)
 
-    
-                
+
+
+
     module.exit_json(msg=msg[0], changed=False)
-    
-    
+
+
 
 
 
