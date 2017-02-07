@@ -8,7 +8,8 @@ To use the modules, create a 'library' directory next to your top level playbook
 For more information, check out: http://docs.ansible.com/developing_modules.html
 
 
-Most (if not all) requires cx_Oracle either on your controlmachine or on the managed node
+Most (if not all) requires cx_Oracle either on your controlmachine or on the managed node.
+
 The default behaviour for the modules using cx_Oracle is this:
 
 - If neither username or password is passed as input to the module(s), the use of an Oracle wallet is assumed.
