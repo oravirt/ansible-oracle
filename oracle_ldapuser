@@ -265,15 +265,38 @@ def main():
         'username': module.params['ldap_username_attribute']
     }
     # Connect to database
-    dsn = cx_Oracle.makedsn(host=module.params['hostname'], port=module.params['port'], service_name=module.params['service_name'])
+    hostname = module.params["hostname"]
+    port = module.params["port"]
+    service_name = module.params["service_name"]
+    user = module.params["user"]
+    password = module.params["password"]
+    mode = module.params["mode"]
+    wallet_connect = '/@%s' % service_name
     try:
-        if module.params['mode'] == 'sysdba':
-            conn = cx_Oracle.connect(module.params['user'], module.params['password'], dsn, mode=cx_Oracle.SYSDBA)
-        else:
-            conn = cx_Oracle.connect(module.params['user'], module.params['password'], dsn)
+        if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
+            if mode == 'sysdba':
+                connect = wallet_connect
+                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+            else:
+                connect = wallet_connect
+                conn = cx_Oracle.connect(wallet_connect)
+
+        elif (user and password ):
+            if mode == 'sysdba':
+                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
+                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+            else:
+                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
+                conn = cx_Oracle.connect(user, password, dsn)
+
+        elif (not(user) or not(password)):
+            module.fail_json(msg='Missing username or password for cx_Oracle')
+
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
-        msg[0] = 'Could not connect to database - %s ' % (error.message)
+        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg[0], changed=False)
     #
     if module.check_mode:
