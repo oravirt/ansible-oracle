@@ -78,6 +78,12 @@ options:
         required: False
         default: True
         type: bool
+    quiet:
+        description:
+            - If set to False, all executed commands are returned as Ansible output message
+        required: False
+        default: True
+        type: bool 
 
 notes:
     - cx_Oracle needs to be installed
@@ -172,6 +178,7 @@ EXAMPLES = '''
           - TABLE
         roles:
           - READER_ROLE
+        quiet: False
       environment: "{{ oracle_env }}"
 '''
 
@@ -201,7 +208,8 @@ def main():
             objs          = dict(required=False, type='list', aliases=['obj']), # CASE SENSITIVE! Can use wildcard %
             objtypes      = dict(required=False, default=['TABLE','VIEW'], type='list'),
             roles         = dict(required=True, type='list', aliases=['role']),
-            convert_to_upper = dict(default=True, type='bool')
+            convert_to_upper = dict(default=True, type='bool'),
+            quiet         = dict(required=False, default=True, type='bool')
         ),
         supports_check_mode=True
     )
@@ -251,7 +259,12 @@ def main():
     objectslist = [p.replace("_", "\_") for p in module.params['objs']] if module.params['objs'] is not None else []
     var_objs = c.arrayvar(cx_Oracle.STRING, objectslist if not module.params['convert_to_upper'] else [p.upper() for p in objectslist], 100)
     var_roles = c.arrayvar(cx_Oracle.STRING, module.params['roles'] if not module.params['convert_to_upper'] else [p.upper() for p in module.params['roles']], 50)
-    c.execute("""
+    #
+    rs_subquery = "SELECT username role FROM dba_users $IF DBMS_DB_VERSION.VERSION >= 12 $THEN WHERE oracle_maintained='N' $END UNION ALL SELECT role FROM dba_roles $IF DBMS_DB_VERSION.VERSION >= 12 $THEN WHERE oracle_maintained='N' $END INTERSECT SELECT column_value name FROM table(v_roles_sql)"
+    objs_subquery = "SELECT DISTINCT o.owner, o.object_name FROM dba_objects o JOIN table(v_objs_sql) s ON o.owner||'.'||o.object_name LIKE s.column_value ESCAPE '\\' AND v_objtype LIKE '%,'||o.object_type||',%'"
+    rp_subquery = "SELECT rs.role, p.column_value priv FROM rs CROSS JOIN table(v_privs_sql) p"
+    #
+    plsql_block = """
     DECLARE
         TYPE str_array IS TABLE OF VARCHAR2(50) INDEX BY BINARY_INTEGER;
         -- output
@@ -265,6 +278,7 @@ def main():
         v_privs str_array;
         v_roles str_array;
         v_report_error NUMBER:= 1;
+        v_quiet NUMBER;
         v_privs_sql sys.DBMS_DEBUG_VC2COLL:= sys.DBMS_DEBUG_VC2COLL();
         v_roles_sql sys.DBMS_DEBUG_VC2COLL:= sys.DBMS_DEBUG_VC2COLL();
         v_objs_sql sys.DBMS_DEBUG_VC2COLL:= sys.DBMS_DEBUG_VC2COLL();
@@ -273,7 +287,9 @@ def main():
         BEGIN
             EXECUTE IMMEDIATE p_sql;
             v_changes:= v_changes+1;
-            v_errstr:= v_errstr||'-'||p_sql;
+            IF v_quiet = 0 THEN
+                v_errstr:= v_errstr||'-'||p_sql;
+            END IF;
         EXCEPTION
             WHEN others THEN
                 v_error:= v_report_error;
@@ -288,6 +304,7 @@ def main():
         v_objtype:= :var_objtype;
         v_privs:= :var_privs;
         v_roles:= :var_roles;
+        v_quiet:= :var_quiet;
         -- Copy to a new array that can be used in SQL
         FOR i IN v_privs.FIRST..v_privs.LAST LOOP
             v_privs_sql.extend();
@@ -312,9 +329,9 @@ def main():
                 -- Object privileges
                 IF v_state = 'present' THEN
                     FOR rec IN (
-                        WITH objs AS (SELECT DISTINCT o.owner, o.object_name FROM dba_objects o JOIN table(v_objs_sql) s ON o.owner||'.'||o.object_name LIKE s.column_value ESCAPE '\\' AND v_objtype LIKE '%,'||o.object_type||',%' ),
-                             rs AS (SELECT username role FROM dba_users WHERE oracle_maintained='N' UNION ALL SELECT role FROM dba_roles WHERE oracle_maintained='N' INTERSECT SELECT column_value name FROM table(v_roles_sql)),
-                             rp AS (SELECT rs.role, p.column_value priv FROM rs CROSS JOIN table(v_privs_sql) p),
+                        WITH objs AS (%s),
+                             rs AS (%s),
+                             rp AS (%s),
                              objpr AS (SELECT o.owner, o.object_name, rp.priv, rp.role FROM objs o CROSS JOIN rp)
                         SELECT owner, object_name, role, LISTAGG(priv,',') WITHIN GROUP (ORDER BY priv) privs FROM (
                             SELECT owner, object_name, priv, role FROM objpr
@@ -326,9 +343,9 @@ def main():
                     END LOOP;
                 ELSIF v_state = 'absent' THEN
                     FOR rec IN (
-                        WITH objs AS (SELECT DISTINCT o.owner, o.object_name FROM dba_objects o JOIN table(v_objs_sql) s ON o.owner||'.'||o.object_name LIKE s.column_value ESCAPE '\\' AND v_objtype LIKE '%,'||o.object_type||',%'),
-                             rs AS (SELECT username role FROM dba_users WHERE oracle_maintained='N' UNION ALL SELECT role FROM dba_roles WHERE oracle_maintained='N' INTERSECT SELECT column_value name FROM table(v_roles_sql)),
-                             rp AS (SELECT rs.role, p.column_value priv FROM rs CROSS JOIN table(v_privs_sql) p),
+                        WITH objs AS (%s),
+                             rs AS (%s),
+                             rp AS (%s),
                              objpr AS (SELECT o.owner, o.object_name, rp.priv, rp.role FROM objs o CROSS JOIN rp)
                         SELECT t.owner, t.table_name, t.grantee, LISTAGG(t.privilege,',') WITHIN GROUP (ORDER BY t.privilege) privs
                         FROM dba_tab_privs t JOIN objpr o ON t.owner=o.owner AND t.table_name=o.object_name AND t.privilege=o.priv AND t.grantee=o.role
@@ -341,8 +358,8 @@ def main():
                 -- System/role grants
                 IF v_state = 'present' THEN
                     FOR rec IN (
-                        WITH rs AS (SELECT username role FROM dba_users WHERE oracle_maintained='N' UNION ALL SELECT role FROM dba_roles WHERE oracle_maintained='N' INTERSECT SELECT column_value name FROM table(v_roles_sql)),
-                             rp AS (SELECT rs.role, p.column_value priv FROM rs CROSS JOIN table(v_privs_sql) p)
+                        WITH rs AS (%s),
+                             rp AS (%s)
                         SELECT role, LISTAGG(priv, ',') WITHIN GROUP (ORDER BY priv) privs FROM (
                             SELECT rp.role, rp.priv FROM rp
                             MINUS
@@ -355,8 +372,8 @@ def main():
                     END LOOP;
                 ELSIF v_state = 'absent' THEN
                     FOR rec IN (
-                        WITH rs AS (SELECT username role FROM dba_users WHERE oracle_maintained='N' UNION ALL SELECT role FROM dba_roles WHERE oracle_maintained='N' INTERSECT SELECT column_value name FROM table(v_roles_sql)),
-                             rp AS (SELECT rs.role, p.column_value priv FROM rs CROSS JOIN table(v_privs_sql) p)
+                        WITH rs AS (%s),
+                             rp AS (%s)
                         SELECT s.role, LISTAGG(s.priv, ',') WITHIN GROUP (ORDER BY s.priv) privs FROM
                             (SELECT grantee role, privilege priv FROM dba_sys_privs
                              UNION ALL
@@ -376,7 +393,8 @@ def main():
         :var_errstr:= v_errstr;
         :var_changes:= v_changes;
     END;
-    """, {
+    """ % (objs_subquery, rs_subquery, rp_subquery, objs_subquery, rs_subquery, rp_subquery, rs_subquery, rp_subquery, rs_subquery, rp_subquery)
+    c.execute(plsql_block, {
         'var_changes': var_changes,
         'var_error': var_error,
         'var_errstr': var_errstr,
@@ -384,7 +402,8 @@ def main():
         'var_objs': var_objs,
         'var_objtype': objtypes.upper(),
         'var_roles': var_roles,
-        'var_state': module.params['state']
+        'var_state': module.params['state'],
+        'var_quiet': 1 if module.params['quiet'] else 0
     })
     if var_error.getvalue() > 0:
         conn.rollback()
