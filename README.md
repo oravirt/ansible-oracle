@@ -112,3 +112,10 @@ If the disk is removed from the disk it will be removed from the DG.
 pre-req: cx_Oracle, ldap, re
 
 - Syncronises users/role grants from LDAP/Active Directory to the database
+
+**oracle_privs**
+
+pre-req: cx_Oracle, re
+
+- Manages system and object level grants
+- Object level grant support wildcards, so now it is possible to grant access to all tables in a schema and maintain it automatically!
