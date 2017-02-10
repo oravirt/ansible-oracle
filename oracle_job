@@ -63,6 +63,23 @@ except ImportError:
 else:
     cx_oracle_exists = True
 
+def query_existing(job_owner, job_name):
+    c = conn.cursor()
+    c.execute("""SELECT job_style, program_owner, program_name, job_type, job_action, number_of_arguments, schedule_owner, schedule_name, schedule_type,
+        repeat_interval, job_class, enabled, restartable, state, logging_level, instance_stickiness, destination_owner, destination, credential_owner,
+        credential_name, comments FROM dba_scheduler_jobs WHERE owner = :owner AND job_name = :name""",
+        {"owner": job_owner.upper(), "name": job_name.upper()})
+    result = c.fetchone()
+    if c.rowcount > 0:
+        return {"exists": True, "job_style": result[0], "program_owner": result[1], "program_name": result[2], "job_type": result[3], "job_action": result[4],
+            "number_of_arguments": result[5], "schedule_owner": result[6], "schedule_name": result[7], "schedule_type": result[8],
+            "repeat_interval": result[9], "job_class": result[10], "enabled": result[11], "restartable": result[12], "state": result[13],
+            "logging_level": result[14], "instance_stickiness": result[15], "destination_owner": result[16], "destination": result[17], "credential_owner": result[18],
+            "credential_name": result[19], "comments": result[20]}
+    else:
+        return {"exists": False}
+
+
 # Ansible code
 def main():
     global lconn, conn, lparam, module
@@ -77,23 +94,22 @@ def main():
             mode          = dict(default='normal', choices=["normal","sysdba"]),
             state         = dict(default="enabled", choices=["enabled", "disabled"]),
             job_name      = dict(required=True),
-            job_type      = dict(required=True, choices=[])
-            job_action
-            job_arguments
-            #enabled
-            credential
-            destination
-            restartable
-            job_class
-            job_start
-            job_end
-            repeat_interval
-            logging_level
-            program_name
-            schedule_name
+            job_type      = dict(default="plsql_block", choices=["plsql_block","stored_procedure","executable","external_script","sql_script","backup_script"]),
+            job_action    = dict(required=True),
+            job_arguments = dict(required=False, type='list'),
+            job_style     = dict(default="regular", choices=["regular","lightweight"]),
+            credential    = dict(required=False),
+            destination   = dict(required=False),
+            restartable   = dict(default=False, type='bool'),
+            job_class     = dict(required=False),
+            repeat_interval = dict(required=False),
+            logging_level = dict(required=False, choices=["off","runs","failed runs","full"]),
+            program_name  = dict(required=False),
+            schedule_name = dict(required=False),
+            comments      = dict(required=False)
         ),
         supports_check_mode=True,
-        mutually_exclusive=[['job_action','program_name'],['repeat_interval','schedule_name']]
+        mutually_exclusive=[['schedule_name','repeat_interval'],['program_name','job_action'],['program_name','job_type']]
     )
     # Check for required modules
     if not cx_oracle_exists:
