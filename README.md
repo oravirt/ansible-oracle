@@ -119,3 +119,15 @@ pre-req: cx_Oracle, re
 
 - Manages system and object level grants
 - Object level grant support wildcards, so now it is possible to grant access to all tables in a schema and maintain it automatically!
+
+**oracle_jobclass**
+
+pre-req: cx_Oracle
+
+- Manages DBMS_SCHEDULER job classes
+
+**oracle_job**
+
+pre-req: cx_Oracle, re
+
+- Manages DBMS_SCHEDULER jobs

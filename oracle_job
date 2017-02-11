@@ -92,29 +92,50 @@ def main():
             user          = dict(required=False),
             password      = dict(required=False),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
-            state         = dict(default="enabled", choices=["enabled", "disabled"]),
-            job_name      = dict(required=True),
-            job_type      = dict(default="plsql_block", choices=["plsql_block","stored_procedure","executable","external_script","sql_script","backup_script"]),
-            job_action    = dict(required=True),
-            job_arguments = dict(required=False, type='list'),
-            job_style     = dict(default="regular", choices=["regular","lightweight"]),
+            state         = dict(default="present", choices=["present", "absent"]),
+            enabled       = dict(default=True, type='bool'),
+            job_name      = dict(required=True, aliases=["name"]),
+            job_class     = dict(required=False, aliases=["class"]),
+            job_type      = dict(default="plsql_block", choices=["plsql_block","stored_procedure","executable","external_script","sql_script","backup_script"], aliases=["type"]),
+            job_action    = dict(required=False, aliases=["action"]),
+            job_arguments = dict(required=False, type='list', aliases=["arguments"]),
+            lightweight   = dict(default=False, type='bool'),
             credential    = dict(required=False),
             destination   = dict(required=False),
             restartable   = dict(default=False, type='bool'),
-            job_class     = dict(required=False),
             repeat_interval = dict(required=False),
             logging_level = dict(required=False, choices=["off","runs","failed runs","full"]),
             program_name  = dict(required=False),
             schedule_name = dict(required=False),
-            comments      = dict(required=False)
+            comments      = dict(required=False),
+            auto_drop     = dict(default=False, type='bool'),
+            convert_to_upper = dict(default=True, type='bool')
         ),
         supports_check_mode=True,
-        mutually_exclusive=[['schedule_name','repeat_interval'],['program_name','job_action'],['program_name','job_type']]
+        mutually_exclusive=[['schedule_name','repeat_interval'],['program_name','job_action']]
     )
     # Check for required modules
     if not cx_oracle_exists:
         module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
     # Check input parameters
+    re_name = re.compile("^[A-Za-z0-9_\$#]+\.[A-Za-z0-9_\$#]+$")
+    if not re_name.match(module.params['job_name']):
+        module.fail_json(msg="Invalid job name")
+    job_fullname = module.params['job_name'].upper() if module.params['convert_to_upper'] else module.params['job_name']
+    job_parts = job_fullname.split(".")
+    job_owner = job_parts[0]
+    job_name = job_parts[1]
+    job_fullname = "\"%s\".\"%s\"" % (job_owner, job_name)
+    if module.params['lightweight'] and not module.params['program_name']:
+        module.fail_json(msg="Lightweight jobs can only be created with program_name")
+    if module.params['lightweight'] and module.params['restartable']:
+        module.fail_json(msg="Lightweight jobs can't be restartable")
+    if module.params['state'] == 'present' and not module.params['job_action'] and not module.params['program_name']:
+        module.fail_json(msg="Either job_action or program name must be set")
+    if module.params['program_name'] and not re_name.match(module.params['program_name']):
+        module.fail_json(msg="Invalid program name, must be SCHEMANAME.PROGRAM_NAME")
+    if module.params['schedule_name'] and not re_name.match(module.params['schedule_name']):
+        module.fail_json(msg="Invalid schedule name, must be SCHEMANAME.SCHEDULE_NAME")
     # Connect to database
     hostname = module.params["hostname"]
     port = module.params["port"]
@@ -155,10 +176,121 @@ def main():
     if module.check_mode:
         module.exit_json(changed=False)
     #
-    c = conn.cursor()
+    result = query_existing(job_owner, job_name)
+    #
+    changed = False
+    if not result['exists'] and module.params['state'] == 'present':
+        # Add job
+        changed = True
+        c = conn.cursor()
+        var_args = c.arrayvar(cx_Oracle.STRING, [] if module.params['job_arguments'] is None else module.params['job_arguments'])
+        # Bild the right CREATE_JOB command
+        job_sql = "job_name=>v_name,comments=>v_comments,auto_drop=>v_auto_drop"
+        if module.params['job_class']:
+            job_sql+= ",job_class=>v_job_class"
+        if module.params['program_name']:
+            job_sql+= ",program_name=>v_program_name"
+            if module.params['lightweight']:
+                job_sql+= ",job_style=>v_job_style"
+        else:
+            job_sql+= ",job_type=>v_job_type,job_action=>v_job_action,number_of_arguments=>v_num_args"
+        if module.params['schedule_name']:
+            job_sql+= ",schedule_name=>v_schedule_name"
+        else:
+            job_sql+= ",repeat_interval=>v_repeat_interval"
+        if module.params['credential']:
+            job_sql+= ",credential_name=>v_cred"
+        if module.params['destination']:
+            job_sql+= ",destination_name=>v_dest"
+        c.execute("""
+            DECLARE
+                TYPE str_array IS TABLE OF VARCHAR2(200) INDEX BY BINARY_INTEGER;
+                v_args str_array;
+                v_name VARCHAR2(100);
+                v_num_args NUMBER;
+                v_comments VARCHAR2(4000);
+                v_job_class VARCHAR2(100);
+                v_auto_drop BOOLEAN;
+                v_restartable BOOLEAN;
+                v_enabled BOOLEAN;
+                v_program_name VARCHAR2(100);
+                v_job_style VARCHAR2(10);
+                v_job_type VARCHAR2(20);
+                v_job_action VARCHAR2(4000);
+                v_schedule_name VARCHAR2(100);
+                v_repeat_interval VARCHAR2(100);
+                v_cred VARCHAR2(100);
+                v_dest VARCHAR2(100);
+                v_logging_level PLS_INTEGER;
+            BEGIN
+                -- Assign input
+                v_name:= :var_name;
+                v_job_type:= :var_job_type;
+                v_job_action:= :var_job_action;
+                v_job_style:= :var_job_style;
+                v_job_class:= :var_job_class;
+                v_cred:= :var_credential;
+                v_dest:= :var_destination;
+                v_restartable:= :var_restartable = 1;
+                v_repeat_interval:= :var_repeat_interval;
+                v_logging_level:= CASE :var_logging_level
+                    WHEN 'off' THEN DBMS_SCHEDULER.LOGGING_OFF
+                    WHEN 'runs' THEN DBMS_SCHEDULER.LOGGING_RUNS
+                    WHEN 'failed runs' THEN DBMS_SCHEDULER.LOGGING_FAILED_RUNS
+                    WHEN 'full' THEN DBMS_SCHEDULER.LOGGING_FULL
+                END;
+                v_program_name:= :var_program_name;
+                v_schedule_name:= :var_schedule_name;
+                v_comments:= :var_comments;
+                v_enabled:= :var_enabled = 1;
+                v_auto_drop:= :var_auto_drop = 1;
+                v_args:= :var_args;
+                v_num_args:= v_args.COUNT;
+                -- Execute CREATE_JOB
+                DBMS_SCHEDULER.CREATE_JOB(%s);
+                -- Set parameters
+                DBMS_SCHEDULER.SET_ATTRIBUTE(v_name, 'restartable', v_restartable);
+                IF v_logging_level IS NOT NULL THEN
+                    DBMS_SCHEDULER.SET_ATTRIBUTE(v_name, 'logging_level', v_logging_level);
+                END IF;
+                IF v_num_args > 0 THEN
+                    FOR i IN v_args.FIRST..v_args.LAST LOOP
+                        DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE(job_name=>v_name, argument_position=>i, argument_value=>v_args(i));
+                    END LOOP;
+                END IF;
+                --
+                IF v_enabled THEN
+                    DBMS_SCHEDULER.ENABLE(v_name);
+                END IF;
+            END;""" % job_sql, {
+                "var_name": job_fullname,
+                "var_job_type": module.params['job_type'],
+                "var_job_action": module.params['job_action'],
+                "var_job_style": 'LIGHTWEIGHT' if module.params['lightweight'] else 'REGULAR',
+                "var_job_class": module.params['job_class'],
+                "var_credential": module.params['credential'],
+                "var_destination": module.params['destination'],
+                "var_restartable": 1 if module.params['restartable'] else 0,
+                "var_repeat_interval": module.params['repeat_interval'],
+                "var_logging_level": module.params['logging_level'],
+                "var_program_name": module.params['program_name'],
+                "var_schedule_name": module.params['schedule_name'],
+                "var_comments": module.params['comments'],
+                "var_enabled": 1 if module.params['enabled'] else 0,
+                "var_auto_drop": 1 if module.params['auto_drop'] else 0,
+                "var_args": var_args
+            })
+    elif result['exists'] and module.params['state'] == 'absent':
+        # Drop job
+        c = conn.cursor()
+        c.execute("BEGIN DBMS_SCHEDULER.DROP_JOB(:name); END;", {"name": job_fullname})
+        changed = True
+    elif result['exists'] and module.params['state'] == 'present':
+        # Modify job
+        changed = True
+        pass
 
-    conn.commit()
-    module.exit_json(msg=var_errstr.getvalue(), changed=var_changes.getvalue()>0)
+    module.exit_json(msg=msg[0], changed=changed)
 
 
 from ansible.module_utils.basic import *
