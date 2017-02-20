@@ -1,0 +1,150 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+DOCUMENTATION = '''
+---
+module: oracle_privs
+short_description: Manage object and system privileges in Oracle database
+description:
+    - Manage users/schemas in an Oracle database
+    - Can be run locally on the controlmachine or on a remote host
+version_added: "2.2.1"
+options:
+    hostname:
+        description:
+            - The Oracle database host
+        required: false
+        default: localhost
+    port:
+        description:
+            - The listener port number on the host
+        required: false
+        default: 1521
+    service_name:
+        description:
+            - The database service name to connect to
+        required: true
+    user:
+        description:
+            - The Oracle user name to connect to the database, must have DBA privilege
+        required: False
+    password:
+        description:
+            - The Oracle user password for 'user'
+        required: False
+    mode:
+        description:
+            - The mode with which to connect to the database
+        required: true
+        default: normal
+        choices: ['normal','sysdba']
+    state:
+        description:
+            - If present, then privileges are granted, if absent then privileges are revoked
+        required: true
+        choices: ['present','absent']
+
+notes:
+    - cx_Oracle needs to be installed
+    - Oracle RDBMS 10gR2 or later required
+requirements: [ "cx_Oracle", "re" ]
+author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
+'''
+
+EXAMPLES = '''
+'''
+
+import re
+
+try:
+    import cx_Oracle
+except ImportError:
+    cx_oracle_exists = False
+else:
+    cx_oracle_exists = True
+
+# Ansible code
+def main():
+    global lconn, conn, lparam, module
+    msg = ['']
+    module = AnsibleModule(
+        argument_spec = dict(
+            hostname      = dict(default='localhost'),
+            port          = dict(default=1521, type='int'),
+            service_name  = dict(required=True),
+            user          = dict(required=False),
+            password      = dict(required=False),
+            mode          = dict(default='normal', choices=["normal","sysdba"]),
+            state         = dict(default="enabled", choices=["enabled", "disabled"]),
+            job_name      = dict(required=True),
+            job_type      = dict(required=True, choices=[])
+            job_action
+            job_arguments
+            #enabled
+            credential
+            destination
+            restartable
+            job_class
+            job_start
+            job_end
+            repeat_interval
+            logging_level
+            program_name
+            schedule_name
+        ),
+        supports_check_mode=True,
+        mutually_exclusive=[['job_action','program_name'],['repeat_interval','schedule_name']]
+    )
+    # Check for required modules
+    if not cx_oracle_exists:
+        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
+    # Check input parameters
+    # Connect to database
+    hostname = module.params["hostname"]
+    port = module.params["port"]
+    service_name = module.params["service_name"]
+    user = module.params["user"]
+    password = module.params["password"]
+    mode = module.params["mode"]
+    wallet_connect = '/@%s' % service_name
+    try:
+        if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
+            if mode == 'sysdba':
+                connect = wallet_connect
+                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+            else:
+                connect = wallet_connect
+                conn = cx_Oracle.connect(wallet_connect)
+
+        elif (user and password ):
+            if mode == 'sysdba':
+                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
+                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+            else:
+                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
+                conn = cx_Oracle.connect(user, password, dsn)
+
+        elif (not(user) or not(password)):
+            module.fail_json(msg='Missing username or password for cx_Oracle')
+
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
+        module.fail_json(msg=msg[0], changed=False)
+    if conn.version < "10.2":
+        module.fail_json(msg="Database version must be 10gR2 or greater", changed=False)
+    #
+    if module.check_mode:
+        module.exit_json(changed=False)
+    #
+    c = conn.cursor()
+
+    conn.commit()
+    module.exit_json(msg=var_errstr.getvalue(), changed=var_changes.getvalue()>0)
+
+
+from ansible.module_utils.basic import *
+if __name__ == '__main__':
+    main()
