@@ -190,14 +190,20 @@ def main():
     cursor = conn.cursor()
 
     if sql:
-        sql = sql.rstrip(';')
-        if sql.lower().startswith('select '):
-            result = execute_sql_get(module, msg, cursor, sql)
-            module.exit_json(msg=result, changed=False)
-        else:
+        if sql.lower().startswith('begin '):
             execute_sql(module, msg, cursor,conn, sql)
             msg[0] = 'SQL executed: %s' % (sql)
             module.exit_json(msg=msg[0], changed=True)
+
+        else:
+            sql = sql.rstrip(';')
+            if sql.lower().startswith('select '):
+                result = execute_sql_get(module, msg, cursor, sql)
+                module.exit_json(msg=result, changed=False)
+            else:
+                execute_sql(module, msg, cursor,conn, sql)
+                msg[0] = 'SQL executed: %s' % (sql)
+                module.exit_json(msg=msg[0], changed=True)
     else:
         sqlfile = read_file(msg,module,script)
         sqlfile = clean_sqlfile(sqlfile)
