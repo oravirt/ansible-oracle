@@ -33,7 +33,7 @@
   oracle_inventory_loc: /u01/app/oraInventory
   oracle_base: /u01/app/oracle
   oracle_home_db: "{% if item.0 is defined %}{% if item.0.oracle_home is defined %}{{ item.0.oracle_home}}{% else %}{{ oracle_base }}/{{ item.0.oracle_version_db }}/{{ item.0.home }}{% endif %}{% else %}{% if item.oracle_home is defined %}{{ item.oracle_home }}{% else %}{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}{% endif %}{% endif %}"
-  
+
   oracle_profile_name: "{% if item.oracle_db_name is defined %}.profile_{{ item.oracle_db_name }}{% else %}.profile_{{ item.home }}{% endif %}"    # Name of profile-file. Sets up the environment for that database. One per database
   oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
   oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
@@ -43,6 +43,7 @@
   autostartup_service: false # automatic startup/stop databases service
 
   oracle_sw_image_db:
+       - { filename: linuxx64_12201_database.zip, version: 12.2.0.1 }
        - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2 }
        - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2 }
        - { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1 }
@@ -53,7 +54,7 @@
        - { filename: p10404530_112030_Linux-x86-64_2of7.zip, version: 11.2.0.3 }
 
   oracle_databases:
-    - home: home1
+    - home: db1
       oracle_version_db: 12.1.0.2
       oracle_edition: EE
       oracle_db_name: orcl

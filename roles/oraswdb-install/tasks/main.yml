@@ -147,14 +147,15 @@
      - "{{checkdbswinstall.results}}"
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and item.1.stdout != "1" #and oracle_sw_unpack
+    when: master_node and item.1.stdout != "1"
     tags:
       - oradbinstall
     register: oradbinstall
 
-
-  - debug: var=oradbinstall.stdout_lines
-    with_items: oradbinstall.results
+  - debug: var=item
+    with_items:
+        #- "{{ oradbinstall.results }}"
+        - "{{ oradbinstall.results|map(attribute='stdout_lines')|list }}"
     when: master_node
     tags:
      - oradbinstall
@@ -202,8 +203,9 @@
     tags:
      - opatchls
 
-  - debug: var=opatchls.stdout_lines
-    with_items: "{{opatchls.results}}"
+  - debug: var=item
+    with_items:
+        - "{{ opatchls.results|map(attribute='stdout_lines')|list }}"
     when: master_node
     tags:
      - opatchls
