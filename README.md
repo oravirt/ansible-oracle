@@ -126,6 +126,18 @@ pre-req: cx_Oracle
 
 - Manages DBMS_SCHEDULER job classes
 
+**oracle_jobschedule**
+
+pre-req: cx_Oracle, re
+
+- Manages DBMS_SCHEDULER job schedules
+
+**oracle_jobprogram**
+
+pre-req: cx_Oracle, re
+
+- Manages DBMS_SCHEDULER job programs
+
 **oracle_job**
 
 pre-req: cx_Oracle, re
