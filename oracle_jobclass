@@ -114,7 +114,7 @@ else:
 
 def query_existing(job_class_name):
     c = conn.cursor()
-    c.execute("SELECT resource_consumer_group, service, logging_level, log_history, comments FROM dba_scheduler_job_classes WHERE owner = 'SYS' AND job_class_name = :jobclass",
+    c.execute("SELECT resource_consumer_group, service, logging_level, log_history, comments FROM all_scheduler_job_classes WHERE owner = 'SYS' AND job_class_name = :jobclass",
         {"jobclass": job_class_name.upper()})
     result = c.fetchone()
     if c.rowcount > 0:
