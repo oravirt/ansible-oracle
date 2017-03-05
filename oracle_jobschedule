@@ -3,10 +3,10 @@
 
 DOCUMENTATION = '''
 ---
-module: oracle_jobclass
-short_description: Manage DBMS_SCHEDULER job classes in Oracle database
+module: oracle_jobschedule
+short_description: Manage DBMS_SCHEDULER job schedules in Oracle database
 description:
-    - Manage DBMS_SCHEDULER job classes in Oracle database
+    - Manage DBMS_SCHEDULER job schedules in Oracle database
     - Can be run locally on the controlmachine or on a remote host
 version_added: "2.2.1"
 options:
@@ -45,36 +45,29 @@ options:
         choices: ['present','absent']
     name:
         description:
-            - Job class name
+            - Job schedule name
         required: True
-    resource_group:
+    repeat_interval:
         description:
-            - Resource manager resource consumer group the class is associated with
-        required: False
-    service:
-        description:
-            - Database service under what jobs run as
-        required: False
-    logging:
-        description:
-            - How much information is logged
-        default: failed runs
-        choices: ["off","runs","failed runs","full"]
-    history:
-        description:
-            - Number of days the logs for this job class are retained
-            - If set to 0, no logs will be kept
-        required: False
-        type: int
+            - Schedule repeat interval using DBMS_SCHEDULER calendaring syntax
+        required: True
+        aliases:
+            - interval
     comments:
         description:
             - Comment about the class
         required: False
+    convert_to_upper:
+        description:
+            - Schedule name automatically converted to upper case
+        required: false
+        default: True
+        type: bool
 
 notes:
     - cx_Oracle needs to be installed
     - Oracle RDBMS 10gR2 or later required
-requirements: [ "cx_Oracle" ]
+requirements: [ "cx_Oracle", "re" ]
 author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
 '''
 
@@ -91,19 +84,21 @@ EXAMPLES = '''
       ORACLE_HOME: /usr/lib/oracle/12.1/client64
       LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
   tasks:
-    - name: job class
-      oracle_jobclass:
+    - name: job schedule
+      oracle_jobschedule:
         hostname: "{{ oraclehost }}"
         port: "{{ oracleport }}"
         service_name: "{{ oracleservice }}"
         user: "{{ oracleuser }}"
         password: "{{ oraclepassword }}"
         state: present
-        name: testclass
-        logging: failed runs
-        history: 14
+        name: hr.hourly_schedule
+        interval: FREQ=HOURLY; INTERVAL=1
+        comments: Just for testing
       environment: "{{ oracle_env }}"
 '''
+
+import re
 
 try:
     import cx_Oracle
@@ -112,13 +107,13 @@ except ImportError:
 else:
     cx_oracle_exists = True
 
-def query_existing(job_class_name):
+def query_existing(owner, name):
     c = conn.cursor()
-    c.execute("SELECT resource_consumer_group, service, logging_level, log_history, comments FROM all_scheduler_job_classes WHERE owner = 'SYS' AND job_class_name = :jobclass",
-        {"jobclass": job_class_name.upper()})
+    c.execute("SELECT repeat_interval, comments FROM all_scheduler_schedules WHERE owner = :owner AND schedule_name = :name",
+        {"owner": owner, "name": name})
     result = c.fetchone()
     if c.rowcount > 0:
-        return {"exists": True, "resource_group": result[0], "service": result[1], "logging": result[2], "history": result[3], "comments": result[4]}
+        return {"exists": True, "repeat_interval": result[0], "comments": result[1]}
     else:
         return {"exists": False}
 
@@ -136,11 +131,9 @@ def main():
             mode          = dict(default='normal', choices=["normal","sysdba"]),
             state         = dict(default="present", choices=["present", "absent"]),
             name          = dict(required=True),
-            resource_group= dict(required=False),
-            service       = dict(required=False),
-            logging       = dict(default="failed runs", choices=["off","runs","failed runs","full"]),
-            history       = dict(required=False, type='int'),
-            comments      = dict(required=False)
+            repeat_interval = dict(required=True, aliases=['interval']),
+            comments      = dict(required=False),
+            convert_to_upper = dict(default=True, type='bool')
         ),
         supports_check_mode=True
     )
@@ -148,6 +141,14 @@ def main():
     if not cx_oracle_exists:
         module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
     # Check input parameters
+    re_name = re.compile("^[A-Za-z0-9_\$#]+\.[A-Za-z0-9_\$#]+$")
+    if not re_name.match(module.params['name']):
+        module.fail_json(msg="Invalid schedule name")
+    job_fullname = module.params['name'].upper() if module.params['convert_to_upper'] else module.params['name']
+    job_parts = job_fullname.split(".")
+    job_owner = job_parts[0]
+    job_name = job_parts[1]
+    job_fullname = "\"%s\".\"%s\"" % (job_owner, job_name)
     # Connect to database
     hostname = module.params["hostname"]
     port = module.params["port"]
@@ -190,46 +191,21 @@ def main():
     #
     #c = conn.cursor()
     result_changed = False
-    result = query_existing(module.params['name'])
+    result = query_existing(job_owner, job_name)
     if result['exists'] and module.params['state'] == "present":
         # Check attributes and modify if needed
-        if (result['comments'] != module.params['comments']) or (result['resource_group'] != module.params['resource_group']) or (result['service'] != module.params['service']) or (result['history'] != module.params['history']) or (result['logging'] != module.params['logging'].upper()):
+        if (result['comments'] != module.params['comments']) or (result['repeat_interval'] != module.params['repeat_interval']):
             c = conn.cursor()
             c.execute("""
             DECLARE
                 v_name VARCHAR2(100);
-                v_service VARCHAR2(100);
-                v_logging PLS_INTEGER;
-                v_history PLS_INTEGER;
-                v_resource VARCHAR2(100);
+                v_interval VARCHAR2(1000);
                 v_comments VARCHAR2(4000);
             BEGIN
-                v_logging:= CASE :logging WHEN 'off' THEN DBMS_SCHEDULER.LOGGING_OFF
-                                          WHEN 'runs' THEN DBMS_SCHEDULER.LOGGING_RUNS
-                                          WHEN 'failed runs' THEN DBMS_SCHEDULER.LOGGING_FAILED_RUNS
-                                          WHEN 'full' THEN DBMS_SCHEDULER.LOGGING_FULL
-                            END;
-                v_name:= 'SYS.'||:name;
-                v_resource:= :resource;
-                v_service:= :service;
-                v_history:= :history;
+                v_name:= :name;
+                v_interval:= :interval;
                 v_comments:= :comments;
-                DBMS_SCHEDULER.SET_ATTRIBUTE(v_name, 'logging_level', v_logging);
-                IF v_resource IS NOT NULL THEN
-                    DBMS_SCHEDULER.SET_ATTRIBUTE(v_name, 'resource_consumer_group', v_resource);
-                ELSE
-                    DBMS_SCHEDULER.SET_ATTRIBUTE_NULL(v_name, 'resource_consumer_group');
-                END IF;
-                IF v_service IS NOT NULL THEN
-                    DBMS_SCHEDULER.SET_ATTRIBUTE(v_name, 'service', v_service);
-                ELSE
-                    DBMS_SCHEDULER.SET_ATTRIBUTE_NULL(v_name, 'service');
-                END IF;
-                IF v_history IS NOT NULL THEN
-                    DBMS_SCHEDULER.SET_ATTRIBUTE(v_name, 'log_history', v_history);
-                ELSE
-                    DBMS_SCHEDULER.SET_ATTRIBUTE_NULL(v_name, 'log_history');
-                END IF;
+                DBMS_SCHEDULER.SET_ATTRIBUTE(v_name, 'repeat_interval', v_interval);
                 IF v_comments IS NOT NULL THEN
                     DBMS_SCHEDULER.SET_ATTRIBUTE(v_name, 'comments', v_comments);
                 ELSE
@@ -237,39 +213,25 @@ def main():
                 END IF;
             END;
             """, {
-                "logging": module.params['logging'],
-                "name": module.params['name'].upper(),
-                "resource": module.params['resource_group'],
-                "service": module.params['service'],
-                "history": module.params['history'],
+                "name": job_fullname,
+                "interval": module.params['repeat_interval'],
                 "comments": module.params['comments']
             })
             result_changed = True
     elif result['exists'] and module.params['state'] == "absent":
         # Drop job class
         c = conn.cursor()
-        c.execute("BEGIN DBMS_SCHEDULER.DROP_JOB_CLASS(:name); END;", {"name": module.params['name'].upper()})
+        c.execute("BEGIN DBMS_SCHEDULER.DROP_SCHEDULE(:name); END;", {"name": job_fullname})
         result_changed = True
     elif not result['exists'] and module.params['state'] == "present":
         # Create job class
         c = conn.cursor()
         c.execute("""
-        DECLARE
-            v_logging PLS_INTEGER;
         BEGIN
-            v_logging:= CASE :logging WHEN 'off' THEN DBMS_SCHEDULER.LOGGING_OFF
-                                      WHEN 'runs' THEN DBMS_SCHEDULER.LOGGING_RUNS
-                                      WHEN 'failed runs' THEN DBMS_SCHEDULER.LOGGING_FAILED_RUNS
-                                      WHEN 'full' THEN DBMS_SCHEDULER.LOGGING_FULL
-                        END;
-            DBMS_SCHEDULER.CREATE_JOB_CLASS(job_class_name=>:name, resource_consumer_group=>:resource, service=>:service,
-                logging_level=>v_logging, log_history=>:history, comments=>:comments);
+            DBMS_SCHEDULER.CREATE_SCHEDULE(schedule_name=>:name, repeat_interval=>:interval, comments=>:comments);
         END;""", {
-            "logging": module.params['logging'],
-            "name": module.params['name'].upper(),
-            "resource": module.params['resource_group'],
-            "service": module.params['service'],
-            "history": module.params['history'],
+            "name": job_fullname,
+            "interval": module.params['repeat_interval'],
             "comments": module.params['comments']
         })
         result_changed = True
