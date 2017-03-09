@@ -87,7 +87,7 @@ def query_existing(name):
         c.execute("SELECT attribute, LISTAGG(value,'&') WITHIN GROUP (ORDER BY value) FROM dba_rsrc_group_mappings WHERE consumer_group = :name GROUP BY attribute", {"name": cgname})
         res = c.fetchall()
         for row in res:
-            mappings[row[0]] = set("&".split(row[1]))
+            mappings[row[0]] = set(row[1].split("&"))
         return {"exists": True, "mgmt_mth": result[0], "comments": result[1], "category": result[2], "grants": grants, "mappings": mappings}
     else:
         return {"exists": False}
@@ -99,7 +99,7 @@ def new_grants_list(users, profiles):
     if profiles:
         pusers = []
         c = conn.cursor()
-        inlist = [":%i" % p for p in profiles.keys()]
+        inlist = [":%i" % k for k,v in profiles.iteritems()]
         c.execure("SELECT username FROM dba_users WHERE profile IN (%s))" % ",".join(inlist), [p.upper() for p in profiles])
         res = c.fetchall()
         for row in res:
