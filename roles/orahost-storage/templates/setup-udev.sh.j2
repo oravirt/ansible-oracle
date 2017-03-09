@@ -1,10 +1,12 @@
 #!/bin/bash
 TEMPFILE=/tmp/udev-temp-file
 UDEVRULE=/etc/udev/rules.d/99-asm-devices.rules
+scsi_id_bin={% if ansible_distribution_major_version == '6' %}/sbin/scsi_id{% elif ansible_distribution_major_version == '7' %}/usr/lib/udev/scsi_id{% endif %}
+
 
 if [[ -f $TEMPFILE ]]; then
    rm -f $TEMPFILE
-fi 
+fi
 
 while read -r device label owner group
 do
@@ -14,14 +16,17 @@ if [[ ${device} == /dev/sda ]]; then
  continue
 fi
 
-scsiid=`scsi_id -g -u -d $device`
+scsiid=`$scsi_id_bin -g -u -d $device`
 chkexist=`grep $scsiid $UDEVRULE |wc -l`
 if [[ $chkexist == 1 ]]; then
  echo "Error: $scsiid is already present. Exiting"
  continue
 fi
-echo "KERNEL==\"sd?1\", BUS==\"scsi\", PROGRAM==\"/sbin/scsi_id -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", NAME=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
-
+{% if ansible_distribution_major_version == '6' %}
+echo "KERNEL==\"sd?1\", BUS==\"scsi\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", NAME=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+{% elif ansible_distribution_major_version == '7' %}
+echo "KERNEL==\"sd?1\", SUBSYSTEM==\"block\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+{% endif %}
 done < {{ oracle_rsp_stage }}/udev-device-input.txt
 
 if [[ -f $TEMPFILE ]]; then
@@ -30,4 +35,3 @@ if [[ -f $TEMPFILE ]]; then
 else
    exit 0
 fi
-

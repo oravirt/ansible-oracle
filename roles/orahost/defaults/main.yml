@@ -161,6 +161,7 @@
       - btrfs-progs
       - parted
       - nc
+      - smartmontools
 
   oracle_packages_sles:
       - ksh
@@ -219,15 +220,18 @@
       - { name: net.core.rmem_max, value: 4194304 }
       - { name: net.core.wmem_default, value: 262144 }
       - { name: net.core.wmem_max, value: 1048576 }
+      - { name: kernel.panic_on_oops, value: 1 }
 
   oracle_hugepages:
       - { name: vm.nr_hugepages, value: "{{ nr_hugepages }}" }
 
 
   oracle_seclimits:
-      - { name: 'soft nproc', value: 2047 }
+      - { name: 'soft nproc', value: 16384 }
       - { name: 'hard nproc', value: 16384 }
       - { name: 'soft nofile', value: 4096 }
       - { name: 'hard nofile', value: 65536 }
+      - { name: 'soft stack', value: 10240 }
+      - { name: 'hard stack', value: 32768 }
       - { name: 'soft memlock', value: "{{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }}" }
       - { name: 'hard memlock', value: "{{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }}" }

@@ -17,30 +17,25 @@
     register: asmca
 
   - name: Print Results
-    debug: var=asmca.stdout_lines
-    with_items: asmca.results
+    debug: var=item
+    with_items:
+       - "{{ asmca.results|map(attribute='stdout_lines')|list }}"
+    when: master_node
     tags: asmca
 
-  - name: ASMCA | List ASM diskgroups (11.2)
+  - name: ASMCA | List ASM diskgroups
     shell: "{{ oracle_home_gi }}/bin/srvctl status diskgroup -g {{ item.diskgroup }}"
     with_items: "{{asm_diskgroups}}"
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
-    when: master_node and '11.2' in oracle_install_version_gi
-    tags: srvctlasm
-    register: srvctlasm
-
-  - name: ASMCA | List ASM diskgroups (12.1)
-    shell: "{{ oracle_home_gi }}/bin/srvctl status diskgroup -diskgroup {{ item.diskgroup }}"
-    with_items: "{{asm_diskgroups}}"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
-    when: master_node and '12.1' in oracle_install_version_gi
+    when: master_node
     tags: srvctlasm
     register: srvctlasm
 
 
   - name: list diskgroups
-    debug: var=srvctlasm.stdout_lines
-    with_items: "{{srvctlasm.results}}"
+    debug: var=item
+    with_items:
+       - "{{ srvctlasm.results|map(attribute='stdout_lines')|list }}"
+    when: master_node
     tags: srvctlasm
