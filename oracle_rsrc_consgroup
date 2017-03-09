@@ -1,0 +1,237 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+DOCUMENTATION = '''
+---
+module: oracle_rsrc_consgroup
+short_description: Manage DBMS_RESOURCE_MANAGER consumer groups
+description:
+    - Manage DBMS_RESOURCE_MANAGER consumer groups
+    - Can be run locally on the controlmachine or on a remote host
+version_added: "2.2.1"
+options:
+    hostname:
+        description:
+            - The Oracle database host
+        required: false
+        default: localhost
+    port:
+        description:
+            - The listener port number on the host
+        required: false
+        default: 1521
+    service_name:
+        description:
+            - The database service name to connect to
+        required: true
+    user:
+        description:
+            - The Oracle user name to connect to the database, must have DBA privilege
+        required: False
+    password:
+        description:
+            - The Oracle user password for 'user'
+        required: False
+    mode:
+        description:
+            - The mode with which to connect to the database
+        required: true
+        default: normal
+        choices: ['normal','sysdba']
+    state:
+        description:
+            - If present, then privileges are granted, if absent then privileges are revoked
+        required: true
+        choices: ['present','absent']
+    name:
+        description:
+            - Resource consumer group name
+        required: True
+    comments:
+        description:
+            - Comment about the group
+        required: False
+
+notes:
+    - cx_Oracle needs to be installed
+    - Oracle RDBMS 11gR2 or later required
+requirements: [ "cx_Oracle", "re" ]
+author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
+'''
+
+EXAMPLES = '''
+'''
+
+import re
+
+try:
+    import cx_Oracle
+except ImportError:
+    cx_oracle_exists = False
+else:
+    cx_oracle_exists = True
+
+def query_existing(name):
+    c = conn.cursor()
+    c.execute("SELECT mgmt_method, comments, category FROM dba_rsrc_consumer_groups WHERE consumer_group = :name",
+        {"name": name.upper()})
+    result = c.fetchone()
+    if c.rowcount > 0:
+        return {"exists": True, "mgmt_mth": result[0], "comments": result[1], "category": result[2]}
+    else:
+        return {"exists": False}
+
+# Ansible code
+def main():
+    global lconn, conn, msg, module
+    msg = ['']
+    module = AnsibleModule(
+        argument_spec = dict(
+            hostname      = dict(default='localhost'),
+            port          = dict(default=1521, type='int'),
+            service_name  = dict(required=True),
+            user          = dict(required=False),
+            password      = dict(required=False),
+            mode          = dict(default='normal', choices=["normal","sysdba"]),
+            state         = dict(default="present", choices=["present", "absent"]),
+            name          = dict(required=True),
+            mgmt_mth      = dict(default='round-robin'),
+            category      = dict(default='other'),
+            comments      = dict(required=False),
+            map_client_id = dict(required=False, type='list'),
+            map_client_machine = dict(required=False, type='list'),
+            map_client_os_user = dict(required=False, type='list'),
+            map_client_program = dict(required=False, type='list'),
+            map_module_name = dict(required=False, type='list'),
+            map_module_name_action = dict(required=False, type='list'),
+            map_oracle_function = dict(required=False, type='list'),
+            map_oracle_user = dict(required=False, type='list'),
+            map_oracle_user_profile = dict(required=False, type='list'),
+            map_service_module = dict(required=False, type='list'),
+            map_service_module_action = dict(required=False, type='list'),
+            map_service_name = dict(required=False, type='list'),
+            grant_name    = dict(required=False, type='list', aliases=['grant','grant_user','grant_role','grants']),
+            grant_user_profile = dict(required=False, type='list')
+        ),
+        supports_check_mode=True
+    )
+    # Check for required modules
+    if not cx_oracle_exists:
+        module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
+    # Check input parameters
+    re_name = re.compile("^[A-Za-z0-9_\$#]+\.[A-Za-z0-9_\$#]+$")
+#    if not re_name.match(module.params['name']):
+#        module.fail_json(msg="Invalid schedule name")
+    # Connect to database
+    hostname = module.params["hostname"]
+    port = module.params["port"]
+    service_name = module.params["service_name"]
+    user = module.params["user"]
+    password = module.params["password"]
+    mode = module.params["mode"]
+    wallet_connect = '/@%s' % service_name
+    try:
+        if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
+            if mode == 'sysdba':
+                connect = wallet_connect
+                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+            else:
+                connect = wallet_connect
+                conn = cx_Oracle.connect(wallet_connect)
+
+        elif (user and password ):
+            if mode == 'sysdba':
+                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
+                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+            else:
+                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
+                conn = cx_Oracle.connect(user, password, dsn)
+
+        elif (not(user) or not(password)):
+            module.fail_json(msg='Missing username or password for cx_Oracle')
+
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
+        module.fail_json(msg=msg[0], changed=False)
+    if conn.version < "10.2":
+        module.fail_json(msg="Database version must be 10gR2 or greater", changed=False)
+    #
+    if module.check_mode:
+        module.exit_json(changed=False)
+    #
+    #c = conn.cursor()
+    result_changed = False
+    result = query_existing(module.params['name'])
+    if result['exists'] and module.params['state'] == "present":
+        # Check attributes and modify if needed
+        if (result['comments'] != module.params['comments']) or (result['mgmt_mth'] != module.params['mgmt_mth']) or (result['category'] != module.params['category']):
+            c = conn.cursor()
+            c.execute("""
+            DECLARE
+                v_name VARCHAR2(50);
+                v_comment DBA_RSRC_CONSUMER_GROUPS.COMMENTS%type;
+                v_mgmt_mth VARCHAR2(50);
+                v_category VARCHAR2(50);
+            BEGIN
+                v_name:= :name;
+                v_comment:= :comments;
+                v_mgmt_mth:= :mgmt_mth;
+                v_category:= :category;
+                DBMS_RESOURCE_MANAGER.CREATE_PENDING_AREA;
+                DBMS_RESOURCE_MANAGER.UPDATE_CONSUMER_GROUP(consumer_group=>v_name, new_comment=>v_comment, new_mgmt_mth=>v_mgmt_mth, new_category=>v_category);
+                DBMS_RESOURCE_MANAGER.VALIDATE_PENDING_AREA;
+                DBMS_RESOURCE_MANAGER.SUBMIT_PENDING_AREA;
+            END;""", {
+                "name": module.params['name'],
+                "comments": module.params['comments'],
+                "mgmt_mth": module.params['mgmt_mth'],
+                "category": module.params['category']
+            })
+            result_changed = True
+    elif result['exists'] and module.params['state'] == "absent":
+        # Drop job class
+        c = conn.cursor()
+        c.execute("""
+        BEGIN
+            DBMS_RESOURCE_MANAGER.CREATE_PENDING_AREA;
+            DBMS_RESOURCE_MANAGER.DELETE_CONSUMER_GROUP(:name);
+            DBMS_RESOURCE_MANAGER.VALIDATE_PENDING_AREA;
+            DBMS_RESOURCE_MANAGER.SUBMIT_PENDING_AREA;
+        END;""", {"name": module.params['name']})
+        result_changed = True
+    elif not result['exists'] and module.params['state'] == "present":
+        # Create job class
+        c = conn.cursor()
+        c.execute("""
+        DECLARE
+            v_name VARCHAR2(50);
+            v_comment DBA_RSRC_CONSUMER_GROUPS.COMMENTS%type;
+            v_mgmt_mth VARCHAR2(50);
+            v_category VARCHAR2(50);
+        BEGIN
+            v_name:= :name;
+            v_comment:= :comments;
+            v_mgmt_mth:= :mgmt_mth;
+            v_category:= :category;
+            DBMS_RESOURCE_MANAGER.CREATE_PENDING_AREA;
+            DBMS_RESOURCE_MANAGER.CREATE_CONSUMER_GROUP(consumer_group=>v_name, comment=>v_comment, mgmt_mth=>v_mgmt_mth, category=>v_category);
+            DBMS_RESOURCE_MANAGER.VALIDATE_PENDING_AREA;
+            DBMS_RESOURCE_MANAGER.SUBMIT_PENDING_AREA;
+        END;""", {
+            "name": module.params['name'],
+            "comments": module.params['comments'],
+            "mgmt_mth": module.params['mgmt_mth'],
+            "category": module.params['category']
+        })
+        result_changed = True
+
+    conn.commit()
+    module.exit_json(msg=", ".join(msg), changed=result_changed)
+
+
+from ansible.module_utils.basic import *
+if __name__ == '__main__':
+    main()
