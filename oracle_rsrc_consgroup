@@ -72,14 +72,40 @@ else:
     cx_oracle_exists = True
 
 def query_existing(name):
+    cgname = name.upper()
     c = conn.cursor()
     c.execute("SELECT mgmt_method, comments, category FROM dba_rsrc_consumer_groups WHERE consumer_group = :name",
-        {"name": name.upper()})
+        {"name": cgname})
     result = c.fetchone()
     if c.rowcount > 0:
-        return {"exists": True, "mgmt_mth": result[0], "comments": result[1], "category": result[2]}
+        grants = set()
+        c.execute("SELECT grantee FROM dba_rsrc_consumer_group_privs WHERE granted_group = :name", {"name": cgname})
+        res = c.fetchall()
+        for row in res:
+            grants.add(row[0])
+        mappings = {}
+        c.execute("SELECT attribute, LISTAGG(value,'&') WITHIN GROUP (ORDER BY value) FROM dba_rsrc_group_mappings WHERE consumer_group = :name GROUP BY attribute", {"name": cgname})
+        res = c.fetchall()
+        for row in res:
+            mappings[row[0]] = set("&".split(row[1]))
+        return {"exists": True, "mgmt_mth": result[0], "comments": result[1], "category": result[2], "grants": grants, "mappings": mappings}
     else:
         return {"exists": False}
+
+def new_grants_list(users, profiles):
+    # Just add the user list to set
+    s = set([u.upper() for u in users] if users else [])
+    # For profiles get the user list that have this profile
+    if profiles:
+        pusers = []
+        c = conn.cursor()
+        inlist = [":%i" % p for p in profiles.keys()]
+        c.execure("SELECT username FROM dba_users WHERE profile IN (%s))" % ",".join(inlist), [p.upper() for p in profiles])
+        res = c.fetchall()
+        for row in res:
+            pusers.add(row[0])
+        s.update(pusers)
+    return s
 
 # Ansible code
 def main():
@@ -167,7 +193,7 @@ def main():
     result = query_existing(module.params['name'])
     if result['exists'] and module.params['state'] == "present":
         # Check attributes and modify if needed
-        if (result['comments'] != module.params['comments']) or (result['mgmt_mth'] != module.params['mgmt_mth']) or (result['category'] != module.params['category']):
+        if (result['comments'] != module.params['comments']) or (result['mgmt_mth'] != module.params['mgmt_mth'].upper()) or (result['category'] != module.params['category'].upper()):
             c = conn.cursor()
             c.execute("""
             DECLARE
@@ -180,6 +206,7 @@ def main():
                 v_comment:= :comments;
                 v_mgmt_mth:= :mgmt_mth;
                 v_category:= :category;
+                DBMS_RESOURCE_MANAGER.CLEAR_PENDING_AREA;
                 DBMS_RESOURCE_MANAGER.CREATE_PENDING_AREA;
                 DBMS_RESOURCE_MANAGER.UPDATE_CONSUMER_GROUP(consumer_group=>v_name, new_comment=>v_comment, new_mgmt_mth=>v_mgmt_mth, new_category=>v_category);
                 DBMS_RESOURCE_MANAGER.VALIDATE_PENDING_AREA;
@@ -196,6 +223,7 @@ def main():
         c = conn.cursor()
         c.execute("""
         BEGIN
+            DBMS_RESOURCE_MANAGER.CLEAR_PENDING_AREA;
             DBMS_RESOURCE_MANAGER.CREATE_PENDING_AREA;
             DBMS_RESOURCE_MANAGER.DELETE_CONSUMER_GROUP(:name);
             DBMS_RESOURCE_MANAGER.VALIDATE_PENDING_AREA;
@@ -216,6 +244,7 @@ def main():
             v_comment:= :comments;
             v_mgmt_mth:= :mgmt_mth;
             v_category:= :category;
+            DBMS_RESOURCE_MANAGER.CLEAR_PENDING_AREA;
             DBMS_RESOURCE_MANAGER.CREATE_PENDING_AREA;
             DBMS_RESOURCE_MANAGER.CREATE_CONSUMER_GROUP(consumer_group=>v_name, comment=>v_comment, mgmt_mth=>v_mgmt_mth, category=>v_category);
             DBMS_RESOURCE_MANAGER.VALIDATE_PENDING_AREA;
