@@ -137,3 +137,9 @@ pre-req: cx_Oracle, re
 pre-req: cx_Oracle, re
 
 - Manages DBMS_SCHEDULER jobs
+
+**oracle_rsrc_consgroup**
+
+pre-req: cx_Oracle, re
+
+- Manages resource manager consumer groups including its mappings and grants
