@@ -15,10 +15,10 @@
   - name: ASM-storage | Run script to create partitions
     shell: sh {{ oracle_rsp_stage }}/part-device-{{ item.diskgroup }}.sh
     with_items: "{{asm_diskgroups}}"
-    when: master_node
+    when: master_node and partition_devices
     tags: asmstorage
 
   - include: dm-multipath-kpartx.yml
-    when: multipath == 'dm-multipath'
+    when: multipath == 'dm-multipath' and partition_devices
 
   - include: "{{ device_persistence }}.yml"
