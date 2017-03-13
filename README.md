@@ -132,6 +132,12 @@ pre-req: cx_Oracle, re
 
 - Manages DBMS_SCHEDULER job schedules
 
+**oracle_jobwindow**
+
+pre-req: cx_Oracle, datetime
+
+- Manages DBMS_SCHEDULER windows
+
 **oracle_job**
 
 pre-req: cx_Oracle, re
