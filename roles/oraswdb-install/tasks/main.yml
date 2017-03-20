@@ -185,13 +185,13 @@
     sudo: yes
     sudo_user: "{{ oracle_user }}"
     tags:
-      - glogin
+      - glogindb
 
   - name: Add additional info to glogin.sql (2)
     lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line='set time on' backup=yes
     with_items: "{{oracle_databases}}"
     tags:
-      - glogin
+      - glogindb
 
   - name: Check opatch lsinventory (DB)
     shell: "{{ oracle_home_db }}/OPatch/opatch lsinventory"

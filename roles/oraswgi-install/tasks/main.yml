@@ -106,13 +106,13 @@
   - name: Add additional info to glogin.sql (1)
     lineinfile: dest="{{ oracle_home_gi }}/sqlplus/admin/glogin.sql" line='set sqlprompt "_user @ _connect_identifier:>"' backup=yes
     tags:
-      - glogin
+      - glogingi
     when: checkgiinstall.stdout != "1"
 
   - name: Add additional info to glogin.sql (2)
     lineinfile: dest="{{ oracle_home_gi }}/sqlplus/admin/glogin.sql" line='set time on' backup=yes
     tags:
-      - glogin
+      - glogingi
     when: checkgiinstall.stdout != "1"
 
   - name: Check opatch lsinventory (GI)
