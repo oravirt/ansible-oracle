@@ -128,7 +128,7 @@ def create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_usern
         return False
     else:
         if save_state:
-            sql = 'alter pluggable database %s save state' % (name)
+            sql = 'alter pluggable database %s save state instances=all' % (name)
             execute_sql(module, msg, cursor, sql)
 
         return True #<-- all is well
