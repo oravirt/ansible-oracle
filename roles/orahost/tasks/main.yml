@@ -272,13 +272,16 @@
 
   - name: Create stage directory
     file: dest={{ oracle_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags: stagedir
 
   - name: Create rsp stage directory
     file: dest={{ oracle_rsp_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    tags: stagedir
 
   - name: Create udev stage directory
     file: dest={{ oracle_stage }}/udev mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     when: device_persistence == 'udev'
+
 
   - name: Asmlib | Configure Oracle Asmlib (1)
     template: src=oracleasm-configure.expect.j2  dest={{ oracle_rsp_stage }}/asmlib-configure.expect owner=root mode=0777 force=yes
