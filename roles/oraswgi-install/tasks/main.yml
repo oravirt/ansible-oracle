@@ -102,6 +102,7 @@
     tags:
       - updatenodelist
     when : master_node and checkgiinstall.stdout != "1"
+    ignore_errors: true
 
   - name: Add additional info to glogin.sql (1)
     lineinfile: dest="{{ oracle_home_gi }}/sqlplus/admin/glogin.sql" line='set sqlprompt "_user @ _connect_identifier:>"' backup=yes
