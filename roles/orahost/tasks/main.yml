@@ -57,7 +57,8 @@
     tags: etchosts
 
   - name: Add host to /etc/hosts if needed
-    lineinfile: dest=/etc/hosts regexp='.*{{ ansible_fqdn }}$' line="{{ ansible_default_ipv4.address }} {{ ansible_hostname }} {{ ansible_fqdn }}" state=present
+    #lineinfile: dest=/etc/hosts regexp='.*{{ ansible_fqdn }}$' line="{{ ansible_default_ipv4.address }} {{ ansible_hostname }} {{ ansible_fqdn }}" state=present
+    lineinfile: dest=/etc/hosts regexp='.*{{ ansible_fqdn }}$' line="{{ etc_hosts_ip }} {{ ansible_hostname }} {{ ansible_fqdn }}" state=present
     when: "'find {{ ansible_hostname }}: NXDOMAIN' in ns.stdout or 'find {{ ansible_hostname }}: SERVFAIL' in ns.stdout or configure_etc_hosts"
     tags: etchosts
 

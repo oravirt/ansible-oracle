@@ -29,6 +29,7 @@
   grid_user: grid
   grid_install_user: "{% if role_separation==true %}{{grid_user }}{% else %}{{ oracle_user }}{% endif %}"
   configure_oracle_sudo: true
+  etc_hosts_ip: "{% if 'virtualbox' in ansible_virtualization_type %}{{ansible_all_ipv4_addresses[1]}}{% else %}{{ansible_default_ipv4.address}}{%endif%}"
 
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
   grid_user_home: "/home/{{ grid_install_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
