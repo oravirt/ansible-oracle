@@ -2,7 +2,7 @@
 
   hostgroup: "{{ group_names[0] }}"
   oracle_dbca_rsp: "dbca_{{ item.0.oracle_db_name }}.rsp"        # Name of responsefile used by dbca. One per database
-
+  oracle_netca_rsp: "netca_{{ item.home }}.rsp"
   master_node: true
   oracle_user: oracle                        # User that will own the Oracle Installations.
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
@@ -24,10 +24,14 @@
   datafile_dest: "{% if item.0.storage_type|upper == 'FS' %}{{ oracle_dbf_dir_fs }}{% elif item.0.storage_type|upper == 'ASM' %}{{ oracle_dbf_dir_asm }}{% else %}{% endif %}"
   recoveryfile_dest: "{% if item.0.storage_type|upper == 'FS' %}{{ oracle_reco_dir_fs }}{% elif item.0.storage_type|upper == 'ASM' %}{{ oracle_reco_dir_asm }}{% else %}{% endif %}"
   configure_cluster: false
-  oracle_install_option_gi: "none"
+  #oracle_install_option_gi: "none"
   oracle_gi_cluster_type: STANDARD
   hostgroup_hub: "{{ hostgroup }}-hub"
   hostgroup_leaf: "{{ hostgroup }}-leaf"
+  create_listener: "{% if oracle_install_option_gi is defined %}False{% else %}true{% endif %}"
+  listener_name: LISTENER
+  listener_protocols: TCP
+  listener_port: 1521
 
 
 

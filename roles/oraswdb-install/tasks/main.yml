@@ -159,6 +159,7 @@
     when: master_node
     tags:
      - oradbinstall
+    ignore_errors: true
 
 
 #  - name: Run oraInstroot script after installation
@@ -209,6 +210,7 @@
     when: master_node
     tags:
      - opatchls
+    ignore_errors: true
 
   - name: Unmount nfs share with installation media
     mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=absent
@@ -220,6 +222,7 @@
     shell: ps -e|grep " 1 ?"|cut -d " " -f15
     tags:
     - checkinitdaemons
+    - autostartup_service
     register: checkinitdaemons
     when: autostartup_service
 
@@ -228,19 +231,22 @@
     become: true
     with_items: "{{oracle_databases}}"
     when: autostartup_service and checkinitdaemons.stdout == "init"
+    tags: autostartup_service
 
   - name: Register dbora service (init.d)
     command: "chkconfig --add dbora"
     become: true
     when: autostartup_service and checkinitdaemons.stdout == "init"
-
+    tags: autostartup_service
   # Prepare for Linux 7
-  #- name: Configure oracle-rdbms auto-startup service (systemd.d)
-    #template: src=oracle-rdbms-service.j2 dest=/etc/systemd/system/oracle-rdbms.service owner=root
-    #become: true
-    #with_items: "{{oracle_databases}}"
-    #when: autostartup_service  and checkinitdaemons.stdout == "systemd"
+  - name: Configure oracle-rdbms auto-startup service (systemd.d)
+    template: src=oracle-rdbms-service.j2 dest=/etc/systemd/system/oracle-rdbms.service owner=root
+    become: true
+    with_items: "{{oracle_databases}}"
+    when: autostartup_service and checkinitdaemons.stdout == "systemd"
+    tags: autostartup_service
 
-  #- name: Register oracle-rdbms service (system.d)
-    #systemd: name=oracle-rdbms daemon_reload=yes enabled=yes
-    #when: autostartup_service and checkinitdaemons.stdout == "systemd"
+  - name: Register oracle-rdbms service (system.d)
+    systemd: name=oracle-rdbms daemon_reload=yes enabled=yes
+    when: autostartup_service and checkinitdaemons.stdout == "systemd" #and ansible_version.full >= "2.2"
+    tags: autostartup_service

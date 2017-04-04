@@ -1,5 +1,9 @@
 ---
 
+  - include: listener.yml
+    when: create_listener
+    tags: listener
+
   - name: Check if database is already created
     shell: grep {{ item.oracle_db_name }}:{{ oracle_home_db }} /etc/oratab |wc -l
     with_items: "{{oracle_databases}}"
@@ -7,12 +11,6 @@
     tags:
     - checkifdbexists
     register: checkdbexist
-
-#  - debug: var=checkdbexist.stdout
-#    with_items: checkdbexist.results
-#    when: master_node
-#    tags:
-#    - checkifdbexists
 
   - name: Create responsefile for dbca
     template: src=dbca-create-db.rsp.{{ item.0.oracle_version_db }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}  owner={{ oracle_user }} group={{ oracle_group }} mode=644 backup=no
@@ -23,10 +21,6 @@
     when: master_node and item.1.stdout != "1"
     tags:
     - dbcaresponse
-
-#  - name: Check memory
-#    debug: msg="memfree={{ ansible_memfree_mb }}M totalmem={{ ansible_memtotal_mb }}M need 616M free"
-#    failed_when: "{{ ansible_memfree_mb }} < 616"
 
   - name: Create database(s)
     shell: "time {{ oracle_home_db }}/bin/dbca -createDatabase -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent -redoLogFileSize {{ item.0.redolog_size_in_mb }} "
@@ -45,28 +39,8 @@
          - "{{ oradbcreate.results|map(attribute='stdout_lines')|list }}"
     tags:
      - oradbcreate
-    when: oradbcreate.changed
+    when: oradbcreate.changed and master_node
 
-#  - name: Add default services to databases
-#    shell: "{{ oracle_home_db }}/bin/srvctl add service -db {{ item.value.oracle_database }}
-#    with_dict: oracle_databases
-#    when: master_node and oracle_install_option_gi == 'HA_CONFIG'
-#    tags:
-#      - oradbcreate
-#    register: oradbcreate
-
-#  - name: Check if database is registered
-#    shell: "{{ oracle_home_db }}/bin/srvctl config database "
-#    when: oracle_install_option_gi == 'CRS_CONFIG' or oracle_install_option_gi == 'HA_CONFIG'
-#    tags:
-#      - srvctlconfig
-#    register: srvctlconfig
-
-
-#  - debug: var=srvctlconfig.stdout_lines
-#    when: oracle_install_option_gi == 'CRS_CONFIG' or oracle_install_option_gi == 'HA_CONFIG'
-#    tags:
-#     - srvctlconfig
   - name: Add dotprofile (1)
     shell:  ps -ef | grep "ora_pmon_{{ item.oracle_db_name }}" |grep -v grep | sed 's/^.*pmon_//g'
     with_items: "{{oracle_databases}}"
@@ -88,6 +62,21 @@
     - "{{oracle_databases}}"
     - "{{dbs.results}}"
     when: item.0.oracle_db_type != "SI"
+    tags: update_oratab
+
+  - name: Customize oratab for autostart
+    lineinfile: dest=/etc/oratab line="{{ item.oracle_db_name }}:{{ oracle_home_db }}:Y" state=present
+    with_items:
+         - "{{ oracle_databases }}"
+    when: autostartup_service
+    tags: update_oratab
+
+  - name: Customize oratab for autostart
+    lineinfile: dest=/etc/oratab line="{{ item.oracle_db_name }}:{{ oracle_home_db }}:N" state=absent
+    with_items:
+         - "{{ oracle_databases }}"
+    when: autostartup_service
+    become: yes
     tags: update_oratab
 
   - name: Check if database is running
