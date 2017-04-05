@@ -21,7 +21,9 @@
 
   oracle_user: oracle
   oracle_group: oinstall
-  oracle_sw_copy: false 
+
+  install_from_nfs: false
+  oracle_sw_copy: false
   oracle_sw_unpack: true
   oracle_stage: /u01/stage
   oracle_stage_remote: /media/swrepo
@@ -31,69 +33,103 @@
   configure_interconnect: false
   configure_ssh: true
   configure_host_disks: true
-                                          
+
   install_os_packages: false
   configure_epel_repo: false
   configure_public_yum_repo: false
   disable_selinux: false
-  
+
 ################ Grid Infrastructure specifics ################
   configure_cluster: false
-  oracle_install_option_gi: HA_CONFIG  
-  oracle_install_version_gi: 11.2.0.4
+  oracle_install_option_gi: HA_CONFIG
+  oracle_install_version_gi: 12.2.0.1
 
   oracle_password: Oracle123
   oracle_asm_init_dg: crs
 
 
   oracle_databases:                                               # Dictionary describing the databases to be installed
-        - home: home1                                                   # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
-          oracle_version_db: 11.2.0.4                         # Oracle versiono
+        - home: db1                                                   # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
+          oracle_version_db: 12.2.0.1                        # Oracle versiono
           oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
-          oracle_db_name: asmdb                                 # Database name
+          oracle_db_name: orclcdb                                 # Database name
           oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
           oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
-          is_container: "false"                                # (true/false) Is the database a container database
-          pdb_prefix: pdb
+          is_container: True                                # (true/false) Is the database a container database
+          pdb_prefix: orclpdb
           num_pdbs: 1
-          is_racone: "false"                                   # (true/false) Is the database a RAC ONE NODE Database
           storage_type: ASM                                     # Database storage to be used. ASM or FS.
-          service_name: asmdb_serv                               # Inital service to be created (not in use yet)
-          oracle_init_params: "open_cursors=300,processes=500" # Specific parameters to be set during installation. Comma-separated list
-          oracle_db_mem_percent: 25                            # Amount of RAM to be used for SGA
+          oracle_db_mem_totalmb: 1024                            # Amount of RAM to be used for SGA
           oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
           redolog_size_in_mb: 100
+          datafile_dest: '+DATA'
+          recoveryfile_dest: '+FRA'
           state: present
+## The following will create a new database (non-cdb) running from the same home as above (/u01/app/oracle/12.2.0.1/db1)
+        # - home: db1                                            # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.2.0.1/db1)
+        #   oracle_version_db: 12.2.0.1                          # Oracle versiono (12.2.0.1,12.1.0.2,12.1.0.1,11.2.0.4,11.2.0.3)
+        #   oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+        #   oracle_db_name: orcl                                 # Database name
+        #   oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
+        #   oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
+        #   is_container: false                                # (true/false) Is the database a container database
+        #   storage_type: ASM                                     # Database storage to be used. ASM or FS.
+        #   oracle_db_mem_totalmb: 1024                            # Amount of RAM to be used for SGA
+        #   oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+        #   redolog_size_in_mb: 100
+        #   datafile_dest: '+DATA'
+        #   recoveryfile_dest: '+FRA'
+        #   state: present
 
+## The following will install a new ORACLE_HOME with version 11.2.0.4 and a database called running out of that home
+        # - home: db1                                            # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.2.0.1/db1)
+        #   oracle_version_db: 11.2.0.4                          # Oracle versiono (12.2.0.1,12.1.0.2,12.1.0.1,11.2.0.4,11.2.0.3)
+        #   oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+        #   oracle_db_name: fsdb                                 # Database name
+        #   oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
+        #   oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
+        #   is_container: false                                # (true/false) Is the database a container database
+        #   storage_type: ASM                                     # Database storage to be used. ASM or FS.
+        #   oracle_db_mem_totalmb: 1024                            # Amount of RAM to be used for SGA
+        #   oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+        #   redolog_size_in_mb: 100
+        #   datafile_dest: '+DATA'
+        #   recoveryfile_dest: '+FRA'
+        #   state: present
 
-  oracle_dbf_dir_asm: "DATA"
-  oracle_reco_dir_asm: "FRA"                                                                                                                                                                                                               
   host_fs_layout:
-      u01:
-        {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora, fstype: ext4}
+   - vgname: vgora
+     state: present
+     filesystem:
+       - {mntp: /u01, lvname: lvora, lvsize: 100%FREE, fstype: ext4}
+     disk:
+       - {device: /dev/sdb, pvname: /dev/sdb1}
 
-  asm_diskgroups: 
+  asm_diskgroups:
     - diskgroup: crs
-      properties: 
+      properties:
         - {redundancy: external, ausize: 4}
-      attributes: 
+      attributes:
         - {name: 'compatible.rdbms', value: 11.2.0.4.0}
-        - {name: 'compatible.asm', value: 12.1.0.2.0}
+        - {name: 'compatible.asm', value: "{{ oracle_install_version_gi }}"}
       disk:
         - {device: /dev/sdc, asmlabel: crs01}
     - diskgroup: data
-      properties: 
+      properties:
         - {redundancy: external, ausize: 4}
-      attributes: 
+      attributes:
         - {name: compatible.rdbms, value: 11.2.0.4.0}
-        - {name: compatible.asm, value: 12.1.0.2.0}
+        - {name: 'compatible.asm', value: "{{ oracle_install_version_gi }}"}
       disk:
-        - {device: /dev/sde, asmlabel: data01}
+        - {device: /dev/sdd, asmlabel: data01}
+        - {device: /dev/sde, asmlabel: data02}
     - diskgroup: fra
-      properties: 
+      properties:
         - {redundancy: external, ausize: 4}
-      attributes: 
+      attributes:
         - {name: compatible.rdbms, value: 11.2.0.4.0}
-        - {name: compatible.asm, value: 12.1.0.2.0}
+        - {name: 'compatible.asm', value: "{{ oracle_install_version_gi }}"}
       disk:
         - {device: /dev/sdf, asmlabel: fra01}
+        - {device: /dev/sdg, asmlabel: fra02}
+        - {device: /dev/sdh, asmlabel: fra03}
