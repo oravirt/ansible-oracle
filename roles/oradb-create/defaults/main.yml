@@ -2,7 +2,7 @@
 
   hostgroup: "{{ group_names[0] }}"
   oracle_dbca_rsp: "dbca_{{ item.0.oracle_db_name }}.rsp"        # Name of responsefile used by dbca. One per database
-  oracle_netca_rsp: "netca_{{ item.home }}.rsp"
+  oracle_netca_rsp: "netca_{{ item.home }}_{{ listener_name_template }}.rsp"
   master_node: true
   oracle_user: oracle                        # User that will own the Oracle Installations.
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
@@ -28,7 +28,10 @@
   oracle_gi_cluster_type: STANDARD
   hostgroup_hub: "{{ hostgroup }}-hub"
   hostgroup_leaf: "{{ hostgroup }}-leaf"
-  create_listener: "{% if oracle_install_option_gi is defined %}False{% else %}true{% endif %}"
+  create_listener: "{% if oracle_install_option_gi is defined %}False{% elif oracle_install_option_gi is undefined %}{% if item.listener_name is defined %}True{% else %}False{% endif %}{% endif %}"
+  listener_name_template: "{% if item.listener_name is defined %}{{ item.listener_name }}{% else %}{{ listener_name }}{% endif %}"
+  listener_protocols_template: "{% if item.listener_protocols is defined %}{{ item.listener_protocols }}{% else %}{{ listener_protocols }}{% endif %}"
+  listener_port_template: "{% if item.listener_port is defined %}{{ item.listener_port }}{% else %}{{ listener_port }}{% endif %}"
   listener_name: LISTENER
   listener_protocols: TCP
   listener_port: 1521
@@ -37,19 +40,20 @@
 
 # This is an example layout of a database installation
   oracle_databases:                                            # Dictionary describing the databases to be installed
-        - home: db1                                          # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
-          oracle_version_db: 12.1.0.2                          # Oracle versiono
+        - home: db1                                            # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
+          oracle_version_db: 12.2.0.1                          # Oracle versiono
           oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
           oracle_db_name: orcl                                 # Database name
           oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
           oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
-          is_container: "false"                                # (true/false) Is the database a container database
+          is_container: False                                  # (true/false) Is the database a container database
           pdb_prefix: pdb
           num_pdbs: 1
           storage_type: FS                                     # Database storage to be used. ASM or FS.
           service_name: orcl_serv                              # Inital service to be created (not in use yet)
-          oracle_init_params: "open_cursors=300,processes=700" # Specific parameters to be set during installation. Comma-separated list
+          oracle_init_params: ""                               # Specific parameters to be set during installation. Comma-separated list
           oracle_db_mem_totalmb: 1024                          # Amount of RAM to be used for SGA + PGA
           oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
           redolog_size_in_mb: 100
+          listener_name: LISTENER
           state: present                                        # present | absent
