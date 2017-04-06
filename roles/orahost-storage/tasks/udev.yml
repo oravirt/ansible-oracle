@@ -20,7 +20,7 @@
   tags: udev
 
 - name: udev | Reload rules
-  shell: partprobe; udevadm control --reload-rules
+  shell: partprobe;sleep 5; udevadm control --reload-rules; udevadm trigger
   when: device_persistence == 'udev'
   tags: udev
 
