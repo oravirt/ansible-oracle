@@ -21,6 +21,7 @@
     with_items:
        - "{{ asmca.results|map(attribute='stdout_lines')|list }}"
     when: master_node
+    ignore_errors: true
     tags: asmca
 
   - name: ASMCA | List ASM diskgroups
@@ -38,4 +39,5 @@
     with_items:
        - "{{ srvctlasm.results|map(attribute='stdout_lines')|list }}"
     when: master_node
+    ignore_errors: true
     tags: srvctlasm
