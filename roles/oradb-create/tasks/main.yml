@@ -40,6 +40,7 @@
     tags:
      - oradbcreate
     when: oradbcreate.changed and master_node
+    ignore_errors: true
 
   - name: Add dotprofile (1)
     shell:  ps -ef | grep "ora_pmon_{{ item.oracle_db_name }}" |grep -v grep | sed 's/^.*pmon_//g'
