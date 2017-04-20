@@ -19,8 +19,8 @@
   oracle_profile_name: ".profile_{{ item.oracle_db_name }}"       # Name of profile-file. Sets up the environment for that database. One per database
   oracle_dbf_dir_fs: /u01/oradata/                                # If storage_type=FS this is where the database is placed.
   oracle_reco_dir_fs: /u01/fra/                                   # If storage_type=FS this is where the fast recovery area is placed.
-  oracle_dbf_dir_asm: "DATA"                                        # If storage_type=ASM this is where the database is placed.
-  oracle_reco_dir_asm: "FRA"                                        # If storage_type=ASM this is where the fast recovery area is placed
+  oracle_dbf_dir_asm: '+DATA'                                        # If storage_type=ASM this is where the database is placed.
+  oracle_reco_dir_asm: '+FRA'                                        # If storage_type=ASM this is where the fast recovery area is placed
   datafile_dest: "{% if item.0.storage_type|upper == 'FS' %}{{ oracle_dbf_dir_fs }}{% elif item.0.storage_type|upper == 'ASM' %}{{ oracle_dbf_dir_asm }}{% else %}{% endif %}"
   recoveryfile_dest: "{% if item.0.storage_type|upper == 'FS' %}{{ oracle_reco_dir_fs }}{% elif item.0.storage_type|upper == 'ASM' %}{{ oracle_reco_dir_asm }}{% else %}{% endif %}"
   configure_cluster: false
