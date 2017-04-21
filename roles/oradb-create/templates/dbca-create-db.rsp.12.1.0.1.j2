@@ -97,8 +97,11 @@ DATABASECONFTYPE  = "{{ item.0.oracle_db_type }}"
 # Default value : None
 # Mandatory     : No [required in case DATABASECONFTYPE is set to RACONENODE ]
 #-----------------------------------------------------------------------------
-RACONENODESERVICENAME = "{{ item.0.service_name }}"
-
+{% if item.0.oracle_db_type|upper == 'RACONENODE' %}
+RACONENODESERVICENAME={{ item.0.service_name }}
+{% else %}
+#RACONENODESERVICENAME =
+{% endif %}
 #-----------------------------------------------------------------------------
 # Name          : POLICYMANAGED
 # Datatype      : Boolean

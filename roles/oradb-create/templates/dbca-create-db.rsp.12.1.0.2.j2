@@ -86,7 +86,7 @@ GDBNAME = "{{ item.0.oracle_db_name }}"
 # Default value : SI
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-DATABASECONFTYPE  = "{{ item.0.oracle_db_type }}"
+DATABASECONFTYPE  = {{ item.0.oracle_db_type }}
 
 #-----------------------------------------------------------------------------
 # Name          : RACONENODESERVICENAME
@@ -98,7 +98,7 @@ DATABASECONFTYPE  = "{{ item.0.oracle_db_type }}"
 # Mandatory     : No [required in case DATABASECONFTYPE is set to RACONENODE ]
 #-----------------------------------------------------------------------------
 {% if item.0.oracle_db_type|upper == 'RACONENODE' %}
-RACONENODESERVICENAME = "{{ item.0.service_name }}"
+RACONENODESERVICENAME={{ item.0.service_name }}
 {% else %}
 #RACONENODESERVICENAME =
 {% endif %}
