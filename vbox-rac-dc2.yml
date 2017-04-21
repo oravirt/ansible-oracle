@@ -1,28 +1,28 @@
 ---
  - name: Host configuration
-   hosts: vbox-rac-dc1
+   hosts: vbox-rac-dc2
    user: vagrant
    sudo: yes
    roles:
       - common
       - orahost
 
- - name: Storage Configuration 
-   hosts: vbox-rac-dc1
+ - name: Storage Configuration
+   hosts: vbox-rac-dc2
    user: vagrant
    sudo: yes
    roles:
       - orahost-storage
 
  - name: Oracle Grid Infrastructure installation
-   hosts: vbox-rac-dc1
+   hosts: vbox-rac-dc2
    user: vagrant
    sudo: yes
    roles:
       - oraswgi-install
 
  - name: ASM Configuration, Database Server Installation & Database Creation
-   hosts: vbox-rac-dc1
+   hosts: vbox-rac-dc2
    user: vagrant
    sudo: yes
    roles:
@@ -31,16 +31,15 @@
       - oradb-create
 
  - name: Install cx_oracle
-   hosts: vbox-rac-dc1
+   hosts: vbox-rac-dc2
    user: vagrant
    sudo: yes
    roles:
       - cxoracle
 
  - name: Configure Logrotate
-   hosts: vbox-rac-dc1
+   hosts: vbox-rac-dc2
    user: vagrant
    sudo: yes
    roles:
       - orahost-logrotate
-
