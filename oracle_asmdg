@@ -207,22 +207,36 @@ def ensure_diskgroup_state(cursor, module, msg, name, state, disks, attribute_na
     disk_sql    = 'alter diskgroup %s ' % (name.upper())
     change_attr = False
     change_disk = False
+    get_ro_attr_sql = 'select distinct(name) from v$asm_attribute where read_only = \'Y\''
+    read_only_attributes = []
 
     # Deal with attribute differences
-    if attribute_name and attribute_value: #and len(attribute_name) >= 1 and len(attribute_value) >= 1:
+    if (attribute_name and attribute_value):
+        # Get all read only attributes
+        get_ro_attr = execute_sql_get(module, msg, cursor, get_ro_attr_sql)
+        for a in get_ro_attr:
+            read_only_attributes.append(a[0])
+
         # Make sure properties are lower case
         attribute_name =  [x.lower() for x in attribute_name]
         attribute_value =  [y.lower() for y in attribute_value]
         wanted_attributes = zip(attribute_name,attribute_value)
 
+        # Make sure we don't try to modify read only attributes. Removing them from the wanted_attributes list
+        for a in wanted_attributes:
+            if a[0] in read_only_attributes:
+                wanted_attributes.remove(a)
+
         # Check the current attributes
-        attribute_names_ =','.join(['\''+str(n)+'\'' for n in (attribute_name)])
-        current_properties = get_current_properties (cursor, module, msg, name, attribute_names_)
-        # Convert to dict and compare current with wanted
-        if cmp(dict(current_properties),dict(wanted_attributes)) is not 0:
-            change_attr = True
-            for i in wanted_attributes:
-                total_sql.append("alter diskgroup %s set attribute '%s'='%s'" % (name, i[0], i[1]))
+        attribute_names_ =','.join(['\''+str(n[0])+'\'' for n in (wanted_attributes)])
+        # Only get current attributes if we still have attributes in the wanted list
+        if len(attribute_names_) != 0:
+            current_properties = get_current_properties (cursor, module, msg, name, attribute_names_)
+            # Convert to dict and compare current with wanted
+            if cmp(dict(current_properties),dict(wanted_attributes)) is not 0:
+                change_attr = True
+                for i in wanted_attributes:
+                    total_sql.append("alter diskgroup %s set attribute '%s'='%s'" % (name, i[0], i[1]))
 
 
     list_current_name = []
@@ -259,9 +273,6 @@ def ensure_diskgroup_state(cursor, module, msg, name, state, disks, attribute_na
     	disk_sql += "'%s'" % remove_disk
     if change_disk:
         total_sql.append(disk_sql)
-
-    # msg[0] = 'sql: %s' % (total_sql)
-    # module.exit_json(msg=msg[0], changed=False)
 
     if ensure_diskgroup_state_sql(module,msg,cursor,total_sql):
         msg[0] = 'Diskgroup %s has been put in the intended state' % (name)
