@@ -139,7 +139,9 @@ def modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
     if name.startswith(starters):
         name = quote_name(name)
 
-
+    if module.check_mode:
+        module.exit_json(changed=True)
+        
     if value.startswith(starters) or contains in value:
         value = quote_value(value)
 
@@ -183,7 +185,10 @@ def reset_parameter(module, mode, msg, cursor, name, value, scope, sid):
     if not(name):
         module.fail_json(msg='Error: Missing parameter name', changed=False)
         return False
-
+    
+    if module.check_mode:
+        module.exit_json(changed=True)
+        
     if name.startswith(starters):
         name = quote_name(name)
 
@@ -248,10 +253,8 @@ def main():
             state         = dict(default="present", choices=["present", "absent","reset"]),
             scope         = dict(default="both", choices=["both", "spfile", "memory"]),
             sid           = dict(default="*"),
-
-
         ),
-
+        supports_check_mode=True
     )
 
     hostname = module.params["hostname"]
