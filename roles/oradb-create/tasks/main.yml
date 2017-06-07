@@ -43,7 +43,7 @@
     ignore_errors: true
 
   - name: Add dotprofile (1)
-    shell:  ps -ef | grep "ora_pmon_{{ item.oracle_db_name }}" |grep -v grep | sed 's/^.*pmon_//g'
+    shell:  ps -ef | grep -w "ora_pmon_{{ item.oracle_db_name }}" |grep -v grep | sed 's/^.*pmon_//g'
     with_items: "{{oracle_databases}}"
     register: dbs
     tags:
