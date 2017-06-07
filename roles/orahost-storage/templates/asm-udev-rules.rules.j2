@@ -1,3 +1,7 @@
-{% for disk in asm_storage_layout[item]    %}
-KERNEL=="{{ disk.device.split("/")[-1]  }}1", NAME="{{oracle_asm_disk_string.split("/",2)[-1] }}{{ disk.asmlabel }}", OWNER="{{ grid_install_user }}", GROUP={% if role_separation==True %}"{{ asmdba_group }}"{% else %}"{{ dba_group }}"{% endif %}, MODE="0660" 
+{% for disk in asm_storage_layout[item] %}
+{% if use_partition_devices  %}
+KERNEL=="{{ disk.device.split("/")[-1]  }}1", NAME="{{oracle_asm_disk_string.split("/",2)[-1] }}{{ disk.asmlabel }}", OWNER="{{ grid_install_user }}", GROUP={% if role_separation==True %}"{{ asmdba_group }}"{% else %}"{{ dba_group }}"{% endif %}, MODE="0660"
+{% elif not use_partition_devices  %}
+KERNEL=="{{ disk.device.split("/")[-1]  }}", NAME="{{oracle_asm_disk_string.split("/",2)[-1] }}{{ disk.asmlabel }}", OWNER="{{ grid_install_user }}", GROUP={% if role_separation==True %}"{{ asmdba_group }}"{% else %}"{{ dba_group }}"{% endif %}, MODE="0660"
+{% endif %}
 {% endfor %}

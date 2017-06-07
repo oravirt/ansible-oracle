@@ -9,6 +9,12 @@ partno=p1
 partno=1
 {% endif %}
 
+{% if use_partition_devices %}
+used_device=${device}${partno}
+{% elif not use_partition_devices %}
+used_device=${device}
+{% endif %}
+
 
 
 #if [[ $# -ne 2 ]]; then
@@ -22,19 +28,19 @@ if [[ ${device} == /dev/sda ]]; then
  continue
 fi
 
-if [[ ! -e ${device}${partno} ]]; then
- echo "Error: Partition ${device}$partno does not exist"
+if [[ ! -e ${used_device} ]]; then
+ echo "Error: Partition ${used_device} does not exist"
  continue
 fi
 
-chkdisk=`service oracleasm querydisk ${device}${partno} |grep 'is marked an ASM disk' |wc -l`
+chkdisk=`service oracleasm querydisk ${used_device} |grep 'is marked an ASM disk' |wc -l`
 if [[ $chkdisk == 1 ]]; then
- echo "Error: ${device}${partno} is already marked as ASM-disk"
+ echo "Error: ${used_device} is already marked as ASM-disk"
  continue
 fi
 
-echo "Creating ASM Label ${asmlabel} on ${device}"
-service oracleasm createdisk ${asmlabel} ${device}${partno}
-service oracleasm querydisk  ${device}${partno}
+echo "Creating ASM Label ${asmlabel} on ${used_device}"
+service oracleasm createdisk ${asmlabel} ${used_device}
+service oracleasm querydisk  ${used_device}
 
 done < {{ oracle_rsp_stage }}/asm-label-device-mapping-{{ item.diskgroup }}.txt
