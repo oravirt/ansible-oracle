@@ -20,6 +20,25 @@ options:
             - The intended state of the diskgroup. 'status' will just show the status of the diskgroup
         default: present
         choices: ['present','absent','status']
+    disks:
+        description:
+            - A list of disks that should be part of the diskgroup. Only the listed disks will be part of the DG, meaning if the disk is removed from the list it will also be removed from the DG
+        default: None
+    redundancy:
+        description:
+            - The redundancy configuration for the diskgroup, It does not yet support putting disks in specific failure groups
+        default: external
+        choices: ['external','normal','high']
+    attribute_name:
+        description:
+            - The attribute name (e.g compatible.rdbms)
+        default: None
+        aliases: ['an']
+    attribute_value:
+        description:
+            - The attribute value (e.g 12.1.0.2)
+        default: None
+        aliases: ['av']
     username:
         description:
             - The ASM username
@@ -66,7 +85,36 @@ author: Mikael Sandström, oravirt@gmail.com, @oravirt
 
 EXAMPLES = '''
 # Create a diskgroup
-oracle_asmdg: un=sys pw=oracle123 sn='+ASM' host=localhost oh=/u01/app/oracle/12.1.2.0/grid name=MYDG1 disks=ORCL:MYDG1,ORCL:MYDG2 redundancy=external state=present
+oracle_asmdg:
+        name: MYDG1
+        disks:
+           - ORCL:MYDG1
+           - ORCL:MYDG2
+        attribute_name: compatible.asm
+        attribute_value: 12.1.0.2
+        redundancy: external
+        state: present
+        un: sys
+        pw: oracle123
+        sn: '+ASM'
+        host: localhost
+        oh: /u01/app/oracle/12.1.2.0/grid
+
+oracle_asmdg:
+        name: DATA
+        disks:
+           - /dev/oracle/data1
+           - /dev/oracle/data2
+        attributes:
+            - {name: compatible.asm, value: 12.2.0.1.0 }
+            - {name: compatible.rdbms, value: 12.2.0.1.0 }
+        redundancy: external
+        state: present
+        un: sys
+        pw: oracle123
+        sn: '+ASM'
+        host: localhost
+        oh: /u01/app/oracle/12.2.0.1/grid
 
 '''
 import os
@@ -91,15 +139,24 @@ def check_diskgroup_exists(cursor, module, msg, name):
     else:
         return False
 
-def create_diskgroup(cursor, module, msg, oracle_home, name, disks, redundancy):
+def create_diskgroup(cursor, module, msg, oracle_home, name, disks, redundancy, attribute_name, attribute_value):
+
+    add_attr = False
+    if not any(x == 'None' for x in attribute_name):
+        add_attr = True
+    if not any(x == None for x in attribute_name):
+        add_attr = True
 
 
+    if add_attr:
+        attributes =','.join(['\''+str(n)+'\'' +'='+'\''+ str(v) + '\'' for n,v in zip(attribute_name,attribute_value)])
 
     disklist = "','".join(disks)
-
     sql = 'create diskgroup %s ' % (name)
     sql += '%s redundancy ' % (redundancy)
     sql += 'disk \'%s\' ' % (disklist)
+    if add_attr:
+        sql += ' attribute %s' % (attributes.lower())
 
     if execute_sql(module, msg, cursor, sql):
         if rac:
@@ -143,13 +200,48 @@ def remove_diskgroup(cursor, module, msg, oracle_home, name):
         else:
             return False
 
-def ensure_diskgroup_state(cursor, module, msg, name, state, disks):
+def ensure_diskgroup_state(cursor, module, msg, name, state, disks, attribute_name, attribute_value):
 
-    disk_sql = 'alter diskgroup %s ' % (name.upper())
+    total_sql   = []
+    #disk_sql    = []
+    disk_sql    = 'alter diskgroup %s ' % (name.upper())
+    change_attr = False
+    change_disk = False
+    get_ro_attr_sql = 'select distinct(name) from v$asm_attribute where read_only = \'Y\''
+    read_only_attributes = []
+
+    # Deal with attribute differences
+    if (attribute_name and attribute_value):
+        # Get all read only attributes
+        get_ro_attr = execute_sql_get(module, msg, cursor, get_ro_attr_sql)
+        for a in get_ro_attr:
+            read_only_attributes.append(a[0])
+
+        # Make sure properties are lower case
+        attribute_name =  [x.lower() for x in attribute_name]
+        attribute_value =  [y.lower() for y in attribute_value]
+        wanted_attributes = zip(attribute_name,attribute_value)
+
+        # Make sure we don't try to modify read only attributes. Removing them from the wanted_attributes list
+        for a in wanted_attributes:
+            if a[0] in read_only_attributes:
+                wanted_attributes.remove(a)
+
+        # Check the current attributes
+        attribute_names_ =','.join(['\''+str(n[0])+'\'' for n in (wanted_attributes)])
+        # Only get current attributes if we still have attributes in the wanted list
+        if len(attribute_names_) != 0:
+            current_properties = get_current_properties (cursor, module, msg, name, attribute_names_)
+            # Convert to dict and compare current with wanted
+            if cmp(dict(current_properties),dict(wanted_attributes)) is not 0:
+                change_attr = True
+                for i in wanted_attributes:
+                    total_sql.append("alter diskgroup %s set attribute '%s'='%s'" % (name, i[0], i[1]))
+
 
     list_current_name = []
     list_current_path = []
-    list_wanted = [x.upper() for x in disks]
+    list_wanted = [x.upper() if ':' in x else x for x in disks]
     list_current = get_current_disks(cursor, module, msg, name)
 
     for p,n in list_current:
@@ -165,42 +257,52 @@ def ensure_diskgroup_state(cursor, module, msg, name, state, disks):
 
     add_disk =  "','".join(list_add)
     remove_disk=  "','".join(remove_disks)
-    if sorted(list_current_path) == sorted(list_wanted):
+    if sorted(list_current_path) == sorted(list_wanted) and change_attr == False:
     	msg[0] = "Diskgroup %s is in the intended state" % (name)
     	module.exit_json(msg=msg[0], changed=False)
 
     if len(list_add)>= 1:
-    	disk_sql += ' add disk '
+        change_disk = True
+        disk_sql += ' add disk '
     	disk_sql += "'%s'" % add_disk
 
     if len(list_remove) >= 1:
-    	disk_sql += ' drop disk '
+        #disk_sql    = 'alter diskgroup %s ' % (name.upper())
+        change_disk = True
+        disk_sql += ' drop disk '
     	disk_sql += "'%s'" % remove_disk
+    if change_disk:
+        total_sql.append(disk_sql)
 
-    if execute_sql(module, msg, cursor, disk_sql):
+    if ensure_diskgroup_state_sql(module,msg,cursor,total_sql):
         msg[0] = 'Diskgroup %s has been put in the intended state' % (name)
         module.exit_json(msg=msg[0], changed=True)
     else:
         return False
 
+def ensure_diskgroup_state_sql(module,msg,cursor,total_sql):
 
+    for a in total_sql:
+        execute_sql(module, msg, cursor, a)
+    return True
 
 def get_current_disks(cursor, module, msg, name):
 
 
-    sql = 'select upper(d.path),upper(d.name) from v$asm_disk d, v$asm_diskgroup dg '
+    sql = 'select d.path,d.name from v$asm_disk d, v$asm_diskgroup dg '
     sql += 'where dg.group_number = d.group_number '
     sql += 'and upper(dg.name) = \'%s\'' % (name.upper())
 
     result = execute_sql_get(module, msg, cursor, sql)
     return result
 
-def get_current_properties(cursor, module, msg, name):
+def get_current_properties(cursor, module, msg, name,attribute_names_):
 
 
     sql = 'select lower(a.name),lower(a.value) from v$asm_attribute a, v$asm_diskgroup dg '
-    sql += 'where dg.group_number = d.group_number '
-    sql += 'and upper(dg.name) = \'%s\'' % (name.upper())
+    sql += 'where dg.group_number = a.group_number '
+    sql += 'and upper(dg.name) = \'%s\' ' % (name.upper())
+    sql += 'and a.name in (%s) ' % (attribute_names_.lower())
 
     result = execute_sql_get(module, msg, cursor, sql)
     return result
@@ -245,6 +347,8 @@ def main():
             name                = dict(required=True, aliases = ['diskgroup','dg']),
             disks               = dict(required=False, type='list'),
             redundancy          = dict(default="external", choices = ["external","normal","high"]),
+            attribute_name      = dict(required=False, type='list', aliases=['an']),
+            attribute_value     = dict(required=False, type='list', aliases=['av']),
             state               = dict(default="present", choices = ["present", "absent", "status"]),
             user                = dict(required=False, aliases = ['un','username']),
             password            = dict(required=False, no_log=True, aliases = ['pw']),
@@ -262,6 +366,8 @@ def main():
     name                = module.params["name"]
     disks               = module.params["disks"]
     redundancy          = module.params["redundancy"]
+    attribute_name      = module.params["attribute_name"]
+    attribute_value     = module.params["attribute_value"]
     state               = module.params["state"]
     user                = module.params["user"]
     password            = module.params["password"]
@@ -311,14 +417,13 @@ def main():
 
     if state == 'present':
         if not check_diskgroup_exists(cursor, module, msg, name):
-             if create_diskgroup(cursor, module, msg, oracle_home, name, disks, redundancy):
+             if create_diskgroup(cursor, module, msg, oracle_home, name, disks, redundancy, attribute_name, attribute_value):
                  msg[0] = 'Successfully created diskgroup %s ' % (name)
                  module.exit_json(msg=msg[0], changed=True)
              else:
                  module.fail_json(msg=msg[0], changed=False)
         else:
-            ensure_diskgroup_state(cursor, module, msg, name, state, disks)
-
+            ensure_diskgroup_state(cursor, module, msg, name, state, disks, attribute_name, attribute_value)
 
     elif state == 'absent' :
         if check_diskgroup_exists(cursor, module, msg, name):
