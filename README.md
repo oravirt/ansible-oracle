@@ -159,3 +159,9 @@ pre-req: cx_Oracle, re
 pre-req: cx_Oracle, datetime
 
 - Manages AWR snapshot settings
+
+**oracle_facts**
+
+pre-req: cx_Oracle
+
+- Gathers facts about Oracle database
