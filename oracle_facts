@@ -173,7 +173,9 @@ def main():
         temp_tablespace = query_result("select 0 con_id, ts.name, ts.bigfile, round(sum(bytes)/1024/1024) size_mb, count(*) tempfiles# from v$tablespace ts join v$tempfile df on df.ts#=ts.ts# group by ts.name, ts.bigfile order by 1,2")
     redolog = query_result("select group#, thread#, sequence#, round(bytes/1024/1024) mb, blocksize, archived, status from v$log order by thread#,group#")
     option = star_query("v$option")
-    parameter = query_result("select name, value, isdefault from v$parameter order by 1")
+    parameter = {}
+    for param in query_result("select name, value, isdefault from v$parameter order by 1"):
+      parameter[param['NAME']] = { 'isdefault': param['ISDEFAULT'], 'value': param['VALUE'] }
     # USERENV
     sql = "SELECT sys_context('USERENV','CURRENT_USER') current_user, sys_context('USERENV','DATABASE_ROLE') database_role, sys_context('USERENV','ISDBA') isdba, sys_context('USERENV','ORACLE_HOME') oracle_home"
     if conn.version >= '12.1':
