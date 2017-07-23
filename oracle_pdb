@@ -81,13 +81,38 @@ author: Mikael Sandström, oravirt@gmail.com, @oravirt
 
 EXAMPLES = '''
 # Creates a pdb on a different filesystem
-oracle_pdb: name=pdb1 sourcedb=cdb1 dfd=/u02/oradata/pdb1 state=present un=system pw=Oracle123
+oracle_pdb: name=pdb1 sourcedb=cdb1 dfd=/u02/oradata/pdb1 state=present un=system pw=Oracle123 oracle_home=/u01/app/oracle/12.2.0.1/db
 
 # Remove a pdb
-oracle_pdb: name=pdb1 sourcedb=cdb1 state=absent un=system pw=Oracle123
+oracle_pdb: name=pdb1 sourcedb=cdb1 state=absent un=system pw=Oracle123 oracle_home=/u01/app/oracle/12.2.0.1/db
 
 # Check the status for a pdb
-oracle_pdb: name=pdb1 sourcedb=cdb1 state=status un=system pw=Oracle123
+oracle_pdb: name=pdb1 sourcedb=cdb1 state=status un=system pw=Oracle123 oracle_home=/u01/app/oracle/12.2.0.1/db
+
+
+# Unplug a pdb
+oracle_pdb:
+    name=pdb1
+    sourcedb=cdb1
+    unplug_dest=/tmp/unplugged-pdb.xml
+    state=unplugged
+    un=sys
+    pw=Oracle123
+    mode=sysdba
+    sn=cdb1
+    oracle_home=/u01/app/oracle/12.2.0.1/db1
+
+# plug in a pdb
+oracle_pdb:
+    name=plug1
+    sourcedb=cdb2
+    plug_dest=/tmp/unplugged-pdb.xml
+    state=present
+    un=sys
+    pw=Oracle123
+    mode=sysdba
+    sn=cdb1
+    oracle_home=/u01/app/oracle/12.2.0.1/db2
 
 '''
 import os
@@ -114,35 +139,62 @@ def check_pdb_exists(cursor, module, msg, name):
         return False
 
 
-def create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username, pdb_admin_password, datafile_dest, save_state):
+def quote_string(item):
 
-    command = '%s/bin/dbca -silent -createPluggableDatabase -pdbName %s -sourceDB %s' % (oracle_home, name, sourcedb)
-    command += ' -pdbAdminUserName %s -pdbAdminPassword %s ' % (pdb_admin_username, pdb_admin_password)
-
-    if datafile_dest != None:
-        command += ' -pdbDatafileDestination %s' % (datafile_dest)
-
-    (rc, stdout, stderr) = module.run_command(command)
-    if rc != 0:
-        msg[0] = 'Error, stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
-        return False
+    if len(value) > 0:
+        return "'%s'" % (value)
     else:
-        if save_state:
-            sql = 'alter pluggable database %s save state' % (name)
-            execute_sql(module, msg, cursor, sql)
+        return value
 
+def create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username, pdb_admin_password, datafile_dest, save_state, unplug_dest):
+
+    run_sql = []
+    opensql = 'alter pluggable database %s open' % (name)
+    createsql = 'create pluggable database %s ' % (name)
+
+    if unplug_dest is not None:
+        createsql += ' using \'%s\' ' % (unplug_dest)
+        createsql += ' nocopy tempfile reuse'
+
+    if unplug_dest is None:
+        createsql += ' admin user %s identified by %s ' % (pdb_admin_username, pdb_admin_password)
+
+    if datafile_dest != None and unplug_dest is None:
+        createsql += ' create_file_dest = \'%s\'' % (datafile_dest)
+    run_sql.append(createsql)
+    run_sql.append(opensql)
+    for a in run_sql:
+        execute_sql(module, msg, cursor, a)
+    if save_state:
+        sql = 'alter pluggable database %s save state instances=all' % (name)
+        execute_sql(module, msg, cursor, sql)
         return True #<-- all is well
+
+def unplug_pdb(cursor, module, msg, oracle_home, name, unplug_dest):
+
+    run_sql = []
+    close_sql = 'alter pluggable database %s close immediate instances=all' % (name)
+    unplug_sql = 'alter pluggable database %s unplug into \'%s\'' % (name,unplug_dest)
+    drop_sql = 'drop pluggable database %s keep datafiles ' % (name)
+
+    run_sql.append(close_sql)
+    run_sql.append(unplug_sql)
+    run_sql.append(drop_sql)
+    for a in run_sql:
+        execute_sql(module, msg, cursor, a)
+    return True #<-- all is well
 
 def remove_pdb(cursor, module, msg, oracle_home, name, sourcedb):
 
-    command = '%s/bin/dbca -silent -deletePluggableDatabase -pdbName %s -sourceDB %s' % (oracle_home, name, sourcedb)
+    run_sql = []
+    close_sql = 'alter pluggable database %s close force instances=all' % (name)
+    dropsql = 'drop pluggable database %s including datafiles' % (name)
 
-    (rc, stdout, stderr) = module.run_command(command)
-    if rc != 0:
-        msg[0] = 'Error, stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
-        return False
-    else:
-        return True
+    run_sql.append(close_sql)
+    run_sql.append(dropsql)
+    for a in run_sql:
+        execute_sql(module,msg,cursor,a)
+    return True
 
 def check_pdb_status(cursor, module, msg, name):
 
@@ -227,12 +279,14 @@ def main():
         argument_spec = dict(
             name                = dict(required=True, aliases = ['pdb','pdb_name']),
             oracle_home         = dict(default=None, aliases = ['oh']),
-            sourcedb            = dict(required=True, aliases = ['db','container']),
-            state               = dict(default="present", choices = ["present", "absent", "open", "closed", "read_write", "read_only", "restricted", "status"]),
+            sourcedb            = dict(required=True, aliases = ['db','container','cdb']),
+            state               = dict(default="present", choices = ["present", "absent", "open", "closed", "read_write", "read_only", "restricted", "status", "unplugged"]),
             save_state          = dict(default=True, type = 'bool'),
             pdb_admin_username  = dict(required=False, default = 'pdb_admin', aliases = ['pdbadmun']),
             pdb_admin_password  = dict(required=False, default = 'pdb_admin', aliases = ['pdbadmpw']),
             datafile_dest       = dict(required=False, aliases = ['dfd']),
+            unplug_dest         = dict(required=False, aliases = ['plug_dest','upd','pd']),
+            file_name_convert   = dict(required=False, aliases = ['fnc']),
             user                = dict(required=False, aliases = ['un','username']),
             password            = dict(required=False, no_log=True, aliases = ['pw']),
             mode                = dict(default="normal", choices = ["sysdba", "normal"]),
@@ -255,6 +309,8 @@ def main():
     pdb_admin_username  = module.params["pdb_admin_username"]
     pdb_admin_password  = module.params["pdb_admin_password"]
     datafile_dest       = module.params["datafile_dest"]
+    unplug_dest         = module.params["unplug_dest"]
+    file_name_convert   = module.params["file_name_convert"]
     user                = module.params["user"]
     password            = module.params["password"]
     mode                = module.params["mode"]
@@ -313,7 +369,7 @@ def main():
 
     if state in ('present','closed', 'open', 'restricted','read_only','read_write'):
         if not check_pdb_exists(cursor, module, msg, name):
-            if create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username, pdb_admin_password, datafile_dest, save_state):
+            if create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username, pdb_admin_password, datafile_dest, save_state, unplug_dest):
                 ensure_pdb_state(cursor, module, msg, name, state, newpdb)
                 module.exit_json(msg=msg[0], changed=True)
             else:
@@ -325,6 +381,17 @@ def main():
         if check_pdb_exists(cursor, module, msg, name):
             if remove_pdb(cursor, module, msg, oracle_home, name, sourcedb):
                 msg[0] = 'Pluggable database %s successfully removed' % (name)
+                module.exit_json(msg=msg[0], changed=True)
+            else:
+                module.fail_json(msg=msg[0], changed=False)
+        else:
+            msg[0] = 'Pluggable database %s doesn\'t exist' % (name)
+            module.exit_json(msg=msg[0], changed=False)
+
+    elif state == 'unplugged' :
+        if check_pdb_exists(cursor, module, msg, name):
+            if unplug_pdb(cursor, module, msg, oracle_home, name, unplug_dest):
+                msg[0] = 'Pluggable database %s successfully unplugged into \'%s\'' % (name, unplug_dest)
                 module.exit_json(msg=msg[0], changed=True)
             else:
                 module.fail_json(msg=msg[0], changed=False)

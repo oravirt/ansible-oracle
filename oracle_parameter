@@ -4,10 +4,10 @@
 DOCUMENTATION = '''
 ---
 module: oracle_parameter
-short_description: Manage users/roles in an Oracle database
+short_description: Manage parameters in an Oracle database
 description:
-    - Manage parameters in an Oracle database
-    - Does not handel underscore parameters yet
+    - Manage init parameters in an Oracle database
+
 version_added: "1.9.1"
 options:
     hostname:
@@ -55,7 +55,7 @@ options:
         choices: ['present','absent','reset']
 notes:
     - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+requirements: [ "cx_Oracle","re" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
@@ -71,7 +71,7 @@ oracle_parameter: hostname=remote-db-server service_name=orcl user=system passwo
 
 
 '''
-
+import re
 try:
     import cx_Oracle
 except ImportError:
@@ -119,8 +119,8 @@ def modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
 
 
 
+    contains = re.compile(r'[?*$%#()!\s,._/=+-]')
     starters = ('+','_','"','"_','/')
-    contains = ('=')
 
     if not(name) or not (value) or name is None or value is None:
         module.fail_json(msg='Error: Missing parameter name or value', changed=False)
@@ -135,12 +135,13 @@ def modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
         module.exit_json(msg='The parameter (%s) is already set to %s' % (name, value), changed=False)
         return True
 
+    if module.check_mode:
+        module.exit_json(changed=True)
 
     if name.startswith(starters):
         name = quote_name(name)
 
-
-    if value.startswith(starters) or contains in value:
+    if contains.search(value):
         value = quote_value(value)
 
     sql = 'alter system set %s = %s scope=%s sid=\'%s\'' % (name, value, scope, sid)
@@ -183,6 +184,9 @@ def reset_parameter(module, mode, msg, cursor, name, value, scope, sid):
     if not(name):
         module.fail_json(msg='Error: Missing parameter name', changed=False)
         return False
+
+    if module.check_mode:
+        module.exit_json(changed=True)
 
     if name.startswith(starters):
         name = quote_name(name)
@@ -248,10 +252,8 @@ def main():
             state         = dict(default="present", choices=["present", "absent","reset"]),
             scope         = dict(default="both", choices=["both", "spfile", "memory"]),
             sid           = dict(default="*"),
-
-
         ),
-
+        supports_check_mode=True
     )
 
     hostname = module.params["hostname"]

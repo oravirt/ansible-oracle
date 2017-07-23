@@ -79,7 +79,7 @@ options:
         description:
             - The profile for the user
         required: false
-        default: default
+        default: None
     grants:
         description:
             - The privileges granted to the new schema
@@ -174,7 +174,7 @@ def create_user(module, msg, cursor, schema, schema_password, schema_password_ha
     if (default_temp_tablespace):
     	sql += 'temporary tablespace %s '% default_temp_tablespace
 
-    if profile:
+    if (profile):
         sql += ' profile %s' % profile
 
     if state == 'locked':
@@ -231,7 +231,7 @@ def modify_user(module, msg, cursor, schema, schema_password, schema_password_ha
         if authentication_type == 'password':
             if schema_password_hash:
                 sql += ' identified by values \'%s\'' % (schema_password_hash)
-            else:
+            elif schema_password:
                 sql += ' identified by %s ' % (schema_password)
         elif authentication_type == 'external':
             sql += ' identified externally '
@@ -385,7 +385,7 @@ def main():
             default_tablespace = dict(default=None),
             default_temp_tablespace = dict(default=None),
             update_password = dict(default='always', choices=['on_create','always']),
-            profile        = dict(default='default'),
+            profile        = dict(default=None),
             authentication_type = dict(default='password', choices=['password','external','global']),
             grants         = dict(default=None, type="list")
 
