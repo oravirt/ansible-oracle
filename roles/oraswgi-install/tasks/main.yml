@@ -69,7 +69,7 @@
     sudo_user: "{{ grid_install_user }}"
     tags:
       - oragridsw
-    when: checkgiinstall.stdout != "1" and not is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool
+    when: checkgiinstall.stdout != "1" and not is_sw_source_local and oracle_install_version_gi  == item.version and oracle_sw_copy|bool
 
   - name: Copy oracle installfiles to server (GI) (local)
     copy: src={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
@@ -78,7 +78,7 @@
     sudo_user: "{{ grid_install_user }}"
     tags:
       - oragridsw
-    when: checkgiinstall.stdout != "1" and is_sw_source_local and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool
+    when: checkgiinstall.stdout != "1" and is_sw_source_local and oracle_install_version_gi == item.version and oracle_sw_copy|bool
 
 
   - include: "{{ oracle_install_version_gi }}.yml"
@@ -120,7 +120,7 @@
     shell: "{{ oracle_home_gi }}/OPatch/opatch lsinventory"
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
-    environment: oracle_env
+    environment: "{{oracle_env}}"
     register: opatchls
     tags:
      - opatchls

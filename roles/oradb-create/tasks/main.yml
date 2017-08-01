@@ -1,4 +1,7 @@
 ---
+  - name: set fact
+    set_fact:
+        create_listener: "{{ create_listener }}"
 
   - include: listener.yml
     when: create_listener
@@ -29,7 +32,7 @@
        - "{{checkdbexist.results}}"
     sudo: yes
     sudo_user: "{{ oracle_user }}"
-    when: master_node and item.1.stdout != "1" and "{{ item.0.state }}"|upper == "PRESENT"
+    when: master_node and item.1.stdout != "1" and item.0.state |upper == "PRESENT"
     tags:
       - oradbcreate
     register: oradbcreate

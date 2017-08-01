@@ -9,7 +9,7 @@
     sudo_user: "{{ grid_install_user }}"
     tags:
       - oragridswunpack
-    when: checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: checkgiinstall.stdout != "1" and oracle_install_version_gi == item.version and oracle_sw_copy|bool and oracle_sw_unpack|bool
 
   - name: Extract files to ORACLE_HOME (gi) (from remote location)
     unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_home_gi }} copy=no
@@ -20,7 +20,7 @@
     sudo_user: "{{ grid_install_user }}"
     tags:
     - oragridswunpack
-    when: checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: checkgiinstall.stdout != "1" and oracle_install_version_gi == item.version and not oracle_sw_copy|bool and oracle_sw_unpack|bool
 
   - name: Install cvuqdisk rpm
     yum: name="{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}" state=present

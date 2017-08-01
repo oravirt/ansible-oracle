@@ -43,7 +43,7 @@
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
     with_items: "{{oracle_opatch_patch}}"
-    when: oracle_psu_apply_gi and "{{ item.version }}" == "{{ oracle_install_version_gi }}" and oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: oracle_psu_apply_gi and item.version == oracle_install_version_gi and oracle_sw_copy|bool and oracle_sw_unpack|bool
     tags:
       - oragridpatchunpack
 
@@ -52,7 +52,7 @@
     with_items: "{{oracle_opatch_patch}}"
     sudo: yes
     sudo_user: "{{ grid_install_user }}"
-    when: oracle_psu_apply_gi and "{{ item.version }}" == "{{ oracle_install_version_gi }}" and not oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: oracle_psu_apply_gi and item.version == oracle_install_version_gi and not oracle_sw_copy|bool and oracle_sw_unpack|bool
     tags:
       - oragridpatchunpack
 
@@ -64,7 +64,7 @@
     with_together:
        - "{{oracle_sw_image_gi_psu}}"
        - "{{gi_applied_patches.results}}"
-    when: oracle_psu_apply_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0 and oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: oracle_psu_apply_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0 and oracle_sw_copy|bool and oracle_sw_unpack|bool
     tags:
       - oragridpsuunpack
 
@@ -75,7 +75,7 @@
     with_together:
        - "{{oracle_sw_image_gi_psu}}"
        - "{{gi_applied_patches.results}}"
-    when: oracle_psu_apply_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0 and not oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: oracle_psu_apply_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0 and not oracle_sw_copy|bool and oracle_sw_unpack|bool
     tags:
       - oragridpsuunpack
 
@@ -120,7 +120,7 @@
        - "{{gi_applied_patches.results}}"
     tags:
       - apply_psu_grid
-    when: master_node and oracle_psu_apply_gi and '12.1' in oracle_install_version_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
+    when: master_node and oracle_psu_apply_gi and '12.1' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
     register: psuapplym
 
 
@@ -130,7 +130,7 @@
     - "{{oracle_sw_image_gi_psu}}"
     - "{{gi_applied_patches.results}}"
     tags: apply_psu_grid
-    when: master_node and oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
+    when: master_node and oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
     register: psuapplym
 
   - debug: var=psuapplym.stdout_lines
@@ -157,7 +157,7 @@
     - "{{gi_applied_patches.results}}"
     tags:
       - apply_psu_grid
-    when: not master_node and oracle_psu_apply_gi and  '12.1' in oracle_install_version_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
+    when: not master_node and oracle_psu_apply_gi and  '12.1' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
     register: psuapplyo
 
   - name: Apply PSU to GI (v11.2) (other nodes)
@@ -166,7 +166,7 @@
     - "{{oracle_sw_image_gi_psu}}"
     - "{{gi_applied_patches.results}}"
     tags: apply_psu_grid
-    when: not master_node and oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
+    when: not master_node and oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
     register: psuapplyo
 
   - debug: var=psuapplyo.stdout_lines
