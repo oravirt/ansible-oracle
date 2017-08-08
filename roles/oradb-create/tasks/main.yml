@@ -2,6 +2,8 @@
   - name: set fact
     set_fact:
         create_listener: "{{ create_listener }}"
+    with_items: "{{ oracle_databases }}"
+    tags: set_fact
 
   - include: listener.yml
     when: create_listener
