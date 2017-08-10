@@ -4,7 +4,7 @@
  - name: Host configuration
    hosts: vbox-si-fs
    user: vagrant
-   sudo: yes
+   become: yes
    roles:
       - common
       - orahost
@@ -12,7 +12,21 @@
  - name: Database Server Installation & Database Creation
    hosts: vbox-si-fs
    user: vagrant
-   sudo: yes
+   become: yes
    roles:
       - oraswdb-install
       - oradb-create
+
+- name: Install cx_oracle
+  hosts: vbox-si-fs
+  user: vagrant
+  become: yes
+  roles:
+     - cxoracle
+
+- name: Configure Logrotate
+  hosts: vbox-si-fs
+  user: vagrant
+  become: yes
+  roles:
+     - orahost-logrotate

@@ -25,3 +25,17 @@
    roles:
       - oraswdb-install
       - oradb-create
+
+- name: Install cx_oracle
+  hosts: vbox-si-asm
+  user: vagrant
+  become: yes
+  roles:
+     - cxoracle
+
+- name: Configure Logrotate
+  hosts: vbox-si-asm
+  user: vagrant
+  become: yes
+  roles:
+     - orahost-logrotate
