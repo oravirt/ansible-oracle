@@ -166,9 +166,9 @@ oracle.install.db.OPER_GROUP={{ oracle_group }}
 #------------------------------------------------------------------------------
 {% if configure_cluster==True %}
 {% if oracle_gi_cluster_type |upper == 'FLEX' %}
-oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup_hub] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
+oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% else %}
-oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
+oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% endif %}
 {% else %}
 {% endif %}
