@@ -6,7 +6,7 @@ ORACLE_HOSTNAME={{ oracle_hostname }}
 
 #-------------------------------------------------------------------------------
 # Specify the location which holds the inventory files.
-# This is an optional parameter if installing on  
+# This is an optional parameter if installing on
 # Windows based Operating System.
 #-------------------------------------------------------------------------------
 INVENTORY_LOCATION={{ oracle_inventory_loc }}
@@ -17,9 +17,9 @@ SELECTED_LANGUAGES=en
 #   - CRS_CONFIG : To configure Grid Infrastructure for cluster
 #   - HA_CONFIG  : To configure Grid Infrastructure for stand alone server
 #   - UPGRADE    : To upgrade clusterware software of earlier release
-#   - CRS_SWONLY : To install clusterware files only (can be configured for cluster 
+#   - CRS_SWONLY : To install clusterware files only (can be configured for cluster
 #                  or stand alone server later)
-#   - HA_SWONLY  : To install clusterware files only (can be configured for stand 
+#   - HA_SWONLY  : To install clusterware files only (can be configured for stand
 #                  alone server later. This is only supported on Windows.)
 #-------------------------------------------------------------------------------
 oracle.install.option={{ oracle_install_option_gi }}
@@ -68,7 +68,7 @@ oracle.install.asm.OSOPER={{ oper_group }}
 oracle.install.asm.OSASM={{ dba_group }}
 
 {% endif %}
-   
+
 ################################################################################
 #                                                                              #
 #                           SECTION C - SCAN                                   #
@@ -101,7 +101,7 @@ oracle.install.crs.config.ClusterType={{ oracle_gi_cluster_type |upper}}
 #-------------------------------------------------------------------------------
 # Specify a name for the Cluster you are creating.
 #
-# The maximum length allowed for clustername is 15 characters. The name can be 
+# The maximum length allowed for clustername is 15 characters. The name can be
 # any combination of lower and uppercase alphabets (A - Z), (0 - 9), hyphen(-)
 # and underscore(_).
 #-------------------------------------------------------------------------------
@@ -159,15 +159,15 @@ oracle.install.crs.config.gpnp.gnsVIPAddress=
 #
 # The list should a comma-separated list of tuples.  Each tuple should be a
 # colon-separated string that contains
-# - 2 fields if configuring a Standard Cluster, or 
+# - 2 fields if configuring a Standard Cluster, or
 # - 3 fields if configuring a Flex Cluster
-# 
+#
 # The fields should be ordered as follows:
 # 1. The first field should be the public node name.
 # 2. The second field should be the virtual host name
 #    (Should be specified as AUTO if you have chosen 'auto configure for VIP'
 #     i.e. autoConfigureClusterNodeVIP=true)
-# 3. The third field indicates the role of node (HUB,LEAF). This has to 
+# 3. The third field indicates the role of node (HUB,LEAF). This has to
 #    be provide only if Flex Cluster is being configured.
 #
 # Examples
@@ -176,20 +176,20 @@ oracle.install.crs.config.gpnp.gnsVIPAddress=
 #
 #
 #-------------------------------------------------------------------------------
-{%  if oracle_gi_cluster_type|upper  == "STANDARD" %}                                                                                                                                                                                        
-                                                                                                                                                                                                                                             
-{%  if ansible_domain  == ""  %}                                                                                                                                                                                                             
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host}}:{{ host }}{{ oracle_vip }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}                   
-  {% else  %}                                                                                                                                                                                                                                
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host}}.{{ ansible_domain }}:{{ host }}{{ oracle_vip }}.{{ ansible_domain }} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}                                                                                                                                                                                                                     
-{% endif %}                                                                                                                                                                                                                                  
-                                                                                                                                                                                                                                             
-{% elif oracle_gi_cluster_type|upper == 'FLEX'  %}                                                                                                                                                                                           
-                                                                                                                                                                                                                                             
-{%  if ansible_domain  == ""  %}                                                                                                                                                                                                             
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup_hub] -%} {{host}}:{{ host }}{{ oracle_vip }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
+{%  if oracle_gi_cluster_type|upper  == "STANDARD" %}
+
+{%  if ansible_domain  == ""  %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
+  {% else  %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}.{{ ansible_domain }} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
+{% endif %}
+
+{% elif oracle_gi_cluster_type|upper == 'FLEX'  %}
+
+{%  if ansible_domain  == ""  %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1") }}{{ oracle_vip }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
  {% else  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup_hub] -%} {{host}}.{{ ansible_domain }}:{{ host }}{{ oracle_vip }}.{{ ansible_domain }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}.{{ ansible_domain }}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1") }}{{ oracle_vip }}.{{ ansible_domain }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}.{{ ansible_domain }}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
 
  {% endif %}
 
@@ -215,7 +215,7 @@ oracle.install.crs.config.networkInterfaceList={{ oracle_gi_nic_pub }}:{{ hostva
 {%  elif oracle_gi_cluster_type|upper  == "STANDARD" %}
 {%  if oracle_asm_storage_option|upper  == "FLEX_ASM_STORAGE" %}
 oracle.install.crs.config.networkInterfaceList={{ oracle_gi_nic_pub }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_pub].ipv4.network }}:1,{{ oracle_gi_nic_priv }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_priv].ipv4.network }}:5
-{% else %}     
+{% else %}
 oracle.install.crs.config.networkInterfaceList={{ oracle_gi_nic_pub }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_pub].ipv4.network }}:1,{{ oracle_gi_nic_priv }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_priv].ipv4.network }}:2
 {% endif %}
 {% endif %}
@@ -240,7 +240,7 @@ oracle.install.crs.config.networkInterfaceList=
 #   - LOCAL_ASM_STORAGE
 #   - FLEX_ASM_STORAGE
 #   - FILE_SYSTEM_STORAGE
-# If configuring a Flex Cluster, FLEX_ASM_STORAGE is the only allowed value 
+# If configuring a Flex Cluster, FLEX_ASM_STORAGE is the only allowed value
 #-------------------------------------------------------------------------------
 {% if oracle_gi_cluster_type|upper  == "FLEX" %}
 oracle.install.crs.config.storageOption=FLEX_ASM_STORAGE
@@ -253,7 +253,7 @@ oracle.install.crs.config.storageOption={{ oracle_asm_storage_option|upper }}
 
 
 #-------------------------------------------------------------------------------
-# These properties are applicable only if FILE_SYSTEM_STORAGE is chosen for 
+# These properties are applicable only if FILE_SYSTEM_STORAGE is chosen for
 # storing OCR and voting disk
 # Specify the location(s) and redundancy for OCR and voting disks
 # Multiple locations can be specified, separated by commas.
@@ -272,7 +272,7 @@ oracle.install.crs.config.storageOption={{ oracle_asm_storage_option|upper }}
 #oracle.install.crs.config.sharedFileSystemStorage.votingDiskRedundancy=NORMAL
 #oracle.install.crs.config.sharedFileSystemStorage.ocrLocations=
 #oracle.install.crs.config.sharedFileSystemStorage.ocrRedundancy=NORMAL
-               	
+
 ################################################################################
 #                                                                              #
 #                               SECTION F - IPMI                               #
@@ -313,7 +313,7 @@ oracle.install.asm.diskGroup.name={{ oracle_asm_init_dg }}
 
 #-------------------------------------------------------------------------------
 # Redundancy level to be used by ASM.
-# It can be one of the following  
+# It can be one of the following
 #   - NORMAL
 #   - HIGH
 #   - EXTERNAL
@@ -397,14 +397,14 @@ oracle.installer.autoupdates.option=SKIP_UPDATES
 oracle.installer.autoupdates.downloadUpdatesLoc=
 
 #------------------------------------------------------------------------------
-# Specify the My Oracle Support Account Username which has the patches download privileges  
+# Specify the My Oracle Support Account Username which has the patches download privileges
 # to be used for software updates.
 #  Example   : AUTOUPDATES_MYORACLESUPPORT_USERNAME=abc@oracle.com
 #------------------------------------------------------------------------------
 AUTOUPDATES_MYORACLESUPPORT_USERNAME=
 
 #------------------------------------------------------------------------------
-# Specify the My Oracle Support Account Username password which has the patches download privileges  
+# Specify the My Oracle Support Account Username password which has the patches download privileges
 # to be used for software updates.
 #
 # Example    : AUTOUPDATES_MYORACLESUPPORT_PASSWORD=password
@@ -414,30 +414,30 @@ AUTOUPDATES_MYORACLESUPPORT_PASSWORD=
 #------------------------------------------------------------------------------
 # Specify the Proxy server name. Length should be greater than zero.
 #
-# Example    : PROXY_HOST=proxy.domain.com 
+# Example    : PROXY_HOST=proxy.domain.com
 #------------------------------------------------------------------------------
 PROXY_HOST=
 
 #------------------------------------------------------------------------------
 # Specify the proxy port number. Should be Numeric and atleast 2 chars.
 #
-# Example    : PROXY_PORT=25 
+# Example    : PROXY_PORT=25
 #------------------------------------------------------------------------------
 PROXY_PORT=0
 
 #------------------------------------------------------------------------------
-# Specify the proxy user name. Leave PROXY_USER and PROXY_PWD 
+# Specify the proxy user name. Leave PROXY_USER and PROXY_PWD
 # blank if your proxy server requires no authentication.
 #
-# Example    : PROXY_USER=username 
+# Example    : PROXY_USER=username
 #------------------------------------------------------------------------------
 PROXY_USER=
 
 #------------------------------------------------------------------------------
-# Specify the proxy password. Leave PROXY_USER and PROXY_PWD  
+# Specify the proxy password. Leave PROXY_USER and PROXY_PWD
 # blank if your proxy server requires no authentication.
 #
-# Example    : PROXY_PWD=password 
+# Example    : PROXY_PWD=password
 #------------------------------------------------------------------------------
 PROXY_PWD=
 
