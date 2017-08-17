@@ -5,8 +5,8 @@
     with_items: "{{oracle_sw_image_gi}}"
     args:
         creates: "{{ oracle_home_gi }}/root.sh"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     tags:
       - oragridswunpack
     when: checkgiinstall.stdout != "1" and oracle_install_version_gi == item.version and oracle_sw_copy|bool and oracle_sw_unpack|bool
@@ -16,8 +16,8 @@
     with_items: "{{oracle_sw_image_gi}}"
     args:
         creates: "{{ oracle_home_gi }}/root.sh"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     tags:
     - oragridswunpack
     when: checkgiinstall.stdout != "1" and oracle_install_version_gi == item.version and not oracle_sw_copy|bool and oracle_sw_unpack|bool
@@ -45,8 +45,8 @@
 
   - name: Install Grid Infrastructure
     shell: "{{ oracle_home_gi }}/gridSetup.sh -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -silent"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     tags:
       - oragridinstall
     when: master_node and checkgiinstall.stdout != "1" #and oracle_sw_unpack
@@ -57,14 +57,14 @@
 
   - name: Run oraInstroot script after installation
     shell: "{{ oracle_inventory_loc }}/orainstRoot.sh"
-    sudo: yes
+    become: yes
     tags:
       - runroot
     when: checkgiinstall.stdout != "1"
 
   - name: Run root script after installation (Master Node)
     shell: "{{ oracle_home_gi }}/root.sh"
-    sudo: yes
+    become: yes
     tags:
       - runroot
     when: master_node and checkgiinstall.stdout != "1"
@@ -75,7 +75,7 @@
 
   - name: Run root script after installation (Other Nodes)
     shell: "sleep {{ item.0 * 60 }}; {{ oracle_home_gi }}/root.sh"
-    sudo: yes
+    become: yes
     with_indexed_items: "{{groups[hostgroup]}}"
     tags:
       - runroot
@@ -87,8 +87,8 @@
 
   - name: Execute ConfigTools
     shell: "{{ oracle_home_gi }}/gridSetup.sh -executeConfigTools -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -silent"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     tags:
       - runconfigtool
     when: master_node and run_configtoolallcommand and checkgiinstall.stdout != "1"

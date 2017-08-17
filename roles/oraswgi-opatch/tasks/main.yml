@@ -2,8 +2,8 @@
 
   - name: Check which GI patches are applied
     shell: "{{ oracle_home_gi }}/OPatch/opatch lspatches -oh {{ oracle_home_gi }}  |grep  {{ item.patchversion }} |wc -l"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     with_items: "{{oracle_sw_image_gi_psu}}"
     tags: check_applied_gi_patches
     when: oracle_psu_apply_gi #and "{{ item.version }}" == "{{ oracle_install_version_gi }}"
@@ -23,8 +23,8 @@
   #      - oracle_sw_image_gi_psu
   #      - gi_applied_patches.results
   #   when: oracle_psu_apply_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
-  #   sudo: yes
-  #   sudo_user: "{{ grid_install_user }}"
+  #   become: yes
+  #   become_user: "{{ grid_install_user }}"
   #   tags:
   #     - oragridpatchget
   #
@@ -32,16 +32,16 @@
   #   get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=775 force=yes
   #   with_items: oracle_opatch_patch
   #   when: oracle_psu_apply_gi and "{{ item.version }}" == "{{ oracle_install_version_gi }}"
-  #   sudo: yes
-  #   sudo_user: "{{ grid_install_user }}"
+  #   become: yes
+  #   become_user: "{{ grid_install_user }}"
   #   tags:
   #     - oragridopatchget
 
 
   - name: Extract OPatch to stage-area
     unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     with_items: "{{oracle_opatch_patch}}"
     when: oracle_psu_apply_gi and item.version == oracle_install_version_gi and oracle_sw_copy|bool and oracle_sw_unpack|bool
     tags:
@@ -50,8 +50,8 @@
   - name: Extract Opatch to stage-area (from remote location)
     unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
     with_items: "{{oracle_opatch_patch}}"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     when: oracle_psu_apply_gi and item.version == oracle_install_version_gi and not oracle_sw_copy|bool and oracle_sw_unpack|bool
     tags:
       - oragridpatchunpack
@@ -59,8 +59,8 @@
 
   - name: Extract GI psu files to stage-area
     unarchive: src={{ oracle_stage }}/{{ item.0.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     with_together:
        - "{{oracle_sw_image_gi_psu}}"
        - "{{gi_applied_patches.results}}"
@@ -70,8 +70,8 @@
 
   - name: Extract GI psu files to stage-area (from remote location)
     unarchive: src={{ oracle_stage_remote }}/{{ item.0.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     with_together:
        - "{{oracle_sw_image_gi_psu}}"
        - "{{gi_applied_patches.results}}"
@@ -85,8 +85,8 @@
 #    with_together:
 #       - oracle_sw_image_gi_psu
 #       - gi_applied_patches.results
-#    sudo: yes
-#    sudo_user: "{{ grid_install_user }}"
+#    become: yes
+#    become_user: "{{ grid_install_user }}"
 #    tags:
 #    - oragridswunpack
 #    when: checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy|bool and oracle_sw_unpack|bool
@@ -100,16 +100,16 @@
   # - name: Configure ocm.rsp (1)
   #   template: src=ocmrsp.expect.j2  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect mode=0777 force=yes
   #   when: oracle_psu_apply_gi #and not {{ item.1.stdout }} != 0
-  #   sudo: yes
-  #   sudo_user: "{{ grid_install_user }}"
+  #   become: yes
+  #   become_user: "{{ grid_install_user }}"
   #   tags:
   #     - ocmconfig
   #
   # - name: Configure ocm.rsp (2)
   #   shell: "{{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect"
   #   when: oracle_psu_apply_gi #and not {{ item.1.stdout }} != 0
-  #   sudo: yes
-  #   sudo_user: "{{ grid_install_user }}"
+  #   become: yes
+  #   become_user: "{{ grid_install_user }}"
   #   tags:
   #     - ocmconfig
 
@@ -188,8 +188,8 @@
 
   - name: Check opatch lsinventory
     shell: "{{ oracle_home_gi }}/OPatch/opatch lsinventory"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     register: opatchls
     when: oracle_psu_apply_gi
 

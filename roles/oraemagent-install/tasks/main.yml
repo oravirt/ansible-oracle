@@ -50,7 +50,7 @@
     get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
     with_items: oracle_sw_image_em_agent
     when: not is_sw_source_local and em_agent_version == item.version
-    sudo_user: "{{ oracle_user }}"
+    become_user: "{{ oracle_user }}"
     tags:
       - oraemsw
 
@@ -58,7 +58,7 @@
     copy: src={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
     with_items: oracle_sw_image_em_agent
     when: is_sw_source_local and em_agent_version == item.version
-    sudo_user: "{{ oracle_user }}"
+    become_user: "{{ oracle_user }}"
     tags:
       - oraemsw
 
@@ -66,20 +66,20 @@
     unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no 
     with_items: oracle_sw_image_em_agent
     when: em_agent_version == item.version
-    sudo_user: "{{ oracle_user }}"
+    become_user: "{{ oracle_user }}"
     tags:
       - oradbswunpack
 
   - name: Setup response file for install (EM Agent)
     template: src=agent.rsp.{{ em_agent_version }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_em_responsefile }}
-    sudo_user: "{{ oracle_user }}"
+    become_user: "{{ oracle_user }}"
     tags:
       - responsefileswem
 
   - name: Install EM Agent (1)
     shell: "{{ oracle_stage }}/{{ item.version }}/agentDeploy.sh AGENT_BASE_DIR={{ em_agent_base_dir }} RESPONSE_FILE={{ oracle_rsp_stage }}/{{ oracle_em_responsefile }}"
     with_items: oracle_sw_image_em_agent
-    sudo_user: "{{ oracle_user }}"
+    become_user: "{{ oracle_user }}"
     when: em_agent_version == item.version
     register: emagent_install
 
@@ -95,7 +95,7 @@
 
   - name: Check status for EM Agent
     shell: "{{ oracle_home_emag }}/bin/emctl status agent"
-    sudo_user: "{{ oracle_user }}"
+    become_user: "{{ oracle_user }}"
     register: emctl_out
     tags: emagent-status
 

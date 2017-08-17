@@ -24,7 +24,7 @@
 
   - name: Create stage directory (version specific)
     file: dest={{ oracle_stage }}/{{ item.version }} mode=775 owner="{{ oracle_user }}" group={{ oracle_group }} state=directory
-    sudo: yes
+    become: yes
     with_items: "{{oracle_sw_image_gi}}"
     when:  oracle_install_version_gi  ==  item.version
     tags:
@@ -57,7 +57,7 @@
 
   - name: Create ORACLE_HOME directory (GI)
     file: dest={{ oracle_home_gi }} owner="{{ grid_install_user }}" group={{ oracle_group }} state=directory mode=775
-    sudo: yes
+    become: yes
     tags:
       - directories
     when: checkgiinstall.stdout != "1"
@@ -65,8 +65,8 @@
   - name: Copy oracle installfiles to server (GI) (web)
     get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
     with_items: "{{oracle_sw_image_gi}}"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     tags:
       - oragridsw
     when: checkgiinstall.stdout != "1" and not is_sw_source_local and oracle_install_version_gi  == item.version and oracle_sw_copy|bool
@@ -74,8 +74,8 @@
   - name: Copy oracle installfiles to server (GI) (local)
     copy: src={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
     with_items: "{{oracle_sw_image_gi}}"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     tags:
       - oragridsw
     when: checkgiinstall.stdout != "1" and is_sw_source_local and oracle_install_version_gi == item.version and oracle_sw_copy|bool
@@ -97,8 +97,8 @@
 
   - name: Update Nodelist, set CRS=TRUE
     shell: "{{ oracle_home_gi }}/oui/bin/runInstaller -updateNodeList ORACLE_HOME={{ oracle_home_gi }} CRS=TRUE"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     tags:
       - updatenodelist
     when : master_node and checkgiinstall.stdout != "1"
@@ -118,8 +118,8 @@
 
   - name: Check opatch lsinventory (GI)
     shell: "{{ oracle_home_gi }}/OPatch/opatch lsinventory"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     environment: "{{oracle_env}}"
     register: opatchls
     tags:
@@ -134,8 +134,8 @@
 
   - name: Check olsnodes (GI)
     shell: "{{ oracle_home_gi }}/bin/olsnodes -a -n -s -t"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     when: oracle_gi_cluster_type |upper == 'FLEX' and '12' in oracle_install_version_gi
     register: olsnodes
     tags:

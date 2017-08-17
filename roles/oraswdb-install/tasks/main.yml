@@ -50,19 +50,19 @@
 
   - name: Create cfgtoollogs directory
     file: dest={{ oracle_base }}/cfgtoollogs mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory recurse=yes
-    sudo: yes
+    become: yes
     tags:
       - directoriesdb
 
   - name: Create admin directory
     file: dest={{ oracle_base }}/admin mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
-    sudo: yes
+    become: yes
     tags:
       - directoriesdb
 
   - name: Create audit directory
     file: dest={{ oracle_base }}/audit mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
-    sudo: yes
+    become: yes
     tags:
       - directoriesdb
 
@@ -77,8 +77,8 @@
     with_nested:
       - "{{oracle_sw_image_db}}"
       - "{{oracle_databases}}"
-    sudo: yes
-    sudo_user: "{{ oracle_user }}"
+    become: yes
+    become_user: "{{ oracle_user }}"
     when: master_node and item[0].version == item[1].oracle_version_db and not is_sw_source_local and oracle_sw_copy|bool
     tags:
       - oradbsw
@@ -88,8 +88,8 @@
     with_nested:
       - "{{oracle_sw_image_db}}"
       - "{{oracle_databases}}"
-    sudo: yes
-    sudo_user: "{{ oracle_user }}"
+    become: yes
+    become_user: "{{ oracle_user }}"
     when: master_node and item[0].version == item[1].oracle_version_db and is_sw_source_local and oracle_sw_copy|bool
     tags:
       - oradbsw
@@ -99,8 +99,8 @@
     with_nested:
       - "{{oracle_sw_image_db}}"
       - "{{oracle_databases}}"
-    sudo: yes
-    sudo_user: "{{ oracle_user }}"
+    become: yes
+    become_user: "{{ oracle_user }}"
     when: master_node and item[0].version == item[1].oracle_version_db and oracle_sw_copy|bool and oracle_sw_unpack|bool
     tags:
       - oradbswunpack
@@ -110,8 +110,8 @@
     with_nested:
       - "{{oracle_sw_image_db}}"
       - "{{oracle_databases}}"
-    sudo: yes
-    sudo_user: "{{ oracle_user }}"
+    become: yes
+    become_user: "{{ oracle_user }}"
     when: master_node and item[0].version == item[1].oracle_version_db and not oracle_sw_copy|bool and oracle_sw_unpack|bool
     tags:
       - oradbswunpack
@@ -122,8 +122,8 @@
     with_together:
      - "{{oracle_databases}}"
      - "{{checkdbswinstall.results}}"
-    sudo: yes
-    sudo_user: "{{ oracle_user }}"
+    become: yes
+    become_user: "{{ oracle_user }}"
     when: master_node #and item.1.stdout != "1"
     tags:
       - responsefileswdb
@@ -133,8 +133,8 @@
     with_together:
      - "{{oracle_databases}}"
      - "{{checkdbswinstall.results}}"
-    sudo: yes
-    sudo_user: "{{ oracle_user }}"
+    become: yes
+    become_user: "{{ oracle_user }}"
     when: master_node #and item.1.stdout != "1"
     tags:
       - responsefileswdb
@@ -145,8 +145,8 @@
     with_together:
      - "{{oracle_databases}}"
      - "{{checkdbswinstall.results}}"
-    sudo: yes
-    sudo_user: "{{ oracle_user }}"
+    become: yes
+    become_user: "{{ oracle_user }}"
     when: master_node and item.1.stdout != "1"
     tags:
       - oradbinstall
@@ -164,8 +164,8 @@
 
 #  - name: Run oraInstroot script after installation
 #    shell: "{{ oracle_inventory_loc }}/orainstRoot.sh"
-#    sudo: yes
-#    sudo_user: root
+#    become: yes
+#    become_user: root
 #    tags:
 #      - runroot
 
@@ -183,8 +183,8 @@
   - name: Add additional info to glogin.sql (1)
     lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line='set sqlprompt "_user @ _connect_identifier:>"' backup=yes
     with_items: "{{oracle_databases}}"
-    sudo: yes
-    sudo_user: "{{ oracle_user }}"
+    become: yes
+    become_user: "{{ oracle_user }}"
     tags:
       - glogindb
 
@@ -197,8 +197,8 @@
   - name: Check opatch lsinventory (DB)
     shell: "{{ oracle_home_db }}/OPatch/opatch lsinventory"
     with_items: "{{oracle_databases}}"
-    sudo: yes
-    sudo_user: "{{ oracle_user }}"
+    become: yes
+    become_user: "{{ oracle_user }}"
     when: master_node
     register: opatchls
     tags:

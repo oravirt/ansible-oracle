@@ -32,8 +32,8 @@
     with_together:
        - "{{oracle_databases}}"
        - "{{checkdbexist.results}}"
-    sudo: yes
-    sudo_user: "{{ oracle_user }}"
+    become: yes
+    become_user: "{{ oracle_user }}"
     when: master_node and item.1.stdout != "1" and item.0.state |upper == "PRESENT"
     tags:
       - oradbcreate
