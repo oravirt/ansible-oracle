@@ -183,7 +183,7 @@ def main():
     if conn.version >= '11.1':
         sql+= ", to_number(sys_context('USERENV','CURRENT_EDITION_ID')) CURRENT_EDITION_ID, sys_context('USERENV','CURRENT_EDITION_NAME') CURRENT_EDITION_NAME"
     sql+= " FROM DUAL"
-    userenv = query_result(sql)
+    userenv = query_result(sql)[0]
     #
     facts.update({'database': database, 'instance': instance, 'rac': rac, 'pdb': pdb, 'tablespace': tablespace, 'temp_tablespace': temp_tablespace, 'userenv': userenv, 'redolog': redolog, 'option': option, 'parameter': parameter})
     #
