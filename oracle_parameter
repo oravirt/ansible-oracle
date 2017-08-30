@@ -4,10 +4,10 @@
 DOCUMENTATION = '''
 ---
 module: oracle_parameter
-short_description: Manage users/roles in an Oracle database
+short_description: Manage parameters in an Oracle database
 description:
-    - Manage parameters in an Oracle database
-    - Does not handel underscore parameters yet
+    - Manage init parameters in an Oracle database
+
 version_added: "1.9.1"
 options:
     hostname:
@@ -55,7 +55,7 @@ options:
         choices: ['present','absent','reset']
 notes:
     - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+requirements: [ "cx_Oracle","re" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
@@ -71,7 +71,7 @@ oracle_parameter: hostname=remote-db-server service_name=orcl user=system passwo
 
 
 '''
-
+import re
 try:
     import cx_Oracle
 except ImportError:
@@ -119,35 +119,31 @@ def modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
 
 
 
+    contains = re.compile(r'[?*$%#()!\s,._/=+-]')
     starters = ('+','_','"','"_','/')
-    contains = ('=')
 
     if not(name) or not (value) or name is None or value is None:
-        module.fail_json(msg='Error: Missing parameter name or value', changed=False)
+        module.fail_json(msg='Error: Missing parameter name or value. (If value is supposed to be an empty string, make sure it\'s quoted)', changed=False)
         return False
 
 
 
-    currval = get_curr_value(module, mode, msg, cursor, name)
+    currval = get_curr_value(module, mode, msg, cursor, name, scope)
 
-
-    if currval == value.lower():
+    if currval == value.lower() or not currval and value == "''":
         module.exit_json(msg='The parameter (%s) is already set to %s' % (name, value), changed=False)
         return True
 
+    if module.check_mode:
+        module.exit_json(changed=True)
 
     if name.startswith(starters):
         name = quote_name(name)
 
-    if module.check_mode:
-        module.exit_json(changed=True)
-        
-    if value.startswith(starters) or contains in value:
+    if contains.search(value):
         value = quote_value(value)
 
     sql = 'alter system set %s = %s scope=%s sid=\'%s\'' % (name, value, scope, sid)
-
-
     try:
         cursor.execute(sql)
     except cx_Oracle.DatabaseError, exc:
@@ -185,10 +181,10 @@ def reset_parameter(module, mode, msg, cursor, name, value, scope, sid):
     if not(name):
         module.fail_json(msg='Error: Missing parameter name', changed=False)
         return False
-    
+
     if module.check_mode:
         module.exit_json(changed=True)
-        
+
     if name.startswith(starters):
         name = quote_name(name)
 
@@ -212,15 +208,18 @@ def reset_parameter(module, mode, msg, cursor, name, value, scope, sid):
     return True
 
 
-def get_curr_value(module, mode, msg, cursor, name):
+def get_curr_value(module, mode, msg, cursor, name, scope):
 
+    if scope == 'spfile':
+        parameter_source = 'v$spparameter'
+    else:
+        parameter_source = 'v$parameter'
 
     if mode == 'sysdba':
         name = clean_string(name)
         sql = 'select lower(y.ksppstdvl) from sys.x$ksppi x, sys.x$ksppcv y where x.indx = y.indx and x.ksppinm = lower(\'%s\')' % (name)
     else:
-        sql = 'select lower(display_value) from v$parameter where name = lower(\'%s\')' % (name)
-
+        sql = 'select lower(display_value) from %s where name = lower(\'%s\')' % (parameter_source, name)
 
     try:
         cursor.execute(sql)

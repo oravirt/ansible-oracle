@@ -43,6 +43,12 @@ options:
         required: false
         default: None
         aliases: ['dfd']
+    unplug_dest:
+        description:
+            - The path where the 'unplug' xml-file will be placed. Also used when plugging in a pdb
+        required: false
+        default: None
+        aliases: ['plug_dest','upd','pd']
     username:
         description:
             - The database username to connect to the database
@@ -146,21 +152,28 @@ def quote_string(item):
     else:
         return value
 
-def create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username, pdb_admin_password, datafile_dest, save_state, unplug_dest):
+def create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username,
+                pdb_admin_password, datafile_dest, save_state, unplug_dest, file_name_convert):
 
     run_sql = []
-    opensql = 'alter pluggable database %s open' % (name)
+    opensql = 'alter pluggable database %s open instances=all' % (name)
     createsql = 'create pluggable database %s ' % (name)
+
 
     if unplug_dest is not None:
         createsql += ' using \'%s\' ' % (unplug_dest)
-        createsql += ' nocopy tempfile reuse'
+        createsql += ' tempfile reuse'
 
     if unplug_dest is None:
         createsql += ' admin user %s identified by %s ' % (pdb_admin_username, pdb_admin_password)
 
-    if datafile_dest != None and unplug_dest is None:
+    if datafile_dest != None:
         createsql += ' create_file_dest = \'%s\'' % (datafile_dest)
+
+    if file_name_convert is not None:
+        quoted = ",".join("'" + p + "'" for p in file_name_convert.split(","))
+        createsql += ' file_name_convert = (%s) copy' % (quoted)
+
     run_sql.append(createsql)
     run_sql.append(opensql)
     for a in run_sql:
@@ -277,22 +290,23 @@ def main():
 
     module = AnsibleModule(
         argument_spec = dict(
-            name                = dict(required=True, aliases = ['pdb','pdb_name']),
-            oracle_home         = dict(default=None, aliases = ['oh']),
-            sourcedb            = dict(required=True, aliases = ['db','container','cdb']),
-            state               = dict(default="present", choices = ["present", "absent", "open", "closed", "read_write", "read_only", "restricted", "status", "unplugged"]),
-            save_state          = dict(default=True, type = 'bool'),
-            pdb_admin_username  = dict(required=False, default = 'pdb_admin', aliases = ['pdbadmun']),
-            pdb_admin_password  = dict(required=False, default = 'pdb_admin', aliases = ['pdbadmpw']),
-            datafile_dest       = dict(required=False, aliases = ['dfd']),
-            unplug_dest         = dict(required=False, aliases = ['plug_dest','upd','pd']),
-            file_name_convert   = dict(required=False, aliases = ['fnc']),
-            user                = dict(required=False, aliases = ['un','username']),
-            password            = dict(required=False, no_log=True, aliases = ['pw']),
-            mode                = dict(default="normal", choices = ["sysdba", "normal"]),
-            service_name        = dict(required=False, aliases = ['sn']),
-            hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
-            port                = dict(required=False, default = 1521),
+            name                   = dict(required=True, aliases = ['pdb','pdb_name']),
+            oracle_home            = dict(default=None, aliases = ['oh']),
+            sourcedb               = dict(required=True, aliases = ['db','container','cdb']),
+            state                  = dict(default="present", choices = ["present", "absent", "open", "closed", "read_write", "read_only", "restricted", "status", "unplugged"]),
+            save_state             = dict(default=True, type = 'bool'),
+            pdb_admin_username     = dict(required=False, default = 'pdb_admin', aliases = ['pdbadmun']),
+            pdb_admin_password     = dict(required=False, default = 'pdb_admin', aliases = ['pdbadmpw']),
+            datafile_dest          = dict(required=False, aliases = ['dfd','create_file_dest']),
+            unplug_dest            = dict(required=False, aliases = ['plug_dest','upd','pd']),
+            file_name_convert      = dict(required=False, aliases = ['fnc']),
+            service_name_convert   = dict(required=False, aliases = ['snc']),
+            user                   = dict(required=False, aliases = ['un','username']),
+            password               = dict(required=False, no_log=True, aliases = ['pw']),
+            mode                   = dict(default="normal", choices = ["sysdba", "normal"]),
+            service_name           = dict(required=False, aliases = ['sn']),
+            hostname               = dict(required=False, default = 'localhost', aliases = ['host']),
+            port                   = dict(required=False, default = 1521),
 
 
 
@@ -301,22 +315,23 @@ def main():
 
     )
 
-    name                = module.params["name"]
-    oracle_home         = module.params["oracle_home"]
-    sourcedb            = module.params["sourcedb"]
-    state               = module.params["state"]
-    save_state          = module.params["save_state"]
-    pdb_admin_username  = module.params["pdb_admin_username"]
-    pdb_admin_password  = module.params["pdb_admin_password"]
-    datafile_dest       = module.params["datafile_dest"]
-    unplug_dest         = module.params["unplug_dest"]
-    file_name_convert   = module.params["file_name_convert"]
-    user                = module.params["user"]
-    password            = module.params["password"]
-    mode                = module.params["mode"]
-    service_name        = module.params["service_name"]
-    hostname            = module.params["hostname"]
-    port                = module.params["port"]
+    name                   = module.params["name"]
+    oracle_home            = module.params["oracle_home"]
+    sourcedb               = module.params["sourcedb"]
+    state                  = module.params["state"]
+    save_state             = module.params["save_state"]
+    pdb_admin_username     = module.params["pdb_admin_username"]
+    pdb_admin_password     = module.params["pdb_admin_password"]
+    datafile_dest          = module.params["datafile_dest"]
+    unplug_dest            = module.params["unplug_dest"]
+    file_name_convert      = module.params["file_name_convert"]
+    service_name_convert   = module.params["service_name_convert"]
+    user                   = module.params["user"]
+    password               = module.params["password"]
+    mode                   = module.params["mode"]
+    service_name           = module.params["service_name"]
+    hostname               = module.params["hostname"]
+    port                   = module.params["port"]
 
 
     if oracle_home is not None:
@@ -369,7 +384,7 @@ def main():
 
     if state in ('present','closed', 'open', 'restricted','read_only','read_write'):
         if not check_pdb_exists(cursor, module, msg, name):
-            if create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username, pdb_admin_password, datafile_dest, save_state, unplug_dest):
+            if create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username, pdb_admin_password, datafile_dest, save_state, unplug_dest, file_name_convert):
                 ensure_pdb_state(cursor, module, msg, name, state, newpdb)
                 module.exit_json(msg=msg[0], changed=True)
             else:
