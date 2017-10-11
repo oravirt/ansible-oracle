@@ -117,7 +117,7 @@ options:
         type: list of dicts
 notes:
     - cx_Oracle needs to be installed
-    - ldap python module needs to be installed
+    - ldap python module needs to be installed, but not from PIP! yum install python-ldap!
 requirements: [ "cx_Oracle", "ldap", "re" ]
 author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
 '''
@@ -325,6 +325,9 @@ def main():
         ldapgroups.append(g)
         msgstr.append("%s - %s" % (user['username'], g))
     #
+    if not len(usernames):
+        module.fail_json(msg="No users found in LDAP", changed=False)
+    #
     msg[0] = msgstr
     c = conn.cursor()
     var_usernames = c.arrayvar(cx_Oracle.STRING, usernames)
@@ -468,9 +471,19 @@ def main():
           v_tbs:= :var_tbs;
           v_tmp:= :var_temp;
           v_profile:= :var_profile;
-          SELECT 1 INTO i FROM dba_tablespaces WHERE tablespace_name = v_tbs and contents = 'PERMANENT';
-          SELECT 1 INTO i FROM dba_tablespaces WHERE tablespace_name = v_tmp and contents = 'TEMPORARY';
-          SELECT 1 INTO i FROM dba_profiles WHERE profile = v_profile AND rownum <= 1;
+          BEGIN
+              SELECT 1 INTO i FROM dba_tablespaces WHERE tablespace_name = v_tbs and contents = 'PERMANENT';
+              SELECT 1 INTO i FROM dba_tablespaces WHERE tablespace_name = v_tmp and contents = 'TEMPORARY';
+          EXCEPTION
+              WHEN no_data_found THEN
+                  raise_application_error(-20100, 'Permanent or temporary tablespace not found.');
+          END;
+          BEGIN
+              SELECT 1 INTO i FROM dba_profiles WHERE profile = v_profile AND rownum <= 1;
+          EXCEPTION
+              WHEN no_data_found THEN
+                  raise_application_error(-20101, 'Profile not found.');
+          END;
           v_default_password:= :var_default_password;
           v_grants:= :var_grants;
           v_tbs_quota:= :var_user_quota;
