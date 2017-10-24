@@ -181,16 +181,22 @@
       - runroot
 
   - name: Add additional info to glogin.sql (1)
-    lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line='set sqlprompt "_user @ _connect_identifier:>"' backup=yes
-    with_items: "{{oracle_databases}}"
+    lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line="set sqlprompt {{ item.1.sqlprompt }}" backup=yes
+    with_together:
+    - "{{oracle_databases}}"
+    - "{{glogin}}"
+    when: item.0.home == item.1.home
     become: yes
     become_user: "{{ oracle_user }}"
     tags:
       - glogindb
 
   - name: Add additional info to glogin.sql (2)
-    lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line='set time on' backup=yes
-    with_items: "{{oracle_databases}}"
+    lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line="set {{ item.1.options }}" backup=yes
+    with_together:
+    - "{{oracle_databases}}"
+    - "{{glogin}}"
+    when: item.0.home == item.1.home
     tags:
       - glogindb
 
