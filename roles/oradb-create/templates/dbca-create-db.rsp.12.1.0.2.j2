@@ -273,7 +273,11 @@ NODELIST={% for host in groups[hostgroup] -%} {{host}} {%- if not loop.last -%} 
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-TEMPLATENAME = "General_Purpose.dbc"
+{% if item.0.dbca_templatename is defined %}
+TEMPLATENAME = "{{item.0.dbca_templatename}}"
+{% else %}
+TEMPLATENAME = "{{dbca_templatename}}"
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : OBFUSCATEDPASSWORDS

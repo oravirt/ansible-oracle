@@ -231,7 +231,11 @@ nodelist={% for host in groups[hostgroup] -%} {{host}} {%- if not loop.last -%} 
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
 #templateName={{ oracle_home_db }}/assistants/dbca/templates/General_Purpose.dbc
-templateName=General_Purpose.dbc
+{% if item.0.dbca_templatename is defined %}
+templateName="{{item.0.dbca_templatename}}"
+{% else %}
+templateName="{{dbca_templatename}}"
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : sysPassword
