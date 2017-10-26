@@ -180,20 +180,15 @@
     tags:
       - runroot
 
-  - name: Add additional info to glogin.sql (1)
-    lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line='set sqlprompt "_user @ _connect_identifier:>"' backup=yes
-    with_items: "{{oracle_databases}}"
+  - name: Generate glogin.sql
+    template: src=glogin.sql.j2 dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" backup=yes
+    with_items:
+     - "{{oracle_databases}}"
     become: yes
     become_user: "{{ oracle_user }}"
     tags:
       - glogindb
-
-  - name: Add additional info to glogin.sql (2)
-    lineinfile: dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" line='set time on' backup=yes
-    with_items: "{{oracle_databases}}"
-    tags:
-      - glogindb
-
+      
   - name: Check opatch lsinventory (DB)
     shell: "{{ oracle_home_db }}/OPatch/opatch lsinventory"
     with_items: "{{oracle_databases}}"

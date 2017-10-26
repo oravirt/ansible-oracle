@@ -42,6 +42,21 @@
   configure_cluster: false
   autostartup_service: false # automatic startup/stop databases service
 
+  glogin_default_nocdb:
+        - "set sqlprompt \"_user @ _connect_identifier:>\""
+        - "set time on"
+  glogin_default_cdb:
+        - "define gname=idle"
+        - "column global_name new_value gname"
+        - "set heading off"
+        - "set termout off"
+        - "col global_name noprint"
+        - "select upper(sys_context ('userenv', 'instance_name') || ':' || sys_context('userenv', 'con_name')) global_name from dual;"
+        - "set sqlprompt '_user @ &gname:>'"
+        - "set heading on"
+        - "set termout on"
+        - "set time on"
+
   oracle_sw_image_db:
        - { filename: linuxx64_12201_database.zip, version: 12.2.0.1 }
        - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2 }
