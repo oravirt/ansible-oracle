@@ -6,18 +6,18 @@
   tags: thpnuma
 
 - name: Disable Transparent Hugepages (in grub.conf)
-  replace: dest=/etc/grub.conf
+  replace: dest=/boot/grub/grub.conf
            regexp='(^\s+kernel(\s+(?!transparent_hugepage=never)[\w=/\-\.]+)*)\s*$'
            replace='\1 transparent_hugepage=never'
+           backup=yes
+  with_sequence: start=0 end={{ count.stdout }}
   tags: thpnuma
 
 - name: Disable Numa (in grub.conf)
-  lineinfile: dest=/etc/grub.conf
-            backup=True
-            backrefs=True
-            state=present
+  replace: dest=/boot/grub/grub.conf
             regexp='(^\s+kernel(\s+(?!numa=off)[\w=/\-\.]+)*)\s*$'
-            line='\1 numa=off'
+            replace='\1 numa=off'
+            backup=yes
   with_sequence: start=0 end={{ count.stdout }}
   tags: thpnuma
   when: disable_numa_boot
