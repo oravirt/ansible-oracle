@@ -4,9 +4,9 @@
 DOCUMENTATION = '''
 ---
 module: oracle_sql
-short_description: Manage pluggable databases in Oracle
+short_description: Execute arbitrary sql
 description:
-    - Manage pluggable databases in Oracle.
+    - Execute arbitrary sql against an Oracle database
 version_added: "2.1.0.0"
 options:
     username:
@@ -49,23 +49,33 @@ options:
         default: 1521
 notes:
     - cx_Oracle needs to be installed
+    - Oracle client libraries need to be installed along with ORACLE_HOME and LD_LIBRARY_PATH settings.
 requirements: [ "cx_Oracle" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
 EXAMPLES = '''
 # Execute arbitrary sql
-oracle_sql: name=myservice =system pw=Oracle123 sql='select username from dba_users'
-
+- oracle_sql:
+    username: "{{ user }}"
+    password: "{{ password }}"
+    service_name: one.world
+    sql: 'select username from dba_users'
 # Execute arbitrary script1
-oracle_sql: name=myservice =system pw=Oracle123 script=/u01/scripts/create-all-the-procedures.sql
-
+- oracle_sql:
+    username: "{{ user }}"
+    password: "{{ password }}"
+    service_name: one.world
+    script: /u01/scripts/create-all-the-procedures.sql
 # Execute arbitrary script2
-oracle_sql: name=myservice =system pw=Oracle123 script=/u01/scripts/create-tables-and-insert-default-values.sql
-
+- oracle_sql:
+    username: "{{ user }}"
+    password: "{{ password }}"
+    service_name: one.world
+    script: /u01/scripts/create-tables-and-insert-default-values.sql
 '''
 import os
-
+from ansible.module_utils.basic import AnsibleModule
 
 try:
     import cx_Oracle
@@ -75,21 +85,19 @@ else:
     cx_oracle_exists = True
 
 
-def execute_sql_get(module, msg, cursor, sql):
-
+def execute_sql_get(module, cursor, sql):
     try:
         cursor.execute(sql)
         result = (cursor.fetchall())
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
-        msg[0] = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
-        module.fail_json(msg=msg[0], changed=False)
+        msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
+        module.fail_json(msg=msg, changed=False)
         return False
     return result
 
-def execute_sql(module, msg, cursor, conn, sql):
 
-
+def execute_sql(module, cursor, conn, sql):
     if 'insert' or 'delete' or 'update' in lower.sql():
         docommit = True
     else:
@@ -97,26 +105,27 @@ def execute_sql(module, msg, cursor, conn, sql):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
-        msg[0] = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
-        module.fail_json(msg=msg[0], changed=False)
+        msg = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
+        module.fail_json(msg=msg, changed=False)
         return False
     if docommit:
         conn.commit()
     return True
 
-def read_file(msg,module,script):
 
+def read_file(module, script):
     try:
         f = open(script, 'r')
         sqlfile = f.read()
         f.close()
+        return sqlfile
     except IOError as e:
-        msg[0] = 'Couldn\'t open/read file: %s' % (e)
-        module.fail_json(msg=msg[0], changed=False)
+        msg = 'Couldn\'t open/read file: %s' % (e)
+        module.fail_json(msg=msg, changed=False)
+    return
 
-    return sqlfile
 
 def clean_sqlfile(sqlfile):
     sqlfile = sqlfile.strip()
@@ -128,40 +137,38 @@ def clean_sqlfile(sqlfile):
 
 def main():
 
-    msg = ['']
-
     module = AnsibleModule(
-        argument_spec = dict(
-            user                = dict(required=False, aliases = ['un','username']),
-            password            = dict(required=False, no_log=True, aliases = ['pw']),
-            mode                = dict(default="normal", choices = ["sysdba", "normal"]),
-            service_name        = dict(required=False, aliases = ['sn']),
-            hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
-            port                = dict(required=False, default = 1521),
-            sql                 = dict(required=False),
-            script              = dict(required=False),
+        argument_spec=dict(
+            user=dict(required=False, aliases=['un', 'username']),
+            password=dict(required=False, no_log=True, aliases=['pw']),
+            mode=dict(default="normal", choices=["sysdba", "normal"]),
+            service_name=dict(required=False, aliases=['sn']),
+            hostname=dict(required=False, default='localhost', aliases=['host']),
+            port=dict(required=False, default=1521),
+            sql=dict(required=False),
+            script=dict(required=False),
 
         ),
         mutually_exclusive=[['sql', 'script']]
     )
 
-    user                = module.params["user"]
-    password            = module.params["password"]
-    mode                = module.params["mode"]
-    service_name        = module.params["service_name"]
-    hostname            = module.params["hostname"]
-    port                = module.params["port"]
-    sql                 = module.params["sql"]
-    script              = module.params["script"]
-
+    user = module.params["user"]
+    password = module.params["password"]
+    mode = module.params["mode"]
+    service_name = module.params["service_name"]
+    hostname = module.params["hostname"]
+    port = module.params["port"]
+    sql = module.params["sql"]
+    script = module.params["script"]
 
     if not cx_oracle_exists:
-        msg[0] = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
-        module.fail_json(msg=msg[0])
+        msg = "The cx_Oracle module is required"
+        module.fail_json(msg=msg)
 
     wallet_connect = '/@%s' % service_name
+
     try:
-        if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
+        if not user and not password:  # If neither user or password is supplied, the use of an oracle wallet is assumed
             if mode == 'sysdba':
                 connect = wallet_connect
                 conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
@@ -169,7 +176,7 @@ def main():
                 connect = wallet_connect
                 conn = cx_Oracle.connect(wallet_connect)
 
-        elif (user and password ):
+        elif user and password:
             if mode == 'sysdba':
                 dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
                 connect = dsn
@@ -179,33 +186,33 @@ def main():
                 connect = dsn
                 conn = cx_Oracle.connect(user, password, dsn)
 
-        elif (not(user) or not(password)):
+        elif not user or not password:
             module.fail_json(msg='Missing username or password for cx_Oracle')
 
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
-        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
-        module.fail_json(msg=msg[0], changed=False)
+        msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
+        module.fail_json(msg=msg, changed=False)
 
     cursor = conn.cursor()
 
     if sql:
         if sql.lower().startswith('begin '):
-            execute_sql(module, msg, cursor,conn, sql)
-            msg[0] = 'SQL executed: %s' % (sql)
-            module.exit_json(msg=msg[0], changed=True)
+            execute_sql(module, cursor, conn, sql)
+            msg = 'SQL executed: %s' % (sql)
+            module.exit_json(msg=msg, changed=True)
 
         else:
             sql = sql.rstrip(';')
             if sql.lower().startswith('select '):
-                result = execute_sql_get(module, msg, cursor, sql)
+                result = execute_sql_get(module, cursor, sql)
                 module.exit_json(msg=result, changed=False)
             else:
-                execute_sql(module, msg, cursor,conn, sql)
-                msg[0] = 'SQL executed: %s' % (sql)
-                module.exit_json(msg=msg[0], changed=True)
+                execute_sql(module, cursor, conn, sql)
+                msg = 'SQL executed: %s' % (sql)
+                module.exit_json(msg=msg, changed=True)
     else:
-        sqlfile = read_file(msg,module,script)
+        sqlfile = read_file(module, script)
         sqlfile = clean_sqlfile(sqlfile)
         sqldelim = ';'
         if 'create or replace' in sqlfile.lower():
@@ -214,18 +221,13 @@ def main():
         sql = sqlfile.split(sqldelim)
         for q in sql:
             if len(q) > 0:
-                execute_sql(module, msg, cursor,conn, q)
+                execute_sql(module, cursor, conn, q)
             else:
-                msg[0] = 'Finished running script %s' % (script)
-                module.exit_json(msg=msg[0], changed=True)
-
+                msg = 'Finished running script %s' % script
+                module.exit_json(msg=msg, changed=True)
 
     module.exit_json(msg="Unhandled exit", changed=False)
 
 
-
-
-
-from ansible.module_utils.basic import *
 if __name__ == '__main__':
     main()
