@@ -145,7 +145,7 @@ def check_user_exists(msg, cursor, schema):
         return True
 
 # Create the user/schema
-def create_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, profile, authentication_type, state, grants):
+def create_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, profile, authentication_type, state, container, grants):
     grants_list=[]
     if not (schema):
         msg[0] = 'Error: Missing schema name'
@@ -177,6 +177,9 @@ def create_user(module, msg, cursor, schema, schema_password, schema_password_ha
     if (profile):
         sql += ' profile %s' % profile
 
+    if (container):
+        sql += ' container=%s' % (container)
+
     if state == 'locked':
         sql += ' account lock'
 
@@ -195,6 +198,8 @@ def create_user(module, msg, cursor, schema, schema_password, schema_password_ha
     	grants = ','.join(grants_list)
 
         sql = 'grant %s to %s '% (grants, schema)
+        if container:
+            sql += ' container=%s' % (container)
     else:
         sql = 'grant create session to %s '% schema
 
@@ -387,6 +392,7 @@ def main():
             update_password = dict(default='always', choices=['on_create','always']),
             profile        = dict(default=None),
             authentication_type = dict(default='password', choices=['password','external','global']),
+            container      = dict(default=None),
             grants         = dict(default=None, type="list")
 
         ),
@@ -408,6 +414,7 @@ def main():
     update_password = module.params["update_password"]
     profile  = module.params["profile"]
     authentication_type = module.params["authentication_type"]
+    container = module.params["container"]
     grants = module.params["grants"]
 
     if not cx_oracle_exists:
@@ -445,7 +452,7 @@ def main():
 
     if state in ('present','unlocked','locked'):
         if not check_user_exists(msg, cursor, schema):
-            if create_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, profile, authentication_type, state, grants):
+            if create_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, profile, authentication_type, state, container, grants):
                 msg[0] = 'The schema %s has been created successfully' % schema
                 module.exit_json(msg=msg[0], changed=True)
             else:
