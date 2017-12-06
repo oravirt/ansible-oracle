@@ -200,7 +200,7 @@ def unplug_pdb(cursor, module, msg, oracle_home, name, unplug_dest):
 def remove_pdb(cursor, module, msg, oracle_home, name, sourcedb):
 
     run_sql = []
-    close_sql = 'alter pluggable database %s close force instances=all' % (name)
+    close_sql = 'alter pluggable database %s close abort instances=all' % (name)
     dropsql = 'drop pluggable database %s including datafiles' % (name)
 
     run_sql.append(close_sql)
