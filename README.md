@@ -165,3 +165,9 @@ pre-req: cx_Oracle, datetime
 pre-req: cx_Oracle
 
 - Gathers facts about Oracle database
+
+**oracle_stats_prefs**
+
+pre-req: cx_Oracle
+
+- Managing DBMS_STATS global preferences
