@@ -86,7 +86,7 @@ def query_result(query):
     c.execute(query)
     res = rows_to_dict_list(c)
     c.close()
-    return res 
+    return res
 
 def star_query(rowsource):
     return query_result("SELECT * FROM %s" % rowsource)
@@ -163,6 +163,8 @@ def main():
     try:
         if database['CDB'] == 'YES':
             pdb = query_result("SELECT con_id, rawtohex(guid) guid_hex, name, open_mode FROM v$pdbs ORDER BY name")
+        else:
+            pdb = []
     except:
         pdb = []
     if conn.version >= '12.1':
