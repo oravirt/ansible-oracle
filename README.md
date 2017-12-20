@@ -166,6 +166,10 @@ pre-req: cx_Oracle
 
 - Gathers facts about Oracle database
 
+**oracle_gi_facts**
+
+- Gathers facts about Grid Infrastructure cluster configuration
+
 **oracle_stats_prefs**
 
 pre-req: cx_Oracle
