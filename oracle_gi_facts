@@ -40,7 +40,7 @@ EXAMPLES = '''
 
 import os, re
 from subprocess import check_output, CalledProcessError
-from socket import gethostname
+from socket import gethostname, getfqdn
 
 def is_executable(fpath):
     return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
@@ -55,6 +55,12 @@ def exec_program_lines(arguments):
 
 def exec_program(arguments):
     return exec_program_lines(arguments)[0]
+
+def hostname_to_fqdn(hostname):
+    if "." not in hostname:
+        return getfqdn(hostname)
+    else:
+        return hostname
 
 def local_listener():
     global srvctl, shorthostname, iscrs, vips
@@ -85,6 +91,7 @@ def local_listener():
                     p = proto.split(':')
                     config[p[0].lower()] = p[1]
         if "network" in config.keys():
+            config['address'] = vips[config['network']]['fqdn']
             config['ipv4'] = vips[config['network']]['ipv4']
             config['ipv6'] = vips[config['network']]['ipv6']
         out.append(config)
@@ -99,7 +106,7 @@ def scan_listener():
             m = re.search('SCAN Listener (.+) exists. Port: (.+)', line)
             if m is not None:
                 endpoints = m.group(2)
-                out[n] = {'network': n, 'scan_address': scans[n]['name'], 'endpoints': endpoints}
+                out[n] = {'network': n, 'scan_address': scans[n]['fqdn'], 'endpoints': endpoints}
                 for proto in endpoints.split('/'):
                     p = proto.split(':')
                     out[n][p[0].lower()] = p[1]
@@ -139,6 +146,7 @@ def get_vips():
             vip['network'] = m.group(1)
         elif line.startswith('VIP Name:'):
             vip['name'] = line[10:]
+            vip['fqdn'] = hostname_to_fqdn(vip['name'])
         elif line.startswith('VIP IPv4 Address:'):
             vip['ipv4'] = line[18:]
         elif line.startswith('VIP IPv6 Address:'):
@@ -158,6 +166,7 @@ def get_scans():
                 out[item['network']] = item
             m = re.search('SCAN name: (.+), Network: ([0-9]+)', line)
             item = {'network': m.group(2), 'name': m.group(1), 'ipv4': [], 'ipv6': []}
+            item['fqdn'] = hostname_to_fqdn(item['name'])
         else:
             m = re.search('SCAN [0-9]+ (IPv[46]) VIP: (.+)', line)
             if m is not None:
@@ -214,7 +223,7 @@ def main():
     facts.update({'scan': scans.values()})
     # Listener
     facts.update({'local_listener': local_listener()})
-    facts.update({'scan_listener': scan_listener() if iscrs else []})
+    facts.update({'scan_listener': scan_listener().values() if iscrs else []})
     # Databases
     facts.update({'database_list': exec_program_lines([srvctl, 'config', 'database'])})
     # Output
