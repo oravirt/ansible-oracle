@@ -214,7 +214,7 @@ def main():
     facts.update({'scan': scans.values()})
     # Listener
     facts.update({'local_listener': local_listener()})
-    facts.update({'scan_listener': scan_listener() if iscrs else []})
+    facts.update({'scan_listener': scan_listener().values() if iscrs else []})
     # Databases
     facts.update({'database_list': exec_program_lines([srvctl, 'config', 'database'])})
     # Output
