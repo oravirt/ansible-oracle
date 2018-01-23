@@ -146,7 +146,7 @@ def scan_listener():
             m = re.search('SCAN Listener (.+) exists. Port: (.+)', line)
             if m is not None:
                 endpoints = m.group(2)
-                out[n] = {'network': n, 'scan_address': scans[n]['fqdn'], 'endpoints': endpoints}
+                out[n] = {'network': n, 'scan_address': scans[n]['fqdn'], 'endpoints': endpoints, 'ipv4': scans[n]['ipv4'], 'ipv6': scans[n]['ipv6']}
                 for proto in endpoints.split('/'):
                     p = proto.split(':')
                     out[n][p[0].lower()] = p[1]
