@@ -182,6 +182,7 @@
         - filesystem
     tags: hostfs
 
+  # create partition only when device != pvname
   - name: filesystem | Create partition and pv
     shell:  parted -a optimal {{ item.1.device }} "mklabel gpt mkpart primary 1 -1"
     args:
@@ -189,7 +190,7 @@
     with_subelements:
         - "{{host_fs_layout}}"
         - disk
-    when: configure_host_disks
+    when: configure_host_disks and item.1.device != item.1.pvname
     tags: hostfs
 
   - name: filesystem | Create vg
