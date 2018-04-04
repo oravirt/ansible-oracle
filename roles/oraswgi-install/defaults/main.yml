@@ -69,6 +69,17 @@
   oracle_gi_gns_subdomain: a.b.c
   oracle_gi_gns_vip: gnsvip.a.b.c
 
+  oracle_opatch_patch:
+       - { filename: p6880880_122010_Linux-x86-64.zip, version: 12.2.0.1 }
+       - { filename: p6880880_122010_Linux-x86-64.zip, version: 12.1.0.2 } # 12.1.0.2 uses OPatch from 12.2.0.1!
+       - { filename: p6880880_121010_Linux-x86-64.zip, version: 12.1.0.1 }
+       - { filename: p6880880_112000_Linux-x86-64.zip, version: 11.2.0.4 }
+       - { filename: p6880880_112000_Linux-x86-64.zip, version: 11.2.0.3 }
+
+
+  opatcharchive: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/{% for opatchfile in oracle_opatch_patch if  opatchfile['version']==oracle_install_version_gi %}{{ opatchfile['filename'] }}{% endfor %}"
+
+
   oracle_sw_image_gi:                                              # Files containing the installation media for Grid Infrastructure
        - { filename: linuxx64_12201_grid_home.zip, version: 12.2.0.1 }
        - { filename: linuxamd64_12102_grid_1of2.zip, version: 12.1.0.2 }

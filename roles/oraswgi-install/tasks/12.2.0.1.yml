@@ -22,6 +22,31 @@
     - oragridswunpack
     when: checkgiinstall.stdout != "1" and oracle_install_version_gi == item.version
 
+  # Check for an existing GRID_HOME before reinstallation of OPatch
+  - name: Check for file GridSetup.sh
+    no_log: true
+    stat: path={{ oracle_home_gi }}/gridSetup.sh
+    register: stat_gridsetup_result
+    when: master_node
+
+  - name: State of GridSetup.sh
+    assert:
+      that: "stat_gridsetup_result.stat.exists == True"
+      msg: "Cannot find {{ oracle_home_gi }}/gridSetup.sh }}"
+    when: master_node
+
+  - name: Remove existing OPatch
+    file: path={{oracle_home_gi}}/OPatch state=absent
+    become: yes
+    become_user: "{{ grid_install_user }}"
+    when: oracle_sw_image_gi_psu is defined and checkgiinstall.stdout != "1"
+
+  - name: Distribute latest opatch
+    unarchive: dest={{oracle_home_gi}} src={{opatcharchive}}
+    become: yes
+    become_user: "{{ grid_install_user }}"
+    when: oracle_sw_image_gi_psu is defined and checkgiinstall.stdout != "1"
+
   - name: Install cvuqdisk rpm
     yum: name="{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}" state=present
     when: configure_cluster
@@ -42,6 +67,15 @@
     tags:
       - responsefilegi
     when: master_node and checkgiinstall.stdout != "1" and item.diskgroup == oracle_asm_init_dg
+
+  - name: Apply Release Update on ORACLE_HOME
+    shell: "{{oracle_home_gi}}/gridSetup.sh -silent -applyPSU {{ oracle_stage_remote }}/{{ oracle_install_version_gi }}/{{item.patchid}} -waitforcompletion"
+    ignore_errors: true
+    become: yes
+    become_user: "{{ grid_install_user }}"
+    with_items:
+      - "{{ oracle_sw_image_gi_psu }}"
+    when: oracle_sw_image_gi_psu is defined and oracle_install_version_gi == item.version and checkgiinstall.stdout != "1"
 
   - name: Install Grid Infrastructure
     shell: "{{ oracle_home_gi }}/gridSetup.sh -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -silent"
