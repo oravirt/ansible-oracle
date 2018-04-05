@@ -35,14 +35,9 @@
       msg: "Cannot find {{ oracle_home_gi }}/gridSetup.sh }}"
     when: master_node
 
-  - name: Remove existing OPatch
-    file: path={{oracle_home_gi}}/OPatch state=absent
-    become: yes
-    become_user: "{{ grid_install_user }}"
-    when: oracle_sw_image_gi_psu is defined and checkgiinstall.stdout != "1"
-
+  # Overwrite existing files from OPatch due to Note 2321749.1
   - name: Distribute latest opatch
-    unarchive: dest={{oracle_home_gi}} src={{opatcharchive}}
+    shell: unzip -u -d {{oracle_home_gi}} {{opatcharchive}}
     become: yes
     become_user: "{{ grid_install_user }}"
     when: oracle_sw_image_gi_psu is defined and checkgiinstall.stdout != "1"
