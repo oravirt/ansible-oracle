@@ -34,10 +34,10 @@
       that: "stat_gridsetup_result.stat.exists == True"
       msg: "Cannot find {{ oracle_home_gi }}/gridSetup.sh }}"
     when: master_node
-
+  # unarchive didn't worked in some environments. => using unzip directly
   # Overwrite existing files from OPatch due to Note 2321749.1
   - name: Distribute latest opatch
-    shell: unzip -u -d {{oracle_home_gi}} {{opatcharchive}}
+    shell: unzip -o -d {{oracle_home_gi}} {{opatcharchive}}
     become: yes
     become_user: "{{ grid_install_user }}"
     when: oracle_sw_image_gi_psu is defined and checkgiinstall.stdout != "1"
