@@ -36,7 +36,7 @@
     - dbcaresponse
 
   - name: Create database(s)
-    shell: "time {{ oracle_home_db }}/bin/dbca -createDatabase -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent -redoLogFileSize {{ item.0.redolog_size_in_mb }} "
+    shell: "time {{ oracle_home_db }}/bin/dbca -createDatabase -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent -redoLogFileSize {{ item.0.redolog_size_in_mb }} {{ dbca_initParams }}"
     with_together:
        - "{{oracle_databases}}"
        - "{{checkdbexist.results}}"
