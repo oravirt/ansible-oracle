@@ -3,14 +3,14 @@
 
   - name: Check for correct OS family & min version
     assert:
-      that: 
+      that:
         - "ansible_os_family == '{{ os_family_supported }}'"
         - "ansible_distribution_version >= '{{ os_min_supported_version }}'"
     tags:
      - oscheck
 
   - name: Install packages required by Oracle on OL/RHEL
-    yum: name={{ item }} state=installed
+    yum: name={{ item }} state=installed enablerepo=*
     with_items: "{{oracle_packages}}"
     when: install_os_packages and ansible_os_family == 'RedHat'
     tags: os_packages, oscheck
@@ -22,7 +22,7 @@
     tags: os_packages, oscheck
 
   - name: Install packages required by Oracle for ASMlib on OL/RHEL
-    yum: name={{ item }} state=installed
+    yum: name={{ item }} state=installed enablerepo=*
     with_items: "{{oracle_asm_packages}}"
     when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'RedHat'
     tags: os_packages, oscheck
@@ -33,10 +33,16 @@
     when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'Suse'
     tags: os_packages, oscheck, asm1
 
+  - name: Check if firewall is installed
+    yum: list={{firewall_service}} disablerepo=*
+    when: disable_firewall and ansible_os_family == 'RedHat'
+    tags: iptables,firewalld
+    register: firewall
+
   - name: Disable firewall
     service: name={{ firewall_service }} state=stopped enabled=no
-    when: disable_firewall and ansible_os_family == 'RedHat'
-    tags: iptables
+    when: disable_firewall and ansible_os_family == 'RedHat' and firewall.results
+    tags: iptables,firewalld
     register: iptables
 
   - name: Disable selinux (permanently)
