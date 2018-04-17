@@ -2,13 +2,13 @@
 - name: ASMlib | Build script to create asmlib-labels
   template: src=label-asm-disks.sh.j2 dest={{ oracle_rsp_stage }}/label-asm-disks-{{ item.diskgroup }}.sh mode=775
   with_items: "{{asm_diskgroups}}"
-  when: master_node and device_persistence == 'asmlib'
+  when: master_node and device_persistence == 'asmlib' and asm_diskgroups is defined
   tags: asmlib,asmstorage
 
 - name: ASMlib | Run script to create asmlib-labels
   shell: sh {{ oracle_rsp_stage }}/label-asm-disks-{{ item.diskgroup }}.sh
   with_items: "{{asm_diskgroups}}"
-  when: master_node and device_persistence == 'asmlib'
+  when: master_node and device_persistence == 'asmlib' and asm_diskgroups is defined
   tags: asmlib,asmstorage
 
 - name: ASMlib | Rescan ASM disks

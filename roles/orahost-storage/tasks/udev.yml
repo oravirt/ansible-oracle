@@ -1,12 +1,12 @@
 - name: udev | Create device to label mappings for udev
   template: src=udev-label-device-mapping.txt.j2 dest={{ oracle_stage }}/udev/udev-{{ item.diskgroup }}
   with_items: "{{asm_diskgroups}}"
-  when: device_persistence == 'udev'
+  when: device_persistence == 'udev' and asm_diskgroups is defined
   tags: udev
 
 - name: udev | Assemble into one mapfile
   assemble: src={{ oracle_stage }}/udev dest={{ oracle_rsp_stage }}/udev-device-input.txt
-  when: device_persistence == 'udev'
+  when: device_persistence == 'udev' 
   tags: udev
 
 - name: udev | Create script to create rules
