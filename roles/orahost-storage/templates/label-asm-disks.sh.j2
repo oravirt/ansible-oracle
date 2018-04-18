@@ -40,7 +40,7 @@ if [[ $chkdisk == 1 ]]; then
 fi
 
 echo "Creating ASM Label ${asmlabel} on ${used_device}"
-service oracleasm createdisk ${asmlabel} ${used_device}
-service oracleasm querydisk  ${used_device}
+{{asmlib_binary}} createdisk ${asmlabel} ${used_device}
+{{asmlib_binary}} querydisk  ${used_device}
 
 done < {{ oracle_rsp_stage }}/asm-label-device-mapping-{{ item.diskgroup }}.txt
