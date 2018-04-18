@@ -19,9 +19,9 @@
 
 
   oracle_users:         # Passwd :Oracle123
-   - { username: oracle, uid: 54321, primgroup: oinstall, othergroups: "dba,asmdba,backupdba,dgdba,kmdba,oper", passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0" }
+   - { username: oracle, uid: 54321, primgroup: oinstall, othergroups: "dba,asmadmin,asmdba,backupdba,dgdba,kmdba,oper", passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0" }
   grid_users:
-   - { username: grid, uid: 54320, primgroup: oinstall, othergroups: "asmadmin,asmdba,asmoper,dba", passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0" }
+   - { username: grid, uid: 54320, primgroup: oinstall, othergroups: "asmadmin,asmdba,asmoper", passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0" }
 
   firewall_service: "{% if ansible_distribution_major_version|int==6%}iptables{%elif ansible_distribution_major_version|int==7 %}firewalld{% else %}0{% endif %}"
   role_separation: false
@@ -49,9 +49,13 @@
 
   #epel_rpm: "http://download.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm"
   asmlib_rpm: "{% if ansible_distribution_major_version|int==6%}{{asmlib_rpm_el6}}{%elif ansible_distribution_major_version|int==7 %}{{asmlib_rpm_el7}}{% else %}None{% endif %}"
+  asmlibsupport_rpm: "{% if ansible_distribution == 'RedHat' %}{% if ansible_distribution_major_version|int==6%}{{asmlibsupport_rpm_el6}}{%elif ansible_distribution_major_version|int==7 %}{{asmlibsupport_rpm_el7}}{% else %}oracleasm-support{% endif %}{% else %}oracleasm-support{% endif %}"
   asmlib_rpm_el6: "http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.4-1.el6.x86_64.rpm"
   asmlib_rpm_el7: "http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.12-1.el7.x86_64.rpm"
   asmlib_rpm_sles: "http://oss.oracle.com/projects/oracleasm-support/dist/files/RPMS/sles12/amd64/2.1.8/oracleasm-support-2.1.8-1.SLE12.x86_64.rpm"
+  asmlibsupport_rpm_el6: "http://oss.oracle.com/projects/oracleasm-support/dist/files/RPMS/rhel6/amd64/2.1.8/oracleasm-support-2.1.8-1.el6.x86_64.rpm"
+  asmlibsupport_rpm_el7: "http://yum.oracle.com/repo/OracleLinux/OL7/latest/x86_64/getPackage/oracleasm-support-2.1.8-3.el7.x86_64.rpm"
+
   #ol6_repo_file: public-yum-ol6.repo
   repo_dir: /etc/yum.repos.d/
 
@@ -214,7 +218,7 @@
 
   oracle_asm_packages:
       - "{{ asmlib_rpm }}"
-      - oracleasm-support
+      - "{{ asmlibsupport_rpm }}"
       - kmod-oracleasm
 
   oracle_asm_packages_sles:
