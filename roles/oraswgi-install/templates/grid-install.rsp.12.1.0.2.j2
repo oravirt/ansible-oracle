@@ -35,8 +35,6 @@ ORACLE_HOME={{ oracle_home_gi }}
 # The DBA_GROUP is the OS group which is to be granted OSDBA privileges.
 #-------------------------------------------------------------------------------
 
-{% if role_separation==True %}
-
 oracle.install.asm.OSDBA={{ asmdba_group }}
 
 ##-------------------------------------------------------------------------------
@@ -51,23 +49,6 @@ oracle.install.asm.OSOPER={{ asmoper_group }}
 ##-------------------------------------------------------------------------------
 oracle.install.asm.OSASM={{ asmadmin_group }}
 
-   {% else %}
-
-oracle.install.asm.OSDBA={{ dba_group }}
-
-#-------------------------------------------------------------------------------
-## The OPER_GROUP is the OS group which is to be granted OSOPER privileges.
-## The value to be specified for OSOPER group is optional.
-##-------------------------------------------------------------------------------
-oracle.install.asm.OSOPER={{ oper_group }}
-
- ##-------------------------------------------------------------------------------
-# The OSASM_GROUP is the OS group which is to be granted OSASM privileges. This
-# must be different than the previous two.
-#-------------------------------------------------------------------------------
-oracle.install.asm.OSASM={{ dba_group }}
-
-{% endif %}
 
 ################################################################################
 #                                                                              #

@@ -9,19 +9,11 @@
 # ORACLEASM_ENABLED: 'true' means to load the driver on boot.
 ORACLEASM_ENABLED=true
 
-{% if role_separation==True %}
 # ORACLEASM_UID: Default user owning the /dev/oracleasm mount point.
-ORACLEASM_UID={{ grid_install_user }}
+ ORACLEASM_UID={{ grid_install_user }}
 
 # ORACLEASM_GID: Default group owning the /dev/oracleasm mount point.
-ORACLEASM_GID={{ asmdba_group }}
-  {% else %}
-# ORACLEASM_UID: Default user owning the /dev/oracleasm mount point.
- ORACLEASM_UID={{ oracle_user }}
-
-# ORACLEASM_GID: Default group owning the /dev/oracleasm mount point.
- ORACLEASM_GID={{ dba_group }}
-{% endif %}
+ ORACLEASM_GID={{ asmadmin_group }}
 
 # ORACLEASM_SCANBOOT: 'true' means scan for ASM disks on boot.
 ORACLEASM_SCANBOOT=true

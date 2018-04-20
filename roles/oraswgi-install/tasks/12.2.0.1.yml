@@ -75,7 +75,7 @@
     when: oracle_sw_image_gi_psu is defined and oracle_install_version_gi == item.version and checkgiinstall.stdout != "1"
 
   - debug: msg="Ignore the failure [FATAL] [INS-40426] in output from gridSetup.sh -applyPSU"
-    when: command_result is defined
+    when: command_result is defined and oracle_sw_image_gi_psu is defined
 
   - debug: msg={{item.stdout_lines}}
     with_items:
