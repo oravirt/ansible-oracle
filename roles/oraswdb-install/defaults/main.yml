@@ -42,6 +42,8 @@
   configure_cluster: false
   autostartup_service: false # automatic startup/stop databases service
 
+  oracle_EE_options: "{% if item.oracle_version_db == '12.2.0.1' %}{{ oracle_EE_options_122 }}{% endif %}"
+
   glogin_default_nocdb:
         - "set sqlprompt \"_user @ _connect_identifier:>\""
         - "set time on"
@@ -74,3 +76,10 @@
       oracle_edition: EE
       oracle_db_name: orcl
       oracle_db_type: SI
+
+  # disable all options who requires extra licences
+  oracle_EE_options_122:
+    - {option: oaa          , state: !!str "disable" }
+    - {option: olap         , state: !!str "disable" }
+    - {option: partitioning , state: !!str "disable" }
+    - {option: rat          , state: !!str "disable" }

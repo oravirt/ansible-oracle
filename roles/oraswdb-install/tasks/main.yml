@@ -180,6 +180,34 @@
     tags:
       - runroot
 
+  # oracle_EE_options = '' => Nothing to do
+  - name: set facts for chopt
+    no_log: true
+    set_fact:
+      oracle_databaseschopt: "{{oracle_databaseschopt|default([]) + [ item | combine({'oracle_EE_options': oracle_EE_options})]}}"
+    with_items:
+     - "{{oracle_databases}}"
+    when: oracle_EE_options != ''
+    tags:
+      - dbchopt
+
+  # licence options in 12.2 must be changed by chopt
+  # => use this method for all >= 11.2 (Doc ID 948061.1)
+  # test -f => reduce number of executions when > 1 database in oracle_databases
+  - name: Change Database options with chopt
+    shell: "test -f {{ oracle_home_db }}/install/{{item.1.state}}_{{item.1.option}}.log || {{ oracle_home_db }}/bin/chopt {{item.1.state}} {{item.1.option}} ; echo "
+    debugger: on_failed
+    with_subelements:
+      - "{{oracle_databaseschopt}}"
+      - oracle_EE_options
+    become: yes
+    become_user: "{{ oracle_user }}"
+    register: choptout
+    changed_when: '"Writing" in choptout.stdout'
+    when: item.0.oracle_edition == 'EE' and item.1.option is defined
+    tags:
+      - dbchopt
+
   - name: Generate glogin.sql
     template: src=glogin.sql.j2 dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" backup=yes
     with_items:
