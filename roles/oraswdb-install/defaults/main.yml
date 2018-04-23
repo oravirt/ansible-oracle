@@ -50,6 +50,9 @@
           - {name: "{{ oracle_base }}/cfgtoollogs/dbca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
           - {name: "{{ oracle_base }}/cfgtoollogs/sqlpatch", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
           - {name: "{{ oracle_base }}/cfgtoollogs/netca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
+  oracle_EE_options: "{%- if item.oracle_version_db in ('12.2.0.1') %}{{ oracle_EE_options_122 }}
+                      {% else %}{%- if item.oracle_version_db in ('12.1.0.1', '12.1.0.2') %}{{oracle_EE_options_121}}
+                      {% else %}{%- if item.oracle_version_db == '11.2.0.4' %}{{oracle_EE_options_112}}{% endif %}{% endif %}{% endif %}"
 
   glogin_default_nocdb:
         - "set sqlprompt \"_user @ _connect_identifier:>\""
@@ -84,3 +87,24 @@
       oracle_db_name: orcl
       oracle_db_type: SI
       is_container: False
+
+  # disable all options who requires extra licences
+  oracle_EE_options_112:
+    - {option: dm           , state: !!str "disable" }
+    - {option: dv           , state: !!str "disable" }
+    - {option: lbac         , state: !!str "disable" }
+    - {option: olap         , state: !!str "disable" }
+    - {option: partitioning , state: !!str "disable" }
+    - {option: rat          , state: !!str "disable" }
+
+  oracle_EE_options_121:
+    - {option: dm           , state: !!str "disable" }
+    - {option: olap         , state: !!str "disable" }
+    - {option: partitioning , state: !!str "disable" }
+    - {option: rat          , state: !!str "disable" }
+
+  oracle_EE_options_122:
+    - {option: oaa          , state: !!str "disable" }
+    - {option: olap         , state: !!str "disable" }
+    - {option: partitioning , state: !!str "disable" }
+    - {option: rat          , state: !!str "disable" }
