@@ -10,7 +10,11 @@
      - oscheck
 
   - name: Install packages required by Oracle on OL/RHEL
-    yum: name={{ item }} state=installed enablerepo=*
+    yum:
+       name: "{{ item }}"
+       state: installed
+       enablerepo: "{{ extrarepos_enabled |default (omit) }}"
+       disablerepo: "{{ extrarepos_disabled |default (omit) }}"
     with_items: "{{oracle_packages}}"
     when: install_os_packages and ansible_os_family == 'RedHat'
     tags: os_packages, oscheck
@@ -22,7 +26,11 @@
     tags: os_packages, oscheck
 
   - name: Install packages required by Oracle for ASMlib on OL/RHEL
-    yum: name={{ item }} state=installed enablerepo=*
+    yum:
+       name: "{{ item }}"
+       state: installed
+       enablerepo: "{{ extrarepos_enabled |default (omit) }}"
+       disablerepo: "{{ extrarepos_disabled |default (omit) }}"
     with_items: "{{oracle_asm_packages}}"
     when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'RedHat'
     tags: os_packages, oscheck
