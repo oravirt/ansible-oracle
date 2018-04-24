@@ -42,8 +42,9 @@
   configure_cluster: false
   autostartup_service: false # automatic startup/stop databases service
 
-  oracle_EE_options: "{%- if item.oracle_version_db in ('12.1.0.1', '12.1.0.2', '12.2.0.1') %}{{ oracle_EE_options_122 }}
-                      {% else %}{%- if item.oracle_version_db == '11.2.0.4' %}{{oracle_EE_options_112}}{% endif %}{% endif %}"
+  oracle_EE_options: "{%- if item.oracle_version_db in ('12.2.0.1') %}{{ oracle_EE_options_122 }}
+                      {% else %}{%- if item.oracle_version_db in ('12.1.0.1', '12.1.0.2') %}{{oracle_EE_options_121}}
+                      {% else %}{%- if item.oracle_version_db == '11.2.0.4' %}{{oracle_EE_options_112}}{% endif %}{% endif %}{% endif %}"
 
   glogin_default_nocdb:
         - "set sqlprompt \"_user @ _connect_identifier:>\""
@@ -83,6 +84,12 @@
     - {option: dm           , state: !!str "disable" }
     - {option: dv           , state: !!str "disable" }
     - {option: lbac         , state: !!str "disable" }
+    - {option: olap         , state: !!str "disable" }
+    - {option: partitioning , state: !!str "disable" }
+    - {option: rat          , state: !!str "disable" }
+
+  oracle_EE_options_121:
+    - {option: dm           , state: !!str "disable" }
     - {option: olap         , state: !!str "disable" }
     - {option: partitioning , state: !!str "disable" }
     - {option: rat          , state: !!str "disable" }
