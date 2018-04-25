@@ -21,7 +21,7 @@
     template: src={{ item.0.dbca_templatename }} dest={{ oracle_home_db }}/assistants/dbca/templates/{{ item.0.dbca_templatename }} owner={{ oracle_user }} group={{ oracle_group }} mode=640
     with_together:
        - "{{oracle_databases}}"
-    when: item.0.dbca_templatename is defined and item.0.dbca_templatename not in('New_Database.dbt','General_Purpose.dbc','New_Database.dbt')
+    when: item.0.dbca_templatename is defined and item.0.dbca_templatename not in('New_Database.dbt','General_Purpose.dbc')
     tags:
       - customdbcatemplate
 
@@ -35,6 +35,11 @@
     tags:
     - dbcaresponse
 
+  # - debug: var="{{ oracle_home_db }}/bin/dbca -createDatabase -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent -redoLogFileSize {{ item.0.redolog_size_in_mb }} {{ dbca_initParams }}"
+  #   with_together:
+  #    - "{{oracle_databases}}"
+  #    - "{{checkdbexist.results}}"
+  # 
   - name: Create database(s)
     shell: "time {{ oracle_home_db }}/bin/dbca -createDatabase -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent -redoLogFileSize {{ item.0.redolog_size_in_mb }} {{ dbca_initParams }}"
     with_together:
@@ -59,6 +64,7 @@
     shell:  ps -ef | grep -w "ora_pmon_{{ item.oracle_db_name }}" |grep -v grep | sed 's/^.*pmon_//g'
     with_items: "{{oracle_databases}}"
     register: dbs
+    changed_when: False
     tags:
       - dotprofile_db
       - update_oratab

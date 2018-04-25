@@ -115,13 +115,13 @@ oracle.install.asm.OSASM={{ asmadmin_group }}
 #-------------------------------------------------------------------------------
 # Specify a name for SCAN
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.gpnp.scanName={% if configure_cluster==True %}{{ oracle_scan }}{% else %}{% endif %}
+oracle.install.crs.config.gpnp.scanName={% if configure_cluster %}{{ oracle_scan }}{% else %}{% endif %}
 
 #-------------------------------------------------------------------------------
 # Specify a unused port number for SCAN service
 #-------------------------------------------------------------------------------
 
-oracle.install.crs.config.gpnp.scanPort={% if configure_cluster==True %}{{ oracle_scan_port }}{% else %}{% endif %}
+oracle.install.crs.config.gpnp.scanPort={% if configure_cluster %}{{ oracle_scan_port }}{% else %}{% endif %}
 
 
 ################################################################################
@@ -379,7 +379,7 @@ oracle.install.asmOnNAS.gimrLocation=
 #-------------------------------------------------------------------------------
 # Password for SYS user of Oracle ASM
 #-------------------------------------------------------------------------------
-oracle.install.asm.SYSASMPassword={{ oracle_password }}
+oracle.install.asm.SYSASMPassword={%if sysasmpassword is defined %}{{ sysasmpassword}}{% else %}{{default_gipass}}{% endif %}
 
 #-------------------------------------------------------------------------------
 # The ASM DiskGroup
@@ -472,7 +472,7 @@ oracle.install.asm.diskGroup.diskDiscoveryString={% if device_persistence == 'as
 # Password for ASMSNMP account
 # ASMSNMP account is used by Oracle Enterprise Manager to monitor Oracle ASM instances
 #-------------------------------------------------------------------------------
-oracle.install.asm.monitorPassword={{ oracle_password }}
+oracle.install.asm.monitorPassword={%if asmmonitorpassword is defined %}{{asmmonitorpassword}}{% else %}{{default_gipass}}{% endif %}
 
 #-------------------------------------------------------------------------------
 # GIMR Storage data ASM DiskGroup

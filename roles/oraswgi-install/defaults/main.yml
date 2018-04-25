@@ -43,7 +43,14 @@
   oracle_profile_name_gi: ".profile_grid"    # .profile that sets up the environment for Grid Infrastructure (Cluster or Single node)
   oracle_grid_responsefile: "grid-{{ oracle_cluster_name }}.rsp"   # Name of responsefile-name used when installing Grid oInfrastructure
 
-  oracle_password: Oracle123                                       # Password used for all Grid Infrastructure related resources (e.g ASM)
+  # GI
+  default_gipass: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
+  sysasmpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
+  asmmonitorpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
+  # DB
+  default_dbpass: "{% if item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd}}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for  backwards compatibility and only temporary, will be removed
+  
+  #oracle_password: Oracle123                                       # Password used for all Grid Infrastructure related resources (e.g ASM)
   oracle_scan: your.scan.address                                   # Scan address for Clustered Grid Infrastructure
   oracle_vip: -vip                                                 # Suffix for the host VIP-addresses (e.g orarac01-vip)
   oracle_scan_port: 1521                                           # Listener port for scan-listener

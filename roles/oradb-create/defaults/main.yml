@@ -37,6 +37,27 @@
   listener_port: 1521
   autostartup_service: false
 
+# Everything between the lines START-OF-PASSWORDS & END-OF-PASSWORDS can be 
+# put in an external passwords.yml file and be encrypted by Vault.
+# The file should be put in 'group_vars/<your-config>/passwords.yml'
+# This example will be broken out to a passwords.yml as soon as is allowed in ansible
+
+## START-OF-PASSWORDS
+  # GI
+  default_gipass: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
+  sysasmpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
+  asmmonitorpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
+  # DB
+  default_dbpass: "{% if item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd}}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for  backwards compatibility and only temporary, will be removed
+  dbpasswords:
+         orcl:
+           sys: Oracle_456
+           system: Oracle_456
+           dbsnmp: Oracle_456
+           pdbadmin: Oracle_456
+
+## END-OF-PASSWORDS
+
   dbca_templatename: General_Purpose.dbc
   dbca_initParams: "{% if '12.2' in item.0.oracle_version_db %} -initParams db_name={{item.0.oracle_db_name}}{% if item.0.oracle_db_unique_name is defined %},db_unique_name={{item.0.oracle_db_unique_name}}{% endif %}{% endif %}"
 
@@ -46,7 +67,6 @@
           oracle_version_db: 12.2.0.1                          # Oracle versiono
           oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
           oracle_db_name: orcl                                 # Database name
-          oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
           oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
           is_container: False                                  # (true/false) Is the database a container database
           pdb_prefix: pdb

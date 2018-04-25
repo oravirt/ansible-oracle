@@ -228,8 +228,11 @@ TEMPLATENAME = "{{dbca_templatename}}"
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-SYSPASSWORD = "{{ item.0.oracle_db_passwd }}"
-
+{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name] is defined and dbpasswords[item.0.oracle_db_name]['sys'] is defined%}
+SYSPASSWORD = "{{dbpasswords[item.0.oracle_db_name]['sys']}}"
+{% else %}
+SYSPASSWORD = "{{default_dbpass }}"
+{% endif %}
 #-----------------------------------------------------------------------------
 # Name          : SYSTEMPASSWORD
 # Datatype      : String
@@ -238,7 +241,11 @@ SYSPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-SYSTEMPASSWORD = "{{ item.0.oracle_db_passwd }}"
+{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name] is defined and dbpasswords[item.0.oracle_db_name]['system'] is defined %}
+SYSTEMPASSWORD = "{{dbpasswords[item.0.oracle_db_name]['system']}}"
+{% else %}
+SYSTEMPASSWORD = "{{default_dbpass }}"
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : EMCONFIGURATION
@@ -279,7 +286,11 @@ EMCONFIGURATION = "NONE"
 # Default value : None
 # Mandatory     : Yes, if EMCONFIGURATION is specified
 #-----------------------------------------------------------------------------
-DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
+{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name] is defined and dbpasswords[item.0.oracle_db_name]['dbsnmp'] is defined %}
+DBSNMPPASSWORD = "{{dbpasswords[item.0.oracle_db_name]['dbsnmp']}}"
+{% else %}
+DBSNMPPASSWORD = "{{default_dbpass }}"
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : CENTRALAGENT
