@@ -1,22 +1,14 @@
 # Partition & ASM-Label Shared disks
----
-  - name: ASM-storage | Create device to label mappings for asm
-    template: src=asm-label-device-mapping.txt.j2 dest={{ oracle_rsp_stage }}/asm-label-device-mapping-{{ item.diskgroup }}.txt
-    with_items: "{{asm_diskgroups}}"
-    when: master_node and asm_diskgroups is defined
-    tags: asmstorage
 
-  - name: ASM-storage | Build script to create partitions
-    template: src=part-device.sh.j2 dest={{ oracle_rsp_stage }}/part-device-{{ item.diskgroup }}.sh mode=775
-    with_items: "{{asm_diskgroups}}"
-    when: master_node and asm_diskgroups is defined
-    tags: asmstorage
-
-  - name: ASM-storage | Run script to create partitions
-    shell: sh {{ oracle_rsp_stage }}/part-device-{{ item.diskgroup }}.sh
-    with_items: "{{asm_diskgroups}}"
+  - name: ASM-storage | partition devices
+    shell: parted {{ item.1.device }} "mklabel gpt mkpart primary 1 -1"
+    args:
+       creates: "{{ item.1.device}}{{partition_suffix}}"
+    with_subelements:
+        - "{{asm_diskgroups}}"
+        - disk
     when: master_node and partition_devices and asm_diskgroups is defined
-    tags: asmstorage
+    tags: asmstorage,partition
 
   - include: dm-multipath-kpartx.yml
     when: multipath == 'dm-multipath' and partition_devices and asm_diskgroups is defined

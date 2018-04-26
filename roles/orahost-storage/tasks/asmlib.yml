@@ -1,25 +1,25 @@
 
-- name: ASMlib | Build script to create asmlib-labels
-  template: src=label-asm-disks.sh.j2 dest={{ oracle_rsp_stage }}/label-asm-disks-{{ item.diskgroup }}.sh mode=775
-  with_items: "{{asm_diskgroups}}"
-  when: master_node and device_persistence == 'asmlib' and asm_diskgroups is defined
-  tags: asmlibconfig,asmstorage
-
-- name: ASMlib | Run script to create asmlib-labels
-  shell: sh {{ oracle_rsp_stage }}/label-asm-disks-{{ item.diskgroup }}.sh
-  with_items: "{{asm_diskgroups}}"
+- name: ASM-storage | create asmlib labels
+  shell: "{{ asmlib_binary}} createdisk {{item.1.asmlabel}} {{ item.1.device }}{{ partition_suffix}}"
+  args:
+     creates: "/dev/oracleasm/disks/{{ item.1.asmlabel | upper}}"
+  with_subelements:
+      - "{{asm_diskgroups}}"
+      - disk
   when: master_node and device_persistence == 'asmlib' and asm_diskgroups is defined
   tags: asmlibconfig,asmstorage
 
 - name: ASMlib | Rescan ASM disks
   shell: "{{asmlib_binary}} scandisks"
   when: device_persistence == 'asmlib'
+  changed_when: False
   tags: asmlibconfig,asmstorage
 
 - name: ASMlib | List ASM disks
   shell: "{{asmlib_binary}} listdisks"
   when: device_persistence == 'asmlib'
   register: listdisks
+  changed_when: False
   tags: asmlibconfig,asmstorage
 
 - name: ASMlib | List ASM disks

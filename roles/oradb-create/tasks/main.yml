@@ -26,7 +26,7 @@
       - customdbcatemplate
 
   - name: Create responsefile for dbca
-    template: src=dbca-create-db.rsp.{{ item.0.oracle_version_db }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}  owner={{ oracle_user }} group={{ oracle_group }} mode=644 backup=no
+    template: src=dbca-create-db.rsp.{{ item.0.oracle_version_db }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}  owner={{ oracle_user }} group={{ oracle_group }} mode=600 backup=no
     #debug: var=msg
     with_together:
        - "{{oracle_databases}}"
