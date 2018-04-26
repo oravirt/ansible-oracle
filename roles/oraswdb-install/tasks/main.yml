@@ -118,7 +118,7 @@
 
 
   - name: Setup response file for install (DB)
-    template: src=db-install.rsp.{{ item.0.oracle_version_db }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_db_responsefile }}
+    template: src=db-install.rsp.{{ item.0.oracle_version_db }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} mode=0600
     with_together:
      - "{{oracle_databases}}"
      - "{{checkdbswinstall.results}}"

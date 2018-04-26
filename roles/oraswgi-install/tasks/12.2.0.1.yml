@@ -57,7 +57,7 @@
     when: not master_node and configure_cluster and checkgiinstall.stdout != "1"
 
   - name: Setup response file for install (GI)
-    template: src=grid-install.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner="{{ grid_install_user }}" group={{ oracle_group }} mode=775 backup=yes
+    template: src=grid-install.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner="{{ grid_install_user }}" group={{ oracle_group }} mode=600 backup=yes
     with_items: "{{asm_diskgroups}}"
     tags:
       - responsefilegi
