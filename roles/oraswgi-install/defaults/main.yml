@@ -49,7 +49,7 @@
   asmmonitorpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
   # DB
   default_dbpass: "{% if item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd}}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for  backwards compatibility and only temporary, will be removed
-  
+
   #oracle_password: Oracle123                                       # Password used for all Grid Infrastructure related resources (e.g ASM)
   oracle_scan: your.scan.address                                   # Scan address for Clustered Grid Infrastructure
   oracle_vip: -vip                                                 # Suffix for the host VIP-addresses (e.g orarac01-vip)
@@ -68,7 +68,7 @@
   run_configtoolallcommand: true
   oracle_cluster_mgmdb: true
   oracle_gi_cluster_type: STANDARD              # STANDARD | FLEX | STANDALONE (12.2 specific)
-  oracle_install_option_gi: HA_CONFIG
+  oracle_install_option_gi: "{% if configure_cluster %}CRS_CONFIG{% else %}HA_CONFIG{% endif %}"
   oracle_install_version_gi: 12.1.0.2
   #oracle_asm_storage_option: LOCAL_ASM_STORAGE  # LOCAL_ASM_STORAGE | FLEX_ASM_STORAGE
   oracle_asm_storage_option: "{% if '12.2' in oracle_install_version_gi %}FLEX_ASM_STORAGE{% else %}LOCAL_ASM_STORAGE{% endif %}"
