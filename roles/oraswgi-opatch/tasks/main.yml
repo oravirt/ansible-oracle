@@ -118,9 +118,10 @@
     with_together:
        - "{{oracle_sw_image_gi_psu}}"
        - "{{gi_applied_patches.results}}"
+    run_once: "{{ configure_cluster}}"
     tags:
       - apply_psu_grid
-    when: master_node and oracle_psu_apply_gi and '12.1' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
+    when: oracle_psu_apply_gi and '12.1' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
     register: psuapplym
 
 
@@ -129,26 +130,30 @@
     with_together:
     - "{{oracle_sw_image_gi_psu}}"
     - "{{gi_applied_patches.results}}"
+    run_once: "{{ configure_cluster}}"
     tags: apply_psu_grid
-    when: master_node and oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
+    when: oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
     register: psuapplym
 
   - debug: var=psuapplym.stdout_lines
-    when: master_node and oracle_psu_apply_gi
+    run_once: "{{ configure_cluster}}"
+    when: oracle_psu_apply_gi
     tags:
       - psuapplym
 
   - name: Check if stuff is running
     shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
+    run_once: "{{ configure_cluster}}"
     tags:
      - crsctl
     register: crsctl
-    when: master_node and oracle_psu_apply_gi #and not {{ item.1.stdout }} != 0
+    when: oracle_psu_apply_gi #and not {{ item.1.stdout }} != 0
 
   - debug: var=crsctl.stdout_lines
     tags:
      - crsctl
-    when: master_node
+    run_once: "{{ configure_cluster}}"
+    #when: master_node
 
   - name: Apply PSU to GI (v12.1) (other nodes)
     shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
@@ -157,7 +162,8 @@
     - "{{gi_applied_patches.results}}"
     tags:
       - apply_psu_grid
-    when: not master_node and oracle_psu_apply_gi and  '12.1' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
+    #when: not master_node and oracle_psu_apply_gi and  '12.1' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
+    when: configure_cluster and inventory_hostname != cluster_master and oracle_psu_apply_gi and  '12.1' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
     register: psuapplyo
 
   - name: Apply PSU to GI (v11.2) (other nodes)
@@ -166,11 +172,12 @@
     - "{{oracle_sw_image_gi_psu}}"
     - "{{gi_applied_patches.results}}"
     tags: apply_psu_grid
-    when: not master_node and oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
+    #when: not master_node and oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
+    when: configure_cluster and inventory_hostname != cluster_master and oracle_psu_apply_gi and  '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
     register: psuapplyo
 
   - debug: var=psuapplyo.stdout_lines
-    when: not master_node and oracle_psu_apply_gi
+    when: configure_cluster and inventory_hostname != cluster_master oracle_psu_apply_gi
     tags:
       - psuapplyo
 

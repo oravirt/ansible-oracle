@@ -31,7 +31,8 @@
     with_together:
        - "{{oracle_databases}}"
        - "{{checkdbexist.results}}"
-    when: master_node and item.1.stdout != "1"
+    run_once: "{{ configure_cluster}}"
+    when: item.1.stdout != "1"
     tags:
     - dbcaresponse
 
@@ -39,7 +40,7 @@
   #   with_together:
   #    - "{{oracle_databases}}"
   #    - "{{checkdbexist.results}}"
-  # 
+  #
   - name: Create database(s)
     shell: "time {{ oracle_home_db }}/bin/dbca -createDatabase -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }} -silent -redoLogFileSize {{ item.0.redolog_size_in_mb }} {{ dbca_initParams }}"
     with_together:
@@ -47,7 +48,8 @@
        - "{{checkdbexist.results}}"
     become: yes
     become_user: "{{ oracle_user }}"
-    when: master_node and item.1.stdout != "1" and item.0.state |upper == "PRESENT"
+    run_once: "{{ configure_cluster}}"
+    when: item.1.stdout != "1" and item.0.state |upper == "PRESENT"
     tags:
       - oradbcreate
     register: oradbcreate
@@ -55,9 +57,10 @@
   - debug: var=item
     with_items:
          - "{{ oradbcreate.results|map(attribute='stdout_lines')|list }}"
+    run_once: "{{ configure_cluster}}"
     tags:
      - oradbcreate
-    when: oradbcreate.changed and master_node
+    when: oradbcreate.changed
     ignore_errors: true
 
   - name: Add dotprofile (1)

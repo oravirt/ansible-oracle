@@ -3,7 +3,6 @@
   hostgroup: "{{ group_names[0] }}"
   oracle_dbca_rsp: "dbca_{{ item.0.oracle_db_name }}.rsp"        # Name of responsefile used by dbca. One per database
   oracle_netca_rsp: "netca_{{ item.home }}_{{ listener_name_template }}.rsp"
-  master_node: true
   oracle_user: oracle                        # User that will own the Oracle Installations.
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
   oracle_group: oinstall                          # Primary group for oracle_user.
@@ -37,7 +36,7 @@
   listener_port: 1521
   autostartup_service: false
 
-# Everything between the lines START-OF-PASSWORDS & END-OF-PASSWORDS can be 
+# Everything between the lines START-OF-PASSWORDS & END-OF-PASSWORDS can be
 # put in an external passwords.yml file and be encrypted by Vault.
 # The file should be put in 'group_vars/<your-config>/passwords.yml'
 # This example will be broken out to a passwords.yml as soon as is allowed in ansible

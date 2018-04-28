@@ -6,7 +6,8 @@
   with_subelements:
       - "{{asm_diskgroups}}"
       - disk
-  when: master_node and device_persistence == 'asmlib' and asm_diskgroups is defined
+  run_once: "{{ configure_cluster}}"
+  when: device_persistence == 'asmlib' and asm_diskgroups is defined
   tags: asmlibconfig,asmstorage
 
 - name: ASMlib | Rescan ASM disks

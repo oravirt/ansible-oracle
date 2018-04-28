@@ -88,21 +88,24 @@
     tags:
      - crsctl
     register: crsctl
-    when: master_node and checkgiinstall.stdout != "1"
+    run_once: "{{ configure_cluster}}"
+    when: checkgiinstall.stdout != "1"
 
   - debug: var=crsctl.stdout_lines
     tags:
      - crsctl
-    when: master_node and checkgiinstall.stdout != "1"
+    run_once: "{{ configure_cluster}}"
+    when: checkgiinstall.stdout != "1"
 
   - name: Update Nodelist, set CRS=TRUE
     shell: "{{ oracle_home_gi }}/oui/bin/runInstaller -updateNodeList ORACLE_HOME={{ oracle_home_gi }} CRS=TRUE"
     become: yes
     become_user: "{{ grid_install_user }}"
+    run_once: "{{ configure_cluster}}"
+    when: checkgiinstall.stdout != "1"
+    ignore_errors: true
     tags:
       - updatenodelist
-    when : master_node and checkgiinstall.stdout != "1"
-    ignore_errors: true
 
   - name: Add additional info to glogin.sql (1)
     lineinfile: dest="{{ oracle_home_gi }}/sqlplus/admin/glogin.sql" line='set sqlprompt "_user @ _connect_identifier:>"' backup=yes

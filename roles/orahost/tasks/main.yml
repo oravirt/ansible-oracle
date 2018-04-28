@@ -118,7 +118,8 @@
   - name: ssh-keys | Generate SSH keys
     local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys
     ignore_errors: True
-    when: configure_ssh and master_node and configure_cluster
+    run_once: "{{ configure_cluster}}"
+    when: configure_ssh and configure_cluster
     become: false
     tags:
      - sshkeys
@@ -184,7 +185,8 @@
     with_items:
         - "{{ ssh_keys }}"
         - "{{ keyfile }}"
-    when: master_node and configure_ssh and configure_cluster
+    run_once: "{{ configure_cluster}}"
+    when: configure_ssh and configure_cluster
     ignore_errors: true
     become: false
     tags:

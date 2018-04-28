@@ -34,7 +34,8 @@
     with_nested:
        - "{{ oracle_sw_image_db }}"
        - "{{ oracle_databases }}"
-    when: master_node and item[0].version == item[1].oracle_version_db
+    run_once: "{{ configure_cluster}}"
+    when: item[0].version == item[1].oracle_version_db
     tags:
       - directoriesdb
 
@@ -79,7 +80,8 @@
       - "{{oracle_databases}}"
     become: yes
     become_user: "{{ oracle_user }}"
-    when: master_node and item[0].version == item[1].oracle_version_db and not is_sw_source_local and oracle_sw_copy
+    run_once: "{{ configure_cluster}}"
+    when: item[0].version == item[1].oracle_version_db and not is_sw_source_local and oracle_sw_copy
     tags:
       - oradbsw
 
@@ -90,7 +92,8 @@
       - "{{oracle_databases}}"
     become: yes
     become_user: "{{ oracle_user }}"
-    when: master_node and item[0].version == item[1].oracle_version_db and is_sw_source_local and oracle_sw_copy
+    run_once: "{{ configure_cluster}}"
+    when: item[0].version == item[1].oracle_version_db and is_sw_source_local and oracle_sw_copy
     tags:
       - oradbsw
 
@@ -101,7 +104,8 @@
       - "{{oracle_databases}}"
     become: yes
     become_user: "{{ oracle_user }}"
-    when: master_node and item[0].version == item[1].oracle_version_db and oracle_sw_copy and oracle_sw_unpack
+    run_once: "{{ configure_cluster}}"
+    when: item[0].version == item[1].oracle_version_db and oracle_sw_copy and oracle_sw_unpack
     tags:
       - oradbswunpack
 
@@ -112,7 +116,8 @@
       - "{{oracle_databases}}"
     become: yes
     become_user: "{{ oracle_user }}"
-    when: master_node and item[0].version == item[1].oracle_version_db and not oracle_sw_copy and oracle_sw_unpack
+    run_once: "{{ configure_cluster}}"
+    when: item[0].version == item[1].oracle_version_db and not oracle_sw_copy and oracle_sw_unpack
     tags:
       - oradbswunpack
 
@@ -124,7 +129,8 @@
      - "{{checkdbswinstall.results}}"
     become: yes
     become_user: "{{ oracle_user }}"
-    when: master_node #and item.1.stdout != "1"
+    run_once: "{{ configure_cluster}}"
+    #when: master_node #and item.1.stdout != "1"
     tags:
       - responsefileswdb
 
@@ -135,7 +141,8 @@
      - "{{checkdbswinstall.results}}"
     become: yes
     become_user: "{{ oracle_user }}"
-    when: master_node #and item.1.stdout != "1"
+    run_once: "{{ configure_cluster}}"
+    #when: master_node #and item.1.stdout != "1"
     tags:
       - responsefileswdb
 
@@ -147,7 +154,8 @@
      - "{{checkdbswinstall.results}}"
     become: yes
     become_user: "{{ oracle_user }}"
-    when: master_node and item.1.stdout != "1"
+    run_once: "{{ configure_cluster}}"
+    when: item.1.stdout != "1"
     tags:
       - oradbinstall
     register: oradbinstall
@@ -156,7 +164,8 @@
     with_items:
         #- "{{ oradbinstall.results }}"
         - "{{ oradbinstall.results|map(attribute='stdout_lines')|list }}"
-    when: master_node
+    run_once: "{{ configure_cluster}}"
+    #when: master_node
     tags:
      - oradbinstall
     ignore_errors: true
@@ -174,7 +183,8 @@
     with_together:
      - "{{oracle_databases}}"
      - "{{checkdbswinstall.results}}"
-    when: master_node and item.1.stdout != "1"
+    run_once: "{{ configure_cluster}}"
+    when: item.1.stdout != "1"
     #with_items: oracle_databases
     #when: master_node
     tags:
@@ -188,13 +198,14 @@
     become_user: "{{ oracle_user }}"
     tags:
       - glogindb
-      
+
   - name: Check opatch lsinventory (DB)
     shell: "{{ oracle_home_db }}/OPatch/opatch lsinventory"
     with_items: "{{oracle_databases}}"
     become: yes
     become_user: "{{ oracle_user }}"
-    when: master_node
+    run_once: "{{ configure_cluster}}"
+    #when: master_node
     register: opatchls
     tags:
      - opatchls
@@ -202,7 +213,8 @@
   - debug: var=item
     with_items:
         - "{{ opatchls.results|map(attribute='stdout_lines')|list }}"
-    when: master_node
+    run_once: "{{ configure_cluster}}"
+    #when: master_node
     tags:
      - opatchls
     ignore_errors: true

@@ -7,7 +7,8 @@
     with_subelements:
         - "{{asm_diskgroups}}"
         - disk
-    when: master_node and partition_devices and asm_diskgroups is defined
+    run_once: "{{ configure_cluster}}"
+    when: partition_devices and asm_diskgroups is defined
     tags: asmstorage,partition
 
   - include: dm-multipath-kpartx.yml
