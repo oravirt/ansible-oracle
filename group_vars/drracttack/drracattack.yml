@@ -20,7 +20,7 @@
   grid_users:           # Passwd :grid
     - { username: grid, uid: 54320, primgroup: oinstall, othergroups: "asmadmin,asmdba,asmoper,dba", passwd: "$6$/yJx24id$K8gB.l5GEMJlv9Q.v1bulyHiRRqZlZaUwoInNEixd9FBRxj9wyZYyyWzgOkRg9gBMfheH/kgRjranYpnAINRI1" }
 
-  oracle_sw_copy: false 
+  oracle_sw_copy: false
   oracle_sw_unpack: true
   oracle_stage: /media/sf_12cR1
   oracle_stage_remote: /media/sf_12cR1
@@ -29,20 +29,19 @@
   configure_interconnect: false
   configure_ssh: true
   configure_host_disks: false
-                                          
+
   configure_cluster: true
   install_os_packages: false
   disable_selinux: false
-  
+
 ################ Grid Infrastructure specifics ################
-  oracle_install_option_gi: CRS_CONFIG  
   oracle_install_version_gi: 12.1.0.2
 
-  oracle_password: racattack                                      
-  oracle_scan: drcollabn-cluster-scan.racattack                     
-  oracle_vip: -vip                                                
-  oracle_scan_port: 1521                                          
-  oracle_asm_init_dg: data        
+  oracle_password: racattack
+  oracle_scan: drcollabn-cluster-scan.racattack
+  oracle_vip: -vip
+  oracle_scan_port: 1521
+  oracle_asm_init_dg: data
   oracle_gi_nic_pub: eth1
   oracle_gi_nic_priv: eth2
   oracle_gi_gns_subdomain: drcollabn.racattack
@@ -53,8 +52,8 @@
        - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2 }
 #       - { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1 }
 #       - { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1 }
-#       - { filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4 }      
-#       - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4 } 
+#       - { filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4 }
+#       - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4 }
 
   oracle_databases:                                               # Dictionary describing the databases to be installed
         - home: rachome1                                                   # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
@@ -77,16 +76,16 @@
 
 
   oracle_dbf_dir_asm: "DATA"
-  oracle_reco_dir_asm: "FRA"                                                                                                                                                                                                               
+  oracle_reco_dir_asm: "FRA"
   host_fs_layout:
       u01:
         {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora, fstype: ext4}
 
-  asm_diskgroups:  
+  asm_diskgroups:
     - diskgroup: data
-      properties: 
+      properties:
         - {redundancy: external, ausize: 1}
-      attributes: 
+      attributes:
         - {name: compatible.rdbms, value: 11.2.0.3.0}
         - {name: compatible.asm, value: "{{ oracle_install_version_gi }}"}
       disk:
@@ -94,11 +93,10 @@
         - {device: /dev/sdd, asmlabel: asmdisk02}
         - {device: /dev/sde, asmlabel: asmdisk03}
     - diskgroup: fra
-      properties: 
+      properties:
         - {redundancy: external, ausize: 1}
-      attributes: 
+      attributes:
         - {name: compatible.rdbms, value: 11.2.0.3.0}
         - {name: compatible.asm, value: "{{ oracle_install_version_gi }}"}
       disk:
         - {device: /dev/sdf, asmlabel: asmdisk04}
-  
