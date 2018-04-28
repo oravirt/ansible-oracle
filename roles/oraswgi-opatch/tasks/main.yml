@@ -43,7 +43,7 @@
     become: yes
     become_user: "{{ grid_install_user }}"
     with_items: "{{oracle_opatch_patch}}"
-    when: oracle_psu_apply_gi and item.version == oracle_install_version_gi and oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: oracle_psu_apply_gi and item.version == oracle_install_version_gi and oracle_sw_copy and oracle_sw_unpack
     tags:
       - oragridpatchunpack
 
@@ -52,7 +52,7 @@
     with_items: "{{oracle_opatch_patch}}"
     become: yes
     become_user: "{{ grid_install_user }}"
-    when: oracle_psu_apply_gi and item.version == oracle_install_version_gi and not oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: oracle_psu_apply_gi and item.version == oracle_install_version_gi and not oracle_sw_copy and oracle_sw_unpack
     tags:
       - oragridpatchunpack
 
@@ -64,7 +64,7 @@
     with_together:
        - "{{oracle_sw_image_gi_psu}}"
        - "{{gi_applied_patches.results}}"
-    when: oracle_psu_apply_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0 and oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: oracle_psu_apply_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0 and oracle_sw_copy and oracle_sw_unpack
     tags:
       - oragridpsuunpack
 
@@ -75,7 +75,7 @@
     with_together:
        - "{{oracle_sw_image_gi_psu}}"
        - "{{gi_applied_patches.results}}"
-    when: oracle_psu_apply_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0 and not oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: oracle_psu_apply_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0 and not oracle_sw_copy and oracle_sw_unpack
     tags:
       - oragridpsuunpack
 
@@ -89,7 +89,7 @@
 #    become_user: "{{ grid_install_user }}"
 #    tags:
 #    - oragridswunpack
-#    when: checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy|bool and oracle_sw_unpack|bool
+#    when: checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy and oracle_sw_unpack
 
   - name: Distribute latest opatch
     shell: rm -rf {{ oracle_home_gi }}/OPatch; cp -Rvp {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/OPatch {{ oracle_home_gi }}; chown -R {{ grid_install_user }}:{{ oracle_group }} {{ oracle_home_gi }}/OPatch

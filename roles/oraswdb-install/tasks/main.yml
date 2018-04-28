@@ -9,7 +9,7 @@
 
   - name: Mount nfs share with installation media
     mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=mounted
-    when: install_from_nfs|bool
+    when: install_from_nfs
     tags:
       - nfsmountdb
 
@@ -79,7 +79,7 @@
       - "{{oracle_databases}}"
     become: yes
     become_user: "{{ oracle_user }}"
-    when: master_node and item[0].version == item[1].oracle_version_db and not is_sw_source_local and oracle_sw_copy|bool
+    when: master_node and item[0].version == item[1].oracle_version_db and not is_sw_source_local and oracle_sw_copy
     tags:
       - oradbsw
 
@@ -90,7 +90,7 @@
       - "{{oracle_databases}}"
     become: yes
     become_user: "{{ oracle_user }}"
-    when: master_node and item[0].version == item[1].oracle_version_db and is_sw_source_local and oracle_sw_copy|bool
+    when: master_node and item[0].version == item[1].oracle_version_db and is_sw_source_local and oracle_sw_copy
     tags:
       - oradbsw
 
@@ -101,7 +101,7 @@
       - "{{oracle_databases}}"
     become: yes
     become_user: "{{ oracle_user }}"
-    when: master_node and item[0].version == item[1].oracle_version_db and oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: master_node and item[0].version == item[1].oracle_version_db and oracle_sw_copy and oracle_sw_unpack
     tags:
       - oradbswunpack
 
@@ -112,7 +112,7 @@
       - "{{oracle_databases}}"
     become: yes
     become_user: "{{ oracle_user }}"
-    when: master_node and item[0].version == item[1].oracle_version_db and not oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: master_node and item[0].version == item[1].oracle_version_db and not oracle_sw_copy and oracle_sw_unpack
     tags:
       - oradbswunpack
 
@@ -209,7 +209,7 @@
 
   - name: Unmount nfs share with installation media
     mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=absent
-    when: install_from_nfs|bool
+    when: install_from_nfs
     tags:
       - nfsunmountdb
 

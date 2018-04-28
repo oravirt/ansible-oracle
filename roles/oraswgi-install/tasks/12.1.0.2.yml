@@ -7,7 +7,7 @@
   become_user: "{{ grid_install_user }}"
   tags:
     - oragridswunpack
-  when: checkgiinstall.stdout != "1" and oracle_install_version_gi == item.version and oracle_sw_copy|bool and oracle_sw_unpack|bool
+  when: checkgiinstall.stdout != "1" and oracle_install_version_gi == item.version and oracle_sw_copy and oracle_sw_unpack
 
 - name: Extract files to stage-area (GI) (from remote location)
   unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no
@@ -16,7 +16,7 @@
   become_user: "{{ grid_install_user }}"
   tags:
   - oragridswunpack
-  when: checkgiinstall.stdout != "1" and oracle_install_version_gi == item.version and not oracle_sw_copy|bool and oracle_sw_unpack|bool
+  when: checkgiinstall.stdout != "1" and oracle_install_version_gi == item.version and not oracle_sw_copy and oracle_sw_unpack
 
 - name: Install cvuqdisk rpm
   yum: name="{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/grid/rpm/{{ cvuqdisk_rpm }}" state=present

@@ -10,7 +10,7 @@
     mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=mounted
     tags:
       - nfsmountgi
-    when: install_from_nfs|bool
+    when: install_from_nfs
 
   - name: Add new dotprofile (GI)
     template: src=dotprofile-gi.j2 dest={{ grid_user_home }}/{{ oracle_profile_name_gi }} owner={{ grid_install_user }} group={{ oracle_group }} mode=755 backup=yes
@@ -69,7 +69,7 @@
     become_user: "{{ grid_install_user }}"
     tags:
       - oragridsw
-    when: checkgiinstall.stdout != "1" and not is_sw_source_local and oracle_install_version_gi  == item.version and oracle_sw_copy|bool
+    when: checkgiinstall.stdout != "1" and not is_sw_source_local and oracle_install_version_gi  == item.version and oracle_sw_copy
 
   - name: Copy oracle installfiles to server (GI) (local)
     copy: src={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=775
@@ -78,7 +78,7 @@
     become_user: "{{ grid_install_user }}"
     tags:
       - oragridsw
-    when: checkgiinstall.stdout != "1" and is_sw_source_local and oracle_install_version_gi == item.version and oracle_sw_copy|bool
+    when: checkgiinstall.stdout != "1" and is_sw_source_local and oracle_install_version_gi == item.version and oracle_sw_copy
 
 
   - include: "{{ oracle_install_version_gi }}.yml"
@@ -149,5 +149,5 @@
 
   - name: Unmount nfs share with installation media
     mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=absent
-    when: install_from_nfs|bool
+    when: install_from_nfs
     tags: nfsunmountgi
