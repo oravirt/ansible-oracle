@@ -1,0 +1,20 @@
+- name: ssh-keys | Add fqdn to known_hosts ({{ user }})
+  shell: ssh-keyscan -H {{ ansible_fqdn }} >> /home/{{ user }}/.ssh/known_hosts
+  delegate_to: "{{ item }}"
+  with_items: "{{groups[hostgroup]}}"
+  tags: sshkeys,known_hosts
+  changed_when: False
+
+- name: ssh-keys | Add short name to known_hosts ({{ user }})
+  shell: ssh-keyscan -H {{ ansible_hostname }} >> /home/{{ user }}/.ssh/known_hosts
+  delegate_to: "{{ item }}"
+  with_items: "{{groups[hostgroup]}}"
+  tags: sshkeys,known_hosts
+  changed_when: False
+
+- name: ssh-keys | Add IPv4 to known_hosts ({{ user }})
+  shell: ssh-keyscan -H {{ansible_default_ipv4.address}} >> /home/{{ user }}/.ssh/known_hosts
+  delegate_to: "{{ item }}"
+  with_items: "{{groups[hostgroup]}}"
+  tags: sshkeys,known_hosts
+  changed_when: False
