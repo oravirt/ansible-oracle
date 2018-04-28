@@ -60,12 +60,12 @@ oracle.install.asm.OSASM={{ asmadmin_group }}
 #-------------------------------------------------------------------------------
 # Specify a name for SCAN
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.gpnp.scanName={% if configure_cluster==True %}{{ oracle_scan }}{% else %}{% endif %}
+oracle.install.crs.config.gpnp.scanName={% if configure_cluster %}{{ oracle_scan }}{% else %}{% endif %}
 
 #-------------------------------------------------------------------------------
 # Specify a unused port number for SCAN service
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.gpnp.scanPort={% if configure_cluster==True %}{{ oracle_scan_port }}{% else %}{% endif %}
+oracle.install.crs.config.gpnp.scanPort={% if configure_cluster %}{{ oracle_scan_port }}{% else %}{% endif %}
 
 ################################################################################
 #                                                                              #
@@ -86,7 +86,7 @@ oracle.install.crs.config.ClusterType={{ oracle_gi_cluster_type |upper}}
 # any combination of lower and uppercase alphabets (A - Z), (0 - 9), hyphen(-)
 # and underscore(_).
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.clusterName={% if configure_cluster==True %}{{ oracle_cluster_name }}{% else %}{% endif %}
+oracle.install.crs.config.clusterName={% if configure_cluster %}{{ oracle_cluster_name }}{% else %}{% endif %}
 
 #-------------------------------------------------------------------------------
 # Specify 'true' if you would like to configure Grid Naming Service(GNS), else
@@ -160,17 +160,17 @@ oracle.install.crs.config.gpnp.gnsVIPAddress=
 {%  if oracle_gi_cluster_type|upper  == "STANDARD" %}
 
 {%  if ansible_domain  == ""  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
   {% else  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}.{{ ansible_domain }} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}.{{ ansible_domain }} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
 {% endif %}
 
 {% elif oracle_gi_cluster_type|upper == 'FLEX'  %}
 
 {%  if ansible_domain  == ""  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1") }}{{ oracle_vip }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1") }}{{ oracle_vip }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
  {% else  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1") }}{{ oracle_vip }}.{{ ansible_domain }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}.{{ ansible_domain }}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1") }}{{ oracle_vip }}.{{ ansible_domain }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}.{{ ansible_domain }}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
 
  {% endif %}
 
@@ -190,7 +190,7 @@ oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for ho
 # For example: eth0:140.87.24.0:1,eth1:10.2.1.0:2,eth2:140.87.52.0:3
 #
 #-------------------------------------------------------------------------------
-{%  if configure_cluster  == True %}
+{%  if configure_cluster %}
 {% if oracle_gi_cluster_type|upper  == "FLEX" %}
 oracle.install.crs.config.networkInterfaceList={{ oracle_gi_nic_pub }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_pub].ipv4.network }}:1,{{ oracle_gi_nic_priv }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_priv].ipv4.network }}:5
 {%  elif oracle_gi_cluster_type|upper  == "STANDARD" %}

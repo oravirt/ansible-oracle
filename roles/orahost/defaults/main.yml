@@ -27,7 +27,7 @@
   role_separation: false
   oracle_user: oracle                        # User that will own the Oracle Installations.
   grid_user: grid
-  grid_install_user: "{% if role_separation==true %}{{grid_user }}{% else %}{{ oracle_user }}{% endif %}"
+  grid_install_user: "{% if role_separation %}{{grid_user }}{% else %}{{ oracle_user }}{% endif %}"
   configure_oracle_sudo: true
   etc_hosts_ip: "{% if 'virtualbox' in ansible_virtualization_type %}{{ansible_all_ipv4_addresses[1]}}{% else %}{{ansible_default_ipv4.address}}{%endif%}"
 
@@ -87,7 +87,7 @@
   size_in_gb_hugepages: 1                     # The amount of RAM in GB to dedicate to hugepages
   nr_hugepages_percent: "{{((((percent_hugepages/100) * ansible_memtotal_mb)/2)+2)|round|int }}"
   nr_hugepages_memory: "{{ (((size_in_gb_hugepages*1024)/2)+2)|round|int }}"
-  nr_hugepages: "{% if configure_hugepages==True%}{% if configure_hugepages_by|lower == 'percentage'%}{{ nr_hugepages_percent }}{%elif configure_hugepages_by|lower == 'memory' %}{{ nr_hugepages_memory }}{% endif %}{% else %}0{% endif %}"
+  nr_hugepages: "{% if configure_hugepages %}{% if configure_hugepages_by|lower == 'percentage'%}{{ nr_hugepages_percent }}{%elif configure_hugepages_by|lower == 'memory' %}{{ nr_hugepages_memory }}{% endif %}{% else %}0{% endif %}"
 
   host_fs_layout:
    - vgname: vgora

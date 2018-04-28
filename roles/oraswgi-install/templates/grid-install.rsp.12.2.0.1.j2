@@ -248,17 +248,17 @@ oracle.install.crs.config.sites=
 {%  if oracle_gi_cluster_type|upper  == "STANDARD"  or oracle_gi_cluster_type|upper == 'STANDALONE' %}
 
 {%  if ansible_domain  == ""  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}:HUB{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}:HUB{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
   {% else  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}.{{ ansible_domain }}:HUB{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}.{{ ansible_domain }}:HUB{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
 {% endif %}
 
 {% elif oracle_gi_cluster_type|upper == 'FLEX'  %}
 
 {%  if ansible_domain  == ""  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
  {% else  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}.{{ ansible_domain }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}.{{ ansible_domain }}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}.{{ ansible_domain }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}.{{ ansible_domain }}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
 
  {% endif %}
 
@@ -278,7 +278,7 @@ oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for ho
 # For example: eth0:140.87.24.0:1,eth1:10.2.1.0:2,eth2:140.87.52.0:3
 #
 #-------------------------------------------------------------------------------
-{%  if configure_cluster  == True %}
+{%  if configure_cluster %}
 {% if oracle_gi_cluster_type|upper  == "FLEX" or oracle_gi_cluster_type|upper == 'STANDALONE'   %}
 oracle.install.crs.config.networkInterfaceList={{ oracle_gi_nic_pub }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_pub].ipv4.network }}:1,{{ oracle_gi_nic_priv }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_priv].ipv4.network }}:5
 {%  elif oracle_gi_cluster_type|upper  == "STANDARD" %}
