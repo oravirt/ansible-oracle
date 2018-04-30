@@ -6,7 +6,7 @@
     become_user: "{{ grid_install_user }}"
     with_items: "{{oracle_sw_image_gi_psu}}"
     tags: check_applied_gi_patches
-    when: oracle_psu_apply_gi #and "{{ item.version }}" == "{{ oracle_install_version_gi }}"
+    when: oracle_psu_apply_gi and item.version == oracle_install_version_gi
     register: gi_applied_patches
 
 
@@ -75,7 +75,7 @@
     with_together:
        - "{{oracle_sw_image_gi_psu}}"
        - "{{gi_applied_patches.results}}"
-    when: oracle_psu_apply_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0 and not oracle_sw_copy and oracle_sw_unpack
+    when: oracle_psu_apply_gi and item.0.version == oracle_install_version_gi and not oracle_sw_copy and oracle_sw_unpack #and not item.1.stdout != 0
     tags:
       - oragridpsuunpack
 
@@ -113,7 +113,7 @@
   #   tags:
   #     - ocmconfig
 
-  - name: Apply PSU to GI (v12.1) (Master node)
+  - name: Apply PSU to GI (v12.x) (Master node)
     shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }}" #-ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
     with_together:
        - "{{oracle_sw_image_gi_psu}}"
@@ -121,7 +121,7 @@
     run_once: "{{ configure_cluster}}"
     tags:
       - apply_psu_grid
-    when: oracle_psu_apply_gi and '12.1' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
+    when: oracle_psu_apply_gi and '12.1' in oracle_install_version_gi or '12.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi #and not item.1.stdout != 0
     register: psuapplym
 
 
@@ -177,7 +177,7 @@
     register: psuapplyo
 
   - debug: var=psuapplyo.stdout_lines
-    when: configure_cluster and inventory_hostname != cluster_master oracle_psu_apply_gi
+    when: configure_cluster and inventory_hostname != cluster_master and oracle_psu_apply_gi and psuapplyo is defined
     tags:
       - psuapplyo
 
