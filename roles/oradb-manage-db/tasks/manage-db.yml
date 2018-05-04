@@ -2,10 +2,10 @@
   debug: msg="DB-name is {{dbh.oracle_db_name}}, state is {{ dbh.state}}"
   run_once: "{{ configure_cluster }}"
 
-- name: manage-db | check if GI is present
-  stat: path=/etc/oracle/olr.loc_xxxx
-  register: olrloc
-# 
+# - name: manage-db | check if GI is present
+#   stat: path=/etc/oracle/olr.loc
+#   register: olrloc
+#
 # - name: manage-db | check if database exists (GI)
 #   shell: "{{ oracle_home_db }}/bin/srvctl config database | grep -w {{ dbh.oracle_db_name}}"
 #   environment: "{{ oracle_env_dbca }}"
@@ -16,17 +16,15 @@
 #   when: olrloc.stat.exists
 #   tags: create_db,dbcatemplate,debug
 
-- name: manage-db | check if database exists (NO GI)
+- name: manage-db | check if database exists
   shell: "cat /etc/oratab | grep -w {{ dbh.oracle_db_name }}:{{ oracle_home_db }} |grep -v \"^#\"|cut -f1 -d: -s"
   environment: "{{ oracle_env_dbca }}"
   run_once: "{{ configure_cluster }}"
   register: existing_dbs
   changed_when: False
   failed_when: False
-  when: not olrloc.stat.exists
+  #when: not olrloc.stat.exists
   tags: create_db,dbcatemplate,debug
-
-#- debug: var=existing_dbs.stdout_lines
 
 - name: manage-db | add dotprofile
   template:
