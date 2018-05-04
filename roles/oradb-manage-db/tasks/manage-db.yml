@@ -1,0 +1,96 @@
+- name: manage-db | print oracle_db_name
+  debug: msg="DB-name is {{dbh.oracle_db_name}}, state is {{ dbh.state}}"
+  run_once: "{{ configure_cluster }}"
+
+- name: manage-db | check if GI is present
+  stat: path=/etc/oracle/olr.loc_xxxx
+  register: olrloc
+# 
+# - name: manage-db | check if database exists (GI)
+#   shell: "{{ oracle_home_db }}/bin/srvctl config database | grep -w {{ dbh.oracle_db_name}}"
+#   environment: "{{ oracle_env_dbca }}"
+#   run_once: "{{ configure_cluster }}"
+#   register: existing_dbs
+#   changed_when: False
+#   failed_when: False
+#   when: olrloc.stat.exists
+#   tags: create_db,dbcatemplate,debug
+
+- name: manage-db | check if database exists (NO GI)
+  shell: "cat /etc/oratab | grep -w {{ dbh.oracle_db_name }}:{{ oracle_home_db }} |grep -v \"^#\"|cut -f1 -d: -s"
+  environment: "{{ oracle_env_dbca }}"
+  run_once: "{{ configure_cluster }}"
+  register: existing_dbs
+  changed_when: False
+  failed_when: False
+  when: not olrloc.stat.exists
+  tags: create_db,dbcatemplate,debug
+
+#- debug: var=existing_dbs.stdout_lines
+
+- name: manage-db | add dotprofile
+  template:
+    src: dotprofile-db.j2
+    dest: "/home/{{ oracle_user}}/.profile_{{ dbh.oracle_db_name }}"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0660
+  when: dbh.state|lower == 'present'
+  tags: create_db,dotprofile_db
+
+- name: manage-db | Prepare installation template
+  template:
+    src: "dbca-create-db.rsp.{{ dbh.oracle_version_db}}.j2"
+    dest: "{{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0660
+  run_once: "{{ configure_cluster }}"
+  when: dbh.oracle_db_name not in existing_dbs.stdout and dbh.state|lower == 'present'
+  tags: create_db,dbcatemplate
+
+- name: manage-db | create database
+  shell: "time {{oracle_home_db}}/bin/dbca -createDatabase -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}  -silent {{ dbca_redolog }} {{ dbca_initParams }}"
+  run_once: "{{ configure_cluster }}"
+  become_user: "{{ oracle_user }}"
+  when: dbh.oracle_db_name not in existing_dbs.stdout and dbh.state|lower == 'present'
+  register: dbca_create
+  tags: create_db,dbca
+
+- debug: var=dbca_create.stdout_lines
+  when: dbca_create.changed
+
+- name: manage-db |Customize oratab for autostart
+  lineinfile:
+          dest=/etc/oratab
+          line="{{ dbh.oracle_db_name }}:{{ oracle_home_db }}:Y"
+          state=present
+  when: autostartup_service and not olrloc.stat.exists
+  tags: update_oratab
+
+- name: manage-db |Customize oratab for autostart
+  lineinfile:
+         dest=/etc/oratab
+         line="{{ dbh.oracle_db_name }}:{{ oracle_home_db }}:N"
+         state=absent
+  when: autostartup_service and not olrloc.stat.exists
+  become: yes
+  tags: update_oratab
+
+- name: manage-db | remove database
+  shell: "{{oracle_home_db}}/bin/dbca -deleteDatabase -silent -sourceDB {{ dbh.oracle_db_name }} -sysDBAUserName sys -sysDBAPassword {{ dbca_sys_pass}}"
+  run_once: "{{ configure_cluster }}"
+  become_user: "{{ oracle_user }}"
+  when: dbh.oracle_db_name in existing_dbs.stdout and dbh.state|lower == 'absent'
+  register: dbca_remove
+  tags: create_cdb,dbca
+
+- debug: var=dbca_remove.stdout_lines
+  when: dbca_remove.changed
+
+- name: manage-db | remove dotprofile
+  file:
+     path: "/home/{{ oracle_user}}/.profile_{{ dbh.oracle_db_name }}"
+     state: absent
+  when: dbh.state|lower == 'absent'
+  tags: create_cdb,dotprofile_db
