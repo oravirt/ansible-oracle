@@ -24,46 +24,18 @@
     tags:
     - orainst
 
-  - name: Create stage directory (base)
-    file: dest={{ oracle_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+  - name: Create common directories
+    file: dest={{ item.name }} mode={{ item.mode}} owner={{ item.owner }} group={{ item.group }} state=directory
+    with_items: "{{oracle_directories}}"
     tags:
       - directoriesdb
 
   - name: Create stage directory (version specific)
-    file: dest={{ oracle_stage }}/{{ item[0].version }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
-    with_nested:
-       - "{{ oracle_sw_image_db }}"
+    file: dest={{ oracle_stage }}/{{ item.oracle_version_db }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    with_items:
        - "{{ oracle_databases }}"
     run_once: "{{ configure_cluster}}"
-    when: item[0].version == item[1].oracle_version_db
-    tags:
-      - directoriesdb
-
-  - name: Create rsp stage directory
-    file: dest={{ oracle_rsp_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
-    tags:
-      - directoriesdb
-
-  - name: Create ORACLE_BASE directory
-    file: dest={{ oracle_base }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
-    tags:
-      - directoriesdb
-
-  - name: Create cfgtoollogs directory
-    file: dest={{ oracle_base }}/cfgtoollogs mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory recurse=yes
-    become: yes
-    tags:
-      - directoriesdb
-
-  - name: Create admin directory
-    file: dest={{ oracle_base }}/admin mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
-    become: yes
-    tags:
-      - directoriesdb
-
-  - name: Create audit directory
-    file: dest={{ oracle_base }}/audit mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
-    become: yes
+    when: oracle_databases is defined
     tags:
       - directoriesdb
 
@@ -98,7 +70,7 @@
       - oradbsw
 
   - name: Extract files to stage-area
-    unarchive: src={{ oracle_stage }}/{{ item[0].filename }}  dest={{ oracle_stage }}/{{ item[0].version }} copy=no
+    unarchive: src={{ oracle_stage }}/{{ item[0].filename }}  dest={{ oracle_stage }}/{{ item[0].version }} copy=no creates="{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates}}"
     with_nested:
       - "{{oracle_sw_image_db}}"
       - "{{oracle_databases}}"
@@ -110,7 +82,7 @@
       - oradbswunpack
 
   - name: Extract files to stage-area (from remote location)
-    unarchive: src={{ oracle_stage_remote }}/{{ item[0].filename }}  dest={{ oracle_stage }}/{{ item[0].version }} copy=no
+    unarchive: src={{ oracle_stage_remote }}/{{ item[0].filename }}  dest={{ oracle_stage }}/{{ item[0].version }} copy=no  creates="{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates}}"
     with_nested:
       - "{{oracle_sw_image_db}}"
       - "{{oracle_databases}}"
@@ -118,6 +90,8 @@
     become_user: "{{ oracle_user }}"
     run_once: "{{ configure_cluster}}"
     when: item[0].version == item[1].oracle_version_db and not oracle_sw_copy and oracle_sw_unpack
+    # args:
+    #   creates: "{{ oracle_stage }}/{{ item[0].version }}/database/runInstaller"
     tags:
       - oradbswunpack
 

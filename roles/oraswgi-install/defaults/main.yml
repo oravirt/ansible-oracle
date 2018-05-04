@@ -35,6 +35,20 @@
   oracle_base: /u01/app/oracle
   oracle_rsp_stage: "{{ oracle_stage }}/rsp"
   oracle_inventory_loc: /u01/app/oraInventory
+
+  oracle_directories:
+          - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
+          - {name: "{{ oracle_rsp_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
+          - {name: "{{ oracle_base }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
+          - {name: "{{ oracle_inventory_loc}}", owner: "{{ grid_install_user }}", group: "{{ oracle_group }}", mode: 775 }
+          - {name: "{{ oracle_base }}/cfgtoollogs", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
+          - {name: "{{ oracle_base }}/admin", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
+          - {name: "{{ oracle_base }}/audit", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
+          - {name: "{{ oracle_base }}/cfgtoollogs/dbca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
+          - {name: "{{ oracle_base }}/cfgtoollogs/sqlpatch", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
+          - {name: "{{ oracle_base }}/cfgtoollogs/netca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
+
+
   oracle_home_gi: "{% if configure_cluster %}{{ oracle_home_gi_cl }}{% else %}{{ oracle_home_gi_so }}{% endif %}"
   oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Clustered)
   oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Stand Alone)
