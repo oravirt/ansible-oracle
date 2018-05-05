@@ -1,7 +1,3 @@
-- name: manage-db | print oracle_db_name
-  debug: msg="DB-name is {{dbh.oracle_db_name}}, state is {{ dbh.state}}"
-  run_once: "{{ configure_cluster }}"
-
 # - name: manage-db | check if GI is present
 #   stat: path=/etc/oracle/olr.loc
 #   register: olrloc
@@ -25,6 +21,10 @@
   failed_when: False
   #when: not olrloc.stat.exists
   tags: create_db,dbcatemplate,debug
+
+- debug: msg="Creating DB - {{dbh.oracle_db_name}}"
+  run_once: "{{ configure_cluster }}"
+  when: dbh.oracle_db_name not in existing_dbs.stdout and dbh.state|lower == 'present'
 
 - name: manage-db | add dotprofile
   template:
@@ -74,6 +74,11 @@
   when: autostartup_service and not olrloc.stat.exists
   become: yes
   tags: update_oratab
+
+
+- debug: msg="Removing DB - {{dbh.oracle_db_name}}"
+  run_once: "{{ configure_cluster }}"
+  when: dbh.oracle_db_name in existing_dbs.stdout and dbh.state|lower == 'absent'
 
 - name: manage-db | remove database
   shell: "{{oracle_home_db}}/bin/dbca -deleteDatabase -silent -sourceDB {{ dbh.oracle_db_name }} -sysDBAUserName sys -sysDBAPassword {{ dbca_sys_pass}}"

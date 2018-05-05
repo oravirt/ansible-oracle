@@ -1,0 +1,11 @@
+- name: install-home-db | Configure oracle-rdbms auto-startup service (systemd.d)
+  template: src=oracle-rdbms-service.j2 dest=/etc/systemd/system/oracle-rdbms.service owner=root
+  become: true
+  with_items: "{{oracle_databases}}"
+  when: autostartup_service and checkinitdaemons.stdout == "systemd"
+  tags: autostartup_service
+
+- name: install-home-db | Register oracle-rdbms service (system.d)
+  systemd: name=oracle-rdbms daemon_reload=yes enabled=yes
+  when: autostartup_service and checkinitdaemons.stdout == "systemd" #and ansible_version.full >= "2.2"
+  tags: autostartup_service

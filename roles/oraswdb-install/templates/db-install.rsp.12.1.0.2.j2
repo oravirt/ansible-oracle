@@ -104,7 +104,7 @@ ORACLE_BASE={{ oracle_base }}
 #   - EE     : Enterprise Edition
 
 #-------------------------------------------------------------------------------
-oracle.install.db.InstallEdition={{ item.0.oracle_edition }}
+oracle.install.db.InstallEdition={{ dbh.oracle_edition }}
 
 ###############################################################################
 #                                                                             #
@@ -186,7 +186,7 @@ oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host |reg
 #
 # If left blank, it will be assumed to be false.
 #------------------------------------------------------------------------------
-{% if item.0.oracle_db_type|upper == 'RACONENODE' %}
+{% if dbh.oracle_db_type|upper == 'RACONENODE' %}
 oracle.install.db.isRACOneInstall=true
 {% else %}
 oracle.install.db.isRACOneInstall=
@@ -196,8 +196,8 @@ oracle.install.db.isRACOneInstall=
 #
 # Specify the name for RAC One Node Service
 #------------------------------------------------------------------------------
-{% if item.0.oracle_db_type|upper == 'RACONENODE' %}
-oracle.install.db.racOneServiceName={{ item.0.service_name }}
+{% if dbh.oracle_db_type|upper == 'RACONENODE' %}
+oracle.install.db.racOneServiceName={{ dbh.service_name }}
 {% else %}
 oracle.install.db.racOneServiceName=
 {% endif %}
@@ -489,7 +489,7 @@ PROXY_PWD=
 #------------------------------------------------------------------------------
 COLLECTOR_SUPPORTHUB_URL=
 
-{% if item.0.oracle_version_db=='12.1.0.1' %}
+{% if dbh.oracle_version_db=='12.1.0.1' %}
 # Example    : PROXY_REALM=metalink
 PROXY_REALM=
 #  Example   : AUTOUPDATES_MYORACLESUPPORT_USERNAME=abc@oracle.com
