@@ -119,14 +119,14 @@
     local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys
     ignore_errors: True
     run_once: "{{ configure_cluster}}"
-    when: configure_ssh and configure_cluster
+    when: configure_ssh and configure_cluster and old_ssh_config
     become: false
     tags:
      - sshkeys
 
   - name: ssh-keys | Add ssh-keys & authorized_keys to oracle user
     copy: src={{ item[1] }} dest=/home/{{ item[0].username }}/.ssh  owner={{ item[0].username }} group={{ item[0].primgroup }} force=yes mode=600
-    when: configure_ssh and configure_cluster
+    when: configure_ssh and configure_cluster and old_ssh_config
     with_nested:
         - "{{oracle_users}}"
         - "{{ssh_keys}}"
@@ -135,7 +135,7 @@
 
   - name: ssh-keys | Add ssh-keys & authorized_keys to grid user
     copy: src={{ item[1] }} dest=/home/{{ item[0].username }}/.ssh  owner={{ item[0].username }} group={{ item[0].primgroup }} force=yes mode=600
-    when: configure_ssh and configure_cluster and role_separation
+    when: configure_ssh and configure_cluster and role_separation and old_ssh_config
     with_nested:
         - "{{grid_users}}"
         - "{{ssh_keys}}"
@@ -146,7 +146,7 @@
     local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_hostname }} 2> /dev/null >> {{keyfile}}
     ignore_errors: True
     become: false
-    when: configure_ssh and configure_cluster
+    when: configure_ssh and configure_cluster and old_ssh_config
     tags:
      - sshkeys
 
@@ -154,7 +154,7 @@
     local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_fqdn}} 2> /dev/null >> {{keyfile}}
     ignore_errors: True
     become: false
-    when: configure_ssh and configure_cluster
+    when: configure_ssh and configure_cluster and old_ssh_config
     tags:
      - sshkeys
 
@@ -162,21 +162,21 @@
     local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_default_ipv4.address}} 2> /dev/null >> {{keyfile}}
     ignore_errors: True
     become: false
-    when: configure_ssh and configure_cluster
+    when: configure_ssh and configure_cluster and old_ssh_config
     tags:
      - sshkeys
 
   - name: ssh-keys | Copy known_hosts to oracle user
     copy: src={{keyfile}} dest=/home/{{ item.username }}/.ssh/known_hosts owner={{ item.username }} group={{ item.primgroup }}
     with_items: "{{oracle_users}}"
-    when: configure_ssh and configure_cluster
+    when: configure_ssh and configure_cluster and old_ssh_config
     tags:
      - sshkeys
 
   - name: ssh-keys | Copy known_hosts to grid user
     copy: src={{keyfile}} dest=/home/{{ item.username }}/.ssh/known_hosts owner={{ item.username }} group={{ item.primgroup }}
     with_items: "{{grid_users}}"
-    when: configure_ssh and configure_cluster and role_separation
+    when: configure_ssh and configure_cluster and role_separation and old_ssh_config
     tags:
      - sshkeys
 
@@ -186,7 +186,7 @@
         - "{{ ssh_keys }}"
         - "{{ keyfile }}"
     run_once: "{{ configure_cluster}}"
-    when: configure_ssh and configure_cluster
+    when: configure_ssh and configure_cluster and old_ssh_config
     ignore_errors: true
     become: false
     tags:
