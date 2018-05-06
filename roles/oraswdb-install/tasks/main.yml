@@ -31,20 +31,11 @@
     tags:
       - directoriesdb
 
-  - name: install-home-db | Transfer oracle installfiles to server (www)
-    get_url: url={{ oracle_sw_source_www }}/{{ item[0].filename }} dest={{ oracle_stage }} mode=775
-    with_nested:
-      - "{{oracle_sw_image_db}}"
-      - "{{oracle_databases}}"
-    become: yes
-    become_user: "{{ oracle_user }}"
-    run_once: "{{ configure_cluster}}"
-    when: item[0].version == item[1].oracle_version_db and not is_sw_source_local and oracle_sw_copy
-    tags:
-      - oradbsw
+  - include_tasks: "{{ www_download_bin }}.yml"
+    when: not is_sw_source_local and oracle_sw_copy
 
   - name: install-home-db | Transfer oracle installfiles to server (local)
-    copy: src={{ oracle_sw_source_local }}/{{ item[0].filename }} dest={{ oracle_stage }} mode=775
+    copy: src={{ oracle_sw_source_local }}/{{ item[0].filename }} dest={{ oracle_stage }} mode=775 force=no
     with_nested:
       - "{{oracle_sw_image_db}}"
       - "{{oracle_databases}}"

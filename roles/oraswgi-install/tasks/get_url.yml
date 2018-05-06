@@ -1,0 +1,12 @@
+- name: install-home-gi | Copy oracle installfiles to server (GI) (web - get_url)
+  get_url:
+      url={{ oracle_sw_source_www }}/{{ item.filename }}
+      dest={{ oracle_stage }}
+      mode=775
+      force=no
+  with_items: "{{oracle_sw_image_gi}}"
+  become: yes
+  become_user: "{{ grid_install_user }}"
+  tags:
+    - oragridsw
+  when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi  == item.version and not is_sw_source_local and oracle_sw_copy

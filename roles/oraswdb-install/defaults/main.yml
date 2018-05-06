@@ -32,6 +32,7 @@
 
   oracle_profile_name: "{% if item is defined %}{% if item.oracle_home is defined %}.profile_{{ item.oracle_home |basename}}_{{ item.oracle_version_db}}{% elif item.home is defined %}.profile_{{ item.home }}_{{item.oracle_version_db}}{% elif item.oracle_home is defined %}.profile_{{item.oracle_home |basename}}_{{item.oracle_version_db}}{% endif %}{% else %}{% if dbh.oracle_home is defined %}.profile_{{ dbh.oracle_home |basename}}_{{ dbh.oracle_version_db}}{% elif dbh.home is defined %}.profile_{{ dbh.home }}_{{dbh.oracle_version_db}}{% else %}.profile_{{dbh.home}}_{{dbh.oracle_db_name}}{% endif%}{%endif %}"    # Name of profile-file. Sets up the environment for that ORACLE_HOME
   oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
+  www_download_bin: curl                              # curl (shell module) or get_url module
   oracle_sw_source_www: ""                            #http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
   oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
   is_sw_source_local: true
