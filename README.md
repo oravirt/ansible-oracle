@@ -4,9 +4,10 @@
 - Start with one or more clean machine(s), end up with a fully configured RAC Cluster.
 
 
-By default, you can install a single instance 12.2.0.1 database on filesystem. Just put the following file in /tmp on the control-machine,
+By default, you can install a single instance 12.2.0.1 database on filesystem. Just put the following file in /tmp on the control-machine
 
 - `linuxx64_12201_database.zip`
+
 
 
 ### Getting started
@@ -25,6 +26,7 @@ This will configure stuff common to all machines
 - Install some generic packages
 - Configure ntp
 
+
 **orahost**:
 This will configure the host specific Oracle stuff:
 - Add a user & group
@@ -39,14 +41,17 @@ This will configure the host specific Oracle stuff:
 - Configures the interconnect network (if needed)
 - Configures Oracle ASMLib
 
+
 **orahost-ssh**
 Configures passwordless ssh between clusternodes if setting up RAC (`configure_cluster=True`)
 - Uses existing ssh-keys
+
 
 **orahost-storage**
 This role configures storage that shoud be used by ASM.
 - Partitions devices (using parted)
 - Create ASMlib labels or sets up udev-rules for device name persistence
+
 
 **oraswgi-install**
 This role will install and configure Oracle Grid Infrastructure. Tested with 12.1.0.1/12.1.0.2 & 11.2.0.4/11.2.0.3
@@ -55,9 +60,11 @@ This role will install and configure Oracle Grid Infrastructure. Tested with 12.
 - Copies the install-files to the servers, or installs from a remote location (e.g nfs share)
 - Install Oracle Grid Infrastructure
 
+
 **oraasm-createdg**
 This role will create the diskgroup(s) that should be used for database storage. Uses asmca to create diskgroups.
 - Generates a shellscript that uses asmca to create the diskgroups.
+
 
 **oraswdb-install**
 This role will install the oracle database server(s). It is possible to run more than 1 database from each home. It performs both Single Instance/RAC installations.
@@ -65,10 +72,12 @@ This role will install the oracle database server(s). It is possible to run more
 - Creates directory structures
 - Installs the database-server(s)
 
+
 **oradb-manage-db**
 This role creates/deletes databases
 - Generates a responsefile to be used by dbca
 - Creates the db using dbca
+
 
 **oradb-create (deprecated - use oradb-manage-db instead)**
 This role creates the databases (RAC/RAC One Node, Single Instance). Possible to create container databases. Performs a dbca silent run to create the database.
@@ -78,21 +87,28 @@ At the moment there is no listener configured when creating a database on a file
 - Creates the db using dbca
 - Changes parameters based on input.
 
+
 **oradb-delete (deprecated - use oradb-manage-db instead)**
 This role deletes a database
+
 
 **oraswgi-opatch**
 This role will use opatch to apply a patch to a Grid Infrastructure home. At the moment it is basically written to apply PSU's, not one-off patches. It'll probably work but it is not designed for that at the moment.
 Does an initial check to see if the patches are already applied, and skips through all steps if they are.
 
+
 **cxoracle**
 Installs cx_Oracle in preparation for using [ansible-oracle-modules](https://github.com/oravirt/ansible-oracle-module)
+
 
 **orahost-cron**
 Configures cron schedules if needed
 
+
 **orahost-logrotate**
 By default sets up logrotate for alert logs and listener logs
+
+
 
 ### Note
 
