@@ -37,6 +37,12 @@
   oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
   oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
   is_sw_source_local: true
+
+  oracle_EE_options: "{%- if item.oracle_version_db in ('12.2.0.1') %}{{ oracle_EE_options_122 }}
+                      {% else %}{%- if item.oracle_version_db in ('12.1.0.1', '12.1.0.2') %}{{oracle_EE_options_121}}
+                      {% else %}{%- if item.oracle_version_db == '11.2.0.4' %}{{oracle_EE_options_112}}{% endif %}{% endif %}{% endif %}"
+  oracle_EE_option_state: "{% if item.1.state is defined and item.1.state %}enable{% else %}disable{% endif %}"
+
   configure_cluster: false
   autostartup_service: false # automatic startup/stop databases service
 
@@ -90,21 +96,22 @@
 
   # disable all options who requires extra licences
   oracle_EE_options_112:
-    - {option: dm           , state: !!str "disable" }
-    - {option: dv           , state: !!str "disable" }
-    - {option: lbac         , state: !!str "disable" }
-    - {option: olap         , state: !!str "disable" }
-    - {option: partitioning , state: !!str "disable" }
-    - {option: rat          , state: !!str "disable" }
+    - {option: dm           , state: false }
+    - {option: dv           , state: false }
+    - {option: lbac         , state: false }
+    - {option: olap         , state: false }
+    - {option: partitioning , state: false }
+    - {option: rat          , state: false }
 
   oracle_EE_options_121:
-    - {option: dm           , state: !!str "disable" }
-    - {option: olap         , state: !!str "disable" }
-    - {option: partitioning , state: !!str "disable" }
-    - {option: rat          , state: !!str "disable" }
+    - {option: dm           , state: false }
+    - {option: olap         , state: false }
+    - {option: partitioning , state: false }
+    - {option: rat          , state: false }
 
   oracle_EE_options_122:
-    - {option: oaa          , state: !!str "disable" }
-    - {option: olap         , state: !!str "disable" }
-    - {option: partitioning , state: !!str "disable" }
-    - {option: rat          , state: !!str "disable" }
+    - {option: oaa          , state: false }
+    - {option: olap         , state: false }
+    - {option: partitioning , state: false }
+    - {option: rat          , state: false }
+
