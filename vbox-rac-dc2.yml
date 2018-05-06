@@ -7,6 +7,14 @@
       - common
       - orahost
 
+ - name: ssh configuration
+   hosts: vbox-rac-dc2
+   user: vagrant
+   become: yes
+   serial: 1
+   roles:
+      - {role: orahost-ssh, when: configure_cluster and not old_ssh_config}
+
  - name: Storage Configuration
    hosts: vbox-rac-dc2
    user: vagrant
@@ -28,7 +36,7 @@
    roles:
       - oraasm-createdg
       - oraswdb-install
-      - oradb-create
+      - oradb-manage-db
 
  - name: Install cx_oracle
    hosts: vbox-rac-dc2

@@ -2,17 +2,15 @@
 
 
  - name: Host configuration
-   hosts: orafs
-   user: ansible
-   sudo: yes
+   hosts: "{{ hostgroup }}"
+   become: yes
    roles:
       - common
       - orahost
 
  - name: Database Server Installation & Database Creation
-   hosts: orafs
-   user: ansible
-   sudo: yes
+   hosts: "{{ hostgroup }}"
+   become: yes
    roles:
       - oraswdb-install
-      - oradb-create
+      - oradb-manage-db
