@@ -36,6 +36,12 @@
   oracle_sw_source_www: ""                            #http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
   oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
   is_sw_source_local: true
+
+  oracle_EE_options: "{%- if item.oracle_version_db in ('12.2.0.1') %}{{ oracle_EE_options_122 }}
+                      {% else %}{%- if item.oracle_version_db in ('12.1.0.1', '12.1.0.2') %}{{oracle_EE_options_121}}
+                      {% else %}{%- if item.oracle_version_db == '11.2.0.4' %}{{oracle_EE_options_112}}{% endif %}{% endif %}{% endif %}"
+  oracle_EE_option_state: "{% if item.1.state is defined and item.1.state %}enable{% else %}disable{% endif %}"
+
   configure_cluster: false
   autostartup_service: false # automatic startup/stop databases service
 
@@ -49,6 +55,9 @@
           - {name: "{{ oracle_base }}/cfgtoollogs/dbca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
           - {name: "{{ oracle_base }}/cfgtoollogs/sqlpatch", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
           - {name: "{{ oracle_base }}/cfgtoollogs/netca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
+  oracle_EE_options: "{%- if item.oracle_version_db in ('12.2.0.1') %}{{ oracle_EE_options_122 }}
+                      {% else %}{%- if item.oracle_version_db in ('12.1.0.1', '12.1.0.2') %}{{oracle_EE_options_121}}
+                      {% else %}{%- if item.oracle_version_db == '11.2.0.4' %}{{oracle_EE_options_112}}{% endif %}{% endif %}{% endif %}"
 
   glogin_default_nocdb:
         - "set sqlprompt \"_user @ _connect_identifier:>\""
@@ -83,3 +92,24 @@
       oracle_db_name: orcl
       oracle_db_type: SI
       is_container: False
+
+  # disable all options who requires extra licences
+  oracle_EE_options_112:
+    - {option: dm           , state: false }
+    - {option: dv           , state: false }
+    - {option: lbac         , state: false }
+    - {option: olap         , state: false }
+    - {option: partitioning , state: false }
+    - {option: rat          , state: false }
+
+  oracle_EE_options_121:
+    - {option: dm           , state: false }
+    - {option: olap         , state: false }
+    - {option: partitioning , state: false }
+    - {option: rat          , state: false }
+
+  oracle_EE_options_122:
+    - {option: oaa          , state: false }
+    - {option: olap         , state: false }
+    - {option: partitioning , state: false }
+    - {option: rat          , state: false }
