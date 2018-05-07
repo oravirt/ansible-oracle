@@ -62,9 +62,11 @@
   - name: Disable selinux (runtime)
     shell: setenforce 0
     when: disable_selinux and ansible_os_family == 'RedHat'
+    changed_when: disable_selinux_runtime.rc == 0
+    failed_when: disable_selinux_runtime.rc > 0 and "SELinux is disabled" not in disable_selinux_runtime.stderr
+    register: disable_selinux_runtime
     tags: selinux
-    ignore_errors: true
-
+    
   - name: Check dns for host
     command: nslookup {{ ansible_hostname }}
     register: ns
