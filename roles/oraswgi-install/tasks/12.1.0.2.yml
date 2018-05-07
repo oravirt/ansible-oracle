@@ -1,7 +1,11 @@
 ---
 
 - name: install-home-gi | Extract files to stage-area (GI)
-  unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no
+  unarchive: 
+       src={{ oracle_stage_remote }}/{{ item.filename }}  
+       dest={{ oracle_stage }}/{{ item.version }} 
+       copy=no
+       creates={{ oracle_stage }}/{{ item.version }}/{{ item.creates}}
   with_items: "{{oracle_sw_image_gi}}"
   become: yes
   become_user: "{{ grid_install_user }}"
@@ -10,7 +14,11 @@
   when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and oracle_sw_copy and oracle_sw_unpack
 
 - name: install-home-gi | Extract files to stage-area (GI) (from remote location)
-  unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no
+  unarchive: 
+       src={{ oracle_stage_remote }}/{{ item.filename }}  
+       dest={{ oracle_stage }}/{{ item.version }} 
+       copy=no
+       creates={{ oracle_stage }}/{{ item.version }}/{{ item.creates}}
   with_items: "{{oracle_sw_image_gi}}"
   become: yes
   become_user: "{{ grid_install_user }}"
