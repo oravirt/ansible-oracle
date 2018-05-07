@@ -59,7 +59,7 @@ This role configures storage that shoud be used by ASM.
 
 **oraswgi-install**
 
-This role will install and configure Oracle Grid Infrastructure (`12.1.0.1/12.1.0.2 & 11.2.0.4/11.2.0.3`)
+This role will install and configure Oracle Grid Infrastructure (RAC/SI)
 - Adds a .profile_grid to the oracle user
 - Sets up directory structures
 - Copies the install-files to the servers, or installs from a remote location (e.g nfs share)
