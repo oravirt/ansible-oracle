@@ -1,6 +1,6 @@
 ---
   hostgroup: vbox-rac-dc1
-  role_separation: false
+  role_separation: True
   device_persistence: asmlib
 
 
@@ -21,10 +21,11 @@
   configure_epel_repo: True
   configure_public_yum_repo: True
   disable_selinux: true
+  old_ssh_config: False
 
 ################ Grid Infrastructure specifics ################
-  configure_cluster: true
-  oracle_install_version_gi: 12.1.0.2
+  configure_cluster: True
+  oracle_install_version_gi: 12.2.0.1
   oracle_gi_cluster_type: STANDARD
   oracle_home_gi: "/u01/app/grid/product/{{ oracle_install_version_gi}}/grid"
 
@@ -40,7 +41,7 @@
 
   oracle_databases:                                            # Dictionary describing the databases to be installed
         - home: db1                                            # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
-          oracle_version_db: 12.1.0.2                          # Oracle versiono
+          oracle_version_db: 12.2.0.1                          # Oracle versiono
           oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
           oracle_db_name: orclcdb                               # Database name
           oracle_db_type: RAC                                  # Type of database (RAC,RACONENODE,SI)
