@@ -1,30 +1,30 @@
 ---
 
-  - name: Check if GI is already installed
+  - name: install-home-gi | Check if GI is already installed
     #shell: grep "{{ oracle_home_gi }}" "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" |wc -l
     shell: cat "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" |grep -w {{ oracle_home_gi  }} |awk  '{print $3}' | cut -f2 -d'"'
     tags:
     - checkifgiinstall
     register: checkgiinstall
 
-  - name: Mount nfs share with installation media
+  - name: install-home-gi | Mount nfs share with installation media
     mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=mounted
     tags:
       - nfsmountgi
     when: install_from_nfs
 
-  - name: Add new dotprofile (GI)
+  - name: install-home-gi | Add new dotprofile (GI)
     template: src=dotprofile-gi.j2 dest={{ grid_user_home }}/{{ oracle_profile_name_gi }} owner={{ grid_install_user }} group={{ oracle_group }} mode=755 backup=yes
     tags:
     - dotprofilegi
 
-  - name: Create common directories
+  - name: install-home-gi | Create common directories
     file: dest={{ item.name }} mode={{ item.mode}} owner={{ item.owner }} group={{ item.group }} state=directory
     with_items: "{{oracle_directories}}"
     tags:
       - directories
 
-  - name: Create stage directory (version specific)
+  - name: install-home-gi | Create stage directory (version specific)
     file: dest={{ oracle_stage }}/{{ item.version }} mode=775 owner="{{ oracle_user }}" group={{ oracle_group }} state=directory
     become: yes
     with_items: "{{oracle_sw_image_gi}}"
@@ -32,7 +32,7 @@
     tags:
       - directories
 
-  - name: Create ORACLE_HOME directory (GI)
+  - name: install-home-gi | Create ORACLE_HOME directory (GI)
     file: dest={{ oracle_home_gi }} owner="{{ grid_install_user }}" group={{ oracle_group }} state=directory mode=775
     become: yes
     tags:
@@ -42,7 +42,7 @@
   - include_tasks: "{{ www_download_bin }}.yml"
     when: not is_sw_source_local and oracle_sw_copy
 
-  - name: Copy oracle installfiles to server (GI) (local)
+  - name: install-home-gi | Copy oracle installfiles to server (GI) (local)
     copy: src={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=775 force=no
     with_items: "{{oracle_sw_image_gi}}"
     become: yes
@@ -54,7 +54,7 @@
 
   - include_tasks: "{{ oracle_install_version_gi }}.yml"
 
-  - name: Check if stuff is running
+  - name: install-home-gi | Check if stuff is running
     shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
     tags:
      - crsctl
@@ -68,7 +68,7 @@
     run_once: "{{ configure_cluster}}"
     when: oracle_home_gi not in checkgiinstall.stdout
 
-  - name: Update Nodelist, set CRS=TRUE
+  - name: install-home-gi | Update Nodelist, set CRS=TRUE
     shell: "{{ oracle_home_gi }}/oui/bin/runInstaller -updateNodeList ORACLE_HOME={{ oracle_home_gi }} CRS=TRUE"
     become: yes
     become_user: "{{ grid_install_user }}"
@@ -78,19 +78,19 @@
     tags:
       - updatenodelist
 
-  - name: Add additional info to glogin.sql (1)
+  - name: install-home-gi | Add additional info to glogin.sql (1)
     lineinfile: dest="{{ oracle_home_gi }}/sqlplus/admin/glogin.sql" line='set sqlprompt "_user @ _connect_identifier:>"' backup=yes
     tags:
       - glogingi
     when: oracle_home_gi not in checkgiinstall.stdout
 
-  - name: Add additional info to glogin.sql (2)
+  - name: install-home-gi | Add additional info to glogin.sql (2)
     lineinfile: dest="{{ oracle_home_gi }}/sqlplus/admin/glogin.sql" line='set time on' backup=yes
     tags:
       - glogingi
     when: oracle_home_gi not in checkgiinstall.stdout
 
-  - name: Check opatch lsinventory (GI)
+  - name: install-home-gi | Check opatch lsinventory (GI)
     shell: "{{ oracle_home_gi }}/OPatch/opatch lsinventory"
     become: yes
     become_user: "{{ grid_install_user }}"
@@ -100,13 +100,13 @@
      - opatchls
     when: oracle_home_gi not in checkgiinstall.stdout
 
-  - name: Check opatch lsinventory (GI)
+  - name: install-home-gi | Check opatch lsinventory (GI)
     debug: var=opatchls.stdout_lines
     tags:
      - opatchls
     when: oracle_home_gi not in checkgiinstall.stdout
 
-  - name: Check olsnodes (GI)
+  - name: install-home-gi | Check olsnodes (GI)
     shell: "{{ oracle_home_gi }}/bin/olsnodes -a -n -s -t"
     become: yes
     become_user: "{{ grid_install_user }}"
@@ -115,13 +115,13 @@
     tags:
      - olsnodes
 
-  - name: Check olsnodes (GI)
+  - name: install-home-gi | Check olsnodes (GI)
     debug: var=olsnodes.stdout_lines
     when: oracle_gi_cluster_type|upper == 'FLEX' and '12' in oracle_install_version_gi
     tags:
      - olsnodes
 
-  - name: Unmount nfs share with installation media
+  - name: install-home-gi | Unmount nfs share with installation media
     mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=absent
     when: install_from_nfs
     tags: nfsunmountgi
