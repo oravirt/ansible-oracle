@@ -19,6 +19,7 @@
   asmdba_group: asmdba                    # osdba
   asmadmin_group: asmadmin                # osasm
 
+  www_download_bin: curl                              # curl (shell module) or get_url module
   oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
   oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
   is_sw_source_local: true
@@ -103,13 +104,13 @@
 
 
   oracle_sw_image_gi:                                              # Files containing the installation media for Grid Infrastructure
-       - { filename: linuxx64_12201_grid_home.zip, version: 12.2.0.1 }
-       - { filename: linuxamd64_12102_grid_1of2.zip, version: 12.1.0.2 }
-       - { filename: linuxamd64_12102_grid_2of2.zip, version: 12.1.0.2 }
+       - { filename: linuxx64_12201_grid_home.zip, version: 12.2.0.1, creates: 'xdk/mesg/lsxja.msb' }
+       - { filename: linuxamd64_12102_grid_1of2.zip, version: 12.1.0.2, creates: 'grid/stage/sizes/oracle.crs.12.1.0.2.0.sizes.properties' }
+       - { filename: linuxamd64_12102_grid_2of2.zip, version: 12.1.0.2, creates: 'grid/install/.oui' }
        - { filename: linuxamd64_12c_grid_1of2.zip, version: 12.1.0.1 }
        - { filename: linuxamd64_12c_grid_2of2.zip, version: 12.1.0.1 }
-       - { filename: p13390677_112040_Linux-x86-64_3of7.zip, version: 11.2.0.4 }
-       - { filename: p10404530_112030_Linux-x86-64_3of7.zip, version: 11.2.0.3 }
+       - { filename: p13390677_112040_Linux-x86-64_3of7.zip, version: 11.2.0.4, creates: 'grid/welcome.html' }
+       - { filename: p10404530_112030_Linux-x86-64_3of7.zip, version: 11.2.0.3, creates: 'grid/stage/properties/userPaths.properties' }
 
   # asm_diskgroups:
   #  - diskgroup: crs

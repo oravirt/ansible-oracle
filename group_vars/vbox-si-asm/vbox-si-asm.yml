@@ -1,7 +1,7 @@
 ---
   hostgroup: vbox-si-asm
   role_separation: True
-  device_persistence: udev
+  device_persistence: asmlib
   storage_type: ASM
   #multipath: dm-multipath
 
@@ -10,8 +10,11 @@
   oracle_group: oinstall
 
   install_from_nfs: false
-  oracle_sw_copy: false
-  oracle_sw_unpack: true
+  oracle_sw_copy: False
+  oracle_sw_unpack: True
+  is_sw_source_local: false
+  #oracle_sw_source_www: http://192.168.0.24/orasw/
+  #oracle_sw_source_local: /Users/miksan/Downloads/oracle/
   oracle_stage: /u01/stage
   oracle_stage_remote: /media/swrepo
 
@@ -21,7 +24,7 @@
   configure_ssh: true
   configure_host_disks: true
 
-  install_os_packages: False
+  install_os_packages: True
   configure_epel_repo: true
   configure_public_yum_repo: True
   disable_selinux: false
@@ -62,7 +65,7 @@
         #   redolog_size_in_mb: 100
         #   datafile_dest: '+DATA'
         #   recoveryfile_dest: '+FRA'
-        #   state: present
+        #   state: absent
 ## The following will install a new ORACLE_HOME with version 11.2.0.4 and a database called running out of that home
         # - home: db1                                            # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.2.0.1/db1)
         #   oracle_version_db: 11.2.0.4                          # Oracle versiono (12.2.0.1,12.1.0.2,12.1.0.1,11.2.0.4,11.2.0.3)
