@@ -1,0 +1,24 @@
+  - name: Manage tablespaces (db/cdb)
+    oracle_tablespace:
+          hostname={{ inventory_hostname }}
+          service_name={{ item.0.oracle_db_name }}
+          user={{ db_user }}
+          password={{ db_password}}
+          tablespace={{ item.1.name }}
+          datafile={{ item.1.datafile |default(omit)}}
+          bigfile={{ item.1.bigfile |default(omit) }}
+          size={{ item.1.size |default(omit)}}
+          autoextend={{ item.1.autoextend |default(omit)}}
+          next={{ item.1.next |default(omit)}}
+          maxsize={{ item.1.maxsize |default(omit)}}
+          content={{ item.1.content |default(omit)}}
+          state={{ item.1.state |default('present')}}
+    environment: "{{oracle_env}}"
+    with_subelements:
+        - "{{oracle_databases}}"
+        - tablespaces
+        - flags:
+          skip_missing: True        
+    when: oracle_databases is defined and item.1 is defined
+    tags: tablespace
+ 
