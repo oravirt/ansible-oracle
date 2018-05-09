@@ -6,7 +6,7 @@ DOCUMENTATION = '''
 module: oracle_services
 short_description: Manage services in an Oracle database
 description:
-    - Manage services in an Oracle database (using srvctl)
+    - Manage services in an Oracle database
 version_added: "2.1.0.0"
 options:
     name:
@@ -298,7 +298,7 @@ def stop_service(cursor, module, msg, oracle_home, name, database_name):
             if 'PRCR-1005' in stdout or 'CRS-2500' in stdout:
                 msg[0] = "Service %s already stopped in database %s" % (name, database_name)
                 module.exit_json(msg=msg[0], changed=False)
-            elif 'PRCR-1001' in stdout:
+            elif 'PRCR-1001' in stdout or 'PRCD-1132' in stdout:
                 msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
                 module.exit_json(msg=msg[0], changed=False)
             else:
