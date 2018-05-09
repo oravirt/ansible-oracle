@@ -1,0 +1,165 @@
+
+- name: Create services (db/cdb)
+  oracle_services:
+        name={{ item.1.name }}
+        database_name={{ item.0.oracle_db_name }}
+        pi={{ item.1.pi |default(omit) }}
+        ai={{ item.1.ai|default(omit) }}
+        pdb={{ item.0.name | default(omit) }}
+        state=present
+        host={{inventory_hostname}}
+        un={{ db_user }}
+        pw={{ db_password_cdb }}
+        sn={{ item.0.oracle_db_name }}
+  environment: "{{oracle_env}}"
+  with_subelements:
+      - "{{ oracle_databases }}"
+      - services
+      - flags:
+        skip_missing: True
+  when: item.1 is defined and item.1.state|upper == 'PRESENT' or item.1.state|upper == 'STARTED'
+  become_user: "{{ oracle_user}}"
+  tags: create_service,services
+
+- name: Create services (pdb)
+  oracle_services:
+        name={{ item.1.name }}
+        database_name={{ item.0.cdb }}
+        pi={{ item.1.pi |default(omit) }}
+        ai={{ item.1.ai|default(omit) }}
+        pdb={{ item.0.pdb_name | default(omit) }}
+        state=present
+        host={{ inventory_hostname}}
+        port=1521
+        un={{ db_user }}
+        pw={{ db_password_pdb }}
+        sn={{ item.0.pdb_name }}
+  environment: "{{oracle_env}}"
+  with_subelements:
+      - "{{ oracle_pdbs }}"
+      - services
+      - flags:
+        skip_missing: True
+  when: item.1 is defined and item.1.state|upper == 'PRESENT' or item.1.state|upper == 'STARTED'
+  become_user: "{{ oracle_user}}"
+  tags: create_service,services
+
+- name: Start services (db/cdb)
+  oracle_services:
+         name={{ item.1.name }}
+         database_name={{ item.0.oracle_db_name }}
+         pdb={{ item.0.pdb_name | default(omit) }}
+         state=started
+         host={{ inventory_hostname }}
+         un={{ db_user }}
+         pw={{ db_password_cdb }}
+         sn={{ item.0.oracle_db_name }}
+  environment: "{{oracle_env}}"
+  with_subelements:
+      - "{{ oracle_databases }}"
+      - services
+      - flags:
+        skip_missing: True
+  when: item.1 is defined and item.1.state|upper == 'STARTED'
+  become_user: "{{ oracle_user}}"
+  tags: start_service,services
+
+- name: Start services (pdbs)
+  oracle_services:
+         name={{ item.1.name }}
+         database_name={{ item.0.cdb }}
+         pdb={{ item.0.pdb_name | default(omit) }}
+         state=started
+         host={{ inventory_hostname }}
+         un={{ db_user }}
+         pw={{ db_password_pdb }}
+         sn={{ item.0.pdb_name }}
+  environment: "{{oracle_env}}"
+  with_subelements:
+      - "{{ oracle_pdbs }}"
+      - services
+      - flags:
+        skip_missing: True
+  when: item.1 is defined and item.1.state|upper == 'STARTED'
+  become_user: "{{ oracle_user}}"
+  tags: start_service,services
+
+- name: Stop services (db/cdb)
+  oracle_services:
+         name={{ item.1.name }}
+         database_name={{ item.0.oracle_db_name }}
+         pdb={{ item.0.pdb_name | default(omit) }}
+         state=stopped
+         host={{ inventory_hostname }}
+         un={{ db_user }}
+         pw={{ db_password_cdb }}
+         sn={{ item.0.oracle_db_name }}
+  environment: "{{oracle_env}}"
+  with_subelements:
+      - "{{ oracle_databases }}"
+      - services
+      - flags:
+        skip_missing: True
+  when: item.1 is defined and item.1.state|upper == 'STOPPED' or item.1.state|upper == 'ABSENT'
+  become_user: "{{ oracle_user}}"
+  tags: start_service,services
+
+- name: Stop services (pdbs)
+  oracle_services:
+         name={{ item.1.name }}
+         database_name={{ item.0.cdb }}
+         pdb={{ item.0.pdb_name | default(omit) }}
+         state=stopped
+         host={{ inventory_hostname }}
+         un={{ db_user }}
+         pw={{ db_password_pdb }}
+         sn={{ item.0.pdb_name }}
+  environment: "{{oracle_env}}"
+  with_subelements:
+      - "{{ oracle_pdbs }}"
+      - services
+      - flags:
+        skip_missing: True
+  when: item.1 is defined and item.1.state|upper == 'STOPPED' or item.1.state|upper == 'ABSENT'
+  become_user: "{{ oracle_user}}"
+  tags: start_service,services
+
+- name: Remove services (db/cdb)
+  oracle_services:
+         name={{ item.1.name }}
+         database_name={{ item.0.oracle_db_name }}
+         pdb={{ item.0.pdb_name | default(omit) }}
+         state=absent
+         host={{ inventory_hostname }}
+         un={{ db_user }}
+         pw={{ db_password_cdb }}
+         sn={{ item.0.oracle_db_name }}
+  environment: "{{oracle_env}}"
+  with_subelements:
+      - "{{ oracle_databases }}"
+      - services
+      - flags:
+        skip_missing: True
+  when: item.1 is defined and item.1.state|upper == 'ABSENT'
+  become_user: "{{ oracle_user}}"
+  tags: start_service,services
+
+- name: Remove services (pdbs)
+  oracle_services:
+         name={{ item.1.name }}
+         database_name={{ item.0.cdb }}
+         pdb={{ item.0.pdb_name | default(omit) }}
+         state=absent
+         host={{ inventory_hostname }}
+         un={{ db_user }}
+         pw={{ db_password_pdb }}
+         sn={{ item.0.pdb_name }}
+  environment: "{{oracle_env}}"
+  with_subelements:
+      - "{{ oracle_pdbs }}"
+      - services
+      - flags:
+        skip_missing: True
+  when: item.1 is defined and item.1.state|upper == 'ABSENT'
+  become_user: "{{ oracle_user}}"
+  tags: start_service,services
