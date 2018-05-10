@@ -1,0 +1,47 @@
+---
+# tasks file fororadb-manage-users
+
+- name: Manage users (db/cdb)
+  oracle_user:
+          hostname={{ inventory_hostname }}
+          service_name={{ item.0.oracle_db_name }}
+          user={{ db_user }}
+          password={{ db_password_cdb }}
+          mode="{{ db_mode}}"
+          schema={{ item.1.schema }}
+          schema_password={{ user_cdb_password }}
+          state={{ item.1.state }}
+          default_tablespace={{ item.1.default_tablespace |default (omit)}}
+          container={{ item.1.container |default(omit) }}
+          update_password=always
+          grants={{ item.1.grants |default (omit) }}
+  with_subelements:
+      - "{{ oracle_databases }}"
+      - users
+  environment: "{{oracle_env}}"
+  when: item.0.state|lower == 'present' and item.1 is defined
+  run_once: "{{ configure_cluster }}"
+  become_user: "{{oracle_user}}"
+  tags: users
+
+- name: Manage users (pdb)
+  oracle_user:
+          hostname={{ inventory_hostname }}
+          service_name={{ item.0.pdb_name }}
+          user={{ db_user }}
+          password={{ db_password_pdb }}
+          mode="{{ db_mode}}"
+          schema={{ item.1.schema }}
+          schema_password={{ user_pdb_password }}
+          state={{ item.1.state }}
+          default_tablespace={{ item.1.default_tablespace |default (omit)}}
+          update_password=always
+          grants={{ item.1.grants |default (omit) }}
+  with_subelements:
+      - "{{ oracle_pdbs }}"
+      - users
+  environment: "{{oracle_env}}"
+  when: item.0.state|lower == 'present' and item.1 is defined
+  run_once: "{{ configure_cluster }}"
+  become_user: "{{oracle_user}}"
+  tags: users
