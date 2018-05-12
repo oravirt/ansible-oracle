@@ -141,7 +141,7 @@ def main():
         argument_spec=dict(
             user=dict(required=False, aliases=['un', 'username']),
             password=dict(required=False, no_log=True, aliases=['pw']),
-            mode=dict(default="normal", choices=["sysdba", "normal"]),
+            mode=dict(default="normal", choices=["sysasm", "sysdba", "normal"]),
             service_name=dict(required=False, aliases=['sn']),
             hostname=dict(required=False, default='localhost', aliases=['host']),
             port=dict(required=False, default=1521),
@@ -172,6 +172,9 @@ def main():
             if mode == 'sysdba':
                 connect = wallet_connect
                 conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+            elif mode == 'sysasm':
+                connect = wallet_connect
+                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSASM)
             else:
                 connect = wallet_connect
                 conn = cx_Oracle.connect(wallet_connect)
@@ -181,6 +184,10 @@ def main():
                 dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
                 connect = dsn
                 conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+            if mode == 'sysasm':
+                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                connect = dsn
+                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSASM)
             else:
                 dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
                 connect = dsn
