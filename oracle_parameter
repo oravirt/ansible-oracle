@@ -135,7 +135,8 @@ def modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
         return True
 
     if module.check_mode:
-        module.exit_json(changed=True)
+        msg = '%s will be changed, new: %s, old: %s' % (name,value,currval.upper())
+        module.exit_json(msg=msg, changed=True)
 
     if name.startswith(starters):
         name = quote_name(name)
