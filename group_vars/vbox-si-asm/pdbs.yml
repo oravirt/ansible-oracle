@@ -6,20 +6,22 @@ oracle_pdbs:
     state: present
     tablespaces:
          - { name: users, size: 10M, bigfile: True, autoextend: false , next: 5M, maxsize: 500M, content: permanent, state: present }
-         - { name: app1_data, size: 10M, bigfile: True, autoextend: false , next: 5M, maxsize: 500M, content: permanent, state: present }
+         - { name: appuser1_data, size: 10M, bigfile: True, autoextend: false , next: 5M, maxsize: 500M, content: permanent, state: present }
     init_parameters:
-         - {name: db_create_file_dest, value: '/tmp', scope: both, state: present}
+         - {name: db_create_file_dest, value: '+DATA', scope: both, state: present}
     services:
-           - { name: app1_service, state: absent }
-           - { name: app1_service,  state: present }
+           - { name: app1_service,  state: started }
     users:
-      - schema: appuser
-        #schema_password: "{{ appuser_passwd}}" # appuser
-        # default_tablespace: users
-        # default_temp_tablespace: temp
+      - schema: appuser1
+        default_tablespace: appuser1_data
         grants:
-           - 'create session'
-           #- 'select any table'
-           # - 'select any dictionary'
-           # - 'create any table'
+           - approle1
+        state: present
+    roles:
+      - name: approle1
+        grants:
+             - create session
+             - create table
+             - select any table
+             - select any dictionary
         state: present
