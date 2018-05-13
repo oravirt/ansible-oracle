@@ -18,6 +18,8 @@
   with_subelements:
       - "{{ oracle_databases }}"
       - users
+      - flags:
+        skip_missing: True
   environment: "{{oracle_env}}"
   when: item.0.state|lower == 'present' and item.1 is defined
   run_once: "{{ configure_cluster }}"
@@ -40,6 +42,8 @@
   with_subelements:
       - "{{ oracle_pdbs }}"
       - users
+      - flags:
+        skip_missing: True
   environment: "{{oracle_env}}"
   when: item.0.state|lower == 'present' and item.1 is defined
   run_once: "{{ configure_cluster }}"

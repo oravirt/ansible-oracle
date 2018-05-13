@@ -16,7 +16,7 @@
       - init_parameters
       - flags:
         skip_missing: True
-  when: oracle_databases is defined and item.1 is defined
+  when: oracle_databases is defined and item.0.state|lower == 'present' and item.1 is defined
   become_user: "{{ oracle_user }}"
   register: param_change
   tags: initparams
@@ -39,7 +39,7 @@
       - init_parameters
       - flags:
         skip_missing: True
-  when: oracle_pdbs is defined and item.1 is defined
+  when: oracle_pdbs is defined and item.0.state|lower == 'present' and item.1 is defined
   become_user: "{{ oracle_user }}"
   register: param_change
   tags: initparams

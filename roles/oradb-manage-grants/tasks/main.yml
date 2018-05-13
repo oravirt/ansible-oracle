@@ -1,6 +1,48 @@
 ---
 # tasks file for manage-db-users
-- name: Manage grants (cdb)
+- name: Manage role grants (cdb)
+  oracle_grants:
+          role={{ item.1.name }}
+          state={{ item.1.state }}
+          grants={{ item.1.grants }}
+          hostname={{ inventory_hostname }}
+          service_name={{ item.0.oracle_db_name }}
+          user={{ db_user }}
+          password={{ db_password_cdb}}
+          mode={{ db_mode }}
+  with_subelements:
+      - "{{ oracle_databases }}"
+      - roles
+      - flags:
+        skip_missing: True
+  environment: "{{oracle_env}}"
+  when: item.0.state|lower == 'present' and item.1.grants is defined
+  run_once: "{{ configure_cluster }}"
+  become_user: "{{ oracle_user }}"
+  tags: users,grants
+
+- name: Manage role grants (pdb)
+  oracle_grants:
+          role={{ item.1.name }}
+          state={{ item.1.state }}
+          grants={{ item.1.grants }}
+          hostname={{ inventory_hostname }}
+          service_name={{ item.0.pdb_name }}
+          user={{ db_user }}
+          password={{ db_password_pdb}}
+          mode={{ db_mode }}
+  with_subelements:
+      - "{{ oracle_pdbs }}"
+      - roles
+      - flags:
+        skip_missing: True
+  environment: "{{oracle_env}}"
+  when: item.0 is defined and item.0.state|lower == 'present' and item.1.grants is defined
+  run_once: "{{ configure_cluster }}"
+  become_user: "{{ oracle_user }}"
+  tags: users,grants
+
+- name: Manage schema grants (cdb)
   oracle_grants:
           schema={{ item.1.schema }}
           state={{ item.1.state }}
@@ -13,13 +55,15 @@
   with_subelements:
       - "{{ oracle_databases }}"
       - users
+      - flags:
+        skip_missing: True
   environment: "{{oracle_env}}"
   when: item.0.state|lower == 'present' and item.1.grants is defined
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   tags: users,grants
 
-- name: Manage grants (pdb)
+- name: Manage schema grants (pdb)
   oracle_grants:
           schema={{ item.1.schema }}
           state={{ item.1.state }}
@@ -32,6 +76,8 @@
   with_subelements:
       - "{{ oracle_pdbs }}"
       - users
+      - flags:
+        skip_missing: True
   environment: "{{oracle_env}}"
   when: item.0 is defined and item.0.state|lower == 'present' and item.1.grants is defined
   run_once: "{{ configure_cluster }}"

@@ -19,7 +19,7 @@
       - tablespaces
       - flags:
         skip_missing: True
-  when: oracle_databases is defined and item.1 is defined
+  when: oracle_databases is defined and item.1 is defined and item.0.state |upper == 'PRESENT'
   tags: tablespace
 
 - name: Manage tablespaces (pdb)
@@ -43,5 +43,5 @@
       - tablespaces
       - flags:
         skip_missing: True
-  when: oracle_pdbs is defined and item.1 is defined
+  when: oracle_pdbs is defined and item.1 is defined and item.0.state |upper == 'PRESENT'
   tags: tablespace
