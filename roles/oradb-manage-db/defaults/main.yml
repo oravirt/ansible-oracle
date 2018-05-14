@@ -71,6 +71,20 @@
   dbca_sys_pass: "{% if dbpasswords[dbh.oracle_db_name] is defined %}{% if dbpasswords[dbh.oracle_db_name]['sys'] is defined %}{{dbpasswords[dbh.oracle_db_name]['sys']}}{% else %}{{default_dbpass}}{% endif %}{% else %}{{default_dbpass}}{% endif %}"
   dbca_redolog: "{% if dbh.redolog_size_in_mb is defined %} -redoLogFileSize {{dbh.redolog_size_in_mb}}{% endif %}"
 
+  shell_ps1: "'[$LOGNAME'@'$ORACLE_SID `basename $PWD`]$'"
+  shell_aliases:
+     - "asmcmd='. oraenv ;rlwrap asmcmd -p'"
+     - "sqlsyso='. oraenv ;rlwrap sqlplus \"/ as sysdba\"'"
+     - "dgmgrl='rlwrap dgmgrl'"
+     - "rman='rlwrap rman'"
+     - "sid='. oraenv'"
+     - "sqlp='rlwrap sqlplus'"
+     - "sqlsys='rlwrap sqlplus \"/ as sysdba\"'"
+     - "dbh='cd $ORACLE_HOME'"
+     - "dbb='cd $ORACLE_BASE'"
+     - "talert='tail -500f $ORACLE_BASE/diag/rdbms/$ORA_DB_UNQ_NAME/$ORACLE_SID/trace/alert_$ORACLE_SID.log'"
+
+
 # This is an example layout of a database installation
   oracle_databases:                                            # Dictionary describing the databases to be installed
         - home: db1                                            # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)

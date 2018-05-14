@@ -56,6 +56,18 @@
            pdbadmin: Oracle_456
 
 ## END-OF-PASSWORDS
+  shell_ps1: "'[$LOGNAME'@'$ORACLE_SID `basename $PWD`]$'"
+  shell_aliases:
+     - "asmcmd='. oraenv ;rlwrap asmcmd -p'"
+     - "sqlsyso='. oraenv ;rlwrap sqlplus \"/ as sysdba\"'"
+     - "dgmgrl='rlwrap dgmgrl'"
+     - "rman='rlwrap rman'"
+     - "sid='. oraenv'"
+     - "sqlp='rlwrap sqlplus'"
+     - "sqlsys='rlwrap sqlplus \"/ as sysdba\"'"
+     - "dbh='cd $ORACLE_HOME'"
+     - "dbb='cd $ORACLE_BASE'"
+     - "talert='tail -500f $ORACLE_BASE/diag/rdbms/$ORA_DB_UNQ_NAME/$ORACLE_SID/trace/alert_$ORACLE_SID.log'"
 
   dbca_templatename: General_Purpose.dbc
   dbca_initParams: "{% if '12.2' in item.0.oracle_version_db %} -initParams db_name={{item.0.oracle_db_name}}{% if item.0.oracle_db_unique_name is defined %},db_unique_name={{item.0.oracle_db_unique_name}}{% endif %}{% endif %}"
