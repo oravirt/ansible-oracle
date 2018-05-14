@@ -260,7 +260,7 @@ def start_service(cursor, module, msg, oracle_home, name, database_name):
             if 'PRCR-1001' in stdout:
                 msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
                 module.fail_json(msg=msg[0], changed=False)
-            elif 'PRCC-1014' in stdout: #<-- service already running
+            elif 'PRCC-1014' in stdout or 'PRCR-1120' in stdout: #<-- service already running
                 return False
             else:
                 msg[0] = 'Starting service %s in database %s failed: %s' % (name,database_name,stdout)
