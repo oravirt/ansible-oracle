@@ -1,0 +1,41 @@
+---
+# tasks file for manage-db-users
+- name: Manage roles (cdb)
+  oracle_role:
+          role={{ item.1.name }}
+          state={{ item.1.state }}
+          hostname={{ inventory_hostname }}
+          service_name={{ item.0.oracle_db_name }}
+          user={{ db_user }}
+          password={{ db_password_cdb}}
+          mode={{ db_mode }}
+  with_subelements:
+      - "{{ oracle_databases }}"
+      - roles
+      - flags:
+        skip_missing: True
+  environment: "{{oracle_env}}"
+  when: item.0.state|lower == 'present' and item.1 is defined
+  run_once: "{{ configure_cluster }}"
+  become_user: "{{ oracle_user }}"
+  tags: users,grants
+
+- name: Manage roles (pdb)
+  oracle_role:
+          role={{ item.1.name }}
+          state={{ item.1.state }}
+          hostname={{ inventory_hostname }}
+          service_name={{ item.0.pdb_name }}
+          user={{ db_user }}
+          password={{ db_password_pdb}}
+          mode={{ db_mode }}
+  with_subelements:
+      - "{{ oracle_pdbs }}"
+      - roles
+      - flags:
+        skip_missing: True
+  environment: "{{oracle_env}}"
+  when: item.0 is defined and item.0.state|lower == 'present' and item.1 is defined
+  run_once: "{{ configure_cluster }}"
+  become_user: "{{ oracle_user }}"
+  tags: users,grants
