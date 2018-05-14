@@ -17,7 +17,7 @@
       - services
       - flags:
         skip_missing: True
-  when: item.0.state|lower == 'present' and item.1 is defined and (item.1.state|upper == 'PRESENT' or item.1.state|upper == 'STARTED')
+  when: oracle_databases is defined and item.0.state|lower == 'present' and item.1 is defined and (item.1.state|upper == 'PRESENT' or item.1.state|upper == 'STARTED')
   become_user: "{{ oracle_user}}"
   tags: create_service,services
 
@@ -40,7 +40,7 @@
       - services
       - flags:
         skip_missing: True
-  when: item.0.state|lower == 'present' and item.1 is defined and (item.1.state|upper == 'PRESENT' or item.1.state|upper == 'STARTED')
+  when: oracle_pdbs is defined and item.0.state|lower == 'present' and item.1 is defined and (item.1.state|upper == 'PRESENT' or item.1.state|upper == 'STARTED')
   become_user: "{{ oracle_user}}"
   tags: create_service,services
 
@@ -60,7 +60,7 @@
       - services
       - flags:
         skip_missing: True
-  when: item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'STARTED'
+  when: oracle_databases is defined and item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'STARTED'
   become_user: "{{ oracle_user}}"
   tags: start_service,services
 
@@ -80,7 +80,7 @@
       - services
       - flags:
         skip_missing: True
-  when: item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'STARTED'
+  when: oracle_pdbs is defined and item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'STARTED'
   become_user: "{{ oracle_user}}"
   tags: start_service,services
 
@@ -100,7 +100,7 @@
       - services
       - flags:
         skip_missing: True
-  when: item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'STOPPED' or item.1.state|upper == 'ABSENT'
+  when: oracle_databases is defined and item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'STOPPED' or item.1.state|upper == 'ABSENT'
   become_user: "{{ oracle_user}}"
   tags: start_service,services
 
@@ -120,7 +120,7 @@
       - services
       - flags:
         skip_missing: True
-  when: item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'STOPPED' or item.1.state|upper == 'ABSENT'
+  when: oracle_pdbs is defined and item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'STOPPED' or item.1.state|upper == 'ABSENT'
   become_user: "{{ oracle_user}}"
   tags: start_service,services
 
@@ -140,7 +140,7 @@
       - services
       - flags:
         skip_missing: True
-  when: item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'ABSENT'
+  when: oracle_databases is defined and item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'ABSENT'
   become_user: "{{ oracle_user}}"
   tags: start_service,services
 
@@ -160,6 +160,6 @@
       - services
       - flags:
         skip_missing: True
-  when: item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'ABSENT'
+  when: oracle_pdbs is defined and item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'ABSENT'
   become_user: "{{ oracle_user}}"
   tags: start_service,services

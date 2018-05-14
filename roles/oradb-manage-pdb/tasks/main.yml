@@ -40,5 +40,5 @@
       - "{{ oracle_databases | default ([]) }}"
       - "{{ oracle_pdbs | default ([]) }}"
   become_user: "{{ oracle_user }}"
-  when: oracle_pdbs is defined and item[0].state|upper == 'PRESENT' and item[1].cdb == item[0].oracle_db_name and item[0].is_container
+  when: oracle_databases is defined and oracle_pdbs is defined and item[0].state|upper == 'PRESENT' and item[1].cdb == item[0].oracle_db_name and item[0].is_container
   tags: pdb
