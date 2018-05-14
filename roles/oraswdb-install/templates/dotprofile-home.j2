@@ -1,6 +1,6 @@
 # {{ ansible_managed }}
 #
-#export PS1='[$LOGNAME'@'$ORACLE_SID `basename $PWD`]$'
+#export PS1='[$LOGNAME'@ home-'$ORACLE_HOME `basename $PWD`]$'
 
 
 # Set up the Oracle parameters
@@ -33,13 +33,9 @@ export PATH=$ORACLE_HOME/bin:$ORACLE_HOME/OPatch:$PATH:$SQLPATH:$GG_HOME/
 
 # Set Up Aliases:
         alias asmcmd='. oraenv ;rlwrap asmcmd -p'
-        alias sqlplus='rlwrap sqlplus'
         alias rman='rlwrap rman'
         alias sid='. oraenv'
-        alias sqlp='. oraenv; sqlplus'
-        alias sqlsys='. oraenv ;rlwrap sqlplus "/ as sysdba"'
+        alias sqlp='. oraenv; rlwrap sqlplus'
         alias dbh='cd $ORACLE_HOME'
         alias dbb='cd $ORACLE_BASE'
         alias c='clear'
-        alias talert='tail -200f $ORACLE_BASE/diag/rdbms/$ORA_DB_UNQ_NAME/$ORACLE_SID/trace/alert_$ORACLE_SID.log'
-        alias ggsci='rlwrap $GG_HOME/ggsci'

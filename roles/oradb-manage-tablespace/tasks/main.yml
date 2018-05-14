@@ -14,6 +14,7 @@
         content={{ item.1.content |default(omit)}}
         state={{ item.1.state |default('present')}}
   environment: "{{oracle_env}}"
+  run_once: "{{ configure_cluster }}"
   with_subelements:
       - "{{oracle_databases}}"
       - tablespaces
@@ -38,6 +39,7 @@
         content={{ item.1.content |default(omit)}}
         state={{ item.1.state |default('present')}}
   environment: "{{oracle_env}}"
+  run_once: "{{ configure_cluster }}"
   with_subelements:
       - "{{oracle_pdbs}}"
       - tablespaces

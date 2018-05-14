@@ -11,6 +11,14 @@
   when: create_listener
   tags: listener
 
+- name: manage-db | Add change-pdb script
+  template:
+         src: pdb.sql.j2
+         dest: "{{oracle_user_home}}/.Scripts/chpdb.sql"
+         owner: "{{ oracle_user }}"
+         group: "{{ oracle_group }}"
+  tags: sql_script
+
 - name: manage-db | Copy custom dbca Templates to ORACLE_HOME/assistants/dbca/templates
   template:
          src={{ item.dbca_templatename }}

@@ -4,6 +4,7 @@
 {% if shell_ps1 is defined %}
 export PS1={{ shell_ps1 }}
 {% endif %}
+get_sid=$(ps -ef | grep "ora_pmon_$ORACLE_DBNAME" |grep -v grep | sed 's/^.*pmon_//g')
 
 
 # Set up the Oracle environment variables
@@ -23,7 +24,7 @@ export PS1={{ shell_ps1 }}
         SQLPATH=/home/oracle/.Scripts
         export SQLPATH
         export ORACLE_DBNAME={{ dbh.oracle_db_name }}
-        export ORACLE_SID=`ps -ef | grep "ora_pmon_$ORACLE_DBNAME" |grep -v grep | sed 's/^.*pmon_//g'`
+        export ORACLE_SID=${get_sid:-$ORACLE_DBNAME}
         export ORA_DB_UNQ_NAME={% if dbh.oracle_db_unique_name is defined %}{{ dbh.oracle_db_unique_name }}{% else %}{{ dbh.oracle_db_name }}{% endif %}
         
         export NLS_DATE_FORMAT='YYYY-MM-DD HH24:MI:SS'
