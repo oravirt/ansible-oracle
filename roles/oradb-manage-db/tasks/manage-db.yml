@@ -1,30 +1,43 @@
-# - name: manage-db | check if GI is present
-#   stat: path=/etc/oracle/olr.loc
-#   register: olrloc
-#
-# - name: manage-db | check if database exists (GI)
-#   shell: "{{ oracle_home_db }}/bin/srvctl config database | grep -w {{ dbh.oracle_db_name}}"
-#   environment: "{{ oracle_env_dbca }}"
-#   run_once: "{{ configure_cluster }}"
-#   register: existing_dbs
-#   changed_when: False
-#   failed_when: False
-#   when: olrloc.stat.exists
-#   tags: create_db,dbcatemplate,debug
+- name: manage-db | check if GI is present
+  stat: path=/etc/oracle/olr.loc
+  register: olrloc
 
-- name: manage-db | check if database exists
+- name: manage-db | check if database exists (GI)
+  shell: "{{ oracle_home_db }}/bin/srvctl config database | grep -w {{ dbh.oracle_db_name}}"
+  environment: "{{ oracle_env_dbca }}"
+  run_once: "{{ configure_cluster }}"
+  register: existing_dbs_gi
+  changed_when: False
+  failed_when: False
+  when: olrloc.stat.exists
+  tags: create_db,dbcatemplate,debug
+
+- name: manage-db | set fact for create-db (GI)
+  set_fact:
+      create_db: True
+  when: olrloc.stat.exists and dbh.oracle_db_name not in existing_dbs_gi.stdout
+  tags: set_fact
+
+
+- name: manage-db | check if database exists (NO GI)
   shell: "cat /etc/oratab | grep -w {{ dbh.oracle_db_name }}:{{ oracle_home_db }} |grep -v \"^#\"|cut -f1 -d: -s"
   environment: "{{ oracle_env_dbca }}"
   run_once: "{{ configure_cluster }}"
-  register: existing_dbs
+  register: existing_dbs_nogi
   changed_when: False
   failed_when: False
-  #when: not olrloc.stat.exists
+  when: not olrloc.stat.exists
   tags: create_db,dbcatemplate,debug
+
+- name: manage-db | set fact for create-db (NO GI)
+  set_fact:
+      create_db: True
+  when: not olrloc.stat.exists and dbh.oracle_db_name not in existing_dbs_nogi.stdout
+  tags: set_fact
 
 - debug: msg="Creating DB - {{dbh.oracle_db_name}}"
   run_once: "{{ configure_cluster }}"
-  when: dbh.oracle_db_name not in existing_dbs.stdout and dbh.state|lower == 'present'
+  when: create_db is defined and create_db and dbh.state|lower == 'present'
 
 - name: manage-db | add dotprofile
   template:
@@ -44,19 +57,20 @@
     group: "{{ oracle_group }}"
     mode: 0660
   run_once: "{{ configure_cluster }}"
-  when: dbh.oracle_db_name not in existing_dbs.stdout and dbh.state|lower == 'present'
+  when: create_db is defined and create_db and dbh.state|lower == 'present'
   tags: create_db,dbcatemplate
 
 - name: manage-db | create database
-  shell: "time {{oracle_home_db}}/bin/dbca -createDatabase -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}  -silent {{ dbca_redolog }} {{ dbca_initParams }}"
+  shell: "time {{oracle_home_db}}/bin/dbca -createDatabase -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}  -silent {{ dbca_redolog }} {{ dbca_initparams }}{% if dbca_initParams_extras is defined  %}{{dbca_initparams_extras}}{% endif %}"
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
-  when: dbh.oracle_db_name not in existing_dbs.stdout and dbh.state|lower == 'present'
+  when: create_db is defined and create_db and dbh.state|lower == 'present'
   register: dbca_create
   tags: create_db,dbca
 
 - debug: var=dbca_create.stdout_lines
   when: dbca_create.changed
+  run_once: "{{ configure_cluster }}"
 
 - name: manage-db |Customize oratab for autostart
   lineinfile:
@@ -78,13 +92,13 @@
 
 - debug: msg="Removing DB - {{dbh.oracle_db_name}}"
   run_once: "{{ configure_cluster }}"
-  when: dbh.oracle_db_name in existing_dbs.stdout and dbh.state|lower == 'absent'
+  when: create_db is not defined and dbh.state|lower == 'absent'
 
 - name: manage-db | remove database
   shell: "{{oracle_home_db}}/bin/dbca -deleteDatabase -silent -sourceDB {{ dbh.oracle_db_name }} -sysDBAUserName sys -sysDBAPassword {{ dbca_sys_pass}}"
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
-  when: dbh.oracle_db_name in existing_dbs.stdout and dbh.state|lower == 'absent'
+  when: create_db is not defined and dbh.state|lower == 'absent'
   register: dbca_remove
   tags: create_cdb,dbca
 
