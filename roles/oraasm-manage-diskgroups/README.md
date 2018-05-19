@@ -5,8 +5,6 @@ oraasm-manage-diskgroups
 
 - Uses oracle_asmdg module from [ansible-oracle-modules](https://github.com/oravirt/ansible-oracle-modules)
 
-- If
-
 Role Variables
 --------------
 `asm_diskgroups` - defines the various disksgroups and their attributes.
