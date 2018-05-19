@@ -61,7 +61,7 @@
   tags: create_db,dbcatemplate
 
 - name: manage-db | create database
-  shell: "time {{oracle_home_db}}/bin/dbca -createDatabase -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}  -silent {{ dbca_redolog }} {{ dbca_initparams }}{% if dbca_initParams_extras is defined  %}{{dbca_initparams_extras}}{% endif %}"
+  shell: "time {{oracle_home_db}}/bin/dbca -createDatabase -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}  -silent {{ dbca_redolog }} {{ dbca_initparams }}{{dbca_initparams_extras}}"
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   when: create_db is defined and create_db and dbh.state|lower == 'present'
