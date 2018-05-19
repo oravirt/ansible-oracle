@@ -56,7 +56,8 @@
   sysasmpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
   asmmonitorpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
    # DB
-  default_dbpass: "{% if item is defined %}{% if item.oracle_db_passwd is defined %}{{ item.oracle_db_passwd}}{% endif %}{% elif dbh is defined %}{% if dbh.oracle_db_passwd is defined %}{{ dbh.oracle_db_passwd }}{% endif %}{% else %}Oracle_123{% endif %}"
+  #default_dbpass: Oracle123
+  default_dbpass: "{% if item is defined and item.oracle_db_passwd is defined %}{{ item.oracle_db_passwd}}{% elif dbh is defined and dbh.oracle_db_passwd is defined %}{{ dbh.oracle_db_passwd }}{% else %}Oracle123{% endif %}"
   dbpasswords:
          orcl:
            sys: Oracle_456
@@ -67,7 +68,8 @@
 ## END-OF-PASSWORDS
 
   dbca_templatename: General_Purpose.dbc
-  dbca_initParams: "{% if '12.2' in dbh.oracle_version_db %} -initParams db_name={{dbh.oracle_db_name}}{% if dbh.oracle_db_unique_name is defined %},db_unique_name={{dbh.oracle_db_unique_name}}{% endif %}{% endif %}"
+  dbca_initparams: "{% if '12.2' in dbh.oracle_version_db %} -initParams db_name={{dbh.oracle_db_name}}{% if dbh.oracle_db_unique_name is defined %},db_unique_name={{dbh.oracle_db_unique_name}}{% endif %}{% endif %}"
+  dbca_initparams_extras: "{% if '12.2' in dbh.oracle_version_db and dbh.storage_type|upper == 'FS' and dbh.init_parameters is defined %}{% for a in  dbh.init_parameters %}{% if loop.first -%},{% endif %}{{ a.name }}={{ a.value}}{% if not loop.last -%},{% endif %}{% endfor %}{% endif %}"
   dbca_sys_pass: "{% if dbpasswords[dbh.oracle_db_name] is defined %}{% if dbpasswords[dbh.oracle_db_name]['sys'] is defined %}{{dbpasswords[dbh.oracle_db_name]['sys']}}{% else %}{{default_dbpass}}{% endif %}{% else %}{{default_dbpass}}{% endif %}"
   dbca_redolog: "{% if dbh.redolog_size_in_mb is defined %} -redoLogFileSize {{dbh.redolog_size_in_mb}}{% endif %}"
 
@@ -77,7 +79,7 @@
      - "sqlsyso='. oraenv ;rlwrap sqlplus \"/ as sysdba\"'"
      - "dgmgrl='rlwrap dgmgrl'"
      - "rman='rlwrap rman'"
-     - "sid='. oraenv'"
+     - "sid='export ORACLE_SID=$(ps -ef | grep \"ora_pmon_$ORACLE_DBNAME\" |grep -v grep | sed 's/^.*pmon_//g')'"
      - "sqlp='rlwrap sqlplus'"
      - "sqlsys='rlwrap sqlplus \"/ as sysdba\"'"
      - "dbh='cd $ORACLE_HOME'"

@@ -1,0 +1,21 @@
+---
+# tasks file for asm-diskgroups
+
+- name: oraasm-manage-dgs | Manage diskgroups
+  oracle_asmdg:
+        un=sys
+        pw={{ sysasmpassword }}
+        sn=+ASM
+        host={{ ansible_hostname }}
+        oh={{ oracle_home_gi }}
+        name={{ item.diskgroup }}
+        disks={{ asmdevice_list }}
+        redundancy={{ item.redundancy |default(omit)}}
+        attribute_name={{ attr_name  |default (omit)}}
+        attribute_value={{ attr_value |default (omit)}}
+        state={{ item.state }}
+  environment: "{{ oracle_env }}"
+  run_once: "{{configure_cluster}}"
+  become_user: "{{ grid_install_user}}"
+  with_items: "{{ asm_diskgroups }}"
+  tags: diskgroup

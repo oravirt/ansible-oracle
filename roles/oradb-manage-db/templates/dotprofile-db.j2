@@ -4,7 +4,7 @@
 {% if shell_ps1 is defined %}
 export PS1={{ shell_ps1 }}
 {% endif %}
-get_sid=$(ps -ef | grep "ora_pmon_$ORACLE_DBNAME" |grep -v grep | sed 's/^.*pmon_//g')
+
 
 
 # Set up the Oracle environment variables
@@ -24,6 +24,7 @@ get_sid=$(ps -ef | grep "ora_pmon_$ORACLE_DBNAME" |grep -v grep | sed 's/^.*pmon
         SQLPATH=/home/oracle/.Scripts
         export SQLPATH
         export ORACLE_DBNAME={{ dbh.oracle_db_name }}
+        get_sid=$(ps -ef | grep "ora_pmon_$ORACLE_DBNAME" |grep -v grep | sed 's/^.*pmon_//g')
         export ORACLE_SID=${get_sid:-$ORACLE_DBNAME}
         export ORA_DB_UNQ_NAME={% if dbh.oracle_db_unique_name is defined %}{{ dbh.oracle_db_unique_name }}{% else %}{{ dbh.oracle_db_name }}{% endif %}
         

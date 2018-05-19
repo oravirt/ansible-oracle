@@ -10,13 +10,27 @@
      - orahost
      - orahost-storage
 
-- name: Oracle Grid Infrastructure installation & ASM Configuration
+- name: Oracle Grid Infrastructure installation 
   hosts: vbox-si-asm
   user: vagrant
   become: yes
   roles:
      - oraswgi-install
-     - oraasm-createdg
+
+- name: Install cx_oracle
+  hosts: vbox-si-asm
+  user: vagrant
+  become: yes
+  roles:
+     - cxoracle
+
+- name: ASM Diskgroup configuration
+  hosts: vbox-si-asm
+  user: vagrant
+  become: yes
+  roles:
+     - {role: oraasm-createdg, when: old_diskgroup_config}
+     - {role: oraasm-manage-diskgroups, when: not old_diskgroup_config}
 
 - name: Database Server Installation & Database Creation
   hosts: vbox-si-asm
@@ -25,13 +39,6 @@
   roles:
       - oraswdb-install
       - oradb-manage-db
-
-- name: Install cx_oracle
-  hosts: vbox-si-asm
-  user: vagrant
-  become: yes
-  roles:
-     - cxoracle
 
 - name: Configure Logrotate
   hosts: vbox-si-asm
