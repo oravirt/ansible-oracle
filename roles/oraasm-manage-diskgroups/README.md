@@ -10,6 +10,8 @@ Role Variables
 `asm_diskgroups` - defines the various disksgroups and their attributes.
 
 e.g
+
+```
 asm_diskgroups:
   - diskgroup: crs
     state: present
@@ -30,7 +32,7 @@ asm_diskgroups:
     disk:
       - {device: /dev/sdd, asmlabel: data01}
       - {device: /dev/sde, asmlabel: data02}
-
+```
 
 
 Example Playbook
