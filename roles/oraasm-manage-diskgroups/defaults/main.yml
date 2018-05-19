@@ -1,0 +1,19 @@
+---
+# defaults file for oraasm-manage-diskgroups
+oracle_base: /u01/app/oracle
+oracle_user: oracle
+grid_user: grid
+grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
+oracle_home_gi: "{% if configure_cluster %}{{ oracle_home_gi_cl }}{% else %}{{ oracle_home_gi_so }}{% endif %}"
+oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Clustered)
+oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Stand Alone)
+
+oracle_env:
+      ORACLE_HOME: "{{ oracle_home_gi }}"
+      LD_LIBRARY_PATH: "{{ oracle_home_gi }}/lib"
+
+
+oracle_asm_disk_prefix: "{% if device_persistence |lower == 'asmlib' %}ORCL:{% elif device_persistence |lower == 'udev' %}/dev/oracle/{% else %}{% endif %}"
+asmdevice_list: "{% if device_persistence |lower == 'asmlib' %}{%- for disk in item.disk -%}{{ oracle_asm_disk_prefix}}{{disk.asmlabel |upper}}{%- if not loop.last -%},{%- endif -%}{% endfor %}{% elif device_persistence |lower == 'udev' %}{%- for disk in item.disk -%}{{ oracle_asm_disk_prefix}}{{disk.asmlabel }}{%- if not loop.last -%},{%- endif -%}{% endfor %}{% endif %}"
+attr_name:  "{% if item.attributes is defined %}{{item.attributes |default (omit) | map(attribute='name') | list }}{% else %}None{%endif%}"
+attr_value: "{% if item.attributes is defined %}{{item.attributes |default (omit) | map(attribute='value') | list }}{% else %}None{%endif%}"
