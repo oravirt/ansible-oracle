@@ -163,8 +163,11 @@ def create_diskgroup(cursor, module, msg, oracle_home, name, disks, redundancy, 
             command = '%s/bin/srvctl start diskgroup -g %s' % (oracle_home, name.lower())
             (rc, stdout, stderr) = module.run_command(command)
             if rc != 0:
-                msg[0] = 'Error, couldn\'t mount the dg on all nodes. stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
-                return False
+                if 'CRS-5702' in stdout: #'Edge-case', where there is only one instance in the cluster. The diskgroup is already running after create statement so this command errors
+                    return True
+                else:
+                    msg[0] = 'Error, couldn\'t mount the dg on all nodes. stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
+                    return False
             else:
                 return True
         else:
