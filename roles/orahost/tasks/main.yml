@@ -306,12 +306,14 @@
   - name: Asmlib | Add configuration
     template: src=oracleasm.j2 dest=/etc/sysconfig/oracleasm-_dev_oracleasm
     register: asmlibconfig
+    when: device_persistence|lower == 'asmlib'
     tags:
       - asmlibconfig
 
   - name: Asmlib | Add configuration (link)
     file: src=/etc/sysconfig/oracleasm-_dev_oracleasm dest=/etc/sysconfig/oracleasm state=link force=yes
     register: asmlibconfig
+    when: device_persistence|lower == 'asmlib'
     tags:
       - asmlibconfig
 
