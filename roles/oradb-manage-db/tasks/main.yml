@@ -7,7 +7,7 @@
   with_items: "{{ oracle_databases }}"
   tags: set_fact
 
-- include: listener.yml
+- include_tasks: listener.yml
   when: create_listener
   tags: listener
 
@@ -32,7 +32,7 @@
   tags:
     - customdbcatemplate
 
-- include: manage-db.yml
+- include_tasks: manage-db.yml
   with_items:
       - "{{ oracle_databases }}"
   loop_control:
