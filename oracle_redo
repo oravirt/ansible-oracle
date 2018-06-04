@@ -242,7 +242,7 @@ def main():
                        v_redo_size_changes := v_redo_size_changes+1;
                        for chloop in (select thread#, group#, status from v$log where thread# = rec.thread# and group# = rec.group#)
                        loop
-                           IF chloop.status = 'CURRENT' THEN
+                           IF chloop.status in ('CURRENT','ACTIVE') THEN
                                  --dbms_output.put_line('Current');
                                  execute immediate v_sql_sw_lf;
                                  execute immediate v_sql_cp;
