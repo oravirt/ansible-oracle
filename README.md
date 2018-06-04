@@ -14,7 +14,7 @@ By default, installs a single instance 12.2.0.1 database on filesystem. Just put
 
 Pre-requisites:
 
-- Ansible >= 2.1
+- Ansible >= 2.4
 - Oracle Linux (or any RHEL-based Linux System) >= 6.4
 - Oracle Database/Grid Infrastructure 12.2.0.1, 12.1.0.1, 12.1.0.2, 11.2.0.4, 11.2.0.3
 
