@@ -175,3 +175,11 @@ pre-req: cx_Oracle
 pre-req: cx_Oracle
 
 - Managing DBMS_STATS global preferences
+
+
+**oracle_redo**
+
+pre-rec: cx_Oracle
+
+- Manage redo-groups and their size in RAC or single instance environments
+- NOTE: For RAC environments, the database needs to be in ARCHIVELOG mode. This is not required for SI environments.
