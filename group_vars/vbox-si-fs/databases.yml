@@ -9,7 +9,8 @@ oracle_databases:                                               # Dictionary des
         storage_type: FS                                     # Database storage to be used. ASM or FS.
         oracle_db_mem_totalmb: 1024                            # Amount of RAM to be used for SGA
         oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
-        redolog_size_in_mb: 100
+        redolog_size: 100M
+        redolog_groups: 3
         datafile_dest: /u02/oradata
         recoveryfile_dest: /u02/fra
         listener_name: LISTENER                              # This home will have a listener configured
@@ -17,6 +18,7 @@ oracle_databases:                                               # Dictionary des
         state: present
         init_parameters:
              - {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
+             - {name: db_create_online_log_dest_1, value: '/u02/fra', scope: both, state: present}
              - {name: db_recovery_file_dest, value: '/u02/fra', scope: both, state: present}
              - {name: db_recovery_file_dest_size, value: 20G, scope: both, state: present}
         services:
