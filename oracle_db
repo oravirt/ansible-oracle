@@ -409,8 +409,10 @@ def create_db (module, msg, oracle_home, sys_password, system_password, dbsnmp_p
     else:
         return True
 
-def remove_db (module, msg, oracle_home, db_name, sys_password):
+def remove_db (module, msg, oracle_home, db_name, db_unique_name, sys_password):
 
+    if db_unique_name is not None:
+        db_name = db_unique_name
     command = "%s/bin/dbca -deleteDatabase -silent -sourceDB %s -sysDBAUserName sys -sysDBAPassword %s" % (oracle_home, db_name, sys_password)
     (rc, stdout, stderr) = module.run_command(command)
     if rc != 0:
@@ -419,7 +421,7 @@ def remove_db (module, msg, oracle_home, db_name, sys_password):
     else:
         return True
 
-def ensure_db_state (module,msg,oracle_home, db_name, archivelog, force_logging):
+def ensure_db_state (module,msg,oracle_home, db_name,db_unique_name, archivelog, force_logging):
 
     cursor = getconn(module,msg)
     israc = ''
@@ -472,14 +474,14 @@ def ensure_db_state (module,msg,oracle_home, db_name, archivelog, force_logging)
 
 
         if len(change_restart_sql) > 0: # <- Apply changes that requires a restart
-            if stop_db(module,msg,oracle_home,db_name):
-                if start_instance(module,msg,oracle_home,db_name,'mount', instance_name, host_name,israc):
+            if stop_db(module,msg,oracle_home,db_name,db_unique_name):
+                if start_instance(module,msg,oracle_home,db_name, db_unique_name,'mount', instance_name, host_name,israc):
                     time.sleep(10) #<- To allow the DB to register with the listener
                     cursor = getconn(module,msg)
                     for sql in change_restart_sql:
                         execute_sql(module,msg,cursor,sql)
-                        if stop_db(module,msg,oracle_home,db_name):
-                            if start_db(module,msg,oracle_home,db_name):
+                        if stop_db(module,msg,oracle_home,db_name,db_unique_name):
+                            if start_db(module,msg,oracle_home,db_name,db_unique_name):
                                 msg = 'Database %s has been put in the intended state - (%s)' % (db_name,archcomp)
                                 module.exit_json(msg=msg, changed=True)
 
@@ -491,9 +493,11 @@ def ensure_db_state (module,msg,oracle_home, db_name, archivelog, force_logging)
         module.exit_json(msg=msg, changed=False)
 
 
-def stop_db (module, msg, oracle_home, db_name):
+def stop_db (module, msg, oracle_home, db_name, db_unique_name):
 
     if gimanaged:
+        if db_unique_name is not None:
+            db_name = db_unique_name
         command = '%s/bin/srvctl stop database -d %s -o immediate' % (oracle_home,db_name)
         (rc, stdout, stderr) = module.run_command(command)
         if rc != 0:
@@ -502,9 +506,11 @@ def stop_db (module, msg, oracle_home, db_name):
         else:
             return True
 
-def start_db (module,msg, oracle_home, db_name):
+def start_db (module,msg, oracle_home, db_name, db_unique_name):
 
     if gimanaged:
+        if db_unique_name is not None:
+            db_name = db_unique_name
         command = '%s/bin/srvctl start database -d %s' % (oracle_home,db_name)
         (rc, stdout, stderr) = module.run_command(command)
         if rc != 0:
@@ -513,9 +519,11 @@ def start_db (module,msg, oracle_home, db_name):
         else:
             return True
 
-def start_instance (module,msg, oracle_home, db_name, open_mode, instance_name, host_name, israc):
+def start_instance (module,msg, oracle_home, db_name, db_unique_name, open_mode, instance_name, host_name, israc):
 
     if gimanaged:
+        if db_unique_name is not None:
+            db_name = db_unique_name
         if israc:
             command = '%s/bin/srvctl start instance  -d %s -i %s' % (oracle_home, db_name, instance_name)
         else:
@@ -691,19 +699,19 @@ def main():
         if not check_db_exists(module, msg, oracle_home,db_name,db_unique_name):
             if create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb, datafile_dest, recoveryfile_dest,
                         storage_type, dbconfig_type, racone_service, characterset, memory_percentage, memory_totalmb, nodelist, db_type, amm, initparams):
-                ensure_db_state (module,msg,oracle_home,db_name,archivelog, force_logging)
+                ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,archivelog, force_logging)
                 # msg = 'Successfully created database %s' % (db_name)
                 # module.exit_json(msg=msg, changed=True)
             else:
                 module.fail_json(msg=msg, changed=False)
         else:
-            ensure_db_state (module,msg,oracle_home,db_name,archivelog, force_logging)
+            ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,archivelog, force_logging)
             # msg = 'Database %s already exists' % (db_name)
             # module.exit_json(msg=msg, changed=False)
 
     elif state == 'absent':
         if check_db_exists(module, msg, oracle_home, db_name, db_unique_name):
-            if remove_db(module, msg, oracle_home, db_name, sys_password):
+            if remove_db(module, msg, oracle_home, db_name,db_unique_name, sys_password):
                 msg = 'Successfully removed database %s' % (db_name)
                 module.exit_json(msg=msg, changed=True)
             else:
