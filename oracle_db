@@ -679,7 +679,10 @@ def main():
     # Connection details for database
     user = 'sys'
     password = sys_password
-    service_name = db_name
+    if db_unique_name is not None:
+        service_name = db_unique_name
+    else:
+        service_name = db_name
 
     # Get the Oracle version
     major_version = get_version(module,msg,oracle_home)
