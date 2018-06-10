@@ -140,29 +140,25 @@ options:
                   - sga_target=1G
                   - sga_max_size=1G
         required: False
+    initparams:
+        description:
+            - Puts the database is archivelog mode
+        required: False
+        default: false
+        choices: ['True','False']
+        type: bool
+    force_logging:
+        description:
+            - Enables force logging for the Database
+        required: False
+        default: false
+        choices: ['True','False']
+        type: bool
     state:
         description:
-            - The intended state of the service. 'status' will just show the status of the service
+            - The intended state of the database
         default: present
-        choices: ['present','absent','started','stopped', 'status']
-    username:
-        description:
-            - The database username to connect to the database if using dbms_service
-        required: false
-        default: None
-        aliases: ['un']
-    password:
-        description:
-            - The password to connect to the database if using dbms_service
-        required: false
-        default: None
-        aliases: ['pw']
-    service_name:
-        description:
-            - The service_name to connect to the database if using dbms_service.
-        required: false
-        default: database_name. Will be set to the pdb-name if pdb is set
-        aliases: ['sn']
+        choices: ['present','absent']
     hostname:
         description:
             - The host of the database if using dbms_service
@@ -247,7 +243,7 @@ oracle_db:
     environment: "{{ oracle_env }}"
     run_once: True
 '''
-import os, re
+import os, re, time
 
 try:
     import cx_Oracle
@@ -423,23 +419,127 @@ def remove_db (module, msg, oracle_home, db_name, sys_password):
     else:
         return True
 
+def ensure_db_state (module,msg,oracle_home, db_name, archivelog, force_logging):
 
+    cursor = getconn(module,msg)
+    israc = ''
+    archcomp = ''
+    flcomp = ''
+
+    israc_sql = 'select parallel,instance_name,host_name from v$instance'
+    israc_ = execute_sql_get(module,msg,cursor,israc_sql)
+    instance_name = israc_[0][1]
+    host_name = israc_[0][2]
+
+    change_restart_sql = []
+    change_db_sql = []
+    log_check_sql = 'select log_mode,force_logging from v$database'
+    log_check_ = execute_sql_get(module,msg,cursor,log_check_sql)
+
+    if israc_[0][0] == 'NO':
+        israc = False
+    else:
+        israc = True
+    alterdb_sql = 'alter database'
+
+    if archivelog == True:
+        archcomp = 'ARCHIVELOG'
+        archsql = alterdb_sql + ' archivelog'
+    else:
+        archcomp = 'NOARCHIVELOG'
+        archsql = alterdb_sql + ' noarchivelog'
+
+    if force_logging == True:
+        flcomp = 'YES'
+        flsql = alterdb_sql + ' force logging'
+    else:
+        flcomp = 'NO'
+        flsql = alterdb_sql +  ' no force logging'
+
+
+    if log_check_[0][0] != archcomp:
+        change_restart_sql.append(archsql)
+
+    if log_check_[0][1] != flcomp:
+        change_db_sql.append(flsql)
+
+
+    if len(change_db_sql) > 0 or len(change_restart_sql) > 0:
+        if len(change_db_sql) > 0: # <- Apply changes that does not require a restart
+            for sql in change_db_sql:
+                execute_sql(module,msg,cursor,sql)
+
+
+
+        if len(change_restart_sql) > 0: # <- Apply changes that requires a restart
+            if stop_db(module,msg,oracle_home,db_name):
+                if start_instance(module,msg,oracle_home,db_name,'mount', instance_name, host_name,israc):
+                    time.sleep(10) #<- To allow the DB to register with the listener
+                    cursor = getconn(module,msg)
+                    for sql in change_restart_sql:
+                        execute_sql(module,msg,cursor,sql)
+                        if stop_db(module,msg,oracle_home,db_name):
+                            if start_db(module,msg,oracle_home,db_name):
+                                msg = 'Database %s has been put in the intended state - (%s)' % (db_name,archcomp)
+                                module.exit_json(msg=msg, changed=True)
+
+
+        msg = 'Database %s has been put in the intended state' % (db_name)
+        module.exit_json(msg=msg, changed=True)
+    else:
+        msg = 'Database %s already exists and is in the intended state' % (db_name)
+        module.exit_json(msg=msg, changed=False)
+
+
+def stop_db (module, msg, oracle_home, db_name):
+
+    if gimanaged:
+        command = '%s/bin/srvctl stop database -d %s -o immediate' % (oracle_home,db_name)
+        (rc, stdout, stderr) = module.run_command(command)
+        if rc != 0:
+            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
+            module.fail_json(msg=msg, changed=False)
+        else:
+            return True
+
+def start_db (module,msg, oracle_home, db_name):
+
+    if gimanaged:
+        command = '%s/bin/srvctl start database -d %s' % (oracle_home,db_name)
+        (rc, stdout, stderr) = module.run_command(command)
+        if rc != 0:
+            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
+            module.fail_json(msg=msg, changed=False)
+        else:
+            return True
+
+def start_instance (module,msg, oracle_home, db_name, open_mode, instance_name, host_name, israc):
+
+    if gimanaged:
+        if israc:
+            command = '%s/bin/srvctl start instance  -d %s -i %s' % (oracle_home, db_name, instance_name)
+        else:
+            command = '%s/bin/srvctl start database -d %s ' % (oracle_home, db_name)
+        if open_mode is not None:
+            command += ' -o %s ' %  (open_mode)
+        (rc, stdout, stderr) = module.run_command(command)
+        if rc != 0:
+            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
+            module.fail_json(msg=msg, changed=False)
+        else:
+            return True
 
 def execute_sql_get(module, msg, cursor, sql):
 
     try:
         cursor.execute(sql)
-        result = (cursor.fetchone())
+        result = (cursor.fetchall())
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
         return False
-
-    if result > 0:
-        return True
-    else:
-        return False
+    return result
 
 def execute_sql(module, msg, cursor, sql):
 
@@ -452,6 +552,29 @@ def execute_sql(module, msg, cursor, sql):
         return False
     return True
 
+def getconn(module,msg):
+
+    hostname = os.uname()[1]
+    wallet_connect = '/@%s' % service_name
+    try:
+        if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
+            connect = wallet_connect
+            conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+        elif (user and password ):
+            dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name, )
+            connect = dsn
+            conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+        elif (not(user) or not(password)):
+            module.fail_json(msg='Missing username or password for cx_Oracle')
+
+    except cx_Oracle.DatabaseError, exc:
+            error, = exc.args
+            msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
+            module.fail_json(msg=msg, changed=False)
+
+    cursor = conn.cursor()
+    return cursor
+
 
 
 def main():
@@ -460,6 +583,13 @@ def main():
     cursor = None
     global gimanaged
     global major_version
+    global user
+    global password
+    global service_name
+    global hostname
+    global port
+    global israc
+
     module = AnsibleModule(
         argument_spec = dict(
             oracle_home         = dict(default=None, aliases = ['oh']),
@@ -484,10 +614,9 @@ def main():
             nodelist            = dict(required=False, type='list'),
             amm                 = dict(default=False, type='bool', aliases = ['automatic_memory_management']),
             initparams          = dict(required=False, type='list'),
+            archivelog          = dict(default=False, type='bool'),
+            force_logging       = dict(default=False, type='bool'),
             state               = dict(default="present", choices = ["present", "absent"]),
-            user                = dict(required=False, aliases = ['un','username']),
-            password            = dict(required=False, no_log=True, aliases = ['pw']),
-            service_name        = dict(required=False, aliases = ['sn']),
             hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
             port                = dict(required=False, default = 1521),
 
@@ -519,10 +648,9 @@ def main():
     db_type             = module.params["db_type"]
     amm                 = module.params["amm"]
     initparams          = module.params["initparams"]
+    archivelog          = module.params["archivelog"]
+    force_logging       = module.params["force_logging"]
     state               = module.params["state"]
-    user                = module.params["user"]
-    password            = module.params["password"]
-    service_name        = module.params["service_name"]
     hostname            = module.params["hostname"]
     port                = module.params["port"]
 
@@ -545,31 +673,13 @@ def main():
     else:
         gimanaged = False
         if not cx_oracle_exists:
-            msg = "System doesn\'t seem to be managed by GI, so the cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
+            msg = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
             module.fail_json(msg=msg)
 
-        # else:
-        #     if not service_name :
-        #         service_name = database_name
-        #
-        #     wallet_connect = '/@%s' % service_name
-        #     try:
-        #         if (not user and not password ): # If neither user or password is supplied, the use of an oracle wallet is assumed
-        #             connect = wallet_connect
-        #             conn = cx_Oracle.connect(wallet_connect)
-        #         elif (user and password ):
-        #             dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
-        #             connect = dsn
-        #             conn = cx_Oracle.connect(user, password, dsn)
-        #         elif (not(user) or not(password)):
-        #             module.fail_json(msg='Missing username or password for cx_Oracle')
-        #
-        #     except cx_Oracle.DatabaseError, exc:
-        #             error, = exc.args
-        #             msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
-        #             module.fail_json(msg=msg, changed=False)
-        #
-        #     cursor = conn.cursor()
+    # Connection details for database
+    user = 'sys'
+    password = sys_password
+    service_name = db_name
 
     # Get the Oracle version
     major_version = get_version(module,msg,oracle_home)
@@ -578,13 +688,15 @@ def main():
         if not check_db_exists(module, msg, oracle_home,db_name,db_unique_name):
             if create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb, datafile_dest, recoveryfile_dest,
                         storage_type, dbconfig_type, racone_service, characterset, memory_percentage, memory_totalmb, nodelist, db_type, amm, initparams):
-                msg = 'Successfully created database %s' % (db_name)
-                module.exit_json(msg=msg, changed=True)
+                ensure_db_state (module,msg,oracle_home,db_name,archivelog, force_logging)
+                # msg = 'Successfully created database %s' % (db_name)
+                # module.exit_json(msg=msg, changed=True)
             else:
                 module.fail_json(msg=msg, changed=False)
         else:
-            msg = 'Database %s already exists' % (db_name)
-            module.exit_json(msg=msg, changed=False)
+            ensure_db_state (module,msg,oracle_home,db_name,archivelog, force_logging)
+            # msg = 'Database %s already exists' % (db_name)
+            # module.exit_json(msg=msg, changed=False)
 
     elif state == 'absent':
         if check_db_exists(module, msg, oracle_home, db_name, db_unique_name):
