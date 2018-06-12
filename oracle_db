@@ -309,7 +309,7 @@ def check_db_exists(module, msg, oracle_home, db_name, db_unique_name ):
 
 
 def create_db (module, msg, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb,
-              datafile_dest, recoveryfile_dest, storage_type, dbconfig_type, racone_service, characterset, memory_percentage, memory_totalmb,
+              local_undo, datafile_dest, recoveryfile_dest, storage_type, dbconfig_type, racone_service, characterset, memory_percentage, memory_totalmb,
               nodelist, db_type, amm, initparams, customscripts):
 
     initparam = '-initParams '
@@ -352,6 +352,10 @@ def create_db (module, msg, oracle_home, sys_password, system_password, dbsnmp_p
         if major_version > '11.2':
             if cdb == True:
                 command += ' -createAsContainerDatabase true '
+                if local_undo == True:
+                    command += ' -useLocalUndoForPDBs true'
+                else:
+                    command += ' -useLocalUndoForPDBs false'
             else:
                 command += ' -createAsContainerDatabase false '
         if datafile_dest != None:
@@ -425,13 +429,17 @@ def remove_db (module, msg, oracle_home, db_name, db_unique_name, sys_password):
     else:
         return True
 
-def ensure_db_state (module,msg,oracle_home, db_name,db_unique_name,sid, archivelog, force_logging):
+def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivelog, force_logging, 
+                     default_tablespace_type,default_tablespace,default_temp_tablespace):
 
     cursor = getconn(module,msg)
     israc = ''
     archcomp = ''
     flcomp = ''
+    alterdb_sql = 'alter database'
 
+    propsql = "select lower(property_value) from database_properties where property_name in ('DEFAULT_TBS_TYPE','DEFAULT_PERMANENT_TABLESPACE','DEFAULT_TEMP_TABLESPACE')"
+    def_tbs_type,def_tbs,def_temp_tbs = execute_sql_get(module,msg,cursor,propsql)
     israc_sql = 'select parallel,instance_name,host_name from v$instance'
     israc_ = execute_sql_get(module,msg,cursor,israc_sql)
     instance_name = israc_[0][1]
@@ -442,12 +450,12 @@ def ensure_db_state (module,msg,oracle_home, db_name,db_unique_name,sid, archive
     log_check_sql = 'select log_mode,force_logging from v$database'
     log_check_ = execute_sql_get(module,msg,cursor,log_check_sql)
 
+    
     if israc_[0][0] == 'NO':
         israc = False
     else:
         israc = True
-    alterdb_sql = 'alter database'
-
+    
     if archivelog == True:
         archcomp = 'ARCHIVELOG'
         archsql = alterdb_sql + ' archivelog'
@@ -462,14 +470,24 @@ def ensure_db_state (module,msg,oracle_home, db_name,db_unique_name,sid, archive
         flcomp = 'NO'
         flsql = alterdb_sql +  ' no force logging'
 
+    if def_tbs_type[0] != default_tablespace_type:
+        deftbstypesql = 'alter database set default %s tablespace ' % (default_tablespace_type)
+        change_db_sql.append(deftbstypesql)
+
+    if default_tablespace is not None and def_tbs[0] != default_tablespace:
+        deftbssql = 'alter database default tablespace %s' % (default_tablespace)
+        change_db_sql.append(deftbssql)
+    
+    if default_temp_tablespace is not None and def_temp_tbs[0] != default_temp_tablespace:
+        deftempsql = 'alter database default temporary tablespace %s' % (default_temp_tablespace)
+        change_db_sql.append(deftempsql)
 
     if log_check_[0][0] != archcomp:
         change_restart_sql.append(archsql)
 
     if log_check_[0][1] != flcomp:
         change_db_sql.append(flsql)
-
-
+    
     if len(change_db_sql) > 0 or len(change_restart_sql) > 0:
         if len(change_db_sql) > 0: # <- Apply changes that does not require a restart
             for sql in change_db_sql:
@@ -493,7 +511,10 @@ def ensure_db_state (module,msg,oracle_home, db_name,db_unique_name,sid, archive
         msg = 'Database %s has been put in the intended state' % (db_name)
         module.exit_json(msg=msg, changed=True)
     else:
-        msg = 'Database %s already exists and is in the intended state' % (db_name)
+        if newdb:
+            msg = 'Database %s successfully created' % (db_name)        
+        else:
+            msg = 'Database %s already exists and is in the intended state' % (db_name)
         module.exit_json(msg=msg, changed=False)
 
 
@@ -668,6 +689,8 @@ def main():
     global hostname
     global port
     global israc
+    global newdb
+    newdb = False
 
     module = AnsibleModule(
         argument_spec = dict(
@@ -681,6 +704,7 @@ def main():
             responsefile        = dict(required=False),
             template            = dict(default='General_Purpose.dbc'),
             cdb                 = dict(default=False, type='bool', aliases= ['container']),
+            local_undo          = dict(default=True, type='bool'),
             datafile_dest       = dict(required=False, aliases= ['dfd']),
             recoveryfile_dest   = dict(required=False, aliases= ['rfd']),
             storage_type        = dict(default='FS', aliases= ['storage'],choices = ['FS','ASM']),
@@ -694,6 +718,9 @@ def main():
             amm                 = dict(default=False, type='bool', aliases = ['automatic_memory_management']),
             initparams          = dict(required=False, type='list'),
             customscripts       = dict(required=False, type='list'),
+            default_tablespace_type  = dict(default='smallfile',choices = ['smallfile','bigfile']),
+            default_tablespace  = dict(required=False),
+            default_temp_tablespace  = dict(required=False),
             archivelog          = dict(default=False, type='bool'),
             force_logging       = dict(default=False, type='bool'),
             state               = dict(default="present", choices = ["present", "absent"]),
@@ -716,6 +743,7 @@ def main():
     responsefile        = module.params["responsefile"]
     template            = module.params["template"]
     cdb                 = module.params["cdb"]
+    local_undo          = module.params["local_undo"]
     datafile_dest       = module.params["datafile_dest"]
     recoveryfile_dest   = module.params["recoveryfile_dest"]
     storage_type        = module.params["storage_type"]
@@ -729,6 +757,9 @@ def main():
     amm                 = module.params["amm"]
     initparams          = module.params["initparams"]
     customscripts       = module.params["customscripts"]
+    default_tablespace_type = module.params["default_tablespace_type"]
+    default_tablespace      = module.params["default_tablespace"]
+    default_temp_tablespace = module.params["default_temp_tablespace"]
     archivelog          = module.params["archivelog"]
     force_logging       = module.params["force_logging"]
     state               = module.params["state"]
@@ -770,15 +801,14 @@ def main():
 
     if state == 'present':
         if not check_db_exists(module, msg, oracle_home,db_name,db_unique_name):
-            if create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb, datafile_dest, recoveryfile_dest,
+            if create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb, local_undo, datafile_dest, recoveryfile_dest,
                         storage_type, dbconfig_type, racone_service, characterset, memory_percentage, memory_totalmb, nodelist, db_type, amm, initparams, customscripts):
-                ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivelog, force_logging)
-                # msg = 'Successfully created database %s' % (db_name)
-                # module.exit_json(msg=msg, changed=True)
+                newdb = True
+                ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivelog, force_logging,default_tablespace_type,default_tablespace,default_temp_tablespace)
             else:
                 module.fail_json(msg=msg, changed=False)
         else:
-            ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivelog, force_logging)
+            ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivelog, force_logging, default_tablespace_type,default_tablespace,default_temp_tablespace)
             # msg = 'Database %s already exists' % (db_name)
             # module.exit_json(msg=msg, changed=False)
 

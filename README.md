@@ -183,3 +183,12 @@ pre-rec: cx_Oracle
 
 - Manage redo-groups and their size in RAC or single instance environments
 - NOTE: For RAC environments, the database needs to be in ARCHIVELOG mode. This is not required for SI environments.
+
+**oracle_db**
+
+pre-rec: cx_Oracle
+
+- Create/remove databases (cdb/non-cdb)
+- Can be created by passing in a responsefile or just by using parameters
+
+
