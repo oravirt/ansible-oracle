@@ -140,7 +140,29 @@ options:
                   - sga_target=1G
                   - sga_max_size=1G
         required: False
-    initparams:
+    customscripts:
+        description:
+            - List of scripts to run after database is created
+            - e.g
+              customScripts:
+                  - /tmp/xxx.sql
+                  - /tmp/yyy.sql
+        required: False
+    default_tablespace_type:
+        description:
+            - Database default tablespace type (DEFAULT_TBS_TYPE)
+        default: smallfile    
+        choices: ['smallfile','bigfile']
+    default_tablespace:
+        description:
+            - Database default tablespace
+        default: smallfile    
+        required: False
+    default_temp_tablespace:
+        description:
+            - Database default temporary tablespace
+        required: False
+    archivelog:
         description:
             - Puts the database is archivelog mode
         required: False
@@ -189,6 +211,7 @@ oracle_db:
     storage=ASM
     dfd=+DATA
     rfd=+DATA"
+    default_tablespace_type: bigfile
 
 
 - hosts: all
