@@ -257,11 +257,48 @@ def create_tablespace(module, msg, cursor, tablespace, state, datafile, numfiles
         else:
             return False
 
+def map_status(state,current_status):
+    wanted_status = ''
+    enforcesql = ''
+    if state == 'read_only':
+        wanted_status = 'READ ONLY'
+        enforcesql = 'read only'
+    elif state == 'read_write':
+        if current_status == 'ONLINE':
+            wanted_status = 'ONLINE'
+            enforcesql = 'online'
+        elif current_status == 'OFFLINE':
+            wanted_status = 'ONLINE'
+            enforcesql = 'online'
+        else:
+            wanted_status = 'ONLINE'
+            enforcesql = 'read write'
+    elif state == 'online':
+        wanted_status = 'ONLINE'
+        enforcesql = 'online'
+    if state == 'present':
+        if current_status == 'READ ONLY':
+            wanted_status = 'ONLINE'
+            enforcesql = 'read write'
+        elif current_status == 'OFFLINE':
+            wanted_status = 'ONLINE'
+            enforcesql = 'online'
+        elif current_status == 'ONLINE':
+            wanted_status = 'ONLINE'
+            enforcesql = 'online'
+    elif state == 'offline':
+        wanted_status = 'OFFLINE'
+        enforcesql = 'offline'
+
+    return wanted_status, enforcesql
+
 def ensure_tablespace_state (module,msg,cursor,tablespace, state, datafile, numfiles, size, content, bigfile, autoextend, nextsize, maxsize):
 
     global newtbs
+    alter_tbs_list = []
+    wanted_list_dbf = []
 
-    #module.exit_json(msg=currfiles,changed=False)
+    #module.exit_json(msg=alter_tbs_list, changed=False)
     checksql = 'select value from v$parameter where lower(name) = \'db_create_file_dest\''
     result = execute_sql_get(module,msg,cursor,checksql)
     dbfc_value = result[0]
@@ -285,14 +322,24 @@ def ensure_tablespace_state (module,msg,cursor,tablespace, state, datafile, numf
         skip_datafile = True
 
 
-    alter_tbs_list = []
-    wanted_list_dbf = []
+
+    statussql = 'select status from dba_tablespaces where tablespace_name = upper(\'%s\')' % (tablespace)
+    current_status = execute_sql_get(module,msg,cursor,statussql)
+    wanted_status,enforcesql = map_status(state,current_status[0][0])
+    # msg = 'ws: %s, curr: %s, sql: %s' % (wanted_status,current_status,enforcesql)
+    # module.exit_json(msg=msg,changed=False)
+    if wanted_status != current_status[0][0]:
+        sql = 'alter tablespace %s %s' % (tablespace, enforcesql)
+        alter_tbs_list.append(sql)
+
     alter_tbs_sql = 'alter tablespace %s' % (tablespace)
     numfiles_curr_sql = 'select count(*) from %s where tablespace_name = upper(\'%s\')' % (dfsource,tablespace)
     numfiles_curr_ = execute_sql_get(module,msg,cursor,numfiles_curr_sql)
     crfiles = numfiles_curr_[0][0]
     #module.exit_json(msg=skip_datafile, changed=False)
 
+    # The following if/elif deals with adding data/temp-files
+    #
     if not skip_datafile and datafile is None:
         msg = 'Error: Missing datafile name/datafile. Either set db_create_file_dest or specify one or more datafiles'
         module.fail_json(msg=msg, changed=False)
@@ -348,18 +395,20 @@ def ensure_tablespace_state (module,msg,cursor,tablespace, state, datafile, numf
             alter_tbs_list.append(alter_tbs_sql)
             crfiles = len(datafile)
 
-    if len(alter_tbs_list) > 0:
 
+    #module.exit_json(msg=alter_tbs_list)
+    # Enforce actual changes (if there are any)
+    if len(alter_tbs_list) > 0:
         for sql in alter_tbs_list:
             execute_sql(module,msg,cursor,sql)
-        msg = 'Tablespace %s has changed state - initial size: %s, bigfile: %s, autoextend: %s, maxsize/file: %s, numfiles: %s ' % (tablespace, size, bigfile, autoextend, maxsize,crfiles)
+        msg = 'Tablespace %s has changed state - initial size: %s, bigfile: %s, autoextend: %s, maxsize/file: %s, numfiles: %s, status: %s' % (tablespace, size, bigfile, autoextend, maxsize,crfiles,wanted_status)
         module.exit_json(msg=msg, changed=True)
     else:
         if newtbs:
-            msg = '%s %s successfully created - initial size: %s, bigfile: %s, autoextend: %s, maxsize/file: %s, numfiles: %s' % (tbstype, tablespace, size, bigfile, autoextend, maxsize,crfiles)
+            msg = '%s %s successfully created - initial size: %s, bigfile: %s, autoextend: %s, maxsize/file: %s, numfiles: %s, status: %s' % (tbstype, tablespace, size, bigfile, autoextend, maxsize,crfiles, wanted_status)
             module.exit_json(msg=msg, changed=True)
         else:
-            msg = 'Tablespace %s already exists - initial size: %s, bigfile: %s, autoextend: %s, maxsize/file: %s, numfiles: %s' % (tablespace, size, bigfile, autoextend, maxsize,crfiles)
+            msg = 'Tablespace %s already exists - initial size: %s, bigfile: %s, autoextend: %s, maxsize/file: %s, numfiles: %s, status: %s' % (tablespace, size, bigfile, autoextend, maxsize,crfiles,wanted_status)
             module.exit_json(msg=msg, changed=False)
 
 # Get the existing datafiles for the tablespace
