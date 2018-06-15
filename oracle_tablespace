@@ -396,20 +396,160 @@ def ensure_tablespace_state (module,msg,cursor,tablespace, state, datafile, numf
             crfiles = len(datafile)
 
 
+    attribute_change = ensure_tablespace_attributes(module,msg,cursor,tablespace, autoextend, nextsize, maxsize)
+    
+            
     #module.exit_json(msg=alter_tbs_list)
     # Enforce actual changes (if there are any)
+    dbf_change = False
     if len(alter_tbs_list) > 0:
         for sql in alter_tbs_list:
             execute_sql(module,msg,cursor,sql)
-        msg = 'Tablespace %s has changed state - initial size: %s, bigfile: %s, autoextend: %s, maxsize/file: %s, numfiles: %s, status: %s' % (tablespace, size, bigfile, autoextend, maxsize,crfiles,wanted_status)
+        dbf_change = True
+            
+    if (dbf_change or attribute_change):
+        msg = 'Tablespace %s has changed state - initial size: %s, bigfile: %s, autoextend: %s, next: %s, maxsize/file: %s, numfiles: %s, status: %s' % (tablespace, size, bigfile, autoextend, nextsize, maxsize,crfiles,wanted_status)
         module.exit_json(msg=msg, changed=True)
     else:
         if newtbs:
-            msg = '%s %s successfully created - initial size: %s, bigfile: %s, autoextend: %s, maxsize/file: %s, numfiles: %s, status: %s' % (tbstype, tablespace, size, bigfile, autoextend, maxsize,crfiles, wanted_status)
+            msg = '%s %s successfully created - initial size: %s, bigfile: %s, autoextend: %s, nextsize: %s, maxsize/file: %s, numfiles: %s, status: %s' % (tbstype, tablespace, size, bigfile, autoextend, nextsize, maxsize,crfiles, wanted_status)
             module.exit_json(msg=msg, changed=True)
         else:
-            msg = 'Tablespace %s already exists - initial size: %s, bigfile: %s, autoextend: %s, maxsize/file: %s, numfiles: %s, status: %s' % (tablespace, size, bigfile, autoextend, maxsize,crfiles,wanted_status)
+            msg = 'Tablespace %s already exists - initial size: %s, bigfile: %s, autoextend: %s, nextsize: %s, maxsize/file: %s, numfiles: %s, status: %s' % (tablespace, size, bigfile, autoextend, nextsize, maxsize,crfiles,wanted_status)
             module.exit_json(msg=msg, changed=False)
+
+
+def ensure_tablespace_attributes (module,msg,cursor,tablespace, autoextend, nextsize, maxsize):
+    
+    ensure_sql = """
+    DECLARE
+       -- output
+       v_autoextend_change number := 0;
+       v_nextsize_change number := 0;
+       v_maxsize_change number := 0;
+       -- input
+       v_tablespace varchar2(30); --:= 'blergh';
+       v_autoextend  varchar2(5); --:= 'True';
+       v_nextsize varchar2(20); --:= '10M' ;
+       v_maxsize varchar2(20); --:= '500M' ;
+       -- runtime
+       v_nextsize_suffix varchar2(1);
+       v_maxsize_suffix varchar2(1);
+       v_divisor_nextsize number(20);
+       v_divisor_maxsize number(20);
+       v_next_change number;
+       v_max_change number;
+       v_autoextend_ varchar2(3);
+       v_autoextend_sql varchar2(30);
+       v_nextsize_current varchar2(20) ;
+       v_maxsize_current varchar2(20) ;
+       v_nextsize_wanted varchar2(20) ;
+       v_maxsize_wanted varchar2(20) ;
+       -- exceptions
+       missing_suffix exception;
+
+       BEGIN
+           v_tablespace:= :tablespace;
+           v_autoextend:= :autoextend;
+           v_nextsize:= :nextsize;
+           v_maxsize:= :maxsize;
+
+           IF upper(v_autoextend) = 'TRUE' THEN
+                v_autoextend_ := 'YES';
+                v_autoextend_sql := 'on';
+           ELSE
+                v_autoextend_ := 'NO';
+                v_autoextend_sql := 'off';
+           END IF;
+           -- Get the suffix to decide the divisor
+           select substr(v_nextsize,-1),substr(v_maxsize,-1) into v_nextsize_suffix,v_maxsize_suffix from dual;
+           IF upper(v_nextsize_suffix) = 'M' THEN
+               v_divisor_nextsize := 1024*1024;
+           ELSIF upper(v_nextsize_suffix) = 'G' THEN
+               v_divisor_nextsize := 1024*1024*1024;
+           ELSIF upper(v_nextsize_suffix) = 'T' THEN
+               v_divisor_nextsize := 1024*1024*1024*1024;
+           ELSE
+               NULL;
+           END IF;
+
+           IF upper(v_maxsize_suffix) = 'M' THEN
+               v_divisor_maxsize := 1024*1024;
+           ELSIF upper(v_maxsize_suffix) = 'G' THEN
+               v_divisor_maxsize := 1024*1024*1024;
+           ELSIF upper(v_maxsize_suffix) = 'T' THEN
+               v_divisor_maxsize := 1024*1024*1024*1024;
+           ELSE
+               NULL;
+           END IF;
+
+           -- Strip the suffix (M/G/T) from the input string
+          IF upper(v_nextsize_suffix) in ('K','M','G','T') THEN
+              select substr (v_nextsize, 0, (length (v_nextsize)-1)) into v_nextsize_wanted from dual;
+          END IF;
+          IF upper(v_maxsize_suffix) in ('K','M','G','T') THEN
+              select substr (v_maxsize, 0, (length (v_maxsize)-1)) into v_maxsize_wanted from dual;
+          END IF;
+
+               -- Loop over files in the tablespace and makes changes if needed
+               FOR rec in (select df.file_name, df.autoextensible, dt.block_size, df.increment_by, df.maxbytes
+                           from dba_tablespaces dt, dba_data_files df
+                           where dt.tablespace_name = df.tablespace_name
+                           and dt.tablespace_name = upper(''||v_tablespace||''))
+               LOOP
+                   v_nextsize_current := ((rec.block_size*rec.increment_by)/v_divisor_nextsize);
+                   v_maxsize_current := ((rec.maxbytes)/v_divisor_nextsize);
+                   
+                   IF (rec.autoextensible != v_autoextend_) THEN
+                       v_autoextend_change := v_autoextend_change+1;
+                       --dbms_output.put_line ('alter database datafile '''||rec.file_name ||''' autoextend '||v_autoextend_sql );
+                       execute immediate 'alter database datafile '''||rec.file_name ||''' autoextend '||v_autoextend_sql;
+                   END IF;
+                   IF upper(v_autoextend) = 'TRUE' THEN
+                       IF (v_nextsize_current != v_nextsize_wanted) THEN
+                          v_nextsize_change := v_nextsize_change+1;
+                          --dbms_output.put_line ('alter database datafile '''||rec.file_name ||''' autoextend on next '||v_nextsize );
+                          execute immediate 'alter database datafile '''||rec.file_name ||''' autoextend on next '||v_nextsize;
+                       END IF;
+                       IF (v_maxsize_current != v_maxsize_wanted) THEN
+                          v_maxsize_change := v_maxsize_change+1;
+                          --dbms_output.put_line ('alter database datafile '''||rec.file_name ||''' autoextend on maxsize '||v_maxsize );
+                          execute immediate 'alter database datafile '''||rec.file_name ||''' autoextend on maxsize '||v_maxsize;
+                       END IF;
+                   END IF;
+               END LOOP;
+               :o_autoextend_changed := v_autoextend_change;
+               :o_nextsize_changed := v_nextsize_change;
+               :o_maxsize_changed := v_maxsize_change;
+               IF v_autoextend_change > 0 or v_nextsize_change > 0 or v_maxsize_change > 0 THEN
+                  dbms_output.put_line ('auto: '||v_autoextend_change);
+                  dbms_output.put_line ('next: '||v_nextsize_change);
+                  dbms_output.put_line ('max: '||v_maxsize_change);
+                  dbms_output.put_line ('Changes applied');
+               END IF;
+       END;
+    """
+    try:
+        v_autoextend_change = cursor.var(cx_Oracle.NUMBER) 
+        v_nextsize_change = cursor.var(cx_Oracle.NUMBER)
+        v_maxsize_change = cursor.var(cx_Oracle.NUMBER)
+                
+        cursor.execute(ensure_sql,
+            {'tablespace': tablespace,'autoextend': str(autoextend), 'nextsize': nextsize, 'maxsize': maxsize, 'o_autoextend_changed': v_autoextend_change, 'o_nextsize_changed': v_nextsize_change,'o_maxsize_changed': v_maxsize_change})
+    except cx_Oracle.DatabaseError, exc:
+        error, = exc.args
+        msg = '%s' % (error.message)
+        module.fail_json(msg=msg, changed=False)
+    
+    autoextend_result_changed = v_autoextend_change.getvalue()
+    nextsize_result_changed = v_nextsize_change.getvalue()
+    maxsize_result_changed = v_maxsize_change.getvalue()
+    
+    if (autoextend_result_changed > 0 or nextsize_result_changed > 0 or maxsize_result_changed):
+        return True
+    else:
+        return False
+    
 
 # Get the existing datafiles for the tablespace
 def get_tablespace_files(module, msg, cursor, tablespace):
