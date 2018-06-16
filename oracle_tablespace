@@ -397,8 +397,8 @@ def ensure_tablespace_state (module,msg,cursor,tablespace, state, datafile, numf
 
 
     attribute_change = ensure_tablespace_attributes(module,msg,cursor,tablespace, autoextend, nextsize, maxsize)
-    
-            
+
+
     #module.exit_json(msg=alter_tbs_list)
     # Enforce actual changes (if there are any)
     dbf_change = False
@@ -406,7 +406,7 @@ def ensure_tablespace_state (module,msg,cursor,tablespace, state, datafile, numf
         for sql in alter_tbs_list:
             execute_sql(module,msg,cursor,sql)
         dbf_change = True
-            
+
     if (dbf_change or attribute_change):
         msg = 'Tablespace %s has changed state - initial size: %s, bigfile: %s, autoextend: %s, next: %s, maxsize/file: %s, numfiles: %s, status: %s' % (tablespace, size, bigfile, autoextend, nextsize, maxsize,crfiles,wanted_status)
         module.exit_json(msg=msg, changed=True)
@@ -420,7 +420,7 @@ def ensure_tablespace_state (module,msg,cursor,tablespace, state, datafile, numf
 
 
 def ensure_tablespace_attributes (module,msg,cursor,tablespace, autoextend, nextsize, maxsize):
-    
+
     ensure_sql = """
     DECLARE
        -- output
@@ -445,6 +445,10 @@ def ensure_tablespace_attributes (module,msg,cursor,tablespace, autoextend, next
        v_maxsize_current varchar2(20) ;
        v_nextsize_wanted varchar2(20) ;
        v_maxsize_wanted varchar2(20) ;
+       v_content varchar2(30) ;
+       v_tbs_source varchar2(30);
+       v_df_source varchar2(50);
+       v_df_file varchar2(50);
        -- exceptions
        missing_suffix exception;
 
@@ -453,6 +457,13 @@ def ensure_tablespace_attributes (module,msg,cursor,tablespace, autoextend, next
            v_autoextend:= :autoextend;
            v_nextsize:= :nextsize;
            v_maxsize:= :maxsize;
+           -- Check what type of tablespace it is
+           select contents into v_tbs_source from dba_tablespaces where tablespace_name = upper(''||v_tablespace||'');
+           IF upper(v_tbs_source) = 'TEMPORARY' THEN
+               v_content := 'temp';
+           ELSE
+               v_content := 'permanent';
+           END IF;
 
            IF upper(v_autoextend) = 'TRUE' THEN
                 v_autoextend_ := 'YES';
@@ -492,32 +503,66 @@ def ensure_tablespace_attributes (module,msg,cursor,tablespace, autoextend, next
           END IF;
 
                -- Loop over files in the tablespace and makes changes if needed
-               FOR rec in (select df.file_name, df.autoextensible, dt.block_size, df.increment_by, df.maxbytes
-                           from dba_tablespaces dt, dba_data_files df
-                           where dt.tablespace_name = df.tablespace_name
-                           and dt.tablespace_name = upper(''||v_tablespace||''))
-               LOOP
-                   v_nextsize_current := ((rec.block_size*rec.increment_by)/v_divisor_nextsize);
-                   v_maxsize_current := ((rec.maxbytes)/v_divisor_nextsize);
-                   
-                   IF (rec.autoextensible != v_autoextend_) THEN
-                       v_autoextend_change := v_autoextend_change+1;
-                       --dbms_output.put_line ('alter database datafile '''||rec.file_name ||''' autoextend '||v_autoextend_sql );
-                       execute immediate 'alter database datafile '''||rec.file_name ||''' autoextend '||v_autoextend_sql;
-                   END IF;
-                   IF upper(v_autoextend) = 'TRUE' THEN
-                       IF (v_nextsize_current != v_nextsize_wanted) THEN
-                          v_nextsize_change := v_nextsize_change+1;
-                          --dbms_output.put_line ('alter database datafile '''||rec.file_name ||''' autoextend on next '||v_nextsize );
-                          execute immediate 'alter database datafile '''||rec.file_name ||''' autoextend on next '||v_nextsize;
-                       END IF;
-                       IF (v_maxsize_current != v_maxsize_wanted) THEN
-                          v_maxsize_change := v_maxsize_change+1;
-                          --dbms_output.put_line ('alter database datafile '''||rec.file_name ||''' autoextend on maxsize '||v_maxsize );
-                          execute immediate 'alter database datafile '''||rec.file_name ||''' autoextend on maxsize '||v_maxsize;
-                       END IF;
-                   END IF;
-               END LOOP;
+               IF upper(v_content) = 'TEMP' THEN
+                    v_df_file := 'tempfile';
+                    FOR rec in (select df.file_name, df.autoextensible, dt.block_size, df.increment_by, df.maxbytes
+                                from dba_tablespaces dt, dba_temp_files df
+                                where dt.tablespace_name = df.tablespace_name
+                                and dt.tablespace_name = upper(''||v_tablespace||''))
+
+                    LOOP
+                        v_nextsize_current := ((rec.block_size*rec.increment_by)/v_divisor_nextsize);
+                        v_maxsize_current := ((rec.maxbytes)/v_divisor_nextsize);
+
+                        IF (rec.autoextensible != v_autoextend_) THEN
+                            v_autoextend_change := v_autoextend_change+1;
+                            --dbms_output.put_line ('alter database '||v_df_file ||' '''||rec.file_name ||''' autoextend '||v_autoextend_sql );
+                            execute immediate 'alter database '||v_df_file ||' '''||rec.file_name ||''' autoextend '||v_autoextend_sql;
+                        END IF;
+                        IF upper(v_autoextend) = 'TRUE' THEN
+                            IF (v_nextsize_current != v_nextsize_wanted) THEN
+                                v_nextsize_change := v_nextsize_change+1;
+                                --dbms_output.put_line ('alter database tempfile '''||rec.file_name ||''' autoextend on next '||v_nextsize );
+                                execute immediate 'alter database '||v_df_file ||' '''||rec.file_name ||''' autoextend on next '||v_nextsize;
+                            END IF;
+                            IF (v_maxsize_current != v_maxsize_wanted) THEN
+                                v_maxsize_change := v_maxsize_change+1;
+                                --dbms_output.put_line ('alter database tempfile '''||rec.file_name ||''' autoextend on maxsize '||v_maxsize );
+                                execute immediate 'alter database '||v_df_file ||' '''||rec.file_name ||''' autoextend on maxsize '||v_maxsize;
+                            END IF;
+                        END IF;
+                    END LOOP;
+
+                    ELSE
+                        v_df_file := 'datafile';
+                        FOR rec in (select df.file_name, df.autoextensible, dt.block_size, df.increment_by, df.maxbytes
+                                    from dba_tablespaces dt, dba_data_files df
+                                    where dt.tablespace_name = df.tablespace_name
+                                    and dt.tablespace_name = upper(''||v_tablespace||''))
+
+                        LOOP
+                            v_nextsize_current := ((rec.block_size*rec.increment_by)/v_divisor_nextsize);
+                            v_maxsize_current := ((rec.maxbytes)/v_divisor_nextsize);
+
+                            IF (rec.autoextensible != v_autoextend_) THEN
+                                v_autoextend_change := v_autoextend_change+1;
+                                --dbms_output.put_line ('alter database '||v_df_file ||' '''||rec.file_name ||''' autoextend '||v_autoextend_sql );
+                                execute immediate 'alter database '||v_df_file ||' '''||rec.file_name ||''' autoextend '||v_autoextend_sql;
+                            END IF;
+                            IF upper(v_autoextend) = 'TRUE' THEN
+                                IF (v_nextsize_current != v_nextsize_wanted) THEN
+                                    v_nextsize_change := v_nextsize_change+1;
+                                    --dbms_output.put_line ('alter database '||v_df_file ||' '''||rec.file_name ||''' autoextend on next '||v_nextsize );
+                                    execute immediate 'alter database '||v_df_file ||' '''||rec.file_name ||''' autoextend on next '||v_nextsize;
+                                END IF;
+                                IF (v_maxsize_current != v_maxsize_wanted) THEN
+                                    v_maxsize_change := v_maxsize_change+1;
+                                    --dbms_output.put_line ('alter database '||v_df_file ||' '''||rec.file_name ||''' autoextend on maxsize '||v_maxsize );
+                                    execute immediate 'alter database '||v_df_file ||' '''||rec.file_name ||''' autoextend on maxsize '||v_maxsize;
+                                END IF;
+                            END IF;
+                        END LOOP;
+               END IF;
                :o_autoextend_changed := v_autoextend_change;
                :o_nextsize_changed := v_nextsize_change;
                :o_maxsize_changed := v_maxsize_change;
@@ -530,26 +575,26 @@ def ensure_tablespace_attributes (module,msg,cursor,tablespace, autoextend, next
        END;
     """
     try:
-        v_autoextend_change = cursor.var(cx_Oracle.NUMBER) 
+        v_autoextend_change = cursor.var(cx_Oracle.NUMBER)
         v_nextsize_change = cursor.var(cx_Oracle.NUMBER)
         v_maxsize_change = cursor.var(cx_Oracle.NUMBER)
-                
+
         cursor.execute(ensure_sql,
             {'tablespace': tablespace,'autoextend': str(autoextend), 'nextsize': nextsize, 'maxsize': maxsize, 'o_autoextend_changed': v_autoextend_change, 'o_nextsize_changed': v_nextsize_change,'o_maxsize_changed': v_maxsize_change})
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
         msg = '%s' % (error.message)
         module.fail_json(msg=msg, changed=False)
-    
+
     autoextend_result_changed = v_autoextend_change.getvalue()
     nextsize_result_changed = v_nextsize_change.getvalue()
     maxsize_result_changed = v_maxsize_change.getvalue()
-    
+
     if (autoextend_result_changed > 0 or nextsize_result_changed > 0 or maxsize_result_changed):
         return True
     else:
         return False
-    
+
 
 # Get the existing datafiles for the tablespace
 def get_tablespace_files(module, msg, cursor, tablespace):
