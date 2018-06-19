@@ -504,6 +504,7 @@ def main():
             else:
                 module.fail_json(msg=msg, changed=False)
         else:
+            msg = 'Schema %s doesn\'t exist' % (schema)
             module.fail_json(msg=msg, changed=False)
 
     elif state == 'present' and role:
@@ -514,6 +515,7 @@ def main():
             # else:
             #     module.fail_json(msg=msg, changed=False)
         else:
+            msg = 'Role %s doesn\'t exist' % (role)
             module.fail_json(msg=msg, changed=False)
 
     elif (state == 'absent' or state == 'REMOVEALL') and schema:
