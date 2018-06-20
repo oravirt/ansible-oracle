@@ -132,8 +132,7 @@ def check_profile_exists(cursor, module, msg, name):
 
     sql = 'select count(*) from dba_profiles where lower (profile) = \'%s\'' % (name.lower())
     result = execute_sql_get(module, msg, cursor, sql)
-    #msg = 'Normal Result is: %s, [0] is: %s, [0][0] is: %s, len is: %s, type is: %s' % (result,result[0],result[0][0],len(result), type(result))
-    #module.exit_json(msg=msg)
+
     if result[0][0] > 0:
         return True
     else:
@@ -189,8 +188,6 @@ def ensure_profile_state(cursor, module, msg, name, state, attribute_name, attri
             current_attributes = get_current_attributes (cursor, module, msg, name, attribute_names_)
 
             # Convert to dict and compare current with wanted
-            # msg = 'current: %s, wanted: %s' % (dict(current_attributes),dict(wanted_attributes))
-            # module.exit_json(msg=msg, changed=True)
             if cmp(dict(current_attributes),dict(wanted_attributes)) is not 0:
                 for i in wanted_attributes:
                     total_sql.append("alter profile %s limit %s %s " % (name, i[0], i[1]))
@@ -227,7 +224,6 @@ def get_current_attributes(cursor, module, msg, name,attribute_names_):
 
 def execute_sql_get(module, msg, cursor, sql):
 
-    #module.exit_json(msg="In execute_sql_get", changed=False)
     try:
         cursor.execute(sql)
         result = (cursor.fetchall())
