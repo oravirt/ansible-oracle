@@ -7,55 +7,45 @@ module: oracle_profile
 short_description: Manage profiles in an Oracle database
 description:
     - Manage profiles in an Oracle database
-version_added: "2.1.0.0"
+version_added: "2.4.1.0"
 options:
     name:
         description:
             - The name of the profile
         required: true
         default: None
-        aliases: ['profile','dg']
+        aliases: ['profile']
     state:
         description:
-            - The intended state of the profile. 'status' will just show the status of the profile
+            - The intended state of the profile.
         default: present
-        choices: ['present','absent','status']
-    disks:
-        description:
-            - A list of disks that should be part of the profile. Only the listed disks will be part of the DG, meaning if the disk is removed from the list it will also be removed from the DG
-        default: None
-    redundancy:
-        description:
-            - The redundancy configuration for the profile, It does not yet support putting disks in specific failure groups
-        default: external
-        choices: ['external','normal','high']
+        choices: ['present','absent']
     attribute_name:
         description:
-            - The attribute name (e.g compatible.rdbms)
+            - The attribute name (e.g PASSWORD_REUSE_TIME)
         default: None
         aliases: ['an']
     attribute_value:
         description:
-            - The attribute value (e.g 12.1.0.2)
+            - The attribute value (e.g 10)
         default: None
         aliases: ['av']
     username:
         description:
-            - The ASM username
+            - The DB username
         required: false
         default: sys
         aliases: ['un']
     password:
         description:
-            - The password for the ASM user
+            - The password for the DB user
         required: false
         default: None
         aliases: ['pw']
     service_name:
         description:
-            - The profile_name to connect to the database if using dbms_profile.
+            - The profile_name to connect to the database.
         required: false
-        default: +ASM
         aliases: ['sn']
     hostname:
         description:
@@ -85,36 +75,40 @@ author: Mikael Sandström, oravirt@gmail.com, @oravirt
 
 EXAMPLES = '''
 # Create a profile
-oracle_profile:
-        name: MYDG1
-        disks:
-           - ORCL:MYDG1
-           - ORCL:MYDG2
-        attribute_name: compatible.asm
-        attribute_value: 12.1.0.2
-        redundancy: external
-        state: present
-        un: sys
-        pw: oracle123
-        sn: '+ASM'
-        host: localhost
-        oh: /u01/app/oracle/12.1.2.0/grid
-
-oracle_profile:
-        name: DATA
-        disks:
-           - /dev/oracle/data1
-           - /dev/oracle/data2
-        attributes:
-            - {name: compatible.asm, value: 12.2.0.1.0 }
-            - {name: compatible.rdbms, value: 12.2.0.1.0 }
-        redundancy: external
-        state: present
-        un: sys
-        pw: oracle123
-        sn: '+ASM'
-        host: localhost
-        oh: /u01/app/oracle/12.2.0.1/grid
+- hosts: dbserver
+  vars:
+      oracle_home: /u01/app/oracle/12.2.0.1/db1
+      hostname: "{{ inventory_hostname }}"
+      service_name: orclpdb
+      user: system
+      password: Oracle_123
+      oracle_env:
+             ORACLE_HOME: "{{ oracle_home }}"
+             LD_LIBRARY_PATH: "{{ oracle_home }}/lib"
+      profiles:
+               - name: profile1
+                 attribute_name:
+                            - password_reuse_max
+                            - password_reuse_time
+                            - sessions_per_user
+                 attribute_value:
+                            - 6
+                            - 20
+                            - 5
+                 state: present
+  tasks:
+  - name: Manage profiles
+    oracle_profile:
+            name={{ item.name }}
+            attribute_name={{ item.attribute_name}}
+            attribute_value={{ item.attribute_value}}
+            state={{ item.state }}
+            hostname={{ hostname }}
+            service_name={{ service_name }}
+            user={{ user }}
+            password={{ password }}
+    environment: "{{oracle_env}}"
+    with_items: "{{ profiles }}"
 
 '''
 import os
@@ -183,7 +177,6 @@ def ensure_profile_state(cursor, module, msg, name, state, attribute_name, attri
 
         # Check the current attributes
         attribute_names_ =','.join(['\''+n[0]+'\'' for n in (wanted_attributes)])
-        # Only get current attributes if we still have attributes in the wanted list
         if len(attribute_names_) != 0:
             current_attributes = get_current_attributes (cursor, module, msg, name, attribute_names_)
 
