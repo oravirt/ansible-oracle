@@ -176,6 +176,13 @@ options:
         default: false
         choices: ['True','False']
         type: bool
+    flashback:
+        description:
+            - Enables flashback for the database
+        required: False
+        default: false
+        choices: ['True','False']
+        type: bool
     state:
         description:
             - The intended state of the database
@@ -452,13 +459,14 @@ def remove_db (module, msg, oracle_home, db_name, db_unique_name, sys_password):
     else:
         return True
 
-def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivelog, force_logging, 
+def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivelog, force_logging, flashback, 
                      default_tablespace_type,default_tablespace,default_temp_tablespace):
 
     cursor = getconn(module,msg)
     israc = ''
     archcomp = ''
     flcomp = ''
+    fbcomp = ''
     alterdb_sql = 'alter database'
 
     propsql = "select lower(property_value) from database_properties where property_name in ('DEFAULT_TBS_TYPE','DEFAULT_PERMANENT_TABLESPACE','DEFAULT_TEMP_TABLESPACE')"
@@ -470,7 +478,7 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
 
     change_restart_sql = []
     change_db_sql = []
-    log_check_sql = 'select log_mode,force_logging from v$database'
+    log_check_sql = 'select log_mode,force_logging, flashback_on from v$database'
     log_check_ = execute_sql_get(module,msg,cursor,log_check_sql)
 
     
@@ -493,6 +501,13 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
         flcomp = 'NO'
         flsql = alterdb_sql +  ' no force logging'
 
+    if flashback == True:
+        fbcomp = 'YES'
+        fbsql = alterdb_sql + ' flashback on'
+    else:
+        fbcomp = 'NO'
+        fbsql = alterdb_sql +  ' flashback off'
+
     if def_tbs_type[0] != default_tablespace_type:
         deftbstypesql = 'alter database set default %s tablespace ' % (default_tablespace_type)
         change_db_sql.append(deftbstypesql)
@@ -510,6 +525,9 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
 
     if log_check_[0][1] != flcomp:
         change_db_sql.append(flsql)
+        
+    if log_check_[0][2] != fbcomp:
+        change_db_sql.append(fbsql)
     
     if len(change_db_sql) > 0 or len(change_restart_sql) > 0:
         if len(change_db_sql) > 0: # <- Apply changes that does not require a restart
@@ -746,6 +764,7 @@ def main():
             default_temp_tablespace  = dict(required=False),
             archivelog          = dict(default=False, type='bool'),
             force_logging       = dict(default=False, type='bool'),
+            flashback           = dict(default=False, type='bool'),
             state               = dict(default="present", choices = ["present", "absent"]),
             hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
             port                = dict(required=False, default = 1521),
@@ -785,6 +804,7 @@ def main():
     default_temp_tablespace = module.params["default_temp_tablespace"]
     archivelog          = module.params["archivelog"]
     force_logging       = module.params["force_logging"]
+    flashback           = module.params["flashback"]
     state               = module.params["state"]
     hostname            = module.params["hostname"]
     port                = module.params["port"]
@@ -827,11 +847,11 @@ def main():
             if create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb, local_undo, datafile_dest, recoveryfile_dest,
                         storage_type, dbconfig_type, racone_service, characterset, memory_percentage, memory_totalmb, nodelist, db_type, amm, initparams, customscripts):
                 newdb = True
-                ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivelog, force_logging,default_tablespace_type,default_tablespace,default_temp_tablespace)
+                ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivelog, force_logging, flashback, default_tablespace_type,default_tablespace,default_temp_tablespace)
             else:
                 module.fail_json(msg=msg, changed=False)
         else:
-            ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivelog, force_logging, default_tablespace_type,default_tablespace,default_temp_tablespace)
+            ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivelog, force_logging, flashback, default_tablespace_type,default_tablespace,default_temp_tablespace)
             # msg = 'Database %s already exists' % (db_name)
             # module.exit_json(msg=msg, changed=False)
 
