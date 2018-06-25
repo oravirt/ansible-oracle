@@ -4,10 +4,9 @@
 DOCUMENTATION = '''
 ---
 module: oracle_opatch
-short_description: Manage
-    - Create/delete a database using dbca
-    - If a responsefile is available, that will be used. If initparams is defined, those will be attached to the createDatabase command
-    - If no responsefile is created, the database will be created based on all other parameters
+short_description: Manage patches in an Oracle environment
+    - Manages patches (applies/rolls back)
+    - Only manages the opatch part of patching (opatch/opatch auto/opatchauto)
 version_added: "2.4.0.0"
 options:
     oracle_home:
@@ -249,7 +248,7 @@ def remove_patch (module, msg, oracle_home, patch_base, patch_id, opatchauto):
         return True
 
 
-# 
+#
 # def execute_sql_get(module, msg, cursor, sql):
 #
 #     try:
