@@ -512,7 +512,7 @@ def ensure_tablespace_attributes (module,msg,cursor,tablespace, autoextend, next
 
                     LOOP
                         v_nextsize_current := ((rec.block_size*rec.increment_by)/v_divisor_nextsize);
-                        v_maxsize_current := ((rec.maxbytes)/v_divisor_nextsize);
+                        v_maxsize_current := ((rec.maxbytes)/v_divisor_maxsize);
 
                         IF (rec.autoextensible != v_autoextend_) THEN
                             v_autoextend_change := v_autoextend_change+1;
@@ -542,7 +542,7 @@ def ensure_tablespace_attributes (module,msg,cursor,tablespace, autoextend, next
 
                         LOOP
                             v_nextsize_current := ((rec.block_size*rec.increment_by)/v_divisor_nextsize);
-                            v_maxsize_current := ((rec.maxbytes)/v_divisor_nextsize);
+                            v_maxsize_current := ((rec.maxbytes)/v_divisor_maxsize);
 
                             IF (rec.autoextensible != v_autoextend_) THEN
                                 v_autoextend_change := v_autoextend_change+1;
