@@ -151,12 +151,12 @@ options:
     default_tablespace_type:
         description:
             - Database default tablespace type (DEFAULT_TBS_TYPE)
-        default: smallfile    
+        default: smallfile
         choices: ['smallfile','bigfile']
     default_tablespace:
         description:
             - Database default tablespace
-        default: smallfile    
+        default: smallfile
         required: False
     default_temp_tablespace:
         description:
@@ -459,7 +459,7 @@ def remove_db (module, msg, oracle_home, db_name, db_unique_name, sys_password):
     else:
         return True
 
-def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivelog, force_logging, flashback, 
+def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivelog, force_logging, flashback,
                      default_tablespace_type,default_tablespace,default_temp_tablespace):
 
     cursor = getconn(module,msg)
@@ -481,12 +481,12 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
     log_check_sql = 'select log_mode,force_logging, flashback_on from v$database'
     log_check_ = execute_sql_get(module,msg,cursor,log_check_sql)
 
-    
+
     if israc_[0][0] == 'NO':
         israc = False
     else:
         israc = True
-    
+
     if archivelog == True:
         archcomp = 'ARCHIVELOG'
         archsql = alterdb_sql + ' archivelog'
@@ -515,7 +515,7 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
     if default_tablespace is not None and def_tbs[0] != default_tablespace:
         deftbssql = 'alter database default tablespace %s' % (default_tablespace)
         change_db_sql.append(deftbssql)
-    
+
     if default_temp_tablespace is not None and def_temp_tbs[0] != default_temp_tablespace:
         deftempsql = 'alter database default temporary tablespace %s' % (default_temp_tablespace)
         change_db_sql.append(deftempsql)
@@ -525,10 +525,10 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
 
     if log_check_[0][1] != flcomp:
         change_db_sql.append(flsql)
-        
+
     if log_check_[0][2] != fbcomp:
         change_db_sql.append(fbsql)
-    
+
     if len(change_db_sql) > 0 or len(change_restart_sql) > 0:
         if len(change_db_sql) > 0: # <- Apply changes that does not require a restart
             for sql in change_db_sql:
@@ -553,7 +553,7 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
         module.exit_json(msg=msg, changed=True)
     else:
         if newdb:
-            msg = 'Database %s successfully created' % (db_name)        
+            msg = 'Database %s successfully created' % (db_name)
         else:
             msg = 'Database %s already exists and is in the intended state' % (db_name)
         module.exit_json(msg=msg, changed=False)
