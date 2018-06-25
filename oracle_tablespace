@@ -765,8 +765,6 @@ def main():
                 module.fail_json(msg=msg, changed=False)
         else:
             ensure_tablespace_state(module, msg, cursor, tablespace, state, datafile, numfiles, size, content, bigfile, autoextend, nextsize, maxsize)
-            # msg = 'Tablespace %s already exists. Status: %s' % (tablespace,status)
-            # module.exit_json(msg=msg, changed=False)
 
     elif state == 'absent':
         if check_tablespace_exists(module, msg, cursor, tablespace):
@@ -775,41 +773,6 @@ def main():
                 module.exit_json(msg=msg, changed=True)
         else:
             module.exit_json(msg='The tablespace %s doesn\'t exist' % tablespace, changed=False)
-
-    # elif state == 'read_only':
-    #     if check_tablespace_exists(module, msg, cursor, tablespace): # and status == 'ONLINE':
-    #         if status == 'READ ONLY' : # return value from check_tablespace_exists
-    #             module.exit_json(msg='The tablespace %s is already in read only mode' % tablespace, changed=False)
-    #         elif manage_tablespace(msg, cursor, tablespace, state):
-    #             #msg = 'The tablespace %s has been made read only' % tablespace
-    #             module.exit_json(msg=msg, changed=True)
-    #
-    # elif state == 'read_write':
-    #     if check_tablespace_exists(module, msg, cursor, tablespace):
-    #         if status == 'ONLINE' : # return value from check_tablespace_exists
-    #             module.exit_json(msg='The tablespace %s is already in read write mode' % tablespace, changed=False)
-    #         elif manage_tablespace(msg, cursor, tablespace, state):
-    #              module.exit_json(msg=msg, changed=True)
-    #
-    # elif state == 'offline':
-    #     if check_tablespace_exists(module, msg, cursor, tablespace):
-    #         if status == 'OFFLINE' : # return value from check_tablespace_exists
-    #             module.exit_json(msg='The tablespace %s is already offline' % tablespace, changed=False)
-    #         elif manage_tablespace(msg, cursor, tablespace, state):
-    #              module.exit_json(msg=msg, changed=True)
-    #
-    # elif state == 'online':
-    #     if check_tablespace_exists(module, msg, cursor, tablespace):
-    #         if status == 'ONLINE' : # return value from check_tablespace_exists
-    #             module.exit_json(msg='The tablespace %s is already online' % tablespace, changed=False)
-    #         elif manage_tablespace(msg, cursor, tablespace, state):
-    #              module.exit_json(msg=msg, changed=True)
-
-    #module.exit_json(msg=msg, changed=False)
-    #module.exit_json(msg='The tablespace %s doesn\'t exist' % tablespace, changed=False)
-
-
-
 
 
 from ansible.module_utils.basic import *
