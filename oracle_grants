@@ -153,27 +153,88 @@ def check_role_exists(module, msg, cursor, role):
         msg = 'Role doesn\'t exist'
         return False
 
+def get_dir_privs(module, msg, cursor, schema, directory_privs):
+
+    total_sql_dir = []
+    # Directory Privs
+
+    # module.exit_json(msg=directory_privs)
+    wanted_dirprivs_list = directory_privs
+    w_object_name_l = [w.split(':')[1].lower() for w in wanted_dirprivs_list]
+    w_object_priv_l = [w.split(':')[0].lower() for w in wanted_dirprivs_list]
+    currdsql_all="""
+    select lower(listagg(p.privilege,',') within group (order by p.privilege) ||':'||p.owner||'.'||p.table_name)
+    from dba_tab_privs p, dba_objects o
+    where p.grantee = upper(\'%s\')
+    and p.table_name = o.object_name
+    and o.object_type = 'DIRECTORY'
+    group by p.owner,p.table_name
+    """ % (schema)
+
+    result = execute_sql_get(module, msg, cursor, currdsql_all)
 
 
-# Add grants to the schema/role
-def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs):
+    grant_list_dir = []
+    revoke_list_dir = []
+    current_privs_l = [a[0] for a in result] # Turn list of tuples into list from resultset
+    c_dir_name_l = [ o.split(':')[1].lower() for o in current_privs_l]
+    c_dir_priv_l = [ o.split(':')[0].lower() for o in current_privs_l]
+    remove_completely_dir = set(c_dir_name_l).difference(w_object_name_l)
+    if len(list(remove_completely_dir)) > 0:
+       for remove in list(remove_completely_dir):
+           rdsql = 'revoke all on directory %s from %s' % (remove,schema)
+           revoke_list_dir.append(rdsql)
 
-    add_sql = ''
-    remove_sql = ''
+    newstuff = set(w_object_name_l).difference(c_dir_name_l)
+    if len(list(newstuff)) > 0:
+       for index,value in enumerate(w_object_name_l):
+           if value in list(newstuff):
+               nsql = "grant %s on directory %s to %s" % (wanted_dirprivs_list[index].split(':')[0], value, schema)
+               grant_list_dir.append(nsql)
 
-    # This list will hold all grants the user currently has
-    total_sql=[]
-    total_current=[]
+    if len(current_privs_l) > 0 and len(wanted_dirprivs_list) > 0:
+       for cp in current_privs_l:
+           object_owner = cp.split(':').pop().split('.')[0]
+           object_name = cp.split(':').pop().split('.')[1]
+           cp_privs = cp.split(':')[0].lower()
+           for wp in wanted_dirprivs_list:
+               wp_object = wp.split(':')[1].lower()
+               if wp.split(':')[1].lower() == cp.split(':')[1].lower(): # Compare object_names
+                   cp_privs = cp.split(':')[0].lower().split(',')
+                   wp_privs = wp.split(':')[0].lower().split(',')
+                   priv_add = set(wp_privs).difference(cp_privs)
+                   priv_revoke = set(cp_privs).difference(wp_privs)
+                   if len(list(priv_add)) > 0:
+                       adsql = "grant %s on directory %s to %s" % (','.join(a for a in priv_add),wp_object,schema)
+                       grant_list_dir.append(adsql)
+                   if len(list(priv_revoke)) > 0:
+                       rdsql = "revoke %s on directory %s from %s" % (','.join(a for a in priv_revoke),wp_object,schema)
+                       revoke_list_dir.append(rdsql)
 
+    if len(grant_list_dir) > 0:
+       for a in grant_list_dir:
+           total_sql_dir.append(a)
+    if len(revoke_list_dir) > 0:
+       for a in revoke_list_dir:
+           total_sql_dir.append(a)
+
+    return total_sql_dir
+
+
+def get_obj_privs (module, msg, cursor, schema, object_privs):
+
+    total_sql_obj = []
     # OBJECT PRIVS
     wanted_privs_list = object_privs
     w_object_name_l = [w.split(':')[1].lower() for w in wanted_privs_list]
     w_object_priv_l = [w.split(':')[0].lower() for w in wanted_privs_list]
     currsql_all="""
-    select lower(listagg(privilege,',') within group (order by privilege) ||':'||owner||'.'||table_name)
-    from dba_tab_privs
-    where grantee = upper(\'%s\')
-    group by owner,table_name
+    select lower(listagg(p.privilege,',') within group (order by p.privilege) ||':'||p.owner||'.'||p.table_name)
+    from dba_tab_privs p, dba_objects o
+    where p.grantee = upper(\'%s\')
+    and p.table_name = o.object_name
+    and o.object_type != 'DIRECTORY'
+    group by p.owner,p.table_name
     """ % (schema)
 
     result = execute_sql_get(module, msg, cursor, currsql_all)
@@ -218,15 +279,47 @@ def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs)
 
     if len(grant_list) > 0:
         for a in grant_list:
-            total_sql.append(a)
+            total_sql_obj.append(a)
     if len(revoke_list) > 0:
         for a in revoke_list:
-            total_sql.append(a)
+            total_sql_obj.append(a)
+
+    return total_sql_obj
+# Add grants to the schema/role
+def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs, directory_privs):
+
+    add_sql = ''
+    remove_sql = ''
+
+    # If no privs are added, we set the 'wanted' lists to be empty.
+    if wanted_grants_list is None or wanted_grants_list == ['']:
+        wanted_grants_list = []
+    if object_privs is None or object_privs == ['']:
+        object_privs = []
+    if directory_privs is None or directory_privs == ['']:
+        directory_privs = []
+
+    # This list will hold all grants the user currently has
+    dir_privs = []
+    obj_privs = []
+    total_sql=[]
+    total_current=[]
+
+    dir_privs = get_dir_privs(module, msg, cursor, schema, directory_privs)
+    if len(dir_privs)>0:
+        for d in dir_privs:
+            total_sql.append(d)
+
+    obj_privs = get_obj_privs(module, msg, cursor, schema, object_privs)
+    if len(obj_privs)>0:
+        for o in obj_privs:
+            total_sql.append(o)
+
 
     #module.exit_json(msg=total_sql)
     exceptions_list=['DBA','RESOURCE','CONNECT']
 
-    if not(schema) or not(wanted_grants_list):
+    if not(schema): # or not(wanted_grants_list):
         module.fail_json(msg='Error: Missing schema/role name or grants', changed=False)
         return False
 
@@ -442,7 +535,8 @@ def main():
             schema        = dict(default=None),
             role        = dict(default=None),
             grants         = dict(default=None, type="list"),
-            object_privs   = dict(default=None, type="list",aliases=['objpriv','priv']),
+            object_privs   = dict(default=None, type="list",aliases=['objprivs']),
+            directory_privs   = dict(default=None, type="list",aliases=['dirprivs']),
             state         = dict(default="present", choices=["present", "absent", "REMOVEALL"])
 
         ),
@@ -459,6 +553,7 @@ def main():
     role = module.params["role"]
     grants = module.params["grants"]
     object_privs = module.params["object_privs"]
+    directory_privs = module.params["directory_privs"]
     state = module.params["state"]
 
 
@@ -498,7 +593,7 @@ def main():
 
     if state == 'present' and schema:
         if check_user_exists(module, msg, cursor, schema):
-            if ensure_grants(module, msg, cursor, schema, grants, object_privs):
+            if ensure_grants(module, msg, cursor, schema, grants, object_privs, directory_privs):
                 #msg = 'The grant(s) (%s) have been added to %s successfully' % (grants, schema)
                 module.exit_json(msg=msg, changed=True)
             else:
@@ -509,7 +604,7 @@ def main():
 
     elif state == 'present' and role:
         if check_role_exists(module, msg, cursor, role):
-            ensure_grants(module, msg, cursor, role, grants, object_privs)
+            ensure_grants(module, msg, cursor, role, grants, object_privs,directory_privs)
                 #msg = 'The grant(s) (%s) have been added to %s successfully' % (grants, schema)
             module.exit_json(msg=msg, changed=False)
             # else:
