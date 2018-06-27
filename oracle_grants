@@ -156,7 +156,7 @@ def check_role_exists(module, msg, cursor, role):
 
 
 # Add grants to the schema/role
-def add_grants(module, msg, cursor, schema, wanted_grants_list, object_privs):
+def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs):
 
     add_sql = ''
     remove_sql = ''
@@ -498,7 +498,7 @@ def main():
 
     if state == 'present' and schema:
         if check_user_exists(module, msg, cursor, schema):
-            if add_grants(module, msg, cursor, schema, grants, object_privs):
+            if ensure_grants(module, msg, cursor, schema, grants, object_privs):
                 #msg = 'The grant(s) (%s) have been added to %s successfully' % (grants, schema)
                 module.exit_json(msg=msg, changed=True)
             else:
@@ -509,7 +509,7 @@ def main():
 
     elif state == 'present' and role:
         if check_role_exists(module, msg, cursor, role):
-            add_grants(module, msg, cursor, role, grants, object_privs)
+            ensure_grants(module, msg, cursor, role, grants, object_privs)
                 #msg = 'The grant(s) (%s) have been added to %s successfully' % (grants, schema)
             module.exit_json(msg=msg, changed=False)
             # else:
