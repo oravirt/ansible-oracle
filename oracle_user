@@ -466,6 +466,8 @@ def main():
             if drop_user(module, msg, cursor, schema):
                 msg = 'The schema (%s) has been dropped successfully' % schema
                 module.exit_json(msg=msg, changed=True)
+            else:
+                module.fail_json(msg=msg[0], changed=False)
         else:
             module.exit_json(msg='The schema (%s) doesn\'t exist' % schema, changed=False)
 
