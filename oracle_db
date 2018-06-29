@@ -183,6 +183,13 @@ options:
         default: false
         choices: ['True','False']
         type: bool
+    datapatch:
+        description:
+            - Forces a datapatch run as part of DB creation
+        required: False
+        default: False
+        choices: ['True','False']
+        type: bool
     state:
         description:
             - The intended state of the database
@@ -217,7 +224,7 @@ oracle_db:
     state=present
     storage=ASM
     dfd=+DATA
-    rfd=+DATA"
+    rfd=+DATA
     default_tablespace_type: bigfile
 
 
@@ -340,7 +347,7 @@ def check_db_exists(module, msg, oracle_home, db_name, db_unique_name ):
 
 def create_db (module, msg, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb,
               local_undo, datafile_dest, recoveryfile_dest, storage_type, dbconfig_type, racone_service, characterset, memory_percentage, memory_totalmb,
-              nodelist, db_type, amm, initparams, customscripts):
+              nodelist, db_type, amm, initparams, customscripts, datapatch):
 
     initparam = '-initParams '
     paramslist = ''
@@ -444,8 +451,43 @@ def create_db (module, msg, oracle_home, sys_password, system_password, dbsnmp_p
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
         module.fail_json(msg=msg, changed=False)
+    elif rc == 0 and datapatch:
+        if run_datapatch(module, msg, oracle_home, db_name, db_unique_name, sys_password):
+            return True
     else:
         return True
+
+def run_datapatch(module, msg, oracle_home, db_name, db_unique_name, sys_password):
+
+    cursor = getconn(module,msg)
+    sid_sql = 'select instance_name from v$instance'
+    sid_ = execute_sql_get(module,msg,cursor,sid_sql)
+    os.environ['ORACLE_SID'] = sid_[0][0]
+
+    if major_version > '11.2':
+        command = '%s/OPatch/datapatch -verbose' % (oracle_home)
+        (rc, stdout, stderr) = module.run_command(command)
+        if rc != 0:
+            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
+            module.fail_json(msg=msg, changed=False)
+        else:
+            return True
+    else:
+        datapatch_sql = '''
+        connect / as sysdba
+        @?/rdbms/admin/catbundle.sql psu apply
+        exit
+        '''
+        sqlplus_bin = '%s/bin/sqlplus' % (oracle_home)
+        p = subprocess.Popen([sqlplus_bin,'/nolog'],stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        (stdout,stderr) = p.communicate(datapatch_sql.encode('utf-8'))
+        rc = p.returncode
+        if rc != 0:
+            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, datapatch_sql)
+            module.fail_json(msg=msg, changed=False)
+        else:
+            return True
 
 def remove_db (module, msg, oracle_home, db_name, db_unique_name, sys_password):
 
@@ -469,7 +511,7 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
     fbcomp = ''
     alterdb_sql = 'alter database'
 
-    propsql = "select lower(property_value) from database_properties where property_name in ('DEFAULT_TBS_TYPE','DEFAULT_PERMANENT_TABLESPACE','DEFAULT_TEMP_TABLESPACE')"
+    propsql = "select lower(property_value) from database_properties where property_name in ('DEFAULT_TBS_TYPE','DEFAULT_PERMANENT_TABLESPACE','DEFAULT_TEMP_TABLESPACE') order by 1"
     def_tbs_type,def_tbs,def_temp_tbs = execute_sql_get(module,msg,cursor,propsql)
     israc_sql = 'select parallel,instance_name,host_name from v$instance'
     israc_ = execute_sql_get(module,msg,cursor,israc_sql)
@@ -554,9 +596,11 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
     else:
         if newdb:
             msg = 'Database %s successfully created' % (db_name)
+            changed = True
         else:
             msg = 'Database %s already exists and is in the intended state' % (db_name)
-        module.exit_json(msg=msg, changed=False)
+            changed = False
+        module.exit_json(msg=msg, changed=changed)
 
 
 def stop_db (module, msg, oracle_home, db_name, db_unique_name, sid):
@@ -765,7 +809,8 @@ def main():
             archivelog          = dict(default=False, type='bool'),
             force_logging       = dict(default=False, type='bool'),
             flashback           = dict(default=False, type='bool'),
-            state               = dict(default="present", choices = ["present", "absent"]),
+            datapatch           = dict(default=False, type='bool'),
+            state               = dict(default="present", choices = ["present", "absent", "datapatch"]),
             hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
             port                = dict(required=False, default = 1521),
 
@@ -805,11 +850,15 @@ def main():
     archivelog          = module.params["archivelog"]
     force_logging       = module.params["force_logging"]
     flashback           = module.params["flashback"]
+    datapatch           = module.params["datapatch"]
     state               = module.params["state"]
     hostname            = module.params["hostname"]
     port                = module.params["port"]
 
 
+    if not os.path.exists(oracle_home):
+        msg = 'oracle_home: %s doesn\'t exist' % (oracle_home)
+        module.fail_json(msg=msg, changed=False)
     #ld_library_path = '%s/lib' % (oracle_home)
     if oracle_home is not None:
         os.environ['ORACLE_HOME'] = oracle_home
@@ -845,7 +894,7 @@ def main():
     if state == 'present':
         if not check_db_exists(module, msg, oracle_home,db_name,db_unique_name):
             if create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb, local_undo, datafile_dest, recoveryfile_dest,
-                        storage_type, dbconfig_type, racone_service, characterset, memory_percentage, memory_totalmb, nodelist, db_type, amm, initparams, customscripts):
+                        storage_type, dbconfig_type, racone_service, characterset, memory_percentage, memory_totalmb, nodelist, db_type, amm, initparams, customscripts,datapatch):
                 newdb = True
                 ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivelog, force_logging, flashback, default_tablespace_type,default_tablespace,default_temp_tablespace)
             else:
@@ -859,6 +908,17 @@ def main():
         if check_db_exists(module, msg, oracle_home, db_name, db_unique_name):
             if remove_db(module, msg, oracle_home, db_name,db_unique_name, sys_password):
                 msg = 'Successfully removed database %s' % (db_name)
+                module.exit_json(msg=msg, changed=True)
+            else:
+                module.fail_json(msg=msg, changed=False)
+        else:
+            msg = 'Database %s doesn\'t exist' % (db_name)
+            module.exit_json(msg=msg, changed=False)
+
+    elif state == 'datapatch':
+        if check_db_exists(module, msg, oracle_home, db_name, db_unique_name):
+            if run_datapatch(module, msg, oracle_home, db_name,db_unique_name, sys_password):
+                msg = 'Successfully ran datapatch on database %s' % (db_name)
                 module.exit_json(msg=msg, changed=True)
             else:
                 module.fail_json(msg=msg, changed=False)
