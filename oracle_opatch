@@ -58,6 +58,11 @@ options:
             - If the check errors the module exits with a failure
         required: False
         default: True
+    ocm_response_file:
+        description:
+            - The OCM responsefile needed for OPatch versions < '12.2.0.1.5' (basically for DB/GI versions < 12.1)
+        required: False
+        default: False
     state:
         description:
             - Should a patch be applied or removed
@@ -77,8 +82,8 @@ options:
         default: 1521
 
 notes:
-    - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+    - 
+requirements: [ "os","pwd","distutils.version" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
@@ -86,13 +91,14 @@ EXAMPLES = '''
 
 '''
 import os, pwd
-
-try:
-    import cx_Oracle
-except ImportError:
-    cx_oracle_exists = False
-else:
-    cx_oracle_exists = True
+from distutils.version import LooseVersion
+# 
+# try:
+#     import cx_Oracle
+# except ImportError:
+#     cx_oracle_exists = False
+# else:
+#     cx_oracle_exists = True
 
 
 def get_version(module, msg, oracle_home):
@@ -221,6 +227,7 @@ def apply_patch (module, msg, oracle_home, patch_base, patch_id, patch_version, 
             else:
                 oh = ' -oh'
         else:
+            oh = ' -oh'
             opatch_cmd = 'opatchauto apply'
 
         command = '%s/OPatch/%s %s %s %s' % (oracle_home,opatch_cmd, patch_base,oh,oracle_home)
@@ -229,10 +236,9 @@ def apply_patch (module, msg, oracle_home, patch_base, patch_id, patch_version, 
         opatch_cmd = 'opatch'
         command = '%s/OPatch/%s apply %s -oh %s -silent' % (oracle_home,opatch_cmd, patch_base,oracle_home)
 
-    if ocm_response_file is not None:
+    if ocm_response_file is not None and (LooseVersion(opatch_version) < LooseVersion(opatch_version_noocm)):
         command += ' -ocmrf %s' % (ocm_response_file)
-
-    #module.exit_json(msg=command, changed=False)
+    
     (rc, stdout, stderr) = module.run_command(command)
     if rc != 0:
       msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
@@ -328,6 +334,7 @@ def main():
     cursor = None
     global major_version
     global opatch_version
+    global opatch_version_noocm
     global hostname
     global port
     global conflict_check
@@ -375,7 +382,7 @@ def main():
         msg = 'OPatch doesn\'t seem to exist in %s/OPatch/' % (oracle_home)
         module.fail_json(msg=msg, changed=False)
 
-    if (patch_base or patch_id) is None:
+    if (patch_base or patch_id) is None and state in ('present','absent'):
         msg = 'patch_base & patch_id needs to be set'
         module.fail_json(msg=msg, changed=False)
 
@@ -398,15 +405,16 @@ def main():
     # Get the Oracle % Opatch version
     major_version = get_version(module,msg,oracle_home)
     opatch_version = get_opatch_version(module,msg,oracle_home)
-
-    #module.exit_json(msg=opatch_version)
+    opatch_version_noocm = '12.2.0.1.5'
+    
     if opatch_minversion is not None:
-        if opatch_version < opatch_minversion:
+        opatch_minversion_ = opatch_minversion.replace('.','')
+        if LooseVersion(opatch_version) < LooseVersion(opatch_minversion):
             msg = 'Current OPatch version: %s, minimum version needed is: %s' % (opatch_version,opatch_minversion)
             module.fail_json(msg=msg, changed=False)
 
-    if opatch_version < '12.2.0.1.5' and state == 'present' and ocm_response_file is None:
-        msg='An OCM response file is needed when the opatch version is < 12.2.0.1.5. Current opatch version: %s' % (opatch_version)
+    if state == 'present' and ocm_response_file is None and LooseVersion(opatch_version) < LooseVersion(opatch_version_noocm):
+        msg='An OCM response file is needed when the opatch version is < %s. Current opatch version: %s' % (opatch_version_noocm,opatch_version)
         module.fail_json(msg=msg,changed=False)
 
     if state == 'opatchversion':
