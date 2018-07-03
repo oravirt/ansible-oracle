@@ -5,7 +5,7 @@
     assert:
       that:
         - "ansible_os_family == '{{ os_family_supported }}'"
-        - "ansible_distribution_version >= '{{ os_min_supported_version }}'"
+        - "ansible_distribution_version | version_compare('{{ os_min_supported_version }}', '>=')"
     tags:
      - oscheck
 
