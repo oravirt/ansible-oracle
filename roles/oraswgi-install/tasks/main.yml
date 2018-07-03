@@ -5,7 +5,13 @@
     shell: cat "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" |grep -w {{ oracle_home_gi  }} |awk  '{print $3}' | cut -f2 -d'"'
     tags:
     - checkifgiinstall
+    changed_when: False
     register: checkgiinstall
+
+  - name: install-home-gi | set fact for patch_before_rootsh
+    set_fact:
+        patch_before_rootsh: False
+    when: oracle_home_gi in checkgiinstall.stdout and patch_before_rootsh
 
   - name: install-home-gi | Mount nfs share with installation media
     mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=mounted
@@ -91,7 +97,7 @@
     when: oracle_home_gi not in checkgiinstall.stdout
 
   - name: install-home-gi | Check opatch lsinventory (GI)
-    shell: "{{ oracle_home_gi }}/OPatch/opatch lsinventory"
+    shell: "{{ oracle_home_gi }}/OPatch/opatch lspatches"
     become: yes
     become_user: "{{ grid_install_user }}"
     environment: "{{oracle_env}}"

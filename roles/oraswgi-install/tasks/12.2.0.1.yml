@@ -38,11 +38,11 @@
     #when: master_node
   # unarchive didn't worked in some environments. => using unzip directly
   # Overwrite existing files from OPatch due to Note 2321749.1
-  - name: install-home-gi | Distribute latest opatch
-    shell: unzip -o -d {{oracle_home_gi}} {{opatcharchive}}
-    become: yes
-    become_user: "{{ grid_install_user }}"
-    when: oracle_sw_image_gi_psu is defined and oracle_home_gi not in checkgiinstall.stdout
+  # - name: install-home-gi | Distribute latest opatch
+  #   shell: unzip -o -d {{oracle_home_gi}} {{opatcharchive}}
+  #   become: yes
+  #   become_user: "{{ grid_install_user }}"
+  #   when: oracle_sw_image_gi_patches is defined and oracle_home_gi not in checkgiinstall.stdout
 
   - name: install-home-gi | Install cvuqdisk rpm
     yum: name="{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}" state=present
@@ -67,23 +67,23 @@
     when: oracle_home_gi not in checkgiinstall.stdout and item.diskgroup == oracle_asm_init_dg
 
   # returncode of gridSetup.sh is always <> 0 => forced exit 0
-  - name: install-home-gi | Apply Release Update on ORACLE_HOME
-    shell: "{{oracle_home_gi}}/gridSetup.sh -silent -applyPSU {{ oracle_stage_remote }}/{{ oracle_install_version_gi }}/{{item.patchid}} -waitforcompletion ; exit 0"
-    become: yes
-    become_user: "{{ grid_install_user }}"
-    with_items:
-      - "{{ oracle_sw_image_gi_psu }}"
-    register: command_result
-    failed_when: "'Successfully applied the patch.' not in command_result.stdout_lines"
-    when: oracle_sw_image_gi_psu is defined and oracle_install_version_gi == item.version and oracle_home_gi not in checkgiinstall.stdout
-
-  - debug: msg="Ignore the failure [FATAL] [INS-40426] in output from gridSetup.sh -applyPSU"
-    when: command_result is defined and oracle_sw_image_gi_psu is defined
-
-  - debug: msg={{item.stdout_lines}}
-    with_items:
-      - "{{command_result.results}}"
-    when: oracle_sw_image_gi_psu is defined and oracle_home_gi not in checkgiinstall.stdout
+  # - name: install-home-gi | Apply Release Update on ORACLE_HOME
+  #   shell: "{{oracle_home_gi}}/gridSetup.sh -silent -applyPSU {{ oracle_stage_remote }}/{{ oracle_install_version_gi }}/{{item.patchid}} -waitforcompletion ; exit 0"
+  #   become: yes
+  #   become_user: "{{ grid_install_user }}"
+  #   with_items:
+  #     - "{{ oracle_sw_image_gi_patches }}"
+  #   register: command_result
+  #   failed_when: "'Successfully applied the patch.' not in command_result.stdout_lines"
+  #   when: oracle_sw_image_gi_patches is defined and oracle_install_version_gi == item.version and oracle_home_gi not in checkgiinstall.stdout
+  #
+  # - debug: msg="Ignore the failure [FATAL] [INS-40426] in output from gridSetup.sh -applyPSU"
+  #   when: command_result is defined and oracle_sw_image_gi_patches is defined
+  #
+  # - debug: msg={{item.stdout_lines}}
+  #   with_items:
+  #     - "{{command_result.results}}"
+  #   when: oracle_sw_image_gi_patches is defined and oracle_home_gi not in checkgiinstall.stdout
 
   - name: install-home-gi | Install Grid Infrastructure
     shell: "{{ oracle_home_gi }}/gridSetup.sh -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -silent"
@@ -98,6 +98,10 @@
   - debug: var=giinstall.stdout_lines
     run_once: "{{ configure_cluster}}"
     when: oracle_home_gi not in checkgiinstall.stdout
+
+  - include_role:
+          name: oraswgi-manage-patches
+    when: patch_before_rootsh and apply_patches_gi
 
   - name: install-home-gi | Run oraInstroot script after installation
     shell: "{{ oracle_inventory_loc }}/orainstRoot.sh"

@@ -46,6 +46,10 @@
   run_once: "{{ configure_cluster}}"
   when: oracle_home_gi not in checkgiinstall.stdout
 
+- include_role:
+        name: oraswgi-manage-patches
+  when: patch_before_rootsh and apply_patches_gi
+
 - name: install-home-gi | Run oraInstroot script after installation
   shell: "{{ oracle_inventory_loc }}/orainstRoot.sh"
   become: yes

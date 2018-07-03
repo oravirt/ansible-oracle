@@ -1,0 +1,103 @@
+---
+
+  #master_node: true
+  role_separation: false
+  hostgroup: "{{ group_names[0] }}"
+  cluster_master: "{{play_hosts[0]}}"
+  configure_cluster: false
+
+  oracle_user: oracle                        # User that will own the Oracle Installations.
+  grid_user: grid
+  grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
+  oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+  grid_user_home: "/home/{{ grid_install_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+  oracle_group: oinstall                          # Primary group for oracle_user.
+
+  oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
+  oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
+  is_sw_source_local: true
+  install_from_nfs: false
+  oracle_sw_copy: "{% if install_from_nfs %}False{% else %}True{% endif %}"
+  oracle_sw_unpack: "{% if install_from_nfs %}False{% else %}True{% endif %}"
+  nfs_server_sw: nfsserver
+  nfs_server_sw_path: /path/to/orasw
+
+  oracle_stage: /u01/stage
+  oracle_stage_remote: "{{ oracle_stage }}"
+  oracle_stage_install: "{% if not oracle_sw_copy and not oracle_sw_unpack%}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
+  oracle_base: /u01/app/oracle
+  oracle_rsp_stage: "{{ oracle_stage }}/rsp"
+  oracle_patch_stage: "{{ oracle_stage }}/patches"
+  oracle_patch_stage_remote: "{{ oracle_stage_remote }}/patches"
+  oracle_patch_install: "{% if not oracle_sw_copy and not oracle_sw_unpack%}{{ oracle_patch_stage_remote }}{% else %}{{ oracle_patch_stage }}{% endif %}"
+  oracle_inventory_loc: /u01/app/oraInventory
+  oracle_home_gi: "{% if configure_cluster %}{{ oracle_home_gi_cl }}{% else %}{{ oracle_home_gi_so }}{% endif %}"
+  oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Clustered)
+  oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Stand Alone)
+
+  oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
+  ocm_response_file: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocm.rsp"
+
+  apply_patches_gi: True
+  patch_before_rootsh: False
+
+  gi_patches:
+       12.2.0.1:
+            opatch_minversion: 12.2.0.1.12
+            opatchauto:
+                - patchid: 27468969
+                  patchversion: 12.2.0.1.180417
+                  apply: True
+                  subpatches:
+                      - 27464465
+                      - 27144050
+                      - 26839277
+                      - 27458609
+                      - 27674384
+            opatch: []
+       12.1.0.2:
+            opatch_minversion: 12.1.0.1.7
+            opatchauto:
+                - patchid: 27468957
+                  patchversion: 12.1.0.2.180417
+                  apply: True
+                  subpatches:
+                      - 27338041
+                      - 27338020
+                      - 27338013
+                      - 26983807
+            opatch: []
+       11.2.0.4:
+            opatch_minversion: 11.2.0.3.6
+            opatchauto:
+                - patchid: 27475913
+                  patchversion: 11.2.0.4.180417
+                  apply: True
+                  subpatches:
+                      - 22502505
+                      - 27441052
+                      - 27338049
+            opatch: []
+
+  oracle_sw_image_gi_patches:                                              # Files containing the installation media for Grid Infrastructure
+       - { filename: p27468969_122010_Linux-x86-64.zip, patchid: 27468969, version: 12.2.0.1,  patchversion: 12.2.0.1.180417, description: GI-RU-April-2018, creates: 27468969/27674384/README.txt }
+       - { filename: p27468957_121020_Linux-x86-64.zip, patchid: 27468957, version: 12.1.0.2, patchversion: 12.1.0.2.180417, description: GI-PSU-Apr-2018, creates: 27468957/27338013/etc/config/inventory.xml }
+       - { filename: p19392646_121020_Linux-x86-64.zip, patchid: 19392646, version: 12.1.0.2, patchversion: 12.1.0.2.1, description: GI-PSU-Oct-2014 }
+       - { filename: p20485724_121020_Linux-x86-64.zip, patchid: 20485724, version: 12.1.0.2, patchversion: 12.1.0.2.3, description: GI-PSU-Apr-2015 }
+       - { filename: p21523234_121020_Linux-x86-64.zip, patchid: 21523234, version: 12.1.0.2, patchversion: 12.1.0.2.5, description: GI-PSU-Oct-2015 }
+       - { filename: p24412235_121020_Linux-x86-64.zip, patchid: 24412235, version: 12.1.0.2, patchversion: 12.1.0.2.161018, description: GI-PSU-Oct-2016 }
+       - { filename: p24968615_121020_Linux-x86-64.zip, patchid: 24968615, version: 12.1.0.2, patchversion: 12.1.0.2.170117, description: GI-PSU-Jan-2017}
+       - { filename: p25434003_121020_Linux-x86-64.zip, patchid: 25434003, version: 12.1.0.2, patchversion: 12.1.0.2.170418, description: GI-PSU-Apr-2017}
+       - { filename: p27475913_112040_Linux-x86-64.zip, patchid: 27475913, version: 11.2.0.4, patchversion: 11.2.0.4.180417, description: GI-PSU-Apr-2018, creates: 27475913/22502505/files/lib/acfstoolsdriver.sh }
+       - { filename: p19380115_112040_Linux-x86-64.zip, patchid: 19380115, version: 11.2.0.4, patchversion: 11.2.0.4.4, description: GI-PSU-Apr-2018 }
+       - { filename: p19380115_112040_Linux-x86-64.zip, patchid: 19380115, version: 11.2.0.4, patchversion: 11.2.0.4.4, description: GI-PSU-Oct-2014 }
+       - { filename: p20485808_112040_Linux-x86-64.zip, patchid: 20485808, version: 11.2.0.4, patchversion: 11.2.0.4.6, description: GI-PSU-Apr-2015 }
+       - { filename: p21523375_112040_Linux-x86-64.zip, patchid: 21523375, version: 11.2.0.4, patchversion: 11.2.0.4.8, description: GI-PSU-Oct-2015 }
+
+
+  oracle_opatch_patch:
+       - { filename: p6880880_122010_Linux-x86-64.zip, version: 12.2.0.1 }
+       - { filename: p6880880_122010_Linux-x86-64.zip, version: 12.1.0.2 }
+       - { filename: p6880880_121010_Linux-x86-64.zip, version: 12.1.0.1 }
+       - { filename: p6880880_112000_Linux-x86-64.zip, version: 11.2.0.4 }
+       - { filename: p6880880_112000_Linux-x86-64.zip, version: 11.2.0.3 }
