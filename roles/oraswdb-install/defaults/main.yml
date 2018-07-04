@@ -39,6 +39,9 @@
   is_sw_source_local: true
   configure_cluster: false
   autostartup_service: false # automatic startup/stop databases service
+  hostinitdaemon: "{% if    ansible_os_family == 'RedHat' and ansible_distribution_major_version | int >= 7   %}systemd
+                   {%- elif ansible_os_family == 'Suse'   and ansible_distribution_major_version | int >= 12 %}systemd
+                   {%- else %}init{% endif %}"
 
   oracle_directories:
           - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }

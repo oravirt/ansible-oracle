@@ -92,13 +92,6 @@
     tags:
       - nfsunmountdb
 
-  - name: install-home-db | Check if systemd or init.d is used
-    shell: ps -e|grep " 1 ?"|cut -d " " -f15
-    tags:
-    - checkinitdaemons
-    - autostartup_service
-    register: checkinitdaemons
+  - include_tasks: "{{ hostinitdaemon }}.yml"
     when: autostartup_service
-
-  - include_tasks: "{{ checkinitdaemons.stdout }}.yml"
-    when: autostartup_service
+    tags: autostartup_service
