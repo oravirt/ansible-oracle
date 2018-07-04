@@ -59,7 +59,7 @@
     become_user: "{{ grid_install_user }}"
     tags:
       - apply_psu_grid
-    when: apply_patches_gi and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and item.0.apply and patch_before_rootsh
+    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and item.0.apply and patch_before_rootsh
     register: psuapplym
 
   - name: gi-opatch | Apply opatchauto patches to GI
@@ -77,7 +77,7 @@
     #run_once: "{{ configure_cluster}}"
     tags:
       - apply_psu_grid
-    when: apply_patches_gi  and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and item.apply and not patch_before_rootsh
+    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and item.apply and not patch_before_rootsh
     register: psuapplym
 
   - name: gi-opatch | Apply non opatchauto patches to GI
@@ -97,7 +97,7 @@
     become_user: "{{ grid_install_user }}"
     tags:
       - apply_psu_grid
-    when: apply_patches_gi and gi_patches[oracle_install_version_gi]['opatch'] is defined and item.apply and not patch_before_rootsh and item.apply_type is not defined
+    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatch'] is defined and item.apply and not patch_before_rootsh and item.apply_type is not defined
     register: psuapplym
   #
   #

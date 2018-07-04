@@ -6,7 +6,7 @@
   with_nested:
      - "{{oracle_sw_image_gi_patches}}"
      - "{{gi_patches[oracle_install_version_gi]['opatchauto']}}"
-  when: apply_patches_gi and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and item[1].patchid == item[0].patchid and oracle_sw_copy and not is_sw_source_local
+  when: apply_patches_gi and item[1].patchid == item[0].patchid and oracle_sw_copy and not is_sw_source_local
   become: yes
   become_user: "{{ grid_install_user }}"
   tags:
@@ -21,7 +21,7 @@
   with_nested:
   - "{{oracle_sw_image_gi_patches}}"
   - "{{gi_patches[oracle_install_version_gi]['opatchauto']}}"
-  when: apply_patches_gi and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and item[1].patchid == item[0].patchid and oracle_sw_copy and is_sw_source_local
+  when: apply_patches_gi and item[1].patchid == item[0].patchid and oracle_sw_copy and is_sw_source_local
   become: yes
   become_user: "{{ grid_install_user }}"
   tags:
