@@ -28,8 +28,21 @@
   oracle_rsp_stage: "{{ oracle_stage }}/rsp"
   oracle_inventory_loc: /u01/app/oraInventory
   oracle_base: /u01/app/oracle
-  oracle_home_db: "{% if dbh is defined %}{% if dbh.oracle_home is defined %}{{ dbh.oracle_home }}{% else %}{{ oracle_base}}/{{ dbh.oracle_version_db }}/{{ dbh.home }}{% endif %}{% elif item.0 is defined %}{% if item.0.oracle_home is defined %}{{ item.0.oracle_home}}{% else %}{{ oracle_base }}/{{ item.0.oracle_version_db }}/{{ item.0.home }}{% endif %}{% elif item is defined %}{% if item.oracle_home is defined %}{{ item.oracle_home}}{% else %}{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}{% endif %}{% endif %}"
-  #oracle_home_db: "{% if item is defined %}{% if item.oracle_home is defined %}{{ item.oracle_home}}{% else %}{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}{% endif %}{% else %}{% if dbh.oracle_home is defined %}{{ dbh.oracle_home }}{% else %}{{ oracle_base }}/{{ dbh.oracle_version_db }}/{{ dbh.home }}{% endif %}{% endif %}"
+
+  oracle_home_db: "{% if dbh is defined %}
+                     {%- if dbh.oracle_home is defined %}{{ dbh.oracle_home }}
+                     {%- else %}{{ oracle_base}}/{{ dbh.oracle_version_db }}/{{ dbh.home }}
+                     {%- endif %}
+                   {%- elif item.0 is defined %}
+                     {%- if item.0.oracle_home is defined %}{{ item.0.oracle_home}}
+                     {%- else %}{{ oracle_base }}/{{ item.0.oracle_version_db }}/{{ item.0.home }}
+                     {%- endif %}
+                   {%- elif item is defined %}
+                     {%- if item.oracle_home is defined %}{{ item.oracle_home}}
+                     {%- else %}{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}
+                     {%- endif %}
+                   {%- endif %}"
+
 
   oracle_profile_name: "{% if item is defined %}{% if item.oracle_home is defined %}.profile_{{ item.oracle_home |basename}}_{{ item.oracle_version_db}}{% elif item.home is defined %}.profile_{{ item.home }}_{{item.oracle_version_db}}{% elif item.oracle_home is defined %}.profile_{{item.oracle_home |basename}}_{{item.oracle_version_db}}{% endif %}{% else %}{% if dbh.oracle_home is defined %}.profile_{{ dbh.oracle_home |basename}}_{{ dbh.oracle_version_db}}{% elif dbh.home is defined %}.profile_{{ dbh.home }}_{{dbh.oracle_version_db}}{% else %}.profile_{{dbh.home}}_{{dbh.oracle_db_name}}{% endif%}{%endif %}"    # Name of profile-file. Sets up the environment for that ORACLE_HOME
   oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
@@ -42,6 +55,34 @@
   hostinitdaemon: "{% if    ansible_os_family == 'RedHat' and ansible_distribution_major_version | int >= 7   %}systemd
                    {%- elif ansible_os_family == 'Suse'   and ansible_distribution_major_version | int >= 12 %}systemd
                    {%- else %}{% if ansible_service_mgr is defined %}{{ ansible_service_mgr }}{% else %}init{% endif %}{% endif %}"
+
+  oracle_EE_options: "{%- if dbh.oracle_version_db in ('12.2.0.1') %}{{ oracle_EE_options_122 }}
+                      {%- elif dbh.oracle_version_db in ('12.1.0.1', '12.1.0.2') %}{{oracle_EE_options_121}}
+                      {%- elif dbh.oracle_version_db == '11.2.0.4' %}{{oracle_EE_options_112}}
+                      {%- endif %}"
+  oracle_EE_option_state: "{% if item.state is defined and item.state %}enable{% else %}disable{% endif %}"
+
+  # disable all options who requires extra licences
+  oracle_EE_options_112:
+    - {option: dm           , state: false }
+    - {option: dv           , state: false }
+    - {option: lbac         , state: false }
+    - {option: olap         , state: false }
+    - {option: partitioning , state: false }
+    - {option: rat          , state: false }
+
+  oracle_EE_options_121:
+    - {option: dm           , state: false }
+    - {option: olap         , state: false }
+    - {option: partitioning , state: false }
+    - {option: rat          , state: false }
+
+  oracle_EE_options_122:
+    - {option: oaa          , state: false }
+    - {option: olap         , state: false }
+    - {option: partitioning , state: false }
+    - {option: rat          , state: false }
+
 
   oracle_directories:
           - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
