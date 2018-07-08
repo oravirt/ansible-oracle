@@ -52,7 +52,7 @@
 # licence options in 11.2+ must be changed by chopt
 # => use this method for all >= 11.2 (Doc ID 948061.1)
 # test -f => reduce number of executions when > 1 database in oracle_databases for same ORACLE_HOME
-- name: Change Database options with chopt
+- name: install-home-db | Change Database options with chopt
   shell: "test -f {{ oracle_home_db }}/install/{{oracle_EE_option_state}}_{{item.option}}.log || {{ oracle_home_db }}/bin/chopt {{oracle_EE_option_state}} {{item.option}}"
   debugger: on_failed
   with_items:
@@ -81,8 +81,8 @@
   tags:
     - glogindb
 
-- name: install-home-db | Check opatch lsinventory (DB)
-  shell: "{{ oracle_home_db }}/OPatch/opatch lsinventory"
+- name: install-home-db | Check opatch lspatches (DB)
+  shell: "{{ oracle_home_db }}/OPatch/opatch lspatches"
   become: yes
   become_user: "{{ oracle_user }}"
   run_once: "{{ configure_cluster}}"
