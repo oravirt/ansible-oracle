@@ -247,6 +247,10 @@
         - filesystem
     tags: hostfs
 
+  - name: filesystem | Create directory for oraInventory
+    file: path={{ oracle_inventory_loc }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=775
+    tags: hostfs
+
   - name: Oracle-recommended kernel settings
     sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes ignoreerrors=yes
     with_items: "{{oracle_sysctl}}"
