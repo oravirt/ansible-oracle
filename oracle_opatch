@@ -82,7 +82,7 @@ options:
         default: 1521
 
 notes:
-    - 
+    -
 requirements: [ "os","pwd","distutils.version" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
@@ -92,7 +92,7 @@ EXAMPLES = '''
 '''
 import os, pwd
 from distutils.version import LooseVersion
-# 
+#
 # try:
 #     import cx_Oracle
 # except ImportError:
@@ -211,7 +211,7 @@ def analyze_patch (module, msg, oracle_home, patch_base, opatchauto):
         else:
             return True
 
-def apply_patch (module, msg, oracle_home, patch_base, patch_id, patch_version, opatchauto, ocm_response_file, offline):
+def apply_patch (module, msg, oracle_home, patch_base, patch_id, patch_version, opatchauto, ocm_response_file, offline, output):
     '''
     Applies the patch
     '''
@@ -238,7 +238,7 @@ def apply_patch (module, msg, oracle_home, patch_base, patch_id, patch_version, 
 
     if ocm_response_file is not None and (LooseVersion(opatch_version) < LooseVersion(opatch_version_noocm)):
         command += ' -ocmrf %s' % (ocm_response_file)
-    
+
     (rc, stdout, stderr) = module.run_command(command)
     if rc != 0:
       msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
@@ -247,10 +247,20 @@ def apply_patch (module, msg, oracle_home, patch_base, patch_id, patch_version, 
         msg = 'STDOUT: %s, COMMAND: %s' % (stdout,command)
         module.fail_json(msg=msg, changed=False)
     else:
-        return True
+        checks = ['successfully applied' in stdout,
+                 'patch applied successfully' in stdout]
+        if any(checks):
+            if output == 'short':
+                return True
+            else:
+                msg = 'STDOUT: %s, COMMAND: %s' % (stdout,command)
+                module.exit_json(msg=msg, changed=True)
+        else:
+            msg = 'STDOUT: %s, COMMAND: %s' % (stdout,command)
+            module.exit_json(msg=msg, changed=False)
 
 
-def remove_patch (module, msg, oracle_home, patch_base, patch_id, opatchauto, ocm_response_file):
+def remove_patch (module, msg, oracle_home, patch_base, patch_id, opatchauto, ocm_response_file,output):
     '''
     Removes the patch
     '''
@@ -267,7 +277,7 @@ def remove_patch (module, msg, oracle_home, patch_base, patch_id, opatchauto, oc
         command = '%s/OPatch/%s -id %s -silent' % (oracle_home,opatch_cmd, patch_id)
 
 
-    if ocm_response_file is not None:
+    if ocm_response_file is not None and (LooseVersion(opatch_version) < LooseVersion(opatch_version_noocm)):
         command += ' -ocmrf %s' % (ocm_response_file)
 
     #module.exit_json(msg=command, changed=False)
@@ -276,7 +286,17 @@ def remove_patch (module, msg, oracle_home, patch_base, patch_id, opatchauto, oc
       msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
       module.fail_json(msg=msg, changed=False)
     else:
-        return True
+        checks = ['RollbackSession removing interim patch' in stdout,
+                 'rolled back successfully' in stdout]
+        if any(checks):
+            if output == 'short':
+                return True
+            else:
+                msg = 'STDOUT: %s, COMMAND: %s' % (stdout,command)
+                module.exit_json(msg=msg, changed=True)
+        else:
+            msg = 'STDOUT: %s, COMMAND: %s' % (stdout,command)
+            module.exit_json(msg=msg, changed=False)
 
 
 #
@@ -350,6 +370,7 @@ def main():
             conflict_check      = dict(default='True', type='bool'),
             ocm_response_file   = dict(required=None,aliases = ['ocmrf']),
             offline             = dict(default='False', type='bool'),
+            output              = dict(default="short", choices = ["short","verbose"]),
             state               = dict(default="present", choices = ["present", "absent", "opatchversion"]),
             hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
             port                = dict(required=False, default = 1521),
@@ -369,6 +390,7 @@ def main():
     conflict_check      = module.params["conflict_check"]
     ocm_response_file   = module.params["ocm_response_file"]
     offline             = module.params["offline"]
+    output              = module.params["output"]
     state               = module.params["state"]
     hostname            = module.params["hostname"]
     port                = module.params["port"]
@@ -406,7 +428,7 @@ def main():
     major_version = get_version(module,msg,oracle_home)
     opatch_version = get_opatch_version(module,msg,oracle_home)
     opatch_version_noocm = '12.2.0.1.5'
-    
+
     if opatch_minversion is not None:
         opatch_minversion_ = opatch_minversion.replace('.','')
         if LooseVersion(opatch_version) < LooseVersion(opatch_minversion):
@@ -422,7 +444,7 @@ def main():
 
     if state == 'present':
         if not check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatchauto):
-            if apply_patch(module, msg, oracle_home, patch_base, patch_id,patch_version, opatchauto,ocm_response_file,offline):
+            if apply_patch(module, msg, oracle_home, patch_base, patch_id,patch_version, opatchauto,ocm_response_file,offline,output):
                 if patch_version is not None:
                     msg = 'Patch %s (%s) successfully applied to %s' % (patch_id,patch_version, oracle_home)
                 else:
@@ -438,7 +460,7 @@ def main():
 
     elif state == 'absent':
         if check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatchauto):
-            if remove_patch(module, msg, oracle_home, patch_base, patch_id, opatchauto,ocm_response_file, offline):
+            if remove_patch(module, msg, oracle_home, patch_base, patch_id, opatchauto,ocm_response_file, output):
                 if patch_version is not None:
                     msg = 'Patch %s (%s) successfully removed from %s' % (patch_id,patch_version, oracle_home)
                 else:
