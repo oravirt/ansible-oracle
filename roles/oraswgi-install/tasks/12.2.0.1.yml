@@ -20,7 +20,7 @@
     become_user: "{{ grid_install_user }}"
     tags:
     - oragridswunpack
-    when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version
+    when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and not oracle_sw_copy
 
   # Check for an existing GRID_HOME before reinstallation of OPatch
   - name: install-home-gi | Check for file GridSetup.sh

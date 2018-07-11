@@ -1,4 +1,12 @@
 ---
+  - name: gi-opatch | check if GI has been configured
+    stat: path=/etc/oracle/olr.loc
+    register: olrloc
+
+  - name: gi-opatch | set fact for patch_before_rootsh
+    set_fact:
+        patch_before_rootsh: False
+    when: olrloc.stat.exists and patch_before_rootsh
 
   - name: gi-opatch | Create patch-base directory (version specific)
     file:
@@ -41,7 +49,7 @@
     tags:
       - ocmconfig
 
-  - name: gi-opatch | Apply opatchauto patches to GI (after sofware only install)
+  - name: gi-opatch | Manage opatchauto patches for GI (after software only install)
     oracle_opatch:
         oracle_home={{ oracle_home_gi }}
         patch_base={{ oracle_patch_install }}/{{ oracle_install_version_gi}}/{{ item.0.path | default (item.0.patchid)}}/{{ item.1}}
@@ -50,6 +58,7 @@
         opatchauto=False
         conflict_check=True
         ocm_response_file={{ ocm_response_file | default(omit)}}
+        output=verbose
         state=present
     with_subelements:
        - "{{gi_patches[oracle_install_version_gi]['opatchauto']}}"
@@ -59,10 +68,10 @@
     become_user: "{{ grid_install_user }}"
     tags:
       - apply_psu_grid
-    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and item.0.apply and patch_before_rootsh
+    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and item.0.apply and patch_before_rootsh and not olrloc.stat.exists
     register: psuapplym
 
-  - name: gi-opatch | Apply opatchauto patches to GI
+  - name: gi-opatch | Manage opatchauto patches for GI
     oracle_opatch:
         oracle_home={{ oracle_home_gi }}
         patch_base={{ oracle_patch_install }}/{{ oracle_install_version_gi}}/{{ item.path | default (item.patchid)}}/
@@ -71,16 +80,17 @@
         opatchauto=True
         conflict_check=True
         ocm_response_file={{ ocm_response_file | default(omit)}}
+        output=verbose
         state=present
     with_items:
        - "{{gi_patches[oracle_install_version_gi]['opatchauto']}}"
     #run_once: "{{ configure_cluster}}"
     tags:
       - apply_psu_grid
-    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and item.apply and not patch_before_rootsh
+    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and item.apply and not patch_before_rootsh and olrloc.stat.exists
     register: psuapplym
 
-  - name: gi-opatch | Apply non opatchauto patches to GI
+  - name: gi-opatch | Manage non opatchauto patches for GI
     oracle_opatch:
         oracle_home={{ oracle_home_gi }}
         patch_base={{ oracle_patch_install }}/{{ oracle_install_version_gi}}/{{ item.path | default (item.patchid)}}/
@@ -89,6 +99,7 @@
         opatchauto=False
         conflict_check=True
         ocm_response_file={{ ocm_response_file | default(omit)}}
+        output=verbose
         state=present
     with_items:
        - "{{gi_patches[oracle_install_version_gi]['opatch']}}"
@@ -97,7 +108,7 @@
     become_user: "{{ grid_install_user }}"
     tags:
       - apply_psu_grid
-    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatch'] is defined and item.apply #and not patch_before_rootsh
+    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatch'] is defined and item.apply and patch_before_rootsh and not olrloc.stat.exists
     register: psuapplym
   #
   #
