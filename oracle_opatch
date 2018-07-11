@@ -248,7 +248,8 @@ def apply_patch (module, msg, oracle_home, patch_base, patch_id, patch_version, 
         module.fail_json(msg=msg, changed=False)
     else:
         checks = ['successfully applied' in stdout,
-                 'patch applied successfully' in stdout]
+                 'patch applied successfully' in stdout,
+                 'apply successful' in stdout]
         if any(checks):
             if output == 'short':
                 return True
