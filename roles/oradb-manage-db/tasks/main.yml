@@ -8,7 +8,11 @@
   tags: set_fact
 
 - include_tasks: listener.yml
-  when: create_listener
+  with_items:
+      - "{{ oracle_databases }}"
+  loop_control:
+    loop_var: dbh
+  when: create_listener and oracle_databases is defined
   tags: listener
 
 - name: manage-db | Add change-pdb script
