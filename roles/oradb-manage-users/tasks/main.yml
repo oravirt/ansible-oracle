@@ -4,6 +4,7 @@
 - name: Manage users (db/cdb)
   oracle_user:
           hostname={{ ansible_hostname }}
+          port={{ listener_port_template }}
           service_name={{ db_service_name }}
           user={{ db_user }}
           password={{ db_password_cdb }}
@@ -29,6 +30,7 @@
 - name: Manage users (pdb)
   oracle_user:
           hostname={{ ansible_hostname }}
+          port={{ listener_port_template }}
           service_name={{ item.0.pdb_name }}
           user={{ db_user }}
           password={{ db_password_pdb }}

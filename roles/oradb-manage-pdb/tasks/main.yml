@@ -32,7 +32,9 @@
       username={{ db_user | default('sys') }}
       password={{ db_password_cdb }}
       mode={{ db_mode }}
-      service_name={{ item[1].cdb }}
+      service_name={{ item[0].oracle_db_unique_name | default(item[0].oracle_db_name) }}
+      port={{ listener_port_template }}
+listener_port
       state={{ item[1].state |default(omit) }}
   environment: "{{oracle_env}}"
   run_once: "{{ configure_cluster}}"
