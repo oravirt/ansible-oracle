@@ -114,11 +114,16 @@
 ## END-OF-PASSWORDS
 
   dbca_templatename: General_Purpose.dbc
-  dbca_initparams: "{% if '12.2' in dbh.oracle_version_db %} -initParams db_name={{dbh.oracle_db_name}}{% if dbh.oracle_db_unique_name is defined %},db_unique_name={{dbh.oracle_db_unique_name}}{% endif %}{% endif %}"
-  dbca_initparams_extras: "{% if '12.2' in dbh.oracle_version_db and dbh.storage_type|upper == 'FS' and dbh.init_parameters is defined %}{% for a in  dbh.init_parameters %}{% if loop.first -%},{% endif %}{{ a.name }}={{ a.value}}{% if not loop.last -%},{% endif %}{% endfor %}{% endif %}"
+  # dbca_initparams: "{% if '12.2' in dbh.oracle_version_db %} -initParams db_name={{dbh.oracle_db_name}}{% if dbh.oracle_db_unique_name is defined %},db_unique_name={{dbh.oracle_db_unique_name}}{% endif %}{% endif %}"
+  # dbca_initparams_extras: "{% if '12.2' in dbh.oracle_version_db and dbh.storage_type|upper == 'FS' and dbh.init_parameters is defined %}{% for a in  dbh.init_parameters %}{% if loop.first -%},{% endif %}{{ a.name }}={{ a.value}}{% if not loop.last -%},{% endif %}{% endfor %}{% endif %}"
   dbca_sys_pass: "{% if dbpasswords[dbh.oracle_db_name] is defined %}{% if dbpasswords[dbh.oracle_db_name]['sys'] is defined %}{{dbpasswords[dbh.oracle_db_name]['sys']}}{% else %}{{default_dbpass}}{% endif %}{% else %}{{default_dbpass}}{% endif %}"
   dbca_system_pass: "{% if dbpasswords[dbh.oracle_db_name] is defined %}{% if dbpasswords[dbh.oracle_db_name]['system'] is defined %}{{dbpasswords[dbh.oracle_db_name]['system']}}{% else %}{{default_dbpass}}{% endif %}{% else %}{{default_dbpass}}{% endif %}"
-  dbca_redolog: "{% if dbh.redolog_size_in_mb is defined %} -redoLogFileSize {{dbh.redolog_size_in_mb}}{% endif %}"
+  # dbca_redolog: "{% if dbh.redolog_size_in_mb is defined %} -redoLogFileSize {{dbh.redolog_size_in_mb}}{% endif %}"
+  init_params_list: "{%- if dbh.init_parameters is defined  -%}
+                        {%- for p in  dbh.init_parameters -%}
+                           {{ p.name }}={{ p.value}}{%- if not loop.last -%},{%- endif -%}
+                        {%- endfor -%}
+                     {%- endif -%}"
 
   shell_ps1: "'[$LOGNAME'@'$ORACLE_SID `basename $PWD`]$'"
   shell_aliases:
