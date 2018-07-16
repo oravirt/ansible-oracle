@@ -7,7 +7,7 @@
   become: yes
   become_user: "{{ oracle_user }}"
   run_once: "{{ configure_cluster}}"
-  when: item[0].version == item[1].oracle_version_db and not is_sw_source_local and oracle_sw_copy
+  when: item[0].version == db_homes_config[item[1].home]['version'] and item[1].state|lower == 'present' and not is_sw_source_local and oracle_sw_copy
   args:
      creates: "{{ oracle_stage }}/{{ item[0].filename }}"
   tags:

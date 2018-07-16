@@ -1,8 +1,8 @@
 - name: install-home-db | Configure DB instances auto-startup service (init.d)
   template: src=dbora.j2 dest=/etc/init.d/dbora owner=root mode=750
   become: true
-  with_items: "{{oracle_databases}}"
-  when: autostartup_service and hostinitdaemon == "init"
+  with_items: "{{db_homes_installed}}"
+  when: autostartup_service and hostinitdaemon == "init" and item.state|lower == 'present'
   tags: autostartup_service
 
 - name: install-home-db | Register dbora service (init.d)

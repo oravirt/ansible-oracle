@@ -14,11 +14,11 @@
 -- USAGE
 --   This script is automatically run
 --
-{% if dbh.glogin is defined %}
-{% for line in dbh.glogin %}
+{% if db_homes_config[dbh.home]['glogin'] is defined %}
+{% for line in db_homes_config[dbh.home]['glogin'] %}
 {{ line }}
 {% endfor %}
-{% elif dbh.oracle_version_db >= '12.1.0.1' and dbh.is_container %}
+{% elif db_homes_config[dbh.home]['version'] >= '12.1.0.1' %}
 {% for item in glogin_default_cdb %}
 {{ item }}
 {% endfor %}

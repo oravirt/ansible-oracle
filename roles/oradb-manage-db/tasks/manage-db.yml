@@ -35,7 +35,7 @@
 #   when: not olrloc.stat.exists and dbh.oracle_db_name not in existing_dbs_nogi.stdout
 #   tags: set_fact
 
-- debug: msg="Creating/Maintaining DB - {{dbh.oracle_db_name}}"
+- debug: msg="Maintaining DB - {{dbh.oracle_db_name}}"
   run_once: "{{ configure_cluster }}"
   when: dbh.state|lower == 'present'
 
@@ -51,7 +51,7 @@
 
 - name: manage-db | Prepare installation template
   template:
-    src: "dbca-create-db.rsp.{{ dbh.oracle_version_db}}.j2"
+    src: "dbca-create-db.rsp.{{ db_version}}.j2"
     dest: "{{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}"
     owner: "{{ oracle_user }}"
     group: "{{ oracle_group }}"
@@ -92,20 +92,20 @@
 #   when: dbca_create.changed
 #   run_once: "{{ configure_cluster }}"
 
-- name: manage-db |Customize oratab for autostart
+- name: manage-db | Customize oratab for autostart
   lineinfile:
           dest=/etc/oratab
           line="{{ dbh.oracle_db_name }}:{{ oracle_home_db }}:Y"
           state=present
-  when: autostartup_service and not olrloc.stat.exists
+  when: autostartup_service and not olrloc.stat.exists and dbh.state == 'present'
   tags: update_oratab
 
-- name: manage-db |Customize oratab for autostart
+- name: manage-db | Customize oratab for autostart
   lineinfile:
          dest=/etc/oratab
          line="{{ dbh.oracle_db_name }}:{{ oracle_home_db }}:N"
          state=absent
-  when: autostartup_service and not olrloc.stat.exists
+  when: autostartup_service and not olrloc.stat.exists and dbh.state == 'present'
   become: yes
   tags: update_oratab
 
