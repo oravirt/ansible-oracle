@@ -2,7 +2,7 @@
 
   hostgroup: "{{ group_names[0] }}"
   oracle_dbca_rsp: "dbca_{{ dbh.oracle_db_name }}.rsp"        # Name of responsefile used by dbca. One per database
-  oracle_netca_rsp: "netca_{{ item.home }}_{{ listener_name_template }}.rsp"
+  oracle_netca_rsp: "netca_{{ dbh.home }}_{{ listener_name_template }}.rsp"
   oracle_user: oracle                        # User that will own the Oracle Installations.
   oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
   oracle_group: oinstall                          # Primary group for oracle_user.
@@ -52,10 +52,10 @@
   oracle_gi_cluster_type: STANDARD
   hostgroup_hub: "{{ hostgroup }}-hub"
   hostgroup_leaf: "{{ hostgroup }}-leaf"
-  create_listener: "{% if oracle_install_option_gi is defined %}False{% elif oracle_install_option_gi is undefined %}{% if item.listener_name is defined %}True{% else %}False{% endif %}{% endif %}"
-  listener_name_template: "{% if item.listener_name is defined %}{{ item.listener_name }}{% else %}{{ listener_name }}{% endif %}"
-  listener_protocols_template: "{% if item.listener_protocols is defined %}{{ item.listener_protocols }}{% else %}{{ listener_protocols }}{% endif %}"
-  listener_port_template: "{% if item.listener_port is defined %}{{ item.listener_port }}{% else %}{{ listener_port }}{% endif %}"
+  create_listener: "{% if oracle_install_option_gi is defined %}False{% elif oracle_install_option_gi is undefined %}{% if dbh.listener_name is defined %}True{% else %}False{% endif %}{% endif %}"
+  listener_name_template: "{% if dbh.listener_name is defined %}{{ dbh.listener_name }}{% else %}{{ listener_name }}{% endif %}"
+  listener_protocols_template: "{% if dbh.listener_protocols is defined %}{{ dbh.listener_protocols }}{% else %}{{ listener_protocols }}{% endif %}"
+  listener_port_template: "{% if dbh.listener_port is defined %}{{ dbh.listener_port }}{% else %}{{ listener_port }}{% endif %}"
   listener_name: LISTENER
   listener_protocols: TCP
   listener_port: 1521
