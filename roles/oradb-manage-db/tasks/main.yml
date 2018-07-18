@@ -5,6 +5,8 @@
   set_fact:
       create_listener: "{{ create_listener }}"
   with_items: "{{ oracle_databases }}"
+  loop_control:
+     loop_var: dbh
   tags: set_fact
 
 - include_tasks: listener.yml

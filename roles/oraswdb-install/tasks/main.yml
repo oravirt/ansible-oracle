@@ -17,17 +17,18 @@
       - directoriesdb
 
   - name: install-home-db | Create stage directory (version specific)
-    file: dest={{ oracle_stage }}/{{ item.oracle_version_db }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    file: dest={{ oracle_stage }}/{{ db_version }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     with_items:
-       - "{{ oracle_databases }}"
+       - "{{ db_homes_installed }}"
     run_once: "{{ configure_cluster}}"
-    when: oracle_databases is defined
+    when: db_homes_installed is defined  and item.state|lower == 'present'
     tags:
       - directoriesdb
 
   - name: install-home-db | Create ORACLE_HOME directory
     file: dest={{ oracle_home_db }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
-    with_items: "{{oracle_databases}}"
+    with_items: "{{db_homes_installed}}"
+    when: db_homes_config[item.home] is defined and item.state|lower == 'present'
     tags:
       - directoriesdb
 
@@ -38,13 +39,14 @@
     copy: src={{ oracle_sw_source_local }}/{{ item[0].filename }} dest={{ oracle_stage }} mode=775 force=no
     with_nested:
       - "{{oracle_sw_image_db}}"
-      - "{{oracle_databases}}"
+      - "{{db_homes_installed}}"
     become: yes
     become_user: "{{ oracle_user }}"
     run_once: "{{ configure_cluster}}"
-    when: item[0].version == item[1].oracle_version_db and is_sw_source_local and oracle_sw_copy
+    when: item[0].version == db_homes_config[item[1].home]['version'] and item[1].state|lower == 'present'  and is_sw_source_local and oracle_sw_copy
     tags:
       - oradbsw
+
 
   - name: install-home-db | Extract files to stage-area
     unarchive:
@@ -54,11 +56,11 @@
         creates="{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates}}"
     with_nested:
       - "{{oracle_sw_image_db}}"
-      - "{{oracle_databases}}"
+      - "{{db_homes_installed}}"
     become: yes
     become_user: "{{ oracle_user }}"
     run_once: "{{ configure_cluster}}"
-    when: item[0].version == item[1].oracle_version_db and oracle_sw_copy and oracle_sw_unpack
+    when: item[0].version == db_homes_config[item[1].home]['version'] and item[1].state|lower == 'present' and oracle_sw_copy and oracle_sw_unpack
     tags:
       - oradbswunpack
 
@@ -70,20 +72,20 @@
         creates="{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates}}"
     with_nested:
       - "{{oracle_sw_image_db}}"
-      - "{{oracle_databases}}"
+      - "{{db_homes_installed}}"
     become: yes
     become_user: "{{ oracle_user }}"
     run_once: "{{ configure_cluster}}"
-    when: item[0].version == item[1].oracle_version_db and not oracle_sw_copy and oracle_sw_unpack
+    when: item[0].version == db_homes_config[item[1].home]['version'] and item[1].state|lower == 'present'  and not oracle_sw_copy and oracle_sw_unpack
     tags:
       - oradbswunpack
 
   - include_tasks: install-home-db.yml
     with_items:
-        - "{{ oracle_databases }}"
+        - "{{ db_homes_installed }}"
     loop_control:
       loop_var: dbh
-    when: oracle_databases is defined
+    when: db_homes_installed is defined and dbh.state|lower == 'present'
     tags: oradbinstall
 
   - name: install-home-db | Unmount nfs share with installation media

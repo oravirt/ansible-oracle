@@ -1,15 +1,12 @@
 oracle_databases:                                               # Dictionary describing the databases to be installed
-      - home: db1                                            # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.2.0.1/db1)
-        oracle_version_db: 12.2.0.1                         # Oracle versiono (12.2.0.1,12.1.0.2,12.1.0.1,11.2.0.4,11.2.0.3)
-        oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+      - home: 12201-base                                            # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.2.0.1/db1)
         oracle_db_name: orclcdb                                 # Database name
-        oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
         oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
         is_container: True                                # (true/false) Is the database a container database
         storage_type: FS                                     # Database storage to be used. ASM or FS.
         oracle_db_mem_totalmb: 1024                            # Amount of RAM to be used for SGA
         oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
-        redolog_size: 100M
+        redolog_size: 75M
         redolog_groups: 3
         datafile_dest: /u02/oradata
         recoveryfile_dest: /u02/fra
@@ -19,13 +16,15 @@ oracle_databases:                                               # Dictionary des
         flashback: False
         force_logging: False
         state: present
+        # tablespaces:
+        #      - { name: users, size: 10M, bigfile: True, autoextend: false , next: 5M, maxsize: 500M, content: permanent, state: present }
         init_parameters:
              - {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
              - {name: db_create_online_log_dest_1, value: '/u02/fra', scope: both, state: present}
              - {name: db_recovery_file_dest, value: '/u02/fra', scope: both, state: present}
              - {name: db_recovery_file_dest_size, value: 20G, scope: both, state: present}
-        services:
-             - { name: service2,  state: present }
+        # services:
+        #      - { name: service2,  state: started }
         # users:
         #   - schema: c##dba
         #     container: all
