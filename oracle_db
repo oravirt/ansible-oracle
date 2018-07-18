@@ -319,12 +319,14 @@ def check_db_exists(module, msg, oracle_home, db_name, db_unique_name ):
             return True
     else:
         existingdbs = []
-        with open('/etc/oratab') as oratab:
-            for line in oratab:
-        		if line.startswith('#') or line.startswith(' '):
-        			continue
-        		elif re.search(db_name +':', line):
-        			existingdbs.append(line)
+        oratabfile = '/etc/oratab'
+        if os.path.exists(oratabfile):
+            with open(oratabfile) as oratab:
+                for line in oratab:
+            		if line.startswith('#') or line.startswith(' '):
+            			continue
+            		elif re.search(db_name +':', line):
+            			existingdbs.append(line)
 
         if not existingdbs: #<-- db doesn't exist
             return False
