@@ -58,7 +58,7 @@
 # test -f => reduce number of executions when > 1 database in oracle_databases for same ORACLE_HOME
 - name: install-home-db | Change Database options with chopt
   shell: "test -f {{ oracle_home_db }}/install/{{oracle_EE_option_state}}_{{item.option}}.log || {{ oracle_home_db }}/bin/chopt {{oracle_EE_option_state}} {{item.option}}"
-  debugger: on_failed
+  #debugger: on_failed
   with_items:
     - "{{oracle_EE_options}}"
   become: yes

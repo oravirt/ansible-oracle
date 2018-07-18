@@ -4,7 +4,6 @@
 oracle_user: oracle
 configure_cluster: false
 oracle_base: /u01/app/oracle
-oracle_home_db: "{% if dbh is defined %}{% if dbh.oracle_home is defined %}{{ dbh.oracle_home }}{% else %}{{ oracle_base}}/{{ dbh.oracle_version_db }}/{{ dbh.home }}{% endif %}{% elif item.0 is defined %}{% if item.0.oracle_home is defined %}{{ item.0.oracle_home}}{% else %}{{ oracle_base }}/{{ item.0.oracle_version_db }}/{{ item.0.home }}{% endif %}{% elif item is defined %}{% if item.oracle_home is defined %}{{ item.oracle_home}}{% else %}{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}{% endif %}{% endif %}"
 
 default_dbpass: "{% if item.0 is defined and item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd}}{% else %}Oracle_123{% endif %}"
 db_user: system
