@@ -1,6 +1,10 @@
 - name: install-home-db | set fact with ORACLE_HOME
   set_fact:
-       oracle_home_db: "{{ oracle_home_db}}"
+       oracle_home_db: "{%- if db_homes_config[dbh.home]['oracle_home'] is defined  -%}
+                            {{db_homes_config[dbh.home]['oracle_home']}}
+                        {%- else -%}
+                             {{oracle_base}}/{{db_homes_config[dbh.home]['version']}}/{{db_homes_config[dbh.home]['home']}}
+                        {%- endif -%}"
 
 - name: install-home-db | Check if DB-server is already installed
   shell: cat "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" |grep -w {{ oracle_home_db  }} |awk  '{print $3}' | cut -f2 -d'"'
