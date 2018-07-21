@@ -42,7 +42,7 @@
   #   shell: unzip -o -d {{oracle_home_gi}} {{opatcharchive}}
   #   become: yes
   #   become_user: "{{ grid_install_user }}"
-  #   when: oracle_sw_image_gi_patches is defined and oracle_home_gi not in checkgiinstall.stdout
+  #   when: oracle_sw_patches is defined and oracle_home_gi not in checkgiinstall.stdout
 
   - name: install-home-gi | Install cvuqdisk rpm
     yum: name="{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}" state=present
@@ -72,18 +72,18 @@
   #   become: yes
   #   become_user: "{{ grid_install_user }}"
   #   with_items:
-  #     - "{{ oracle_sw_image_gi_patches }}"
+  #     - "{{ oracle_sw_patches }}"
   #   register: command_result
   #   failed_when: "'Successfully applied the patch.' not in command_result.stdout_lines"
-  #   when: oracle_sw_image_gi_patches is defined and oracle_install_version_gi == item.version and oracle_home_gi not in checkgiinstall.stdout
+  #   when: oracle_sw_patches is defined and oracle_install_version_gi == item.version and oracle_home_gi not in checkgiinstall.stdout
   #
   # - debug: msg="Ignore the failure [FATAL] [INS-40426] in output from gridSetup.sh -applyPSU"
-  #   when: command_result is defined and oracle_sw_image_gi_patches is defined
+  #   when: command_result is defined and oracle_sw_patches is defined
   #
   # - debug: msg={{item.stdout_lines}}
   #   with_items:
   #     - "{{command_result.results}}"
-  #   when: oracle_sw_image_gi_patches is defined and oracle_home_gi not in checkgiinstall.stdout
+  #   when: oracle_sw_patches is defined and oracle_home_gi not in checkgiinstall.stdout
 
   - name: install-home-gi | Install Grid Infrastructure
     shell: "{{ oracle_home_gi }}/gridSetup.sh -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -silent"

@@ -115,7 +115,7 @@
   # - name: Apply PSU to GI (v11.2) (Master node)
   #   shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
   #   with_together:
-  #   - "{{oracle_sw_image_gi_patches}}"
+  #   - "{{oracle_sw_patches}}"
   #   - "{{gi_applied_patches.results}}"
   #   run_once: "{{ configure_cluster}}"
   #   tags: apply_psu_grid
@@ -145,7 +145,7 @@
   # - name: Apply PSU to GI (v12.1) (other nodes)
   #   shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
   #   with_together:
-  #   - "{{oracle_sw_image_gi_patches}}"
+  #   - "{{oracle_sw_patches}}"
   #   - "{{gi_applied_patches.results}}"
   #   tags:
   #     - apply_psu_grid
@@ -156,7 +156,7 @@
   # - name: Apply PSU to GI (v11.2) (other nodes)
   #   shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
   #   with_together:
-  #   - "{{oracle_sw_image_gi_patches}}"
+  #   - "{{oracle_sw_patches}}"
   #   - "{{gi_applied_patches.results}}"
   #   tags: apply_psu_grid
   #   #when: not master_node and apply_patches_gi and '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0

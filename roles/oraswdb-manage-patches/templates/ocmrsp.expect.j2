@@ -1,0 +1,14 @@
+#!/usr/bin/expect -f
+spawn {{ oracle_home_gi }}/OPatch/ocm/bin/emocmrsp -no_banner -output {{ ocm_response_file }}
+expect {
+  "Email address/User Name:"
+  {
+    send "\r"
+    exp_continue
+  }
+  "Do you wish to remain uninformed of security issues*"
+  {
+    send "Y\r"
+    exp_continue
+  }
+}

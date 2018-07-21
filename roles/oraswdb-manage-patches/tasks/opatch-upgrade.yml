@@ -1,0 +1,49 @@
+- name: db-opatch | Check current opatch version
+  oracle_opatch:
+         oracle_home={{ oracle_home_db }}
+         state=opatchversion
+  register: current_opatch_version
+  tags: current_opatch_version
+  when: db_homes_config[dbh.home]['opatch_minversion'] is defined
+
+- debug: var=current_opatch_version.msg
+  tags: current_opatch_version
+  when: current_opatch_version.changed
+
+- name: db-opatch | Extract OPatch to DB Home
+  unarchive:
+      src={{ oracle_stage }}/{{ item.filename }}
+      dest={{ oracle_home_db }}
+      copy=no
+      owner={{ oracle_user }}
+      group={{ oracle_group }}
+  become: yes
+  with_items: "{{oracle_opatch_patch}}"
+  when: apply_patches_db and item.version == db_version and oracle_sw_copy and db_homes_config[dbh.home]['opatch_minversion'] is defined and (current_opatch_version.msg is version_compare(db_homes_config[dbh.home]['opatch_minversion'], '<'))
+  tags:
+    - oragridpatchunpack
+
+- name: db-opatch | Extract OPatch to DB Home (from remote location)
+  unarchive:
+      src={{ oracle_stage_remote }}/{{ item.filename }}
+      dest={{ oracle_home_db }}
+      copy=no
+      owner={{ oracle_user }}
+      group={{ oracle_group }}
+  become: yes
+  with_items: "{{oracle_opatch_patch}}"
+  when: apply_patches_db and item.version == db_version and not oracle_sw_copy and db_homes_config[dbh.home]['opatch_minversion'] is defined and (current_opatch_version.msg is version_compare(db_homes_config[dbh.home]['opatch_minversion'], '<'))
+  tags:
+    - oragridpatchunpack
+
+- name: db-opatch | Check current opatch version
+  oracle_opatch:
+         oracle_home={{ oracle_home_db }}
+         state=opatchversion
+  register: current_opatch_version
+  tags: current_opatch_version
+  when: db_homes_config[dbh.home]['opatch_minversion'] is defined
+
+- debug: var=current_opatch_version.msg
+  tags: current_opatch_version
+  when: current_opatch_version.changed

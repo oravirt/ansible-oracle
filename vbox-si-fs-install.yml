@@ -15,14 +15,9 @@
   become: yes
   roles:
      - oraswdb-install
-     - oradb-manage-db
-
-- name: Install cx_oracle
-  hosts: vbox-si-fs
-  user: vagrant
-  become: yes
-  roles:
      - cxoracle
+     - {role: oraswdb-manage-patches, when: apply_patches_db}
+     - oradb-manage-db
 
 - name: Configure Logrotate
   hosts: vbox-si-fs
