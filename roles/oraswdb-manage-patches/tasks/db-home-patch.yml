@@ -38,7 +38,7 @@
   become_user: "{{ oracle_user }}"
   tags:
     - apply_patch_db
-  when: apply_patches_db and db_homes_config[dbh.home]['opatchauto'] is defined and item.1 is defined and not olrloc.stat.exists
+  when: apply_patches_db and db_homes_config[dbh.home]['opatchauto'] is defined and item.1 is defined and item.0.apply and not olrloc.stat.exists
   register: psuapplym
 
 - name: db-opatch | Manage opatchauto patches for DB (gi)
@@ -58,7 +58,28 @@
   become: yes
   tags:
     - apply_patch_db
-  when: apply_patches_db and db_homes_config[dbh.home]['opatchauto'] is defined and olrloc.stat.exists
+  when: apply_patches_db and db_homes_config[dbh.home]['opatchauto'] is defined and item.apply and olrloc.stat.exists
+  register: psuapplym
+
+- name: db-opatch | Manage patches for DB (gi)
+  oracle_opatch:
+      oracle_home={{ oracle_home_db }}
+      patch_base={{ oracle_patch_install }}/{{ db_version}}/{{ item.path | default (item.patchid)}}/
+      patch_id={{item.patchid}}
+      patch_version={{ item.patchversion |default(omit)}}
+      opatchauto=False
+      conflict_check=True
+      ocm_response_file={{ ocm_response_file | default(omit)}}
+      output=verbose
+      state=present
+  with_items:
+      - "{{db_homes_config[dbh.home]['opatch']}}"
+  #run_once: "{{ configure_cluster}}"
+  become: yes
+  become_user: "{{ oracle_user }}"
+  tags:
+    - apply_patch_db
+  when: apply_patches_db and db_homes_config[dbh.home]['opatch'] is defined and item.apply
   register: psuapplym
 
 - name: db-opatch | Check patches
