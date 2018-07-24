@@ -11,7 +11,7 @@
   with_nested:
      - "{{oracle_sw_patches}}"
      - "{{gi_patches[oracle_install_version_gi]['opatchauto']}}"
-  when: apply_patches_gi and item[1].patchid == item[0].patchid and item[1].apply and oracle_sw_copy and oracle_sw_unpack and gi_patches[oracle_install_version_gi]['opatchauto'] is defined
+  when: apply_patches_gi and item[1].patchid == item[0].patchid and item[1].state == 'present' and oracle_sw_copy and oracle_sw_unpack and gi_patches[oracle_install_version_gi]['opatchauto'] is defined
   tags:
     - oragridpsuunpack1
 
@@ -26,6 +26,6 @@
   with_nested:
      - "{{oracle_sw_patches}}"
      - "{{gi_patches[oracle_install_version_gi]['opatchauto']}}"
-  when: apply_patches_gi and item[1].patchid == item[0].patchid and item[1].apply and not oracle_sw_copy and oracle_sw_unpack and gi_patches[oracle_install_version_gi]['opatchauto'] is defined
+  when: apply_patches_gi and item[1].patchid == item[0].patchid and item[1].state == 'present' and not oracle_sw_copy and oracle_sw_unpack and gi_patches[oracle_install_version_gi]['opatchauto'] is defined
   tags:
     - oragridpsuunpack2

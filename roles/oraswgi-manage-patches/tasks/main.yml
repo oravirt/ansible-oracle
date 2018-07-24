@@ -59,7 +59,7 @@
         conflict_check=True
         ocm_response_file={{ ocm_response_file | default(omit)}}
         output=verbose
-        state=present
+        state={{ item.0.state }}
     with_subelements:
        - "{{gi_patches[oracle_install_version_gi]['opatchauto']}}"
        - subpatches
@@ -68,7 +68,7 @@
     become_user: "{{ grid_install_user }}"
     tags:
       - apply_psu_grid
-    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and item.0.apply and patch_before_rootsh and not olrloc.stat.exists
+    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and patch_before_rootsh and not olrloc.stat.exists
     register: psuapplym
 
   - name: gi-opatch | Manage opatchauto patches for GI
@@ -81,13 +81,13 @@
         conflict_check=True
         ocm_response_file={{ ocm_response_file | default(omit)}}
         output=verbose
-        state=present
+        state=state={{ item.state }}
     with_items:
        - "{{gi_patches[oracle_install_version_gi]['opatchauto']}}"
     #run_once: "{{ configure_cluster}}"
     tags:
       - apply_psu_grid
-    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and item.apply and not patch_before_rootsh and olrloc.stat.exists
+    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and not patch_before_rootsh and olrloc.stat.exists
     register: psuapplym
 
   - name: gi-opatch | Manage non opatchauto patches for GI
@@ -100,7 +100,7 @@
         conflict_check=True
         ocm_response_file={{ ocm_response_file | default(omit)}}
         output=verbose
-        state=present
+        state={{ item.state }}
     with_items:
        - "{{gi_patches[oracle_install_version_gi]['opatch']}}"
     #run_once: "{{ configure_cluster}}"
@@ -108,7 +108,7 @@
     become_user: "{{ grid_install_user }}"
     tags:
       - apply_psu_grid
-    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatch'] is defined and item.apply and patch_before_rootsh and not olrloc.stat.exists
+    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatch'] is defined and patch_before_rootsh and not olrloc.stat.exists
     register: psuapplym
   #
   #

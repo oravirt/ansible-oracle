@@ -17,6 +17,27 @@
 - include: opatch-upgrade.yml
   when: apply_patches_db
 
+- name: db-opatch | Configure ocm.rsp (1)
+  template:
+       src=ocmrsp.expect.j2
+       dest={{ oracle_patch_stage }}/{{ db_version }}/ocmrsp.expect
+       mode=0777
+       force=yes
+  when: apply_patches_db and current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
+  become: yes
+  become_user: "{{ oracle_user }}"
+  tags:
+    - ocmconfig
+
+- name: db-opatch | Configure ocm.rsp (2)
+  shell: "{{ oracle_patch_stage }}/{{ db_version }}/ocmrsp.expect"
+  when: apply_patches_db and current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
+  become: yes
+  become_user: "{{ oracle_user }}"
+  changed_when: False
+  tags:
+    - ocmconfig
+
 - name: db-opatch | Manage opatchauto patches for DB (non-gi)
   oracle_opatch:
       oracle_home={{ oracle_home_db }}
@@ -27,7 +48,7 @@
       conflict_check=True
       ocm_response_file={{ ocm_response_file | default(omit)}}
       output=verbose
-      state=present
+      state={{ item.0.state }}
   with_subelements:
       - "{{db_homes_config[dbh.home]['opatchauto']}}"
       - subpatches
@@ -38,7 +59,7 @@
   become_user: "{{ oracle_user }}"
   tags:
     - apply_patch_db
-  when: apply_patches_db and db_homes_config[dbh.home]['opatchauto'] is defined and item.1 is defined and item.0.apply and not olrloc.stat.exists
+  when: apply_patches_db and db_homes_config[dbh.home]['opatchauto'] is defined and item.1 is defined and not olrloc.stat.exists
   register: psuapplym
 
 - name: db-opatch | Manage opatchauto patches for DB (gi)
@@ -51,17 +72,17 @@
       conflict_check=True
       ocm_response_file={{ ocm_response_file | default(omit)}}
       output=verbose
-      state=present
+      state={{ item.state}}
   with_items:
       - "{{db_homes_config[dbh.home]['opatchauto']}}"
   #run_once: "{{ configure_cluster}}"
   become: yes
   tags:
     - apply_patch_db
-  when: apply_patches_db and db_homes_config[dbh.home]['opatchauto'] is defined and item.apply and olrloc.stat.exists
+  when: apply_patches_db and db_homes_config[dbh.home]['opatchauto'] is defined and olrloc.stat.exists
   register: psuapplym
 
-- name: db-opatch | Manage patches for DB (gi)
+- name: db-opatch | Manage patches for DB
   oracle_opatch:
       oracle_home={{ oracle_home_db }}
       patch_base={{ oracle_patch_install }}/{{ db_version}}/{{ item.path | default (item.patchid)}}/
@@ -71,7 +92,7 @@
       conflict_check=True
       ocm_response_file={{ ocm_response_file | default(omit)}}
       output=verbose
-      state=present
+      state={{ item.state}}
   with_items:
       - "{{db_homes_config[dbh.home]['opatch']}}"
   #run_once: "{{ configure_cluster}}"
@@ -79,7 +100,7 @@
   become_user: "{{ oracle_user }}"
   tags:
     - apply_patch_db
-  when: apply_patches_db and db_homes_config[dbh.home]['opatch'] is defined and item.apply
+  when: apply_patches_db and db_homes_config[dbh.home]['opatch'] is defined
   register: psuapplym
 
 - name: db-opatch | Check patches

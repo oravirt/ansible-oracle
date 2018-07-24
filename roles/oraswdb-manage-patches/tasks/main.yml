@@ -18,7 +18,7 @@
         - "{{ db_homes_installed }}"
     tags:
       - directories
-    when: apply_patches_db and item.apply_patches
+    when: apply_patches_db and item.apply_patches |default (False) 
 
   # - include: transfer-files.yml
   #   when: oracle_sw_copy
@@ -34,7 +34,7 @@
         - "{{ db_homes_installed }}"
     loop_control:
       loop_var: dbh
-    when: db_homes_installed is defined and dbh.state == 'present' and dbh.apply_patches and apply_patches_db
+    when: db_homes_installed is defined and dbh.state == 'present' and dbh.apply_patches |default (False) and apply_patches_db
     tags: autopatch
 
   # - name: db-opatch | Configure ocm.rsp (1)
