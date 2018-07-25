@@ -28,13 +28,20 @@
   - include: opatch-upgrade.yml
     when: apply_patches_gi
 
+  - name: gi-opatch | Check current opatch version
+    oracle_opatch:
+           oracle_home={{ oracle_home_gi }}
+           state=opatchversion
+    register: current_opatch_version
+    tags: current_opatch_version
+
   - name: gi-opatch | Configure ocm.rsp (1)
     template:
          src=ocmrsp.expect.j2
          dest={{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect
          mode=0777
          force=yes
-    when: apply_patches_gi and current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
+    when: apply_patches_gi and current_opatch_version is defined and current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
     become: yes
     become_user: "{{ grid_install_user }}"
     tags:
@@ -42,7 +49,7 @@
 
   - name: gi-opatch | Configure ocm.rsp (2)
     shell: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect"
-    when: apply_patches_gi and current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
+    when: apply_patches_gi and current_opatch_version is defined and current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
     become: yes
     become_user: "{{ grid_install_user }}"
     changed_when: False
