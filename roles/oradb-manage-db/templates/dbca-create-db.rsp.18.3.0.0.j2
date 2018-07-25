@@ -4,16 +4,16 @@
 ##                            ------------------                            ##
 ## Copyright(c) Oracle Corporation 1998,2017. All rights reserved.         ##
 ##                                                                          ##
-## Specify values for the variables listed below to customize               ##
-## your installation.                                         		    ##
-##                                                            		    ##
-## Each variable is associated with a comment. The comment    		    ##
-## can help to populate the variables with the appropriate   		    ##
-## values.                                                  		    ##
-##                                                               	    ##
-## IMPORTANT NOTE: This file contains plain text passwords and   	    ##
-## should be secured to have read permission only by oracle user 	    ##
-## or db administrator who owns this installation.               	    ##
+## Specify values for the variables listed below to customize 			    ##
+## your installation.                                         			    ##
+##                                                            			    ##
+## Each variable is associated with a comment. The comment    			    ##
+## can help to populate the variables with the appropriate   			    ##
+## values.                                                  			    ##
+##                                                               			##
+## IMPORTANT NOTE: This file contains plain text passwords and   			##
+## should be secured to have read permission only by oracle user 			##
+## or db administrator who owns this installation.               			##
 ##############################################################################
 #-------------------------------------------------------------------------------
 # Do not change the following system generated value.
@@ -75,7 +75,7 @@ RACOneNodeServiceName={{ dbh.service_name }}
 # Default value : FALSE
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-#policyManaged=false
+#policyManaged=
 
 
 #-----------------------------------------------------------------------------
@@ -89,7 +89,7 @@ RACOneNodeServiceName={{ dbh.service_name }}
 # Default value : FALSE
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-#createServerPool=false
+#createServerPool=
 
 #-----------------------------------------------------------------------------
 # Name          : serverPoolName
@@ -123,12 +123,12 @@ RACOneNodeServiceName={{ dbh.service_name }}
 #		  if this option is specified then the newly created serverpool
 #		  will be assigned server even if no free servers are available.
 #		  This may affect already running database.
-#		  This flag can be specified for Admin managed as well as policy managed dbh.
+#		  This flag can be specified for Admin managed as well as policy managed db.
 # Valid values  : TRUE\FALSE
 # Default value : FALSE
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-#force=false
+#force=
 
 #-----------------------------------------------------------------------------
 # Name          : pqPoolName
@@ -169,7 +169,7 @@ createAsContainerDatabase={% if dbh.is_container is defined %}{{ dbh.is_containe
 # Name          : numberOfPDBs
 # Datatype      : Number
 # Description   : Specify the number of pdb to be created
-# Valid values  : 0 to 252
+# Valid values  : 0 to 4094
 # Default value : 0
 # Mandatory     : No
 #-----------------------------------------------------------------------------
@@ -208,7 +208,6 @@ pdbAdminPassword={{dbpasswords[dbh.oracle_db_name]['pdbadmin']}}
 {% else %}
 pdbAdminPassword={{default_dbpass }}
 {% endif %}
-
 #-----------------------------------------------------------------------------
 # Name          : nodelist
 # Datatype      : String
@@ -222,8 +221,9 @@ nodelist={% for host in groups[hostgroup_hub] -%} {{host}} {%- if not loop.last 
 {% elif configure_cluster and dbh.oracle_db_type|upper != "SI" and dbh.oracle_db_type|upper != "SIFO"  and oracle_gi_cluster_type |upper != 'FLEX' %}
 nodelist={% for host in groups[hostgroup] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% else %}
-#NODELIST=
+#nodelist=
 {% endif %}
+
 
 #-----------------------------------------------------------------------------
 # Name          : templateName
@@ -268,13 +268,13 @@ systemPassword={{default_dbpass }}
 {% endif %}
 
 #-----------------------------------------------------------------------------
-# Name          : serviceUserPassword
+# Name          : oracleHomeUserPassword
 # Datatype      : String
 # Description   : Password for Windows Service user
 # Default value : None
 # Mandatory     : If Oracle home is installed with windows service user
 #-----------------------------------------------------------------------------
-#serviceUserPassword=
+oracleHomeUserPassword=
 
 #-----------------------------------------------------------------------------
 # Name          : emConfiguration
@@ -284,7 +284,7 @@ systemPassword={{default_dbpass }}
 # Default value : NONE
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-emConfiguration=NONE
+emConfiguration=
 
 #-----------------------------------------------------------------------------
 # Name          : emExpressPort
@@ -306,7 +306,7 @@ emExpressPort=5500
 # Default value : FALSE
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-runCVUChecks=false
+runCVUChecks=
 
 #-----------------------------------------------------------------------------
 # Name          : dbsnmpPassword
@@ -339,7 +339,7 @@ omsHost=
 # Default value : None
 # Mandatory     : Yes, if CENTRAL is specified for emConfiguration
 #-----------------------------------------------------------------------------
-omsPort=0
+omsPort=
 
 #-----------------------------------------------------------------------------
 # Name          : emUser
@@ -367,7 +367,7 @@ emPassword=
 # Default value : False
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-dvConfiguration=false
+dvConfiguration=
 
 #-----------------------------------------------------------------------------
 # Name          : dvUserName
@@ -417,7 +417,7 @@ dvAccountManagerPassword=
 # Default value : False
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-olsConfiguration=false
+olsConfiguration=
 
 #-----------------------------------------------------------------------------
 # Name          : datafileJarLocation
@@ -427,7 +427,7 @@ olsConfiguration=false
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-datafileJarLocation={ORACLE_HOME}/assistants/dbca/templates/
+datafileJarLocation=
 
 #-----------------------------------------------------------------------------
 # Name          : datafileDestination
@@ -502,6 +502,7 @@ recoveryGroupName={{ dbh.recoveryfile_dest }}
 recoveryGroupName={{ recoveryfile_dest }}
 {% endif %}
 
+
 #-----------------------------------------------------------------------------
 # Name          : characterSet
 # Datatype      : String
@@ -538,7 +539,7 @@ nationalCharacterSet=AL16UTF16
 # Default value : FALSE
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-registerWithDirService=false
+registerWithDirService=
 
 
 #-----------------------------------------------------------------------------
@@ -596,7 +597,7 @@ variablesFile=
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-#variables=DB_UNIQUE_NAME=asmdb,ORACLE_BASE=/u01/app/oracle,PDB_NAME=,DB_NAME=asmdb,ORACLE_HOME=/u01/app/oracle/12.2.0.1/db1,SID=asmdb
+variables=
 
 #-----------------------------------------------------------------------------
 # Name          : initParams
@@ -605,7 +606,7 @@ variablesFile=
 # Default value : None
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
-#initParams =
+initParams=
 
 #-----------------------------------------------------------------------------
 # Name          : sampleSchema
@@ -615,7 +616,7 @@ variablesFile=
 # Default value : FASLE
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-sampleSchema=false
+sampleSchema=
 
 #-----------------------------------------------------------------------------
 # Name          : memoryPercentage

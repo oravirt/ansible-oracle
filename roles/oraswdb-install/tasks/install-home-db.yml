@@ -39,41 +39,25 @@
   register:
   tags: responsefileswdb
 
-- name: install-home-db | Install Oracle Database Server
-  shell: "{{ oracle_stage_install }}/{{ db_homes_config[dbh.home]['version'] }}/database/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent -waitforcompletion"
-  become: yes
-  become_user: "{{ oracle_user }}"
-  run_once: "{{ configure_cluster}}"
-  when: oracle_home_db not in existing_dbhome.stdout_lines
-  tags:
-    - oradbinstall
-  register: oradbinstall
-
-- debug: var=oradbinstall.stdout_lines
-  run_once: "{{ configure_cluster}}"
-  when: oracle_home_db not in existing_dbhome.stdout_lines and oradbinstall.changed
-  tags:
-   - oradbinstall
-  ignore_errors: true
-
+- include_tasks: "{{ db_version }}.yml"
 # oracle_EE_options = '' => Nothing to do
 # licence options in 11.2+ must be changed by chopt
 # => use this method for all >= 11.2 (Doc ID 948061.1)
 # test -f => reduce number of executions when > 1 database in oracle_databases for same ORACLE_HOME
-- name: install-home-db | Change Database options with chopt
-  shell: "test -f {{ oracle_home_db }}/install/{{oracle_EE_option_state}}_{{item.option}}.log || {{ oracle_home_db }}/bin/chopt {{oracle_EE_option_state}} {{item.option}}"
-  #debugger: on_failed
-  with_items:
-    - "{{oracle_EE_options}}"
-  become: yes
-  become_user: "{{ oracle_user }}"
-  register: choptout
-  changed_when: '"Writing" in choptout.stdout'
-  when: db_homes_config[dbh.home]['edition'] == 'EE' and oracle_EE_options is defined and disable_EE_options
-  loop_control:
-    label: "{{ oracle_home_db }} {{oracle_EE_option_state}} {{item.option}}"
-  tags:
-    - dbchopt
+# - name: install-home-db | Change Database options with chopt
+#   shell: "test -f {{ oracle_home_db }}/install/{{oracle_EE_option_state}}_{{item.option}}.log || {{ oracle_home_db }}/bin/chopt {{oracle_EE_option_state}} {{item.option}}"
+#   #debugger: on_failed
+#   with_items:
+#     - "{{oracle_EE_options}}"
+#   become: yes
+#   become_user: "{{ oracle_user }}"
+#   register: choptout
+#   changed_when: '"Writing" in choptout.stdout'
+#   when: db_homes_config[dbh.home]['edition'] == 'EE' and oracle_EE_options is defined and disable_EE_options
+#   loop_control:
+#     label: "{{ oracle_home_db }} {{oracle_EE_option_state}} {{item.option}}"
+#   tags:
+#     - dbchopt
 #
 - name: install-home-db | Run root script after installation
   shell: "{{ oracle_home_db }}/root.sh"

@@ -28,7 +28,11 @@
   oracle_rsp_stage: "{{ oracle_stage }}/rsp"
   oracle_inventory_loc: /u01/app/oraInventory
   oracle_base: /u01/app/oracle
-
+  oracle_sw_extract_path: "{%- if '18' in db_version -%}
+                              {{ oracle_home_db }}
+                           {%- else -%}
+                               {{ oracle_stage }}/{{ item[0].version }}
+                           {%- endif -%}"
   # oracle_home_db: "{% if dbh is defined %}
   #                    {%- if dbh.oracle_home is defined %}{{ dbh.oracle_home }}
   #                    {%- else %}{{ oracle_base}}/{{ dbh.oracle_version_db }}/{{ dbh.home }}
@@ -131,6 +135,7 @@
         - "set time on"
 
   oracle_sw_image_db:
+       - { filename: LINUX.X64_180000_db_home.zip, version: 18.3.0.0, creates: 'install/.img.bin' }
        - { filename: linuxx64_12201_database.zip, version: 12.2.0.1, creates: 'database/runInstaller' }
        - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2, creates: 'database/stage/sizes/oracle.server.Custom.sizes.properties' }
        - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2, creates: 'database/install/.oui' }
