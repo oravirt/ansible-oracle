@@ -152,7 +152,7 @@ Statefully manages various aspects of the DB. They all use modules from [ansible
 
 
 
-###Deprecated roles
+### Deprecated roles
 
 _**oraasm-createdg (use oraasm-manage-diskgroups instead)**_
 
