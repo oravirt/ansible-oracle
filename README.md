@@ -3,13 +3,6 @@
 - Installs Oracle RAC, RAC One Node and normal single instances.
 - Start with one or more clean machine(s), end up with a fully configured RAC Cluster.
 
-
-By default, installs a single instance 18.3.0.0 database on filesystem. Just put the following file in /tmp on the control-machine
-
-- `LINUX.X64_180000_db_home.zip`
-
-
-
 ### Getting started
 
 Pre-requisites:
@@ -17,6 +10,26 @@ Pre-requisites:
 - Ansible >= 2.4
 - Oracle Linux (or any RHEL-based Linux System) >= 6.4
 - Oracle Database/Grid Infrastructure 18.3.0.0, 12.2.0.1, 12.1.0.1, 12.1.0.2, 11.2.0.4, 11.2.0.3
+
+By default, installs a single instance 18.3.0.0 database on a filesystem.
+
+1. Clone this repository:
+   `git clone --recursive https://github.com/oravirt/ansible-oracle`
+
+2. Add the following file to `/tmp` on the controlmachine
+   - `LINUX.X64_180000_db_home.zip`
+
+3. Create an Ansible inventory file
+   ```
+   [myhostgroup]
+    dbhost
+   ```
+
+4. Run the playbook:
+
+   `ansible-playbook single-instance-db-on-fs.yml -e hostgroup=myhostgroup -i /path/to/inventory`
+
+   where the `-i` part is optional
 
 
 ### Roles
@@ -68,8 +81,8 @@ This role will install and configure Oracle Grid Infrastructure (RAC/SI)
 
 _**oraasm-createdg (deprecated - use oraasm-manage-diskgroups instead)**_
 
-This role will create the diskgroup(s) that should be used for database storage. Uses asmca to create diskgroups.
-- Generates a shellscript that uses asmca to create the diskgroups.
+_This role will create the diskgroup(s) that should be used for database storage. Uses asmca to create diskgroups.
+- Generates a shellscript that uses asmca to create the diskgroups._
 
 **oraasm-manage-diskgroups**
 
@@ -96,21 +109,21 @@ This role statefully manages the lifecycle of a database
 
 _**oradb-create (deprecated - use oradb-manage-db instead)**_
 
-This role creates the databases (RAC/RAC One Node, Single Instance). Possible to create container databases. Performs a dbca silent run to create the database.
+_This role creates the databases (RAC/RAC One Node, Single Instance). Possible to create container databases. Performs a dbca silent run to create the database.
 - Generates a responsefile to be used by dbca
 - Creates the db using dbca
-- Changes parameters based on input.
+- Changes parameters based on input._
 
 
 _**oradb-delete (deprecated - use oradb-manage-db instead)**_
 
-This role deletes a database
+_This role deletes a database_
 
 
 _**oraswgi-opatch (deprecated - use oraswgi-manage-patches instead)_
 
-This role will use opatch to apply a patch to a Grid Infrastructure home. At the moment it is basically written to apply PSU's, not one-off patches. It'll probably work but it is not designed for that at the moment.
-Does an initial check to see if the patches are already applied, and skips through all steps if they are.
+_This role will use opatch to apply a patch to a Grid Infrastructure home. At the moment it is basically written to apply PSU's, not one-off patches. It'll probably work but it is not designed for that at the moment.
+Does an initial check to see if the patches are already applied, and skips through all steps if they are._
 
 **oraswgi-manage-patches**
 
@@ -141,7 +154,7 @@ Configures cron schedules if needed
 **oradb-manage-<*>**
 
 Statefully manages various aspects of the DB
-- **oradb-manage-pdb** 
+- **oradb-manage-pdb**
 - **oradb-manage-tablespace**
 - **oradb-manage-parameters**
 - **oradb-manage-roles**
