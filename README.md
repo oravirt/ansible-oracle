@@ -40,7 +40,7 @@ By default, installs a single instance 18.3.0.0 database on a filesystem.
 
 ### Roles
 
-A lot of these roles uses Ansible modules that comes from [ansible-oracle-modules](https://github.com/oravirt/ansible-oracle-module)
+A lot of these roles uses Ansible modules that comes from [ansible-oracle-modules](https://github.com/oravirt/ansible-oracle-modules)
 
 **common**
 
@@ -126,7 +126,7 @@ Statefully manage patches in a DB environment
 
 **cxoracle**
 
-Installs cx_Oracle in preparation for using [ansible-oracle-modules](https://github.com/oravirt/ansible-oracle-module)
+Installs cx_Oracle in preparation for using [ansible-oracle-modules](https://github.com/oravirt/ansible-oracle-modules)
 
 
 **orahost-cron**
@@ -139,7 +139,7 @@ Configures cron schedules if needed
 
 **oradb-manage-<*>**
 
-Statefully manages various aspects of the DB. They all use modules from [ansible-oracle-modules](https://github.com/oravirt/ansible-oracle-module)
+Statefully manages various aspects of the DB. They all use modules from [ansible-oracle-modules](https://github.com/oravirt/ansible-oracle-modules)
 
 - **oradb-manage-pdb**
 - **oradb-manage-tablespace**
