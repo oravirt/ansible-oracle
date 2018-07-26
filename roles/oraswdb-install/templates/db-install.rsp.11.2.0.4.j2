@@ -105,7 +105,7 @@ ORACLE_BASE={{ oracle_base }}
 #   - SEONE  : Standard Edition One
 #   - PE     : Personal Edition (WINDOWS ONLY)
 #------------------------------------------------------------------------------
-oracle.install.db.InstallEdition={{ dbh.oracle_edition }}
+oracle.install.db.InstallEdition={{ db_homes_config[dbh.home]['edition'] | default ('EE') }}
 
 #------------------------------------------------------------------------------
 # This variable is used to enable or disable custom install and is considered
@@ -182,20 +182,10 @@ oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host |reg
 #
 # If left blank, it will be assumed to be false
 #------------------------------------------------------------------------------
-{% if dbh.oracle_db_type|upper == 'RACONENODE' %}
-oracle.install.db.isRACOneInstall=true
-{% else %}
-oracle.install.db.isRACOneInstall=
-{% endif %}
 
 #------------------------------------------------------------------------------
 # Specify the name for RAC One Node Service.
 #------------------------------------------------------------------------------
-{% if dbh.oracle_db_type|upper == 'RACONENODE' %}
-oracle.install.db.racOneServiceName={{ dbh.service_name }}
-{% else %}
-oracle.install.db.racOneServiceName=
-{% endif %}
 
 #------------------------------------------------------------------------------
 # Specify the type of database to create.

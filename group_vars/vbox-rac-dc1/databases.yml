@@ -1,14 +1,12 @@
 oracle_databases:
-      - home: db1
-        oracle_version_db: 12.2.0.1
-        oracle_edition: EE
+      - home: 18300-base
         oracle_db_name: orclcdb
         oracle_db_type: RAC
         is_container: True
         storage_type: ASM
         oracle_db_mem_totalmb: 1024
         oracle_database_type: MULTIPURPOSE
-        redolog_size: 100M
+        redolog_size: 75M
         redolog_groups: 3
         datafile_dest: '+DATA'
         recoveryfile_dest: '+FRA'
@@ -25,9 +23,9 @@ oracle_databases:
              - {name: db_recovery_file_dest_size, value: 20G, scope: both, state: present}
         # services:
         #      - { name: service2,  state: present }
-        users:
-          - schema: c##dba
-            container: all
-            grants:
-                 - dba
-            state: present
+        # users:
+        #   - schema: c##dba
+        #     container: all
+        #     grants:
+        #          - dba
+        #     state: present

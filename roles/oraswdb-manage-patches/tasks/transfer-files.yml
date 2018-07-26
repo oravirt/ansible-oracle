@@ -1,0 +1,54 @@
+- name: gi-opatch | Copy oracle GI patch (opatchauto) to server (www)
+  get_url:
+      url={{ oracle_sw_source_www }}/{{ item[0].filename }}
+      dest={{ oracle_stage }}
+      mode=775
+  with_nested:
+     - "{{oracle_sw_patches}}"
+     - "{{db_homes_config[dbh.home]['opatchauto']}}"
+  when: apply_patches_db and item[1].patchid == item[0].patchid and item[1].apply and oracle_sw_copy and not is_sw_source_local
+  become: yes
+  become_user: "{{ oracle_user }}"
+  tags:
+    - oragridpatchget
+
+- name: gi-opatch | Copy oracle GI patch (opatchauto) to server (local)
+  copy:
+     src={{ oracle_sw_source_local }}/{{ item[0].filename }}
+     dest={{ oracle_stage }}
+     mode=775
+     force=no
+  with_nested:
+  - "{{oracle_sw_patches}}"
+  - "{{db_homes_config[dbh.home]['opatchauto']}}"
+  when: apply_patches_db and item[1].patchid == item[0].patchid and item[1].apply and oracle_sw_copy and is_sw_source_local
+  become: yes
+  become_user: "{{ oracle_user }}"
+  tags:
+  - oragridpatchpush
+
+- name: gi-opatch | Copy oracle opatch to server (www)
+  get_url:
+      url={{ oracle_sw_source_www }}/{{ item.filename }}
+      dest={{ oracle_stage }}
+      mode=775
+      force=yes
+  with_items: "{{oracle_opatch_patch}}"
+  when: apply_patches_db and item.version == db_version and oracle_sw_copy and not is_sw_source_local
+  become: yes
+  become_user: "{{ oracle_user }}"
+  tags:
+    - oragridopatchget
+
+- name: gi-opatch | Copy oracle opatch to server (local)
+  copy:
+     src={{ oracle_sw_source_local }}/{{ item.filename }}
+     dest={{ oracle_stage }}
+     mode=775
+     force=yes
+  with_items: "{{oracle_opatch_patch}}"
+  when: apply_patches_db and item.version == db_version and oracle_sw_copy and is_sw_source_local
+  become: yes
+  become_user: "{{ oracle_user }}"
+  tags:
+    - oragridpatchpush

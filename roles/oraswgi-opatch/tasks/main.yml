@@ -4,7 +4,7 @@
     shell: "{{ oracle_home_gi }}/OPatch/opatch lspatches -oh {{ oracle_home_gi }}  |grep  {{ item.patchversion }} |wc -l"
     become: yes
     become_user: "{{ grid_install_user }}"
-    with_items: "{{oracle_sw_image_gi_psu}}"
+    with_items: "{{oracle_sw_patches}}"
     tags: check_applied_gi_patches
     when: oracle_psu_apply_gi and item.version == oracle_install_version_gi
     register: gi_applied_patches
@@ -20,7 +20,7 @@
   # - name: Copy oracle GI patchfiles to server (www)
   #   get_url: url={{ oracle_sw_source_www }}/{{ item.0.filename }} dest={{ oracle_stage }} mode=775
   #   with_together:
-  #      - oracle_sw_image_gi_psu
+  #      - oracle_sw_patches
   #      - gi_applied_patches.results
   #   when: oracle_psu_apply_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
   #   become: yes
@@ -62,7 +62,7 @@
     become: yes
     become_user: "{{ grid_install_user }}"
     with_together:
-       - "{{oracle_sw_image_gi_psu}}"
+       - "{{oracle_sw_patches}}"
        - "{{gi_applied_patches.results}}"
     when: oracle_psu_apply_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0 and oracle_sw_copy and oracle_sw_unpack
     tags:
@@ -73,7 +73,7 @@
     become: yes
     become_user: "{{ grid_install_user }}"
     with_together:
-       - "{{oracle_sw_image_gi_psu}}"
+       - "{{oracle_sw_patches}}"
        - "{{gi_applied_patches.results}}"
     when: oracle_psu_apply_gi and item.0.version == oracle_install_version_gi and not oracle_sw_copy and oracle_sw_unpack #and not item.1.stdout != 0
     tags:
@@ -83,7 +83,7 @@
 #  - name: Extract files to stage-area (GI) (from remote location)
 #    unarchive: src={{ oracle_stage_remote }}/{{ item.0.filename }}  dest={{ oracle_psu_stage }}/{{ item.0.version }} copy=no
 #    with_together:
-#       - oracle_sw_image_gi_psu
+#       - oracle_sw_patches
 #       - gi_applied_patches.results
 #    become: yes
 #    become_user: "{{ grid_install_user }}"
@@ -116,7 +116,7 @@
   - name: Apply PSU to GI (v12.x) (Master node)
     shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }}" #-ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
     with_together:
-       - "{{oracle_sw_image_gi_psu}}"
+       - "{{oracle_sw_patches}}"
        - "{{gi_applied_patches.results}}"
     run_once: "{{ configure_cluster}}"
     tags:
@@ -128,7 +128,7 @@
   - name: Apply PSU to GI (v11.2) (Master node)
     shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
     with_together:
-    - "{{oracle_sw_image_gi_psu}}"
+    - "{{oracle_sw_patches}}"
     - "{{gi_applied_patches.results}}"
     run_once: "{{ configure_cluster}}"
     tags: apply_psu_grid
@@ -158,7 +158,7 @@
   - name: Apply PSU to GI (v12.1) (other nodes)
     shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
     with_together:
-    - "{{oracle_sw_image_gi_psu}}"
+    - "{{oracle_sw_patches}}"
     - "{{gi_applied_patches.results}}"
     tags:
       - apply_psu_grid
@@ -169,7 +169,7 @@
   - name: Apply PSU to GI (v11.2) (other nodes)
     shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
     with_together:
-    - "{{oracle_sw_image_gi_psu}}"
+    - "{{oracle_sw_patches}}"
     - "{{gi_applied_patches.results}}"
     tags: apply_psu_grid
     #when: not master_node and oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0

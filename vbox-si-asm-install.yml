@@ -38,6 +38,7 @@
   become: yes
   roles:
       - oraswdb-install
+      - {role: oraswdb-manage-patches, when: apply_patches_db}
       - oradb-manage-db
 
 - name: Configure Logrotate
