@@ -10,6 +10,12 @@ Pre-requisites:
 - Ansible >= 2.4
 - Oracle Linux (or any RHEL-based Linux System) >= 6.4
 - Oracle Database/Grid Infrastructure 18.3.0.0, 12.2.0.1, 12.1.0.1, 12.1.0.2, 11.2.0.4, 11.2.0.3
+- For example configurations, look in:
+```
+  SI/FS:   group_vars/vbox-si-fs.  - vagrant config: http://github.com/oravirt/vagrant-vbox-si-fs
+  SI/ASM:  group_vars/vbox-si-asm  - vagrant config: http://github.com/oravirt/vagrant-vbox-si-asm
+  RAC/ASM: group_vars/vbox-rac-dc1 - vagrant config: http://github.com/oravirt/vagrant-vbox-rac
+```
 
 By default, installs a single instance 18.3.0.0 database on a filesystem.
 
@@ -33,6 +39,8 @@ By default, installs a single instance 18.3.0.0 database on a filesystem.
 
 
 ### Roles
+
+A lot of these roles uses Ansible modules that comes from [ansible-oracle-modules](https://github.com/oravirt/ansible-oracle-module)
 
 **common**
 
@@ -79,10 +87,6 @@ This role will install and configure Oracle Grid Infrastructure (RAC/SI)
 - Install Oracle Grid Infrastructure
 
 
-_**oraasm-createdg (deprecated - use oraasm-manage-diskgroups instead)**_
-
-_This role will create the diskgroup(s) that should be used for database storage. Uses asmca to create diskgroups.
-- Generates a shellscript that uses asmca to create the diskgroups._
 
 **oraasm-manage-diskgroups**
 
@@ -103,27 +107,9 @@ This role will install the oracle database server(s). It is possible to run more
 **oradb-manage-db**
 
 This role statefully manages the lifecycle of a database
-- Manages the db using the **oracle_db** module
+- Uses the **oracle_db** module
+- Creates/deletes: `state: present/absent`
 - Maintains archivelog/force_logging True/False
-
-
-_**oradb-create (deprecated - use oradb-manage-db instead)**_
-
-_This role creates the databases (RAC/RAC One Node, Single Instance). Possible to create container databases. Performs a dbca silent run to create the database.
-- Generates a responsefile to be used by dbca
-- Creates the db using dbca
-- Changes parameters based on input._
-
-
-_**oradb-delete (deprecated - use oradb-manage-db instead)**_
-
-_This role deletes a database_
-
-
-_**oraswgi-opatch (deprecated - use oraswgi-manage-patches instead)_
-
-_This role will use opatch to apply a patch to a Grid Infrastructure home. At the moment it is basically written to apply PSU's, not one-off patches. It'll probably work but it is not designed for that at the moment.
-Does an initial check to see if the patches are already applied, and skips through all steps if they are._
 
 **oraswgi-manage-patches**
 
@@ -153,7 +139,8 @@ Configures cron schedules if needed
 
 **oradb-manage-<*>**
 
-Statefully manages various aspects of the DB
+Statefully manages various aspects of the DB. They all use modules from [ansible-oracle-modules](https://github.com/oravirt/ansible-oracle-module)
+
 - **oradb-manage-pdb**
 - **oradb-manage-tablespace**
 - **oradb-manage-parameters**
@@ -162,6 +149,18 @@ Statefully manages various aspects of the DB
 - **oradb-manage-grants**
 - **oradb-manage-redo**
 - **oradb-manage-services**
+
+
+
+###Deprecated roles
+
+_**oraasm-createdg (use oraasm-manage-diskgroups instead)**_
+
+_**oradb-create (use oradb-manage-db instead)**_
+
+_**oradb-delete (use oradb-manage-db instead)**_
+
+_**oraswgi-opatch (use oraswgi-manage-patches instead)**_
 
 
 
