@@ -79,6 +79,39 @@ def get_version(module, msg, oracle_home):
     else:
         return stdout.split(' ')[2][0:4]
 
+# Check if the database exists
+def check_db_exists(module, msg, oracle_home, db_name, db_unique_name ):
+
+    if gimanaged:
+        if db_unique_name != None:
+            checkdb = db_unique_name
+        else:
+            checkdb = db_name
+        command = "%s/bin/srvctl config database -d %s " % (oracle_home, checkdb)
+        (rc, stdout, stderr) = module.run_command(command)
+        if rc != 0:
+            if '%s' % (db_name) in stdout: #<-- db doesn't exist
+                return False
+            else:
+                msg = 'Error: command is  %s. stdout is %s' % (command, stdout)
+                return False
+        elif 'Database name: %s' % (db_name) in stdout: #<-- Database already exist
+            return True
+    else:
+        existingdbs = []
+        oratabfile = '/etc/oratab'
+        if os.path.exists(oratabfile):
+            with open(oratabfile) as oratab:
+                for line in oratab:
+            		if line.startswith('#') or line.startswith(' '):
+            			continue
+            		elif re.search(db_name +':', line):
+            			existingdbs.append(line)
+
+        if not existingdbs: #<-- db doesn't exist
+            return False
+        else:
+            return True
 
 def run_datapatch(module, msg, hsotname, oracle_home, db_name):
 
@@ -204,6 +237,8 @@ def main():
         argument_spec = dict(
             oracle_home         = dict(default=None, aliases = ['oh']),
             db_name             = dict(required=True, aliases = ['db','database_name','name']),
+            db_unique_name      = dict(required=False, aliases = ['dbunqn','unique_name']),
+            fail_on_db_not_exist = dict(default=True, type='bool'),
             output              = dict(default="short", choices = ["short","verbose"]),
             user                = dict(default='sys', aliases = ['un']),
             password            = dict(required=True, no_log=True, aliases = ['pw','password']),
@@ -217,7 +252,9 @@ def main():
 
     oracle_home         = module.params["oracle_home"]
     db_name             = module.params["db_name"]
-    output             = module.params["output"]
+    db_unique_name      = module.params["db_unique_name"]
+    fail_on_db_not_exist  = module.params["fail_on_db_not_exist"]
+    output              = module.params["output"]
     user                = module.params["user"]
     password            = module.params["password"]
     hostname            = module.params["hostname"]
@@ -250,13 +287,19 @@ def main():
     service_name = db_name
     # Get the Oracle version
     major_version = get_version(module,msg,oracle_home)
-
-    if run_datapatch(module,msg,hostname,oracle_home,db_name):
-        msg = 'Datapatch run successfully for database: %s' % (db_name)
-        module.exit_json(msg=msg, changed=True)
+    if check_db_exists(module,msg,oracle_home,db_name,db_unique_name):
+        if run_datapatch(module,msg,hostname,oracle_home,db_name):
+            msg = 'Datapatch run successfully for database: %s' % (db_name)
+            module.exit_json(msg=msg, changed=True)
+        else:
+            module.fail_json(msg='datapatch failed in a unhandled way')
     else:
-        module.fail_json(msg='failed')
-
+        if fail_on_db_not_exist:
+            msg = 'Database %s does not exist' % (db_name)
+            module.fail_json(msg=msg)
+        else:
+            msg = 'Database %s does not exist (so datapatch can not run, obviously), but continuing anyway' % (db_name)
+            module.exit_json(msg=msg, changed=False)
 
 from ansible.module_utils.basic import *
 if __name__ == '__main__':
