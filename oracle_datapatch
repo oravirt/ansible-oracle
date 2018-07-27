@@ -30,6 +30,13 @@ options:
         required: False
         default: short
         aliases: ['db','database_name','name']
+    fail_on_db_not_exist:
+        description:
+            - Fail the task if the db does not exist
+            - If False, continues the play (changed=False)
+        required: False
+        default: True
+        choices: ['True','False']
     user:
         description:
             - Password for the DB user
@@ -47,6 +54,11 @@ options:
         required: false
         default: localhost
         aliases: ['host']
+    service_name:
+        description:
+            - The service_name to connect to (will default to db_name if empty)
+        required: false
+        aliases: ['sn']
     port:
         description:
             - The listener port to connect to the database
@@ -243,6 +255,7 @@ def main():
             user                = dict(default='sys', aliases = ['un']),
             password            = dict(required=True, no_log=True, aliases = ['pw','password']),
             hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
+            service_name        = dict(required=False, aliases = ['sn']),
             port                = dict(required=False, default = 1521),
 
 
@@ -258,6 +271,7 @@ def main():
     user                = module.params["user"]
     password            = module.params["password"]
     hostname            = module.params["hostname"]
+    service_name        = module.params["service_name"]
     port                = module.params["port"]
 
 
@@ -284,7 +298,12 @@ def main():
         module.fail_json(msg=msg)
 
     # Connection details for database
-    service_name = db_name
+    if service_name is not None:
+        service_name = service_name
+    elif db_unique_name is not None:
+        service_name = db_unique_name
+    else:
+        service_name = db_name
     # Get the Oracle version
     major_version = get_version(module,msg,oracle_home)
     if check_db_exists(module,msg,oracle_home,db_name,db_unique_name):
