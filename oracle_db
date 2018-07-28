@@ -446,43 +446,50 @@ def create_db (module, msg, oracle_home, sys_password, system_password, dbsnmp_p
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
         module.fail_json(msg=msg, changed=False)
+    else:
+        if output == 'short':
+            return True
+        else:
+            msg = 'STDOUT: %s,  COMMAND: %s' % (stdout, command)
+            module.exit_json(msg=msg, changed=True)
+
     # elif rc == 0 and datapatch:
     #     if run_datapatch(module, msg, oracle_home, db_name, db_unique_name, sys_password):
     #         return True
-    else:
-        return True
+    # else:
+    #     return True
 
-def run_datapatch(module, msg, oracle_home, db_name, db_unique_name, sys_password):
-
-    cursor = getconn(module,msg)
-    sid_sql = 'select instance_name from v$instance'
-    sid_ = execute_sql_get(module,msg,cursor,sid_sql)
-    os.environ['ORACLE_SID'] = sid_[0][0]
-
-    if major_version > '11.2':
-        command = '%s/OPatch/datapatch -verbose' % (oracle_home)
-        (rc, stdout, stderr) = module.run_command(command)
-        if rc != 0:
-            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
-            module.fail_json(msg=msg, changed=False)
-        else:
-            return True
-    else:
-        datapatch_sql = '''
-        connect / as sysdba
-        @?/rdbms/admin/catbundle.sql psu apply
-        exit
-        '''
-        sqlplus_bin = '%s/bin/sqlplus' % (oracle_home)
-        p = subprocess.Popen([sqlplus_bin,'/nolog'],stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        (stdout,stderr) = p.communicate(datapatch_sql.encode('utf-8'))
-        rc = p.returncode
-        if rc != 0:
-            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, datapatch_sql)
-            module.fail_json(msg=msg, changed=False)
-        else:
-            return True
+# def run_datapatch(module, msg, oracle_home, db_name, db_unique_name, sys_password):
+#
+#     cursor = getconn(module,msg)
+#     sid_sql = 'select instance_name from v$instance'
+#     sid_ = execute_sql_get(module,msg,cursor,sid_sql)
+#     os.environ['ORACLE_SID'] = sid_[0][0]
+#
+#     if major_version > '11.2':
+#         command = '%s/OPatch/datapatch -verbose' % (oracle_home)
+#         (rc, stdout, stderr) = module.run_command(command)
+#         if rc != 0:
+#             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
+#             module.fail_json(msg=msg, changed=False)
+#         else:
+#             return True
+#     else:
+#         datapatch_sql = '''
+#         connect / as sysdba
+#         @?/rdbms/admin/catbundle.sql psu apply
+#         exit
+#         '''
+#         sqlplus_bin = '%s/bin/sqlplus' % (oracle_home)
+#         p = subprocess.Popen([sqlplus_bin,'/nolog'],stdin=subprocess.PIPE,
+#         stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+#         (stdout,stderr) = p.communicate(datapatch_sql.encode('utf-8'))
+#         rc = p.returncode
+#         if rc != 0:
+#             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, datapatch_sql)
+#             module.fail_json(msg=msg, changed=False)
+#         else:
+#             return True
 
 def remove_db (module, msg, oracle_home, db_name, db_unique_name, sys_password):
 
@@ -494,7 +501,11 @@ def remove_db (module, msg, oracle_home, db_name, db_unique_name, sys_password):
         msg = 'Removal of database %s failed: %s' % (db_name, stdout)
         module.fail_json(msg=msg, changed=False)
     else:
-        return True
+        if output == 'short':
+            return True
+        else:
+            msg = 'STDOUT: %s,  COMMAND: %s' % (stdout, command)
+            module.exit_json(msg=msg, changed=True)
 
 def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivelog, force_logging, flashback,
                      default_tablespace_type,default_tablespace,default_temp_tablespace):
@@ -770,6 +781,7 @@ def main():
     global port
     global israc
     global newdb
+    global output
     newdb = False
 
     module = AnsibleModule(
@@ -805,6 +817,7 @@ def main():
             force_logging       = dict(default=False, type='bool'),
             flashback           = dict(default=False, type='bool'),
             datapatch           = dict(default=True, type='bool'),
+            output              = dict(default="short", choices = ["short","verbose"]),
             state               = dict(default="present", choices = ["present", "absent"]),
             hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
             port                = dict(required=False, default = 1521),
@@ -846,6 +859,7 @@ def main():
     force_logging       = module.params["force_logging"]
     flashback           = module.params["flashback"]
     datapatch           = module.params["datapatch"]
+    output              = module.params["output"]
     state               = module.params["state"]
     hostname            = module.params["hostname"]
     port                = module.params["port"]
