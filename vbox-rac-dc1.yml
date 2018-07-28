@@ -74,3 +74,10 @@
      - oradb-manage-users
      - oradb-manage-grants
      - oradb-manage-services
+
+- name: Run Datapatch
+  hosts: vbox-si-rac-dc1
+  user: vagrant
+  become: yes
+  roles:
+      - {role: oradb-datapatch, when: apply_patches_db}

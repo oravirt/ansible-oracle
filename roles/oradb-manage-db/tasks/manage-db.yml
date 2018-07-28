@@ -80,6 +80,7 @@
         flashback={{ dbh.flashback | default (omit)}}
         force_logging={{ dbh.force_logging | default (omit)}}
         initparams={{ init_params_list | default(omit)}}
+        output=verbose
         state={{ dbh.state}}
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
@@ -122,6 +123,7 @@
         port={{ listener_port_template }}
         sys_password={{ dbca_sys_pass }}
         db_name={{ dbh.oracle_db_name }}
+        output=verbose
         state={{ dbh.state}}
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
