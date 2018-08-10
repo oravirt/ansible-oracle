@@ -450,8 +450,10 @@ def create_db (module, msg, oracle_home, sys_password, system_password, dbsnmp_p
         if output == 'short':
             return True
         else:
-            msg = 'STDOUT: %s,  COMMAND: %s' % (stdout, command)
-            module.exit_json(msg=msg, changed=True)
+            verbosemsg = 'STDOUT: %s,  COMMAND: %s' % (stdout, command)
+            verboselist.append(verbosemsg)
+            return True,verboselist
+            # module.exit_json(msg=verbosemsg, changed=True)
 
     # elif rc == 0 and datapatch:
     #     if run_datapatch(module, msg, oracle_home, db_name, db_unique_name, sys_password):
@@ -593,7 +595,15 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
                         execute_sql(module,msg,cursor,sql)
                         if stop_db(module,msg,oracle_home,db_name,db_unique_name,sid):
                             if start_db(module,msg,oracle_home,db_name,db_unique_name, sid):
-                                msg = 'Database %s has been put in the intended state - (%s)' % (db_name,archcomp)
+                                if newdb:
+                                    msg = 'Database %s successfully created (%s) ' % (db_name, archcomp)
+                                    if output == 'verbose':
+                                        msg += ' ,'.join(verboselist)
+                                    changed = True
+                                else:
+                                    msg = 'Database %s has been put in the intended state - (%s) ' % (db_name,archcomp)
+                                    if output == 'verbose':
+                                        msg += ' ,'.join(verboselist)
                                 module.exit_json(msg=msg, changed=True)
 
 
@@ -601,10 +611,12 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
         module.exit_json(msg=msg, changed=True)
     else:
         if newdb:
-            msg = 'Database %s successfully created' % (db_name)
+            msg = 'Database %s successfully created created (%s) ' % (db_name,archcomp)
+            if output == 'verbose':
+                msg += ' ,'.join(verboselist)
             changed = True
         else:
-            msg = 'Database %s already exists and is in the intended state' % (db_name)
+            msg = ' Database %s already exists and is in the intended state' % (db_name)
             changed = False
         module.exit_json(msg=msg, changed=changed)
 
@@ -782,6 +794,10 @@ def main():
     global israc
     global newdb
     global output
+    global verbosemsg
+    global verboselist
+    verbosemsg = ''
+    verboselist = []
     newdb = False
 
     module = AnsibleModule(
