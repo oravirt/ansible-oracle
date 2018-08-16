@@ -53,12 +53,13 @@
 
   #epel_rpm: "http://download.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm"
   asmlib_rpm: "{% if ansible_distribution_major_version|int==6%}{{asmlib_rpm_el6}}{%elif ansible_distribution_major_version|int==7 %}{{asmlib_rpm_el7}}{% else %}None{% endif %}"
-  asmlibsupport_rpm: "{% if ansible_distribution == 'RedHat' %}{% if ansible_distribution_major_version|int==6%}{{asmlibsupport_rpm_el6}}{%elif ansible_distribution_major_version|int==7 %}{{asmlibsupport_rpm_el7}}{% else %}oracleasm-support{% endif %}{% else %}oracleasm-support{% endif %}"
+  asmlibsupport_rpm: "{% if ansible_os_family == 'RedHat' %}{% if ansible_distribution_major_version|int==6%}{{asmlibsupport_rpm_el6}}{%elif ansible_distribution_major_version|int==7 %}{{asmlibsupport_rpm_el7}}{% else %}oracleasm-support{% endif %}{% else %}oracleasm-support{% endif %}"
   asmlib_rpm_el6: "http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.4-1.el6.x86_64.rpm"
   asmlib_rpm_el7: "http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.12-1.el7.x86_64.rpm"
   asmlib_rpm_sles: "http://oss.oracle.com/projects/oracleasm-support/dist/files/RPMS/sles12/amd64/2.1.8/oracleasm-support-2.1.8-1.SLE12.x86_64.rpm"
   asmlibsupport_rpm_el6: "http://oss.oracle.com/projects/oracleasm-support/dist/files/RPMS/rhel6/amd64/2.1.8/oracleasm-support-2.1.8-1.el6.x86_64.rpm"
-  asmlibsupport_rpm_el7: "http://yum.oracle.com/repo/OracleLinux/OL7/latest/x86_64/getPackage/oracleasm-support-2.1.8-3.el7.x86_64.rpm"
+  asmlibsupport_rpm_el7: "https://yum.oracle.com/repo/OracleLinux/OL7/latest/x86_64/getPackage/oracleasm-support-2.1.11-2.el7.x86_64.rpm"
+  # asmlibsupport_rpm_el7:  "http://yum.oracle.com/repo/OracleLinux/OL7/latest/x86_64/getPackage/oracleasm-support-2.1.8-3.el7.x86_64.rpm"
 
   #ol6_repo_file: public-yum-ol6.repo
   repo_dir: /etc/yum.repos.d/
