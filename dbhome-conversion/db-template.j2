@@ -1,0 +1,35 @@
+oracle_databases:
+{% for a in oracle_databases %}
+      - home: {{ a.home }}-{{ a.oracle_version_db }}
+        oracle_db_name: {{ a.oracle_db_name}}
+        oracle_db_type: {{ a.oracle_db_type }}
+        is_container: {{ a.is_container }}
+        storage_type: {{ a.storage_type }}
+        {% if a.oracle_db_mem_totalmb is defined  %}
+        oracle_db_mem_totalmb: {{ a.oracle_db_mem_totalmb }}
+        {% endif %}
+        {% if a.oracle_db_mem_percent is defined  %}
+        oracle_db_mem_percent: {{ a.oracle_db_mem_percent }}
+        {% endif %}
+        oracle_database_type: {{ a.oracle_database_type }}
+        redolog_size: {{ a.redolog_size_in_mb}}M
+        {% if a.redolog_groups is defined  %}
+        redolog_groups: {{ a.redolog_groups}}
+        {% endif %}
+        {% if a.datafile_dest is defined  %}
+        datafile_dest: {{ a.datafile_dest }}
+        {% endif  %}
+        {% if a.recoveryfile_dest is defined  %}
+        recoveryfile_dest: {{ a.recoveryfile_dest }}
+        {% endif  %}
+        {% if a.archivelog is defined  %}
+        archivelog: {{ a.archivelog }}
+        {% endif %}
+        {% if a.flashback is defined  %}
+        flashback: {{ a.flashback }}
+        {% endif %}
+        {% if a.force_logging is defined  %}
+        force_logging: {{ a.force_logging }}
+        {% endif %}
+        state: {{ a.state }}
+{% endfor %}
