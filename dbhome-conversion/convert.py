@@ -7,7 +7,7 @@ target_pdb = 'pdbs.yml'
 template_home = 'dbhome-template.j2'
 template_db = 'db-template.j2'
 template_pdb = 'pdb-template.j2'
-base_dir = './group_vars'
+base_dir = '../group_vars'
 
 file_list_all = []
 for root, _, filenames in os.walk(base_dir):
