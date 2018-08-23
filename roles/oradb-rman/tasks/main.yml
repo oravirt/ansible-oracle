@@ -132,7 +132,10 @@
        - "{{oracle_databases}}"
        - rman_jobs
        - skip_missing: yes
-    when: master_node and item.1.immediate is defined and item.1.immediate
+    when: item.1.immediate is defined and item.1.immediate
+          and ( (configure_cluster and inventory_hostname == cluster_master)
+               or not configure_cluster
+              )
     tags:
       - rmanexecute
 
