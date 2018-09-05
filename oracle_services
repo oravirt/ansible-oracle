@@ -6,7 +6,7 @@ DOCUMENTATION = '''
 module: oracle_services
 short_description: Manage services in an Oracle database
 description:
-    - Manage services in an Oracle database (using srvctl)
+    - Manage services in an Oracle database
 version_added: "2.1.0.0"
 options:
     name:
@@ -48,6 +48,12 @@ options:
             - The pdb which the service is attached to
         required: false
         default: None
+    role:
+        description:
+            - Role of the service (primary, physical_standby, logical_standby, snapshot_standby)
+        required: false
+        default: None
+        choices: ['primary','physical_standby','logical_standby','snapshot_standby']
     force:
         description:
             - Adds the 'force' flag to the srvctl command
@@ -148,7 +154,7 @@ def check_service_exists(cursor, module, msg, oracle_home, name, database_name):
 
 
 
-def create_service(cursor, module, msg, oracle_home, name, database_name, preferred_instances, available_instances, pdb):
+def create_service(cursor, module, msg, oracle_home, name, database_name, preferred_instances, available_instances, pdb, role):
 
     if gimanaged:
         command = "%s/bin/srvctl add service -d %s -s %s" % (oracle_home, database_name, name)
@@ -160,6 +166,9 @@ def create_service(cursor, module, msg, oracle_home, name, database_name, prefer
 
         if pdb != None:
             command += ' -pdb %s' % (pdb)
+
+        if role != None:
+            command += ' -l %s' % (role)
 
         (rc, stdout, stderr) = module.run_command(command)
         if rc != 0:
@@ -260,7 +269,7 @@ def start_service(cursor, module, msg, oracle_home, name, database_name):
             if 'PRCR-1001' in stdout:
                 msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
                 module.fail_json(msg=msg[0], changed=False)
-            elif 'PRCC-1014' in stdout: #<-- service already running
+            elif 'PRCC-1014' in stdout or 'PRCR-1120' in stdout: #<-- service already running
                 return False
             else:
                 msg[0] = 'Starting service %s in database %s failed: %s' % (name,database_name,stdout)
@@ -298,7 +307,7 @@ def stop_service(cursor, module, msg, oracle_home, name, database_name):
             if 'PRCR-1005' in stdout or 'CRS-2500' in stdout:
                 msg[0] = "Service %s already stopped in database %s" % (name, database_name)
                 module.exit_json(msg=msg[0], changed=False)
-            elif 'PRCR-1001' in stdout:
+            elif 'PRCR-1001' in stdout or 'PRCD-1132' in stdout:
                 msg[0] = 'Service %s doesn\'t exist in database %s' % (name, database_name)
                 module.exit_json(msg=msg[0], changed=False)
             else:
@@ -370,6 +379,7 @@ def main():
             preferred_instances = dict(required=False, aliases = ['pi']),
             available_instances = dict(required=False, aliases = ['ai']),
             pdb                 = dict(required=False),
+            role                = dict(required=False, choices = ["primary", "physical_standby", "logical_standby", "snapshot_standby"]),
             force               = dict(default=False, type = 'bool'),
             user                = dict(required=False, aliases = ['un','username']),
             password            = dict(required=False, no_log=True, aliases = ['pw']),
@@ -390,6 +400,7 @@ def main():
     preferred_instances = module.params["preferred_instances"]
     available_instances = module.params["available_instances"]
     pdb                 = module.params["pdb"]
+    role                = module.params["role"]
     force               = module.params["force"]
     user                = module.params["user"]
     password            = module.params["password"]
@@ -448,7 +459,7 @@ def main():
 
     if state == 'present':
         if not check_service_exists(cursor, module, msg, oracle_home, name, database_name):
-            if create_service(cursor, module, msg, oracle_home, name, database_name, preferred_instances,available_instances, pdb):
+            if create_service(cursor, module, msg, oracle_home, name, database_name, preferred_instances,available_instances, pdb, role):
                 msg[0] = 'Successfully created service %s in database %s' % (name, database_name)
                 module.exit_json(msg=msg[0], changed=True)
             else:

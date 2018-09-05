@@ -137,24 +137,25 @@ def check_user_exists(msg, cursor, schema):
             result = cursor.fetchone()[0]
     except cx_Oracle.DatabaseError, exc:
             error, = exc.args
-            msg[0] = error.message+ 'sql: ' + sql
+            msg = error.message+ 'sql: ' + sql
             return False
 
     if result > 0:
-        msg[0] = 'The schema (%s) already exists' % schema
+        msg = 'The schema (%s) already exists' % schema
         return True
 
 # Create the user/schema
 def create_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, profile, authentication_type, state, container, grants):
     grants_list=[]
     if not (schema):
-        msg[0] = 'Error: Missing schema name'
+        msg = 'Error: Missing schema name'
         return False
 
-    if not (schema_password):
+    if not (schema_password) and authentication_type == 'password':
         if not (schema_password_hash):
-            msg[0] = 'Error: Missing schema password or password hash'
-            return False
+            msg = 'Error: Missing schema password or password hash'
+            module.fail_json(msg=msg, Changed=False)
+            
 
     if authentication_type == 'password':
         if (schema_password_hash):
@@ -187,7 +188,7 @@ def create_user(module, msg, cursor, schema, schema_password, schema_password_ha
         cursor.execute(sql)
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
-        msg[0] = 'Blergh, something went wrong while creating the schema - %s sql: %s' % (error.message, sql)
+        msg = 'Blergh, something went wrong while creating the schema - %s sql: %s' % (error.message, sql)
         return False
 
     # Add grants to user if explicitly set. If not, only 'create session' is granted
@@ -208,7 +209,7 @@ def create_user(module, msg, cursor, schema, schema_password, schema_password_ha
         cursor.execute(sql)
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
-        msg[0] = 'Blergh, something went wrong while adding grants to the schema - %s sql: %s' % (error.message, sql)
+        msg = 'Blergh, something went wrong while adding grants to the schema - %s sql: %s' % (error.message, sql)
         return False
 
     return True
@@ -221,8 +222,8 @@ def get_user_password_hash(module, msg, cursor, schema):
             pwhashresult = cursor.fetchone()[0]
     except cx_Oracle.DatabaseError, exc:
             error, = exc.args
-            msg[0] = error.message+ ': sql: ' + sql
-            module.fail_json(msg=msg[0])
+            msg = error.message+ ': sql: ' + sql
+            module.fail_json(msg=msg)
 
     return pwhashresult
 
@@ -332,8 +333,8 @@ def execute_sql(module, msg, cursor, sql):
         cursor.execute(sql)
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
-        msg[0] = 'Blergh, something went wrong while executing sql - %s sql: %s' % (error.message, sql)
-        module.fail_json(msg=msg[0], changed=False)
+        msg = 'Blergh, something went wrong while executing sql - %s sql: %s' % (error.message, sql)
+        module.fail_json(msg=msg, changed=False)
         return False
 
     return True
@@ -345,8 +346,8 @@ def execute_sql_get(module, msg, cursor, sql):
             result = cursor.fetchall()
     except cx_Oracle.DatabaseError, exc:
             error, = exc.args
-            msg[0] = error.message+ ': sql: ' + sql
-            module.fail_json(msg=msg[0])
+            msg = error.message+ ': sql: ' + sql
+            module.fail_json(msg=msg)
 
     return result
 
@@ -356,7 +357,7 @@ def drop_user(module, msg, cursor, schema):
     black_list = ['sys','system','dbsnmp']
     if schema.lower() in black_list:
 
-       msg[0] = 'Trying to drop an internal user: %s. Not allowed' % schema
+       msg = 'Trying to drop an internal user: %s. Not allowed' % schema
        return False
 
     sql = 'drop user %s cascade' % schema
@@ -365,7 +366,7 @@ def drop_user(module, msg, cursor, schema):
         cursor.execute(sql)
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
-        msg[0] = 'Blergh, something went wrong while dropping the schema - %s sql: %s' % (error.message, sql)
+        msg = 'Blergh, something went wrong while dropping the schema - %s sql: %s' % (error.message, sql)
         return False
 
     return True
@@ -384,8 +385,8 @@ def main():
             password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
             schema        = dict(default=None),
-            schema_password  = dict(default=None),
-            schema_password_hash  = dict(default=None),
+            schema_password  = dict(default=None, no_log=True),
+            schema_password_hash  = dict(default=None, no_log=True),
             state         = dict(default="present", choices=["present", "absent", "locked", "unlocked"]),
             default_tablespace = dict(default=None),
             default_temp_tablespace = dict(default=None),
@@ -445,31 +446,33 @@ def main():
 
     except cx_Oracle.DatabaseError, exc:
         error, = exc.args
-        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
-        module.fail_json(msg=msg[0], changed=False)
+        msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
+        module.fail_json(msg=msg, changed=False)
 
     cursor = conn.cursor()
 
     if state in ('present','unlocked','locked'):
         if not check_user_exists(msg, cursor, schema):
             if create_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, profile, authentication_type, state, container, grants):
-                msg[0] = 'The schema %s has been created successfully' % schema
-                module.exit_json(msg=msg[0], changed=True)
+                msg = 'The schema %s has been created successfully' % schema
+                module.exit_json(msg=msg, changed=True)
             else:
-                module.fail_json(msg=msg[0], changed=False)
+                module.fail_json(msg=msg, changed=False)
         else:
             modify_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, update_password, profile, authentication_type, state)
 
     elif state == 'absent':
         if check_user_exists(msg, cursor, schema):
             if drop_user(module, msg, cursor, schema):
-                msg[0] = 'The schema (%s) has been dropped successfully' % schema
-                module.exit_json(msg=msg[0], changed=True)
+                msg = 'The schema (%s) has been dropped successfully' % schema
+                module.exit_json(msg=msg, changed=True)
+            else:
+                module.fail_json(msg=msg[0], changed=False)
         else:
             module.exit_json(msg='The schema (%s) doesn\'t exist' % schema, changed=False)
 
 
-    module.exit_json(msg=msg[0], changed=False)
+    module.exit_json(msg='Undhandled exit', changed=False)
 
 
 
