@@ -1,0 +1,35 @@
+
+  master_node: true
+  oracle_user: oracle 
+  oracle_base: /u01/app/oracle
+
+  rman_cronfile: oracle_rman_ansible
+  rman_cron_logdir: /var/log/oracle/rman/log
+
+  rman_script_dir: "{% if item is defined and item.0.rman_script_dir is defined %}{{item.0.rman_script_dir}}{% else %}{{oracle_base}}/rman/{% endif %}"
+  rman_log_dir: "{% if item is defined and item.0.rman_log_dir is defined %}{{item.0.rman_log_dir}}{% else %}{{oracle_base}}/rman/log/{% endif %}"
+
+  rman_tns_admin: /u01/app/oracle/rman/network/admin
+  rman_wallet_loc: "{{oracle_base}}/rman/network/wallet"
+  rman_wallet_password: "oracleWallet1"
+
+  rmanautofs: false
+
+  rman_cron_mkjob: False
+
+  rman_retention_policy_default: "RECOVERY WINDOW OF 14 DAYS"
+  rman_channel_disk_default: "'/u10/rmanbackup/%d/%d_%T_%U'"
+  rman_controlfile_autobackup_disk_default: "'/u10/rmanbackup/%d/%d_%F'"
+  rman_device_type_disk_default: 'PARALLELISM 1 BACKUP TYPE TO COMPRESSED BACKUPSET'
+
+  rman_retention_policy: "{% if item.0.rman_retention_policy is defined %}{{item.0.rman_retention_policy}}{% else %}{{rman_retention_policy_default}}{% endif %}"
+  rman_channel_disk: "{% if item.0.rman_channel_disk is defined %}{{item.0.rman_channel_disk}}{% else %}{{rman_channel_disk_default}}{% endif %}"
+  rman_controlfile_autobackup_disk: "{% if item.0.rman_controlfile_autobackup_disk is defined %}{{item.0.rman_controlfile_autobackup_disk}}{% else %}{{rman_controlfile_autobackup_disk_default}}{% endif %}"
+
+  rman_service_param: "{% if item.1.service is defined %}--service {{item.1.service}}{% else %}{% endif %}"
+
+  check_mk_mkjob: "{% if rman_cron_mkjob %}/usr/bin/mk-job rman_{{item.0.oracle_db_name}}_{{item.1.name}} {% endif %}"
+
+  rmanbackuplogdir:    "{% if item.0.rman_log_dir is defined %}-l {{item.0.rman_log_dir}}{% else %}{% endif %}"
+  rmanbackupscriptdir: "{% if item.0.rman_script_dir is defined %}-r {{item.0.rman_script_dir}}{% else %}{% endif %}"
+  rman_catalog_param: "{% if item.0.rman_wallet is defined and item.0.rman_wallet %}-c /@{{item.0.rman_tnsalias}}{% else %}{% if item.0.rman_user is defined %}-c {{item.0.rman_user}}/{{item.0.rman_password}}@{{item.0.rman_tnsalias}}{% endif %}{% endif %}"
