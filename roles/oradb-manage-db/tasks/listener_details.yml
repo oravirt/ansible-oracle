@@ -1,0 +1,23 @@
+- debug: msg="ORACLE_HOME {{listener_home}}"
+  tags: listener2
+
+- name: listener | create custom configuration in listener.ora
+  blockinfile:
+    path: "{{ listener_home }}/network/admin/listener.ora"
+    backup: True
+    create: True
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    state: present
+    insertafter: "EOF"
+    marker: "# {mark} Ansible managed for  {{ lsnrinst.listener_name }}"
+    block: "{{ lookup('template', 'listener_details.j2') }}"
+  tags: listener2
+
+# Don't try to stop the listener at this point
+# => Restart of role will fail at create/manage database due to TNS-12514
+- name: listener | Reload Listener
+  shell: "{{ listener_home }}/bin/lsnrctl start {{ lsnrinst.listener_name }}; {{ listener_home }}/bin/lsnrctl reload {{ lsnrinst.listener_name }}"
+  environment: "{{ oracle_env_lsnrctl }}"
+  become_user: "{{ oracle_user }}"
+  tags: listener2

@@ -9,12 +9,20 @@
      loop_var: dbh
   tags: set_fact
 
+- include_tasks: listener_details.yml
+  with_items:
+    - "{{ listener_installed }}"
+  loop_control:
+     loop_var: lsnrinst
+  when: create_listener and listener_installed is defined
+  tags: listener2
+
 - include_tasks: listener.yml
   with_items:
       - "{{ oracle_databases }}"
   loop_control:
     loop_var: dbh
-  when: create_listener and oracle_databases is defined
+  when: create_listener and oracle_databases is defined and listener_installed is not defined
   tags: listener
 
 - name: manage-db | Add change-pdb script
