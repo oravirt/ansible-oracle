@@ -1,6 +1,14 @@
 ---
 # tasks file for manage-db
 
+- include_tasks: tnsnames.yml
+  with_items:
+    - "{{ tnsnames_installed }}"
+  loop_control:
+     loop_var: tnsinst
+  when: tnsnames_installed is defined
+  tags: tnsnames2
+
 - name: manage-db | set fact for Listener
   set_fact:
       create_listener: "{{ create_listener }}"
