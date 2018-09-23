@@ -31,7 +31,7 @@ SALES=
 
 # do not edit the configuration manually.
 # The execution of ansible-oracle automatically replace all manual changes!
-{{ tnsinst.tnsname }} =
+{{ tnsinst.tnsname | upper }} =
  (DESCRIPTION_LIST=
    (LOAD_BALANCE={{ oracle_tnsnames_config[tnsinst.tnsname]['load_balance'] | default('off')}})
    (FAILOVER={{ oracle_tnsnames_config[tnsinst.tnsname]['failover'] | default('yes')}})
@@ -46,6 +46,7 @@ SALES=
      )
      (CONNECT_DATA =
        (SERVICE_NAME = {{oracle_tnsnames_config[tnsinst.tnsname]['connect']['service_name']}})
+       (SERVER =  {{oracle_tnsnames_config[tnsinst.tnsname]['connect']['SERVER']| default ('DEDICATED')}})
      )
    )
 {% endfor %}

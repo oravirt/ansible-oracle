@@ -30,6 +30,8 @@
 SID_LIST_{{ lsnrinst.listener_name }} =
 {# loop over oracle_database when testsid.listener_name was found for lsnrinst.listener_name #}
   {%- for sid in oracle_databases if sid.listener_name is defined and sid.listener_name == lsnrinst.listener_name %}
+{%- set sid_name = sid.oracle_db_instance_name | default(sid.oracle_db_name) %}
+{%- set sid_name_dgmgrl = sid.oracle_db_unique_name | default(sid.oracle_db_name) %}
   (SID_LIST =
     (SID_DESC =
     {% if db_homes_config[sid.home]['oracle_home'] is defined %}
@@ -37,7 +39,7 @@ SID_LIST_{{ lsnrinst.listener_name }} =
     {% else %}
   (ORACLE_HOME = {{oracle_base}}/{{db_homes_config[sid.home]['version']}}/{{db_homes_config[sid.home]['home']}})
     {% endif %}
-  (SID_NAME = {{ sid.oracle_db_name }})
+  (SID_NAME = {{ sid_name }})
     )
 {# added for compatibility against Oracle 11.2#}
     (SID_DESC =
@@ -46,8 +48,8 @@ SID_LIST_{{ lsnrinst.listener_name }} =
     {% else %}
   (ORACLE_HOME = {{oracle_base}}/{{db_homes_config[sid.home]['version']}}/{{db_homes_config[sid.home]['home']}})
     {% endif %}
-  (SID_NAME = {{ sid.oracle_db_name }})
-      (GLOBAL_DBNAME = {{ sid.oracle_db_name }}_DGMGRL)
+  (SID_NAME = {{ sid_name }})
+      (GLOBAL_DBNAME = {{ sid_name_dgmgrl }}_DGMGRL)
     )
   {% endfor %}
 )
