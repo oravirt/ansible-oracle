@@ -16,8 +16,14 @@
 
 # Don't try to stop the listener at this point
 # => Restart of role will fail at create/manage database due to TNS-12514
+- name: listener | Start Listener - ignore errors for running Listener
+  shell: "export PATH=${ORACLE_HOME}/bin:${PATH}; lsnrctl start {{ lsnrinst.listener_name }} /dev/null; exit 0"
+  environment: "{{ oracle_env_lsnrctl }}"
+  become_user: "{{ oracle_user }}"
+  tags: listener2
+
 - name: listener | Reload Listener
-  shell: "{{ listener_home }}/bin/lsnrctl start {{ lsnrinst.listener_name }}; {{ listener_home }}/bin/lsnrctl reload {{ lsnrinst.listener_name }}"
+  shell: "export PATH=${ORACLE_HOME}/bin:${PATH}; lsnrctl reload {{ lsnrinst.listener_name }}"
   environment: "{{ oracle_env_lsnrctl }}"
   become_user: "{{ oracle_user }}"
   tags: listener2
