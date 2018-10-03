@@ -1,9 +1,23 @@
 - debug: msg="ORACLE_HOME {{listener_home}}"
   tags: tnsnames
 
-- name: tnsnames.ora | create custom configuration in tnsnames.ora
-  blockinfile:
+- name: tnsnames.ora | create IFILE entry in tnsnames.ora
+  lineinfile:
+    line: "IFILE={{ listener_home }}/network/admin/tnsnames_ansible.ora"
+    regexp: "^IFILE=/"
+    insertbefore: BOF
     path: "{{ listener_home }}/network/admin/tnsnames.ora"
+    backup: True
+    create: True
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    state: present
+    mode: 0644
+  tags: tnsnames
+
+- name: tnsnames.ora | create custom configuration in tnsnames_ansible.ora
+  blockinfile:
+    path: "{{ listener_home }}/network/admin/tnsnames_ansible.ora"
     backup: True
     create: True
     group: "{{ oracle_group }}"
