@@ -9,6 +9,7 @@
         pdb={{ item.0.name | default(omit) }}
         state=present
         host={{ansible_hostname}}
+        port={{ listener_port_template }}
         un={{ db_user }}
         pw={{ db_password_cdb }}
         sn={{ db_service_name }}
@@ -33,7 +34,7 @@
         role={{ item.1.role|default(omit) }}
         state=present
         host={{ ansible_hostname}}
-        port=1521
+        port={{ listener_port_template }}
         un={{ db_user }}
         pw={{ db_password_pdb }}
         sn={{ item.0.pdb_name }}
@@ -55,6 +56,7 @@
          pdb={{ item.0.pdb_name | default(omit) }}
          state=started
          host={{ ansible_hostname }}
+         port={{ listener_port_template }}
          un={{ db_user }}
          pw={{ db_password_cdb }}
          sn={{ db_service_name }}
@@ -76,6 +78,7 @@
          pdb={{ item.0.pdb_name | default(omit) }}
          state=started
          host={{ ansible_hostname }}
+         port={{ listener_port_template }}
          un={{ db_user }}
          pw={{ db_password_pdb }}
          sn={{ item.0.pdb_name }}
@@ -97,6 +100,7 @@
          pdb={{ item.0.pdb_name | default(omit) }}
          state=stopped
          host={{ ansible_hostname }}
+         port={{ listener_port_template }}
          un={{ db_user }}
          pw={{ db_password_cdb }}
          sn={{ db_service_name }}
@@ -118,6 +122,7 @@
          pdb={{ item.0.pdb_name | default(omit) }}
          state=stopped
          host={{ ansible_hostname }}
+         port={{ listener_port_template }}
          un={{ db_user }}
          pw={{ db_password_pdb }}
          sn={{ item.0.pdb_name }}
@@ -139,6 +144,7 @@
          pdb={{ item.0.pdb_name | default(omit) }}
          state=absent
          host={{ ansible_hostname }}
+         port={{ listener_port_template }}
          un={{ db_user }}
          pw={{ db_password_cdb }}
          sn={{ db_service_name }}
@@ -160,6 +166,7 @@
          pdb={{ item.0.pdb_name | default(omit) }}
          state=absent
          host={{ ansible_hostname }}
+         port={{ listener_port_template }}
          un={{ db_user }}
          pw={{ db_password_pdb }}
          sn={{ item.0.pdb_name }}

@@ -18,6 +18,9 @@ db_service_name: "{% if item.0 is defined %}
 user_cdb_password: "{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name] is defined and dbpasswords[item.0.oracle_db_name][item.1.schema] is defined %}{{dbpasswords[item.0.oracle_db_name][item.1.schema]}}{% else %}{{ default_dbpass}}{% endif%}"
 user_pdb_password: "{% if dbpasswords is defined and dbpasswords[item.0.cdb] is defined and dbpasswords[item.0.cdb][item.0.pdb_name] is defined and dbpasswords[item.0.cdb][item.0.pdb_name][item.1.schema] is defined%}{{dbpasswords[item.0.cdb][item.0.pdb_name][item.1.schema]}}{% else %}{{ default_dbpass}}{% endif%}"
 
+listener_port_template: "{% if item.0.listener_port is defined %}{{ item.0.listener_port }}{% else %}{{ listener_port }}{% endif %}"
+listener_port: 1521
+
 oracle_env:
        ORACLE_HOME: "{{ oracle_home_db }}"
        LD_LIBRARY_PATH: "{{ oracle_home_db }}/lib"
