@@ -1,6 +1,7 @@
 - name: manage-db | check if GI is present
   stat: path=/etc/oracle/olr.loc
   register: olrloc
+  tags: update_oratab
 #
 # - name: manage-db | check if database exists (GI)
 #   shell: "{{ oracle_home_db }}/bin/srvctl config database | grep -w {{ dbh.oracle_db_name}}"
@@ -42,7 +43,7 @@
 - name: manage-db | add dotprofile
   template:
     src: dotprofile-db.j2
-    dest: "/home/{{ oracle_user}}/.profile_{{ dbh.oracle_db_name }}"
+    dest: "/home/{{ oracle_user}}/.profile_{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_name) }}"
     owner: "{{ oracle_user }}"
     group: "{{ oracle_group }}"
     mode: 0660
@@ -99,7 +100,7 @@
 - name: manage-db | Customize oratab for autostart
   lineinfile:
           dest=/etc/oratab
-          line="{{ dbh.oracle_db_name }}:{{ oracle_home_db }}:Y"
+          line="{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_name) }}:{{ oracle_home_db }}:Y"
           state=present
   when: autostartup_service and not olrloc.stat.exists and dbh.state == 'present'
   tags: update_oratab
@@ -107,7 +108,7 @@
 - name: manage-db | Customize oratab for autostart
   lineinfile:
          dest=/etc/oratab
-         line="{{ dbh.oracle_db_name }}:{{ oracle_home_db }}:N"
+         line="{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_name) }}:{{ oracle_home_db }}:N"
          state=absent
   when: autostartup_service and not olrloc.stat.exists and dbh.state == 'present'
   become: yes
