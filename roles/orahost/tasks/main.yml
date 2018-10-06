@@ -30,13 +30,13 @@
        state: installed
        enablerepo: "{{ extrarepos_enabled |default (omit) }}"
        disablerepo: "{{ extrarepos_disabled |default (omit) }}"
-    when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'RedHat'
+    when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'RedHat' and asm_diskgroups is defined
     tags: os_packages, oscheck
 
   - name: Install packages required by Oracle for ASMlib on SLES
     zypper: name={{ item }} state=installed
     with_items: "{{ oracle_asm_packages_sles }}"
-    when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'Suse'
+    when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'Suse' and asm_diskgroups is defined
     tags: os_packages, oscheck, asm1
 
   - name: Check if firewall is installed
