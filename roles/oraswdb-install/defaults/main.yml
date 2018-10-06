@@ -79,11 +79,11 @@
                    {%- else %}{% if ansible_service_mgr is defined %}{{ ansible_service_mgr }}{% else %}init{% endif %}{% endif %}"
 
   disable_EE_options: True
-  oracle_EE_options: "{%- if db_homes_config[dbh.home]['version'] in ('12.2.0.1') %}{{ oracle_EE_options_122 }}
+  oracle_EE_options: "{%- if   db_homes_config[dbh.home]['version'] in ('18.3.0.0') %}{{ oracle_EE_options_183 }}
+                      {%- elif db_homes_config[dbh.home]['version'] in ('12.2.0.1') %}{{ oracle_EE_options_122 }}
                       {%- elif db_homes_config[dbh.home]['version'] in ('12.1.0.1', '12.1.0.2') %}{{oracle_EE_options_121}}
                       {%- elif db_homes_config[dbh.home]['version'] == '11.2.0.4' %}{{oracle_EE_options_112}}
                       {%- endif %}"
-  oracle_EE_option_state: "{% if item.state is defined and item.state %}enable{% else %}disable{% endif %}"
 
   # disable all options who requires extra licences
   oracle_EE_options_112:
@@ -106,6 +106,11 @@
     - {option: partitioning , state: false }
     - {option: rat          , state: false }
 
+  oracle_EE_options_183:
+    - {option: oaa          , state: false }
+    - {option: olap         , state: false }
+    - {option: partitioning , state: false }
+    - {option: rat          , state: false }
 
   oracle_directories:
           - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
