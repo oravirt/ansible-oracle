@@ -17,6 +17,14 @@
      loop_var: dbh
   tags: set_fact
 
+- include_tasks: sqlnet.yml
+  with_items:
+    - "{{ sqlnet_installed }}"
+  loop_control:
+     loop_var: sqlnetinst
+  when: sqlnet_installed is defined
+  tags: sqlnet2
+
 - include_tasks: listener_details.yml
   with_items:
     - "{{ listener_installed }}"

@@ -57,6 +57,10 @@
                     {%- if db_homes_config[tnsinst.home]['oracle_home'] is defined -%}{{db_homes_config[tnsinst.home]['oracle_home']}}
                     {%- else -%}{{oracle_base}}/{{db_homes_config[tnsinst.home]['version']}}/{{db_homes_config[tnsinst.home]['home']}}
                     {%- endif -%}
+                  {%- elif sqlnetinst is defined -%}
+                    {%- if db_homes_config[sqlnetinst.home]['oracle_home'] is defined -%}{{db_homes_config[sqlnetinst.home]['oracle_home']}}
+                    {%- else -%}{{oracle_base}}/{{db_homes_config[sqlnetinst.home]['version']}}/{{db_homes_config[sqlnetinst.home]['home']}}
+                    {%- endif -%}
                   {%- endif -%}"
 
   oracle_env_lsnrctl:
