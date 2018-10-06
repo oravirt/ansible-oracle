@@ -311,26 +311,26 @@
   - name: Asmlib | Add configuration
     template: src=oracleasm.j2 dest=/etc/sysconfig/oracleasm-_dev_oracleasm
     register: asmlibconfig
-    when: device_persistence|lower == 'asmlib'
+    when: device_persistence|lower == 'asmlib' and asm_diskgroups is defined
     tags:
       - asmlibconfig
 
   - name: Asmlib | Add configuration (link)
     file: src=/etc/sysconfig/oracleasm-_dev_oracleasm dest=/etc/sysconfig/oracleasm state=link force=yes
     register: asmlibconfig
-    when: device_persistence|lower == 'asmlib'
+    when: device_persistence|lower == 'asmlib' and asm_diskgroups is defined
     tags:
       - asmlibconfig
 
   - name: Asmlib | Enable and start Oracle Asmlib
     service: name=oracleasm  state=started  enabled=yes
-    when: device_persistence == 'asmlib'
+    when: device_persistence == 'asmlib' and asm_diskgroups is defined
     tags:
       - asmlibconfig
 
   - name: Asmlib | Restart Asmlib
     service: name=oracleasm  state=restarted
-    when: device_persistence == 'asmlib' and asmlibconfig.changed
+    when: asm_diskgroups is defined and device_persistence == 'asmlib' and asmlibconfig.changed
     tags:
       - asmlibconfig
 
