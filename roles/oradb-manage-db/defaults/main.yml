@@ -81,7 +81,9 @@
   # dbca_redolog: "{% if dbh.redolog_size_in_mb is defined %} -redoLogFileSize {{dbh.redolog_size_in_mb}}{% endif %}"
   init_params_list: "{%- if dbh.init_parameters is defined  -%}
                         {%- for p in  dbh.init_parameters -%}
-                           {{ p.name }}={{ p.value}}{%- if not loop.last -%},{%- endif -%}
+                          {%- if p.dbca | default(True) -%}
+                             {{ p.name }}={{ p.value}}{%- if not loop.last -%},{%- endif -%}
+                          {%- endif -%}
                         {%- endfor -%}
                      {%- endif -%}"
 
