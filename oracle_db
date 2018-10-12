@@ -294,8 +294,10 @@ def get_version(module, msg, oracle_home):
 
 
 # Check if the database exists
-def check_db_exists(module, msg, oracle_home, db_name, db_unique_name ):
-
+def check_db_exists(module, msg, oracle_home, db_name, sid, db_unique_name ):
+    
+    if sid is None:
+        sid = ''
     if gimanaged:
         if db_unique_name != None:
             checkdb = db_unique_name
@@ -325,19 +327,27 @@ def check_db_exists(module, msg, oracle_home, db_name, db_unique_name ):
                 for line in oratab:
             		if line.startswith('#') or line.startswith(' '):
             			continue
-            		elif re.search(db_name +':', line):
+            		elif re.search(db_name +':', line) or re.search(sid +':', line):
             			existingdbs.append(line)
-
+        
         if not existingdbs: #<-- db doesn't exist
             return False
         else:
             for dbs in existingdbs:
-                if '%s:' % db_name in dbs:
-                    if dbs.split(':')[1] != oracle_home: #<-- DB is created, but with a different ORACLE_HOME
-                        msg = 'Database %s already exists in a different ORACLE_HOME (%s)' % (db_name, dbs.split(':')[1])
-                        module.fail_json(msg=msg, changed=False)
-                    elif dbs.split(':')[1] == oracle_home:  #<-- Database already exist
-                        return True
+                if sid != '':
+                    if '%s:' % db_name in dbs or '%s:' % sid in dbs:
+                        if dbs.split(':')[1] != oracle_home.rstrip('/'): #<-- DB is created, but with a different ORACLE_HOME
+                            msg = 'Database %s already exists in a different ORACLE_HOME (%s)' % (db_name, dbs.split(':')[1])
+                            module.fail_json(msg=msg, changed=False)
+                        elif dbs.split(':')[1] == oracle_home.rstrip('/'):  #<-- Database already exist
+                            return True
+                else:
+                    if '%s:' % db_name in dbs:
+                        if dbs.split(':')[1]!= oracle_home.rstrip('/'): #<-- DB is created, but with a different ORACLE_HOME
+                            msg = 'Database %s already exists in a different ORACLE_HOME (%s)' % (db_name, dbs.split(':')[1])
+                            module.fail_json(msg=msg, changed=False)
+                        elif dbs.split(':')[1] == oracle_home.rstrip('/'):  #<-- Database already exist
+                            return True
 
 
 def create_db (module, msg, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb,
@@ -493,11 +503,29 @@ def create_db (module, msg, oracle_home, sys_password, system_password, dbsnmp_p
 #         else:
 #             return True
 
-def remove_db (module, msg, oracle_home, db_name, db_unique_name, sys_password):
+def remove_db (module, msg, oracle_home, db_name, sid, db_unique_name, sys_password):
 
-    if db_unique_name is not None:
-        db_name = db_unique_name
-    command = "%s/bin/dbca -deleteDatabase -silent -sourceDB %s -sysDBAUserName sys -sysDBAPassword %s" % (oracle_home, db_name, sys_password)
+    cursor = getconn(module,msg)
+    israc = ''
+    israc_sql = 'select parallel,instance_name,host_name from v$instance'
+    israc_ = execute_sql_get(module,msg,cursor,israc_sql)
+    remove_db = ''
+    if gimanaged:
+        if db_unique_name is not None:
+            remove_db = db_unique_name
+        elif sid is not None and israc_[0][0] == 'YES':
+            remove_db = db_name
+        elif sid is not None and israc_[0][0] == 'NO':
+            remove_db = sid
+        else:
+            remove_db = db_name
+    else:
+        if sid is not None:
+            remove_db = sid
+        else:
+            remove_db = db_name
+
+    command = "%s/bin/dbca -deleteDatabase -silent -sourceDB %s -sysDBAUserName sys -sysDBAPassword %s" % (oracle_home, remove_db, sys_password)
     (rc, stdout, stderr) = module.run_command(command)
     if rc != 0:
         msg = 'Removal of database %s failed: %s' % (db_name, stdout)
@@ -580,34 +608,23 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
         change_db_sql.append(fbsql)
 
     if len(change_db_sql) > 0 or len(change_restart_sql) > 0:
-        if len(change_db_sql) > 0: # <- Apply changes that does not require a restart
-            for sql in change_db_sql:
-                execute_sql(module,msg,cursor,sql)
+            
+        if log_check_[0][0] == 'ARCHIVELOG' and log_check_[0][2] == 'YES' and not archivelog and not flashback: # Flashback database needs to be turned off before archivelog is turned off
+                        
+            if len(change_db_sql) > 0: # <- Apply changes that does not require a restart
+                apply_norestart_changes(module,msg,change_db_sql)
+        
+            if len(change_restart_sql) > 0: # <- Apply changes that requires a restart
+                apply_restart_changes(module,msg,oracle_home,db_name,db_unique_name,sid,instance_name,host_name,israc,archcomp,change_restart_sql)
+        else:
+            if len(change_restart_sql) > 0: # <- Apply changes that requires a restart
+                apply_restart_changes(module,msg,oracle_home,db_name,db_unique_name,sid,instance_name,host_name,israc,archcomp,change_restart_sql)
+                        
+            if len(change_db_sql) > 0: # <- Apply changes that does not require a restart
+                apply_norestart_changes(module,msg,change_db_sql)
+        
 
-
-
-        if len(change_restart_sql) > 0: # <- Apply changes that requires a restart
-            if stop_db(module,msg,oracle_home,db_name,db_unique_name,sid):
-                if start_instance(module,msg,oracle_home,db_name, db_unique_name,sid,'mount', instance_name, host_name,israc):
-                    time.sleep(10) #<- To allow the DB to register with the listener
-                    cursor = getconn(module,msg)
-                    for sql in change_restart_sql:
-                        execute_sql(module,msg,cursor,sql)
-                        if stop_db(module,msg,oracle_home,db_name,db_unique_name,sid):
-                            if start_db(module,msg,oracle_home,db_name,db_unique_name, sid):
-                                if newdb:
-                                    msg = 'Database %s successfully created (%s) ' % (db_name, archcomp)
-                                    if output == 'verbose':
-                                        msg += ' ,'.join(verboselist)
-                                    changed = True
-                                else:
-                                    msg = 'Database %s has been put in the intended state - (%s) ' % (db_name,archcomp)
-                                    if output == 'verbose':
-                                        msg += ' ,'.join(verboselist)
-                                module.exit_json(msg=msg, changed=True)
-
-
-        msg = 'Database %s has been put in the intended state' % (db_name)
+        msg = 'Database %s has been put in the intended state - Archivelog: %s, Force Logging: %s, Flashback: %s' % (db_name, archivelog,force_logging,flashback)
         module.exit_json(msg=msg, changed=True)
     else:
         if newdb:
@@ -616,10 +633,40 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
                 msg += ' ,'.join(verboselist)
             changed = True
         else:
-            msg = ' Database %s already exists and is in the intended state' % (db_name)
+            msg = ' Database %s already exists and is in the intended state - Archivelog: %s, Force Logging: %s, Flashback: %s' % (db_name, archivelog,force_logging,flashback)
             changed = False
         module.exit_json(msg=msg, changed=changed)
 
+
+def apply_restart_changes(module,msg,oracle_home,db_name,db_unique_name,sid,instance_name,host_name,israc,archcomp,change_restart_sql):
+    
+
+    if stop_db(module,msg,oracle_home,db_name,db_unique_name,sid):
+        if start_instance(module,msg,oracle_home,db_name, db_unique_name,sid,'mount', instance_name, host_name,israc):
+            time.sleep(10) #<- To allow the DB to register with the listener
+            cursor = getconn(module,msg)
+            for sql in change_restart_sql:
+                execute_sql(module,msg,cursor,sql)
+                if stop_db(module,msg,oracle_home,db_name,db_unique_name,sid):
+                    if start_db(module,msg,oracle_home,db_name,db_unique_name, sid):
+                        if newdb:
+                            msg = 'Database %s successfully created (%s) ' % (db_name, archcomp)
+                            if output == 'verbose':
+                                msg += ' ,'.join(verboselist)
+                            changed = True
+                        else:
+                            msg = 'Database %s has been put in the intended state - (%s) ' % (db_name,archcomp)
+                            if output == 'verbose':
+                                msg += ' ,'.join(verboselist)
+                            changed = True
+                        
+                        
+    
+def apply_norestart_changes(module,msg,change_db_sql):
+    
+    cursor = getconn(module,msg)
+    for sql in change_db_sql:
+        execute_sql(module,msg,cursor,sql)
 
 def stop_db (module, msg, oracle_home, db_name, db_unique_name, sid):
 
@@ -634,12 +681,10 @@ def stop_db (module, msg, oracle_home, db_name, db_unique_name, sid):
         else:
             return True
     else:
-
         if sid is not None:
             os.environ['ORACLE_SID'] = sid
         else:
             os.environ['ORACLE_SID'] = db_name
-
         shutdown_sql = '''
         connect / as sysdba
         shutdown immediate;
@@ -714,7 +759,7 @@ def start_instance (module,msg, oracle_home, db_name, db_unique_name,sid, open_m
             os.environ['ORACLE_SID'] = sid
         else:
             os.environ['ORACLE_SID'] = db_name
-
+        
         startup_sql = '''
         connect / as sysdba
         startup mount;
@@ -883,7 +928,7 @@ def main():
 
     #ld_library_path = '%s/lib' % (oracle_home)
     if oracle_home is not None:
-        os.environ['ORACLE_HOME'] = oracle_home
+        os.environ['ORACLE_HOME'] = oracle_home.rstrip('/')
         #os.environ['LD_LIBRARY_PATH'] = ld_library_path
     elif 'ORACLE_HOME' in os.environ:
         oracle_home     = os.environ['ORACLE_HOME']
@@ -914,7 +959,7 @@ def main():
     major_version = get_version(module,msg,oracle_home)
 
     if state == 'present':
-        if not check_db_exists(module, msg, oracle_home,db_name,db_unique_name):
+        if not check_db_exists(module, msg, oracle_home,db_name, sid, db_unique_name):
             if create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb, local_undo, datafile_dest, recoveryfile_dest,
                         storage_type, dbconfig_type, racone_service, characterset, memory_percentage, memory_totalmb, nodelist, db_type, amm, initparams, customscripts,datapatch):
                 newdb = True
@@ -927,8 +972,8 @@ def main():
             # module.exit_json(msg=msg, changed=False)
 
     elif state == 'absent':
-        if check_db_exists(module, msg, oracle_home, db_name, db_unique_name):
-            if remove_db(module, msg, oracle_home, db_name,db_unique_name, sys_password):
+        if check_db_exists(module, msg, oracle_home, db_name, sid, db_unique_name):
+            if remove_db(module, msg, oracle_home, db_name, sid, db_unique_name, sys_password):
                 msg = 'Successfully removed database %s' % (db_name)
                 module.exit_json(msg=msg, changed=True)
             else:
