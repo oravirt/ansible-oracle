@@ -2,6 +2,12 @@
     stat: path=/etc/oracle/olr.loc
     register: olrloc
 
+  - name: install-home-db | Mount nfs share with installation media
+    mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state
+    when: install_from_nfs
+    tags:
+      - nfsmountdb
+
   # - name: db-opatch | set fact for patch_before_rootsh
   #   set_fact:
   #       patch_before_rootsh: False
