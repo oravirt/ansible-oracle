@@ -1,6 +1,14 @@
 ---
 # tasks file for manage-db
 
+- include_tasks: tnsnames.yml
+  with_items:
+    - "{{ tnsnames_installed }}"
+  loop_control:
+     loop_var: tnsinst
+  when: tnsnames_installed is defined
+  tags: tnsnames2
+
 - name: manage-db | set fact for Listener
   set_fact:
       create_listener: "{{ create_listener }}"
@@ -9,12 +17,28 @@
      loop_var: dbh
   tags: set_fact
 
+- include_tasks: sqlnet.yml
+  with_items:
+    - "{{ sqlnet_installed }}"
+  loop_control:
+     loop_var: sqlnetinst
+  when: sqlnet_installed is defined
+  tags: sqlnet2
+
+- include_tasks: listener_details.yml
+  with_items:
+    - "{{ listener_installed }}"
+  loop_control:
+     loop_var: lsnrinst
+  when: listener_installed is defined
+  tags: listener2
+
 - include_tasks: listener.yml
   with_items:
       - "{{ oracle_databases }}"
   loop_control:
     loop_var: dbh
-  when: create_listener and oracle_databases is defined
+  when: create_listener and oracle_databases is defined and listener_installed is not defined
   tags: listener
 
 - name: manage-db | Add change-pdb script
