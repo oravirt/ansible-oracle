@@ -86,7 +86,7 @@
     loop_control:
       loop_var: dbh
     when: db_homes_installed is defined and dbh.state|lower == 'present'
-    tags: oradbinstall
+    tags: oradbinstall,dbchopt
 
   - name: install-home-db | Unmount nfs share with installation media
     mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=absent
