@@ -122,7 +122,7 @@
   # The task is only execute once on master_node when GI is installed!
   # no catalog connection, because setting initial parameters with catalog takes much more time
   - name: Execute RMAN-Script at playbook
-    shell: "{{oracle_base}}/bin/rman_backup.sh -a {{item.1.name}} -s {{item.0.oracle_db_name}} -r {{rman_script_dir}} -l {{rman_log_dir}} | tee -a {{rman_cron_logdir}}/rman_{{item.1.name}}.log"
+    shell: "{{oracle_base}}/bin/rman_backup.sh -a {{item.1.name}} -s {{item.0.oracle_db_instance_name | default(item.0.oracle_db_name)}} -r {{rman_script_dir}} -l {{rman_log_dir}} | tee -a {{rman_cron_logdir}}/rman_{{item.1.name}}.log"
     environment:
       - PATH: /bin:/usr/bin
     become: yes
@@ -171,7 +171,7 @@
       weekday: "{{item.1.weekday}}"
       hour: "{{item.1.hour}}"
       minute: "{{item.1.minute}}"
-      job: "{{ check_mk_mkjob }}{{oracle_base}}/bin/rman_backup.sh -a {{item.1.name}} -s {{item.0.oracle_db_name}} {{rman_service_param}} {{rman_catalog_param}} {{rmanbackuplogdir}} {{rmanbackupscriptdir}}>> {{rman_cron_logdir}}/rman_{{item.0.oracle_db_name}}_{{item.1.name}}.log 2>&1"
+      job: "{{ check_mk_mkjob }}{{oracle_base}}/bin/rman_backup.sh -a {{item.1.name}} -s {{item.0.oracle_db_instance_name | default(item.0.oracle_db_name)}} {{rman_service_param}} {{rman_catalog_param}} {{rmanbackuplogdir}} {{rmanbackupscriptdir}}>> {{rman_cron_logdir}}/rman_{{item.0.oracle_db_name}}_{{item.1.name}}.log 2>&1"
     with_subelements:
        - "{{oracle_databases}}"
        - rman_jobs
