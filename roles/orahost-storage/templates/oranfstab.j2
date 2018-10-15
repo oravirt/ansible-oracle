@@ -1,0 +1,19 @@
+{#
+server:  nfsserver
+ local: 198.51.100.02
+ path: 10.0.0.0
+ local: 198.51.100.03
+ path: 10.0.0.3
+ export: /private/oracle1/logs  mount: C:\APP\ORACLE\ORADATA\logs  security: krb5
+ export: /private/oracle1/data  mount: C:\APP\ORACLE\ORADATA\data  security: krb5p
+ export: /private/oracle1/archive mount: C:\APP\ORACLE\ORADATA\archive security: sys
+ export: /private/oracle1/data1 mount: C:\APP\ORACLE\ORADATA\data1
+#}
+server: {{ item.server }}
+{% for ips in item.ips %}
+ local: {{ ips.local }}
+ path: {{ ips.path }}
+{% endfor %}
+{% for exp in item.exports %}
+ export: {{ exp.export }} mount: {{ exp.mount }}
+{% endfor %}
