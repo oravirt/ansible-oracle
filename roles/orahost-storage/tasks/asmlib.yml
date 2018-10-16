@@ -12,18 +12,18 @@
 
 - name: ASMlib | Rescan ASM disks
   shell: "{{asmlib_binary}} scandisks"
-  when: device_persistence == 'asmlib'
+  when: device_persistence == 'asmlib' and asm_diskgroups is defined
   changed_when: False
   tags: asmlibconfig,asmstorage
 
 - name: ASMlib | List ASM disks
   shell: "{{asmlib_binary}} listdisks"
-  when: device_persistence == 'asmlib'
+  when: device_persistence == 'asmlib' and asm_diskgroups is defined
   register: listdisks
   changed_when: False
   tags: asmlibconfig,asmstorage
 
 - name: ASMlib | List ASM disks
   debug: var=listdisks.stdout_lines
-  when: device_persistence == 'asmlib'
+  when: device_persistence == 'asmlib' and asm_diskgroups is defined
   tags: asmlibconfig,asmstorage
