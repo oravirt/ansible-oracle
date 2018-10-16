@@ -26,3 +26,19 @@ oracle_env:
 
 attr_name:  "{% if item.1.attributes is defined %}{{item.1.attributes |default (omit) | map(attribute='name') | list }}{% else %}None{%endif%}"
 attr_value: "{% if item.1.attributes is defined %}{{item.1.attributes |default (omit) | map(attribute='value') | list }}{% else %}None{%endif%}"
+
+
+# This is an example of how the profile configuration should look like
+
+# oracle_databases:
+#       - home: 12201-base
+#         oracle_db_name: orclcdb
+#         ....
+#         ....
+#         profiles:
+#             - name: profile1
+#               state: present
+#               attributes:
+#                    - {name: password_reuse_max, value: 7}
+#                    - {name: password_reuse_time, value: 500}
+
