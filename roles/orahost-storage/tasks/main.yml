@@ -39,6 +39,13 @@
         - exports
     when: oradnfs is defined
 
+  - name: dNFS-storage | Change permission on directories
+    file: path={{ item.1.mount }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=775
+    with_subelements:
+        - "{{ oradnfs }}"
+        - exports
+    when: oradnfs is defined
+
   - name: dNFS-storage | Create /etc/oranfstab for dNFS
     blockinfile:
       path: /etc/oranfstab
