@@ -17,6 +17,8 @@
       - flags:
         skip_missing: True
   environment: "{{oracle_env}}"
+  loop_control:
+      label: "home: {{ item.0.home }} db_name: {{ item.0.oracle_db_name }} Profile: {{ item.1.name }} attributes: {{ item.1.attributes }}"
   when: oracle_databases is defined and item.0.state|lower == 'present' and item.1 is defined
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
@@ -39,6 +41,8 @@
       - flags:
         skip_missing: True
   environment: "{{oracle_env}}"
+  loop_control:
+      label: "home: {{ item.0.home }} CDB: {{ item.0.cdb }} PDB: {{ item.0.pdb_name }} Profile: {{ item.1.name }} attributes: {{ item.1.attributes }}"
   when: oracle_pdbs is defined and item.0 is defined and item.0.state|lower == 'present' and item.1 is defined
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
