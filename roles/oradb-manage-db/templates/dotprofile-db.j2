@@ -29,6 +29,14 @@ get_sid=$(ps -ef | grep "ora_pmon_$ORACLE_DBNAME" |grep -v grep | sed 's/^.*pmon
         export ORA_DB_UNQ_NAME={% if dbh.oracle_db_unique_name is defined %}{{ dbh.oracle_db_unique_name }}{% else %}{{ dbh.oracle_db_name }}{% endif %}
         export NLS_DATE_FORMAT='YYYY-MM-DD HH24:MI:SS'
 
+{# Remove possible old LSNRNAME from environmet
+   Maybe we cannot set it because it is not defined for this database...
+#}
+        unset LSNRNAME
+{% if dbh.listener_name is defined %}
+        LSNRNAME={{ dbh.listener_name }}
+        export LSNRNAME
+{% endif %}
 
 {# create environemt variables when rman is configured in oracle_databases #}
 {% if dbh.rman_jobs is defined %}        
