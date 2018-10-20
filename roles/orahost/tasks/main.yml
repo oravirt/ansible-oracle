@@ -13,8 +13,8 @@
     yum:
        name: "{{ oracle_packages }}"
        state: installed
-       enablerepo: "{{ extrarepos_enabled |default (omit) }}"
-       disablerepo: "{{ extrarepos_disabled |default (omit) }}"
+       enablerepo: "{{ extrarepos_enabled |default (omit, True) }}"
+       disablerepo: "{{ extrarepos_disabled |default (omit, True) }}"
     when: install_os_packages and ansible_os_family == 'RedHat'
     tags: os_packages, oscheck
 
@@ -28,8 +28,8 @@
     yum:
        name: "{{ oracle_asm_packages }}"
        state: installed
-       enablerepo: "{{ extrarepos_enabled |default (omit) }}"
-       disablerepo: "{{ extrarepos_disabled |default (omit) }}"
+       enablerepo: "{{ extrarepos_enabled |default (omit, True) }}"
+       disablerepo: "{{ extrarepos_disabled |default (omit, True) }}"
     when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'RedHat' and asm_diskgroups is defined
     tags: os_packages, oscheck
 
