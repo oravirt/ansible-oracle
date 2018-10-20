@@ -25,6 +25,8 @@
   when: oracle_databases is defined and item.0.state|lower == 'present' and item.1 is defined
   run_once: "{{ configure_cluster }}"
   become_user: "{{oracle_user}}"
+  loop_control:
+      label: "port: {{ listener_port_template }} service: {{ db_service_name }} schema: {{ item.1.schema }} state:{{ item.1.state }}"
   tags: users
 
 - name: Manage users (pdb)
@@ -50,4 +52,6 @@
   when: oracle_pdbs is defined and item.0.state|lower == 'present' and item.1 is defined
   run_once: "{{ configure_cluster }}"
   become_user: "{{oracle_user}}"
+  loop_control:
+      label: "port: {{ listener_port_template }} service: {{ item.0.pdb_name }} schema: {{ item.1.schema }} state:{{ item.1.state }}"
   tags: users
