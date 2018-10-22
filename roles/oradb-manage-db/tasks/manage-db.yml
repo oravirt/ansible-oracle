@@ -2,6 +2,14 @@
   stat: path=/etc/oracle/olr.loc
   register: olrloc
   tags: update_oratab
+
+- name: manage-db | set fact with ORACLE_HOME
+  set_fact:
+       oracle_home_db: "{%- if db_homes_config[dbh.home]['oracle_home'] is defined  -%}
+                            {{db_homes_config[dbh.home]['oracle_home']}}
+                        {%- else -%}
+                             {{oracle_base}}/{{db_homes_config[dbh.home]['version']}}/{{db_homes_config[dbh.home]['home']}}
+                        {%- endif -%}"
 #
 # - name: manage-db | check if database exists (GI)
 #   shell: "{{ oracle_home_db }}/bin/srvctl config database | grep -w {{ dbh.oracle_db_name}}"
@@ -36,9 +44,10 @@
 #   when: not olrloc.stat.exists and dbh.oracle_db_name not in existing_dbs_nogi.stdout
 #   tags: set_fact
 
-- debug: msg="Maintaining DB - {{dbh.oracle_db_name}}"
+- debug: msg="Maintaining DB - {{dbh.oracle_db_name}}, ORACLE_HOME - {{ oracle_home_db }}"
   run_once: "{{ configure_cluster }}"
   when: dbh.state|lower == 'present'
+
 
 - name: manage-db | add dotprofile
   template:
@@ -126,8 +135,7 @@
   become: yes
   tags: update_oratab
 
-
-- debug: msg="Removing DB - {{dbh.oracle_db_name}}"
+- debug: msg="Removing DB - {{dbh.oracle_db_name}}, ORACLE_HOME - {{ oracle_home_db }}"
   run_once: "{{ configure_cluster }}"
   when: dbh.state|lower == 'absent'
 
