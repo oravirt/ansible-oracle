@@ -40,7 +40,7 @@ options:
         choices: ['normal','sysdba']
     snapshot_interval_min:
         description:
-            - AWR snapshot interval in minutes
+            - AWR snapshot interval in minutes; 0 disables
         default: 60
         type: int
         aliases:
@@ -123,8 +123,8 @@ def main():
     if not cx_oracle_exists:
         module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
     # Check input parameters
-    if module.params['snapshot_interval_min'] < 10:
-        module.fail_json(msg="Snapshot interval must be >= 10", changed=False)
+    if module.params['snapshot_interval_min'] < 10 and module.params['snapshot_interval_min'] != 0:
+        module.fail_json(msg="Snapshot interval must be >= 10 or 0", changed=False)
     if module.params['snapshot_interval_min'] > 1000:
         module.fail_json(msg="You probably entered incorrect snapshot interval time", changed=False)
     if module.params['snapshot_retention_days'] <= 0:
