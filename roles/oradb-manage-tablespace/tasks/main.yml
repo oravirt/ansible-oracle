@@ -22,6 +22,8 @@
       - tablespaces
       - flags:
         skip_missing: True
+  loop_control:
+      label: "port: {{ listener_port_template }} service: {{ db_service_name }} tablespace: {{ item.1.name }} content: {{ item.1.content |default(omit)}} state: {{ item.1.state |default('present')}}"
   when: oracle_databases is defined and item.1 is defined and item.0.state |upper == 'PRESENT'
   tags: tablespace
 
@@ -50,4 +52,6 @@
       - flags:
         skip_missing: True
   when: oracle_pdbs is defined and item.1 is defined and item.0.state |upper == 'PRESENT'
+  loop_control:
+      label: "port: {{ listener_port_template }} service: {{ item.0.pdb_name }} tablespace: {{ item.1.name }} content: {{ item.1.content |default(omit)}} state: {{ item.1.state |default('present')}}"
   tags: tablespace

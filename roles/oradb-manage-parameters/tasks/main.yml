@@ -19,6 +19,8 @@
         skip_missing: True
   when: oracle_databases is defined and item.0.state|lower == 'present' and item.1 is defined
   become_user: "{{ oracle_user }}"
+  loop_control:
+      label: "port: {{ listener_port_template }} service: {{ db_service_name }} name: {{ item.1.name }} value: {{ item.1.value }} scope: {{ item.1.scope | default ('both') }} state:{{ item.1.state }}"
   register: param_change
   tags: initparams
 
@@ -43,6 +45,8 @@
         skip_missing: True
   when: oracle_pdbs is defined and item.0.state|lower == 'present' and item.1 is defined
   become_user: "{{ oracle_user }}"
+  loop_control:
+      label: "port: {{ listener_port_template }} service: {{ item.0.pdb_name }} name: {{ item.1.name }} value: {{ item.1.value }} scope: {{ item.1.scope | default ('both') }} state:{{ item.1.state }}"
   register: param_change
   tags: initparams
 
