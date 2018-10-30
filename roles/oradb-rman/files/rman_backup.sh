@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Date: 11.01.2017
+# Date: 22.05.2018
 #
 # Thorsten Bruhns (thorsten.bruhns@opitz-consulting.de)
 #
@@ -135,12 +135,22 @@ check_service()
 	fi
 
 	# Is service running??
-	running_instances=$(${SRVCTL} status service -d ${ORACLE_SID} -s ${INSTANCE_SERVICE} | sed 's/^Service .* is running on instance(s)//g' | sed 's/ //g')
-	node_sid=$(${SRVCTL} status instance -d ${ORACLE_SID} -node $(${crs_home}/bin/olsnodes -l) | cut -d" " -f2)
-	if [ ! $node_sid = "$running_instances" ]
+	if [ $local_only = 'TRUE' ]
 	then
-		echo "Service not running on current node. Skipping backup!"
-		exit 0
+		running_service=$(${SRVCTL} status service -d ${ORACLE_SID} -s ${INSTANCE_SERVICE} | sed 's/^Service .* is running//g' | sed 's/ //g')
+		if [ ! $running_service = '' ]
+		then
+			echo "Service not running on current node. Skipping backup!"
+			exit 0
+		fi
+	else
+		running_instances=$(${SRVCTL} status service -d ${ORACLE_SID} -s ${INSTANCE_SERVICE} | sed 's/^Service .* is running on instance(s)//g' | sed 's/ //g')
+		node_sid=$(${SRVCTL} status instance -d ${ORACLE_SID} -node $(${crs_home}/bin/olsnodes -l) | cut -d" " -f2)
+		if [ ! $node_sid = "$running_instances" ]
+		then
+			echo "Service not running on current node. Skipping backup!"
+			exit 0
+		fi
 	fi
 }
 
@@ -174,11 +184,11 @@ setenv()
 				shift 2;;
 
 			-r|--rmanscriptdir)
-					rmanscripdir=${2}
+					RMANSCRIPTDIR=${2}
 				shift 2;;
 
 			-l|--logdir)
-					rmanlogdir=${2}
+					RMANLOGDIR=${2}
 				shift 2;;
 
 			-t|--targetconnect)
@@ -246,6 +256,9 @@ setenv()
 			fi
 		fi
 
+		# Some Installations store local_only in uppercase...
+		local_only=$(echo ${local_only:-"true"} | tr '[:upper:]' '[:lower:]')
+
 		if [ ${local_only:-"true"} = 'false' ]
 		then
 			# We are on a real Grid-Infrastructure!
@@ -290,18 +303,24 @@ setenv()
 	export ORACLE_BASE
 
 	# where are the rman-skripts?
-	# we have the option with rmanscripdir for a dedicated directory
-	if [ ! -d ${rmanscripdir:-"leer"}  ]
+	# we have the option with RMANSCRIPTDIR for a dedicated directory
+	if [ ! -d ${RMANSCRIPTDIR:-"leer"}  ]
 	then
 		# Do we have a rman-Skript for doing the backup?
 		# The skript must be located in $ORACLE_BASE/admin/ORACLE_SID/rman/<Skript>.rman
 
-		rmanscripdir=${ORACLE_BASE}/admin/${ORACLE_SID}/rman
+		RMANSCRIPTDIR=${ORACLE_BASE}/admin/${ORACLE_SID}/rman
 	fi
 
-	rmanskript=${rmanscripdir}/${rmanbackuptyp}.rman
+	if [ ! -z ${RMANTNS_ADMIN} ]
+	then
+		echo "Setting TNS_ADMIN from RMANTNS_ADMIN to: "${RMANTNS_ADMIN}
+		export TNS_ADMIN=${RMANTNS_ADMIN}
+	fi
 
-	rmanlog=${rmanlogdir}/${ORACLE_SID}_${rmanbackuptyp}.log
+	rmanskript=${RMANSCRIPTDIR}/${rmanbackuptyp}.rman
+
+	rmanlog=${RMANLOGDIR}/${ORACLE_SID}_${rmanbackuptyp}.log
 
 	if [ ! ${CATALOGCONNECT:-"leer"} = 'leer' ]
 	then
@@ -314,10 +333,10 @@ setenv()
 
 check_requirements()
 {
-	if [ ! -d ${rmanlogdir} ]
+	if [ ! -d ${RMANLOGDIR} ]
 	then
-		echo "Directory "${rmanlogdir}" for RMAN logfiles not existing."
-		print_syslog "Directory "${rmanlogdir}" for RMAN logfiles not existing."
+		echo "Directory "${RMANLOGDIR}" for RMAN logfiles not existing."
+		print_syslog "Directory "${RMANLOGDIR}" for RMAN logfiles not existing."
 		abort_script 21
 	fi
 
