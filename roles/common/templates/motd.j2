@@ -4,11 +4,12 @@ Welcome to {{ ansible_hostname }}
 {{ ansible_distribution }} {{ ansible_distribution_version }} {{ ansible_userspace_architecture }}
 
 FQDN: {{ ansible_fqdn }}
-{% if  ansible_virtualization_type|lower == 'virtualbox'%}
-IP:   {{ ansible_all_ipv4_addresses[0] }}
-{% else %}
-IP:   {{ ansible_default_ipv4.address }}
+IP's:
+{% for a in  ansible_interfaces %}
+{% if a != 'lo' %}
+{{a}}: {{ hostvars[ansible_hostname]['ansible_'~a]['ipv4']['address'] }} 
 {% endif %}
+{% endfor %}
 
 Processor: {% for processor in ansible_processor %}{% if loop.last %}{{ processor }} {% endif %}
 {% endfor %}
