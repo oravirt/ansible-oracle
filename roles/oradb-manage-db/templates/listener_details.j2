@@ -1,6 +1,14 @@
 
 # do not edit the configuration manually.
 # The execution of ansible-oracle automatically replace all manual changes!
+{% if oracle_listeners_config[lsnrinst.listener_name]['parameter'] is defined %}
+  {%- for item in  oracle_listeners_config[lsnrinst.listener_name]['parameter'] %}
+
+{{item.param | upper() }}_{{ lsnrinst.listener_name }}={{item.value}}
+  {%- endfor %}
+
+{% endif %}
+
 {{ lsnrinst.listener_name }} =
   (DESCRIPTION =
 {% if oracle_listeners_config[lsnrinst.listener_name]['address'] is defined %}
