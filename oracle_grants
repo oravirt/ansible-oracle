@@ -325,6 +325,7 @@ def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs,
 
     # Strip the list of unnecessary quotes etc
     wanted_grants_list = clean_list(wanted_grants_list)
+    wanted_grants_list = [x.lower() for x in wanted_grants_list]
     wanted_grants_list_upper = [x.upper() for x in wanted_grants_list]
     schema = clean_string(schema)
 
