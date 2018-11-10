@@ -317,7 +317,8 @@ def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs,
 
 
     #module.exit_json(msg=total_sql)
-    exceptions_list=['DBA','RESOURCE','CONNECT']
+    exceptions_list=['DBA']
+    exceptions_priv='UNLIMITED TABLESPACE'
 
     if not(schema): # or not(wanted_grants_list):
         module.fail_json(msg='Error: Missing schema/role name or grants', changed=False)
@@ -335,19 +336,22 @@ def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs,
         total_current.extend(curr_role_grants)
 
     # Get the current sys privs for the schema. If any are present, add them to the total
-    # Special case: If DBA,CONNECT,RESOURCE roles are in the wanted_grants_list,
-    # we do not check for system_privileges.
-
-    if not any(x in exceptions_list for x in wanted_grants_list_upper):
-        curr_sys_grants=get_current_sys_grants(module, msg, cursor, schema)
-        if any(curr_sys_grants):
-            total_current.extend(curr_sys_grants)
-
+    curr_sys_grants=get_current_sys_grants(module, msg, cursor, schema)
+    if any(curr_sys_grants):
+        total_current.extend(curr_sys_grants)
 
 
     # Get the difference between current grants and wanted grants
     grants_to_add=set(wanted_grants_list).difference(total_current)
     grants_to_remove=set(total_current).difference(wanted_grants_list)
+
+    # Special case: If DBA is granted to a user, unlimited tablespace is also implicitly
+    # granted -> on the next run, unlimited tablespace is removed from the user
+    # since it is not part of the wanted grants.
+    # The following removes 'unlimited tablespace' privilege from the grants_to_remove list, if DBA is also granted
+
+    if any(x in exceptions_list for x in wanted_grants_list_upper):
+        grants_to_remove = [x for x in grants_to_remove if x.upper() != exceptions_priv]
 
     # if there are differences, they will be added.
     if not any(grants_to_add) and not any(grants_to_remove):
