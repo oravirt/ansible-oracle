@@ -318,7 +318,7 @@ def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs,
 
     #module.exit_json(msg=total_sql)
     exceptions_list=['DBA']
-    exceptions_priv='UNLIMITED TABLESPACE'
+    exceptions_priv=['UNLIMITED TABLESPACE']
 
     if not(schema): # or not(wanted_grants_list):
         module.fail_json(msg='Error: Missing schema/role name or grants', changed=False)
@@ -351,7 +351,7 @@ def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs,
     # The following removes 'unlimited tablespace' privilege from the grants_to_remove list, if DBA is also granted
 
     if any(x in exceptions_list for x in wanted_grants_list_upper):
-        grants_to_remove = [x for x in grants_to_remove if x.upper() != exceptions_priv]
+        grants_to_remove = [x for x in grants_to_remove if x.upper() not in exceptions_priv]
 
     # if there are differences, they will be added.
     if not any(grants_to_add) and not any(grants_to_remove):
