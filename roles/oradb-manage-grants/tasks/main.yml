@@ -21,7 +21,7 @@
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   loop_control:
-      label: "port: {{ listener_port_template }} service: {{ db_service_name }} role: {{ item.1.name | default('none') }} grants: {{ item.1.grants | default('empty') }} state: {{ item.1.state }}"
+      label: "port: {{ listener_port_template }}, service: {{ db_service_name }}, role: {{ item.1.name | default('none') }}, grants: {{ item.1.grants | default('empty') }}, state: {{ item.1.state }}"
   tags: users,grants
 
 - name: Manage role grants (pdb)
@@ -45,7 +45,7 @@
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   loop_control:
-      label: "port: {{ listener_port_template }} service: {{ db_service_name }} role: {{ item.1.name | default('none') }} grants: {{ item.1.grants | default('empty') }} state: {{ item.1.state }}"
+      label: "port: {{ listener_port_template }}, service: {{ item.0.pdb_name }}, role: {{ item.1.name | default('none') }}, grants: {{ item.1.grants | default('empty') }}, state: {{ item.1.state }}"
   tags: users,grants
 
 - name: Manage schema grants (cdb)
@@ -69,7 +69,7 @@
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   loop_control:
-      label: "port: {{ listener_port_template }} service: {{ db_service_name }} schema: {{ item.1.schema }} grants: {{ item.1.grants | default('empty') }} state: {{ item.1.state }}"
+      label: "port: {{ listener_port_template }}, service: {{ db_service_name }}, schema: {{ item.1.schema }}, grants: {{ item.1.grants | default('empty') }}, state: {{ item.1.state }}"
   tags: users,grants
 
 - name: Manage schema grants (pdb)
@@ -93,5 +93,5 @@
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   loop_control:
-      label: "port: {{ listener_port_template }} service: {{ db_service_name }} role: {{ item.1.name | default('none') }} grants: {{ item.1.grants | default('empty') }} state: {{ item.1.state }}"
+      label: "port: {{ listener_port_template }}, service: {{ item.0.pdb_name }}, schema: {{ item.1.schema | default('none') }}, grants: {{ item.1.grants | default('empty') }}, state: {{ item.1.state }}"
   tags: users,grants

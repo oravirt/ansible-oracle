@@ -42,6 +42,6 @@
       - "{{ oracle_pdbs | default ([]) }}"
   become_user: "{{ oracle_user }}"
   loop_control:
-      label: "CDB: {{ item[1].cdb }} PDB: {{ item[1].pdb_name }} {{ item.1.home }}"
+      label: "CDB: {{ item[1].cdb }}, PDB: {{ item[1].pdb_name }}, {{ item.1.home }}, state: {{ item[1].state }}"
   when: oracle_databases is defined and oracle_pdbs is defined and item[0].state|upper == 'PRESENT' and item[1].cdb == item[0].oracle_db_name and item[0].is_container
   tags: pdb
