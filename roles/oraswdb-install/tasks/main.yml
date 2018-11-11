@@ -94,6 +94,14 @@
     tags:
       - nfsunmountdb
 
-  - include_tasks: "{{ hostinitdaemon }}.yml"
+  - name: install-home-db | copy start/stop script for autostart
+    copy: 
+      dest: /usr/local/bin
+      src: manage_oracle_rdbms_procs.sh
+      mode: 0755
+    tags: autostartup_service
+
+#  - include_tasks: "{{ hostinitdaemon }}.yml"
+  - include_tasks: "init.yml"
     when: autostartup_service
     tags: autostartup_service
