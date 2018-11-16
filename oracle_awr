@@ -174,7 +174,7 @@ def main():
     result_changed = False
     result = query_existing()
     if result['exists']:
-        if (snap_interval != result['snap_interval']) or (snap_retention != result['retention']):
+        if (snap_interval > timedelta(minutes=0) and snap_interval != result['snap_interval']) or (snap_interval == timedelta(minutes=0) and result['snap_interval'] != timedelta(days=40150)) or (snap_retention != result['retention']):
             c = conn.cursor()
             c.execute("CALL DBMS_WORKLOAD_REPOSITORY.MODIFY_SNAPSHOT_SETTINGS(retention=>:retention, interval=>:interval)",
                 {'retention': (module.params['snapshot_retention_days']*1440), 'interval': module.params['snapshot_interval_min']})
