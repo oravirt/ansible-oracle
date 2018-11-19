@@ -12,35 +12,28 @@
 #  chkconfig --add dbora
 #  chkconfig dbora on
 
-# Note: Change the value of ORACLE_HOME to specify the correct Oracle home
-# directory for your installation.
-# ORACLE_HOME=/u01/app/oracle/product/11.1.0/db_1
-ORACLE_HOME={{ oracle_home_db }}
-
 #
 # Note: Change the value of ORACLE to the login name of the oracle owner
 ORACLE={{ oracle_user }}
 
-PATH=${PATH}:$ORACLE_HOME/bin
 HOST=`hostname`
 PLATFORM=`uname`
-export ORACLE_HOME PATH
 
 case $1 in
 'start')
         echo -n $"Starting Oracle: "
-        su $ORACLE -c "$ORACLE_HOME/bin/dbstart $ORACLE_HOME"
+        su $ORACLE -c "/usr/local/bin/manage_oracle_rdbms_procs.sh -a start"
         ;;
 'stop')
         echo -n $"Shutting down Oracle: "
-        su $ORACLE -c "$ORACLE_HOME/bin/dbshut $ORACLE_HOME"
+        su $ORACLE -c "/usr/local/bin/manage_oracle_rdbms_procs.sh -a stop"
         ;;
 'restart')
         echo -n $"Shutting down Oracle: "
-        su $ORACLE -c "$ORACLE_HOME/bin/dbshut $ORACLE_HOME"
+        su $ORACLE -c "/usr/local/bin/manage_oracle_rdbms_procs.sh -a stop"
         sleep 5
         echo -n $"Starting Oracle: "
-        su $ORACLE -c "$ORACLE_HOME/bin/dbstart $ORACLE_HOME"
+        su $ORACLE -c "/usr/local/bin/manage_oracle_rdbms_procs.sh -a start"
         ;;
 *)
         echo "usage: $0 {start|stop|restart}"

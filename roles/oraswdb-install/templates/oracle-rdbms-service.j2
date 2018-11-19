@@ -9,8 +9,8 @@ Requires=network.target
 [Service]
 Type=forking
 Restart=no
-ExecStart={{ oracle_home_db }}/bin/dbstart {{ oracle_home_db }}
-ExecStop={{ oracle_home_db }}/bin/dbshut {{ oracle_home_db }}
+ExecStart=/usr/local/bin/manage_oracle_rdbms_procs.sh -a start
+ExecStop=/usr/local/bin/manage_oracle_rdbms_procs.sh -a stop
 User={{ oracle_user }}
 
 [Install]
