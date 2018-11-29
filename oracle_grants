@@ -58,6 +58,13 @@ options:
               - select:sys.v_$session
         required: false
         default: null
+    grants_mode:
+        description:
+            - Should the list of grants be enforced, or just appended to.
+              enforce: Whatever is in the list of grants will be enforced, i.e grants/privileges will be removed if they are not in the list
+              append: Grants/privileges are just appended, nothing is removed
+        default: enforce
+        choices: ['enforce','append']
     state:
         description:
             - The intended state of the priv (present=added to the user, absent=removed from the user). REMOVEALL will remove ALL role/sys privileges
@@ -153,7 +160,7 @@ def check_role_exists(module, msg, cursor, role):
         msg = 'Role doesn\'t exist'
         return False
 
-def get_dir_privs(module, msg, cursor, schema, directory_privs):
+def get_dir_privs(module, msg, cursor, schema, directory_privs, grants_mode):
 
     total_sql_dir = []
     # Directory Privs
@@ -214,14 +221,18 @@ def get_dir_privs(module, msg, cursor, schema, directory_privs):
     if len(grant_list_dir) > 0:
        for a in grant_list_dir:
            total_sql_dir.append(a)
-    if len(revoke_list_dir) > 0:
-       for a in revoke_list_dir:
-           total_sql_dir.append(a)
+           
+    if grants_mode.lower() == 'enforce':
+        if len(revoke_list_dir) > 0:
+           for a in revoke_list_dir:
+               total_sql_dir.append(a)
+    else:
+        pass
 
     return total_sql_dir
 
 
-def get_obj_privs (module, msg, cursor, schema, object_privs):
+def get_obj_privs (module, msg, cursor, schema, object_privs, grants_mode):
 
     total_sql_obj = []
     # OBJECT PRIVS
@@ -280,13 +291,17 @@ def get_obj_privs (module, msg, cursor, schema, object_privs):
     if len(grant_list) > 0:
         for a in grant_list:
             total_sql_obj.append(a)
-    if len(revoke_list) > 0:
-        for a in revoke_list:
-            total_sql_obj.append(a)
+            
+    if grants_mode.lower() == 'enforce':
+        if len(revoke_list) > 0:
+            for a in revoke_list:
+                total_sql_obj.append(a)
+    else:
+        pass
 
     return total_sql_obj
 # Add grants to the schema/role
-def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs, directory_privs):
+def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs, directory_privs, grants_mode):
 
     add_sql = ''
     remove_sql = ''
@@ -305,12 +320,12 @@ def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs,
     total_sql=[]
     total_current=[]
 
-    dir_privs = get_dir_privs(module, msg, cursor, schema, directory_privs)
+    dir_privs = get_dir_privs(module, msg, cursor, schema, directory_privs, grants_mode)
     if len(dir_privs)>0:
         for d in dir_privs:
             total_sql.append(d)
 
-    obj_privs = get_obj_privs(module, msg, cursor, schema, object_privs)
+    obj_privs = get_obj_privs(module, msg, cursor, schema, object_privs, grants_mode)
     if len(obj_privs)>0:
         for o in obj_privs:
             total_sql.append(o)
@@ -364,12 +379,15 @@ def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs,
             grants_to_add = clean_string(grants_to_add)
             add_sql += 'grant %s to %s' % (grants_to_add, schema)
             total_sql.append(add_sql)
-
-        if any(grants_to_remove):
-            grants_to_remove = ','.join(grants_to_remove)
-            grants_to_remove = clean_string(grants_to_remove)
-            remove_sql += 'revoke %s from %s' % (grants_to_remove, schema)
-            total_sql.append(remove_sql)
+        
+        if grants_mode.lower() == 'enforce':
+            if any(grants_to_remove):
+                grants_to_remove = ','.join(grants_to_remove)
+                grants_to_remove = clean_string(grants_to_remove)
+                remove_sql += 'revoke %s from %s' % (grants_to_remove, schema)
+                total_sql.append(remove_sql)
+        else:
+            pass
 
 
     #module.exit_json(msg=total_sql)
@@ -542,6 +560,7 @@ def main():
             grants         = dict(default=None, type="list"),
             object_privs   = dict(default=None, type="list",aliases=['objprivs']),
             directory_privs   = dict(default=None, type="list",aliases=['dirprivs']),
+            grants_mode   = dict(default="enforce", choices=["append", "enforce"]),aliases=['privs_mode']),
             state         = dict(default="present", choices=["present", "absent", "REMOVEALL"])
 
         ),
@@ -559,6 +578,7 @@ def main():
     grants = module.params["grants"]
     object_privs = module.params["object_privs"]
     directory_privs = module.params["directory_privs"]
+    grants_mode = module.params["grants_mode"]
     state = module.params["state"]
 
 
@@ -598,7 +618,7 @@ def main():
 
     if state == 'present' and schema:
         if check_user_exists(module, msg, cursor, schema):
-            if ensure_grants(module, msg, cursor, schema, grants, object_privs, directory_privs):
+            if ensure_grants(module, msg, cursor, schema, grants, object_privs, directory_privs, grants_mode):
                 #msg = 'The grant(s) (%s) have been added to %s successfully' % (grants, schema)
                 module.exit_json(msg=msg, changed=True)
             else:
@@ -609,7 +629,7 @@ def main():
 
     elif state == 'present' and role:
         if check_role_exists(module, msg, cursor, role):
-            ensure_grants(module, msg, cursor, role, grants, object_privs,directory_privs)
+            ensure_grants(module, msg, cursor, role, grants, object_privs,directory_privs, grants_mode)
                 #msg = 'The grant(s) (%s) have been added to %s successfully' % (grants, schema)
             module.exit_json(msg=msg, changed=False)
             # else:
