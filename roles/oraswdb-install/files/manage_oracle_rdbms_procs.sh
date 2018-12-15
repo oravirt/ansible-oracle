@@ -143,7 +143,7 @@ function stop_database() {
     ORA_STOPMODE=${3}
     echo "########################################"
     # check for pmon
-    ps -C ora_pmon_${ORACLE_SID} > /dev/null 2>&1
+    ps ax | grep "[0-9] ora_pmon_${ORACLE_SID}$" > /dev/null 2>&1
     if [ ${?} -ne 0 ] ; then
         echo "Instance "${ORACLE_SID}" not running"
         return
