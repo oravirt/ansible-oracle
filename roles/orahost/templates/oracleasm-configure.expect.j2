@@ -1,7 +1,7 @@
 #!/usr/bin/expect -f
 
 spawn service oracleasm configure
-{% if role_separation==True %}
+{% if role_separation %}
 expect {
   "Default user to own the driver interface*:"
   {
@@ -21,8 +21,8 @@ expect {
   "Scan for Oracle ASM disks on boot*:"
   {
     send "y\r"
-    exp_continue                                                                                                                                                                                                                             
-  }                                                                                                                                                                                                                                          
+    exp_continue
+  }
 }
 {% else %}
 expect {
@@ -44,7 +44,7 @@ expect {
   "Scan for Oracle ASM disks on boot*:"
   {
     send "y\r"
-    exp_continue                                                                                                                                                                                                               
-  }                                                                                                                                                                                                                            
+    exp_continue
+  }
 }
 {% endif %}

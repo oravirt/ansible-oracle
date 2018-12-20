@@ -2,11 +2,11 @@
 
   - name: Check which GI patches are applied
     shell: "{{ oracle_home_gi }}/OPatch/opatch lspatches -oh {{ oracle_home_gi }}  |grep  {{ item.patchversion }} |wc -l"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
-    with_items: "{{oracle_sw_image_gi_psu}}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
+    with_items: "{{oracle_sw_patches}}"
     tags: check_applied_gi_patches
-    when: oracle_psu_apply_gi #and "{{ item.version }}" == "{{ oracle_install_version_gi }}"
+    when: oracle_psu_apply_gi and item.version == oracle_install_version_gi
     register: gi_applied_patches
 
 
@@ -20,11 +20,11 @@
   # - name: Copy oracle GI patchfiles to server (www)
   #   get_url: url={{ oracle_sw_source_www }}/{{ item.0.filename }} dest={{ oracle_stage }} mode=775
   #   with_together:
-  #      - oracle_sw_image_gi_psu
+  #      - oracle_sw_patches
   #      - gi_applied_patches.results
   #   when: oracle_psu_apply_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
-  #   sudo: yes
-  #   sudo_user: "{{ grid_install_user }}"
+  #   become: yes
+  #   become_user: "{{ grid_install_user }}"
   #   tags:
   #     - oragridpatchget
   #
@@ -32,50 +32,50 @@
   #   get_url: url={{ oracle_sw_source_www }}/{{ item.filename }} dest={{ oracle_stage }} mode=775 force=yes
   #   with_items: oracle_opatch_patch
   #   when: oracle_psu_apply_gi and "{{ item.version }}" == "{{ oracle_install_version_gi }}"
-  #   sudo: yes
-  #   sudo_user: "{{ grid_install_user }}"
+  #   become: yes
+  #   become_user: "{{ grid_install_user }}"
   #   tags:
   #     - oragridopatchget
 
 
   - name: Extract OPatch to stage-area
     unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     with_items: "{{oracle_opatch_patch}}"
-    when: oracle_psu_apply_gi and "{{ item.version }}" == "{{ oracle_install_version_gi }}" and oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: oracle_psu_apply_gi and item.version == oracle_install_version_gi and oracle_sw_copy and oracle_sw_unpack
     tags:
       - oragridpatchunpack
 
   - name: Extract Opatch to stage-area (from remote location)
     unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
     with_items: "{{oracle_opatch_patch}}"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
-    when: oracle_psu_apply_gi and "{{ item.version }}" == "{{ oracle_install_version_gi }}" and not oracle_sw_copy|bool and oracle_sw_unpack|bool
+    become: yes
+    become_user: "{{ grid_install_user }}"
+    when: oracle_psu_apply_gi and item.version == oracle_install_version_gi and not oracle_sw_copy and oracle_sw_unpack
     tags:
       - oragridpatchunpack
 
 
   - name: Extract GI psu files to stage-area
     unarchive: src={{ oracle_stage }}/{{ item.0.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     with_together:
-       - "{{oracle_sw_image_gi_psu}}"
+       - "{{oracle_sw_patches}}"
        - "{{gi_applied_patches.results}}"
-    when: oracle_psu_apply_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0 and oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: oracle_psu_apply_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0 and oracle_sw_copy and oracle_sw_unpack
     tags:
       - oragridpsuunpack
 
   - name: Extract GI psu files to stage-area (from remote location)
     unarchive: src={{ oracle_stage_remote }}/{{ item.0.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     with_together:
-       - "{{oracle_sw_image_gi_psu}}"
+       - "{{oracle_sw_patches}}"
        - "{{gi_applied_patches.results}}"
-    when: oracle_psu_apply_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0 and not oracle_sw_copy|bool and oracle_sw_unpack|bool
+    when: oracle_psu_apply_gi and item.0.version == oracle_install_version_gi and not oracle_sw_copy and oracle_sw_unpack #and not item.1.stdout != 0
     tags:
       - oragridpsuunpack
 
@@ -83,13 +83,13 @@
 #  - name: Extract files to stage-area (GI) (from remote location)
 #    unarchive: src={{ oracle_stage_remote }}/{{ item.0.filename }}  dest={{ oracle_psu_stage }}/{{ item.0.version }} copy=no
 #    with_together:
-#       - oracle_sw_image_gi_psu
+#       - oracle_sw_patches
 #       - gi_applied_patches.results
-#    sudo: yes
-#    sudo_user: "{{ grid_install_user }}"
+#    become: yes
+#    become_user: "{{ grid_install_user }}"
 #    tags:
 #    - oragridswunpack
-#    when: checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy|bool and oracle_sw_unpack|bool
+#    when: checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy and oracle_sw_unpack
 
   - name: Distribute latest opatch
     shell: rm -rf {{ oracle_home_gi }}/OPatch; cp -Rvp {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/OPatch {{ oracle_home_gi }}; chown -R {{ grid_install_user }}:{{ oracle_group }} {{ oracle_home_gi }}/OPatch
@@ -100,77 +100,84 @@
   # - name: Configure ocm.rsp (1)
   #   template: src=ocmrsp.expect.j2  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect mode=0777 force=yes
   #   when: oracle_psu_apply_gi #and not {{ item.1.stdout }} != 0
-  #   sudo: yes
-  #   sudo_user: "{{ grid_install_user }}"
+  #   become: yes
+  #   become_user: "{{ grid_install_user }}"
   #   tags:
   #     - ocmconfig
   #
   # - name: Configure ocm.rsp (2)
   #   shell: "{{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect"
   #   when: oracle_psu_apply_gi #and not {{ item.1.stdout }} != 0
-  #   sudo: yes
-  #   sudo_user: "{{ grid_install_user }}"
+  #   become: yes
+  #   become_user: "{{ grid_install_user }}"
   #   tags:
   #     - ocmconfig
 
-  - name: Apply PSU to GI (v12.1) (Master node)
+  - name: Apply PSU to GI (v12.x) (Master node)
     shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }}" #-ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
     with_together:
-       - "{{oracle_sw_image_gi_psu}}"
+       - "{{oracle_sw_patches}}"
        - "{{gi_applied_patches.results}}"
+    run_once: "{{ configure_cluster}}"
     tags:
       - apply_psu_grid
-    when: master_node and oracle_psu_apply_gi and '12.1' in oracle_install_version_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
+    when: oracle_psu_apply_gi and '12.1' in oracle_install_version_gi or '12.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi #and not item.1.stdout != 0
     register: psuapplym
 
 
   - name: Apply PSU to GI (v11.2) (Master node)
     shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
     with_together:
-    - "{{oracle_sw_image_gi_psu}}"
+    - "{{oracle_sw_patches}}"
     - "{{gi_applied_patches.results}}"
+    run_once: "{{ configure_cluster}}"
     tags: apply_psu_grid
-    when: master_node and oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
+    when: oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
     register: psuapplym
 
   - debug: var=psuapplym.stdout_lines
-    when: master_node and oracle_psu_apply_gi
+    run_once: "{{ configure_cluster}}"
+    when: oracle_psu_apply_gi
     tags:
       - psuapplym
 
   - name: Check if stuff is running
     shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
+    run_once: "{{ configure_cluster}}"
     tags:
      - crsctl
     register: crsctl
-    when: master_node and oracle_psu_apply_gi #and not {{ item.1.stdout }} != 0
+    when: oracle_psu_apply_gi #and not {{ item.1.stdout }} != 0
 
   - debug: var=crsctl.stdout_lines
     tags:
      - crsctl
-    when: master_node
+    run_once: "{{ configure_cluster}}"
+    #when: master_node
 
   - name: Apply PSU to GI (v12.1) (other nodes)
     shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
     with_together:
-    - "{{oracle_sw_image_gi_psu}}"
+    - "{{oracle_sw_patches}}"
     - "{{gi_applied_patches.results}}"
     tags:
       - apply_psu_grid
-    when: not master_node and oracle_psu_apply_gi and  '12.1' in oracle_install_version_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
+    #when: not master_node and oracle_psu_apply_gi and  '12.1' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
+    when: configure_cluster and inventory_hostname != cluster_master and oracle_psu_apply_gi and  '12.1' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
     register: psuapplyo
 
   - name: Apply PSU to GI (v11.2) (other nodes)
     shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
     with_together:
-    - "{{oracle_sw_image_gi_psu}}"
+    - "{{oracle_sw_patches}}"
     - "{{gi_applied_patches.results}}"
     tags: apply_psu_grid
-    when: not master_node and oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and "{{ item.0.version }}" == "{{ oracle_install_version_gi }}" and not {{ item.1.stdout }} != 0
+    #when: not master_node and oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
+    when: configure_cluster and inventory_hostname != cluster_master and oracle_psu_apply_gi and  '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
     register: psuapplyo
 
   - debug: var=psuapplyo.stdout_lines
-    when: not master_node and oracle_psu_apply_gi
+    when: configure_cluster and inventory_hostname != cluster_master and oracle_psu_apply_gi and psuapplyo is defined
     tags:
       - psuapplyo
 
@@ -188,8 +195,8 @@
 
   - name: Check opatch lsinventory
     shell: "{{ oracle_home_gi }}/OPatch/opatch lsinventory"
-    sudo: yes
-    sudo_user: "{{ grid_install_user }}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
     register: opatchls
     when: oracle_psu_apply_gi
 

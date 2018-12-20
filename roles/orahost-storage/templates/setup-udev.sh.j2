@@ -22,10 +22,18 @@ if [[ $chkexist == 1 ]]; then
  echo "Error: $scsiid is already present. Exiting"
  continue
 fi
+{% if use_partition_devices %}
 {% if ansible_distribution_major_version == '6' %}
 echo "KERNEL==\"sd?1\", BUS==\"scsi\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", NAME=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
 {% elif ansible_distribution_major_version == '7' %}
 echo "KERNEL==\"sd?1\", SUBSYSTEM==\"block\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+{% endif %}
+{% elif not use_partition_devices %}
+{% if ansible_distribution_major_version == '6' %}
+echo "KERNEL==\"sd?\", BUS==\"scsi\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", NAME=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+{% elif ansible_distribution_major_version == '7' %}
+echo "KERNEL==\"sd?\", SUBSYSTEM==\"block\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+{% endif %}
 {% endif %}
 done < {{ oracle_rsp_stage }}/udev-device-input.txt
 

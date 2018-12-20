@@ -4,14 +4,18 @@ Welcome to {{ ansible_hostname }}
 {{ ansible_distribution }} {{ ansible_distribution_version }} {{ ansible_userspace_architecture }}
 
 FQDN: {{ ansible_fqdn }}
-IP:   {{ ansible_default_ipv4.address }}
+IP's:
+{% for a in  ansible_interfaces %}
+{% if a != 'lo' %}
+{{a}}: {{ hostvars[ansible_hostname]['ansible_'~a]['ipv4']['address'] }} 
+{% endif %}
+{% endfor %}
 
 Processor: {% for processor in ansible_processor %}{% if loop.last %}{{ processor }} {% endif %}
 {% endfor %}
 
-#CPU's:    {{ ansible_processor_vcpus }} 
+#CPU's:    {{ ansible_processor_vcpus }}
 Memory:    {{ ansible_memtotal_mb }} MB
 Kernel:    {{ ansible_kernel }}
 
 ----------------------------------------
-

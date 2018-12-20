@@ -1,0 +1,76 @@
+---
+# tasks file for manage-db
+
+- include_tasks: tnsnames.yml
+  with_items:
+    - "{{ tnsnames_installed }}"
+  loop_control:
+     loop_var: tnsinst
+  when: tnsnames_installed is defined
+  tags: tnsnames2
+
+- name: manage-db | set fact for Listener
+  set_fact:
+      create_listener: "{{ create_listener }}"
+  with_items: "{{ oracle_databases }}"
+  loop_control:
+     loop_var: dbh
+  tags: set_fact
+
+- include_tasks: sqlnet.yml
+  with_items:
+    - "{{ sqlnet_installed }}"
+  loop_control:
+     loop_var: sqlnetinst
+  when: sqlnet_installed is defined
+  tags: sqlnet2
+
+- include_tasks: listener_details.yml
+  with_items:
+    - "{{ listener_installed }}"
+  loop_control:
+     loop_var: lsnrinst
+  when: listener_installed is defined
+  tags: listener2
+
+- include_tasks: listener.yml
+  with_items:
+      - "{{ oracle_databases }}"
+  loop_control:
+    loop_var: dbh
+  when: create_listener and oracle_databases is defined and listener_installed is not defined
+  tags: listener
+
+- name: manage-db | Add change-pdb script
+  template:
+         src: pdb.sql.j2
+         dest: "{{oracle_user_home}}/.Scripts/chpdb.sql"
+         owner: "{{ oracle_user }}"
+         group: "{{ oracle_group }}"
+  tags: sql_script
+
+- include_tasks: manage-db.yml
+  with_items:
+      - "{{ oracle_databases }}"
+  loop_control:
+    loop_var: dbh
+  when: oracle_databases is defined
+  tags: create_db,dbca,customdbcatemplate,dotprofile_db
+
+
+- name: manage-db | Check if database is running
+  shell: ps -ef |grep pmon |grep -v grep
+  tags:
+   - psout
+  register: psout
+  changed_when: False
+  failed_when: False
+  ignore_errors: True
+
+
+- debug: var=psout.stdout_lines
+  changed_when: False
+  failed_when: False
+  when: psout is defined
+  tags:
+   - psout

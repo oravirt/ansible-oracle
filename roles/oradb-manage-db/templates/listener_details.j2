@@ -1,0 +1,64 @@
+
+# do not edit the configuration manually.
+# The execution of ansible-oracle automatically replace all manual changes!
+{% if oracle_listeners_config[lsnrinst.listener_name]['parameter'] is defined %}
+  {%- for item in  oracle_listeners_config[lsnrinst.listener_name]['parameter'] %}
+
+{{item.param | upper() }}_{{ lsnrinst.listener_name }}={{item.value}}
+  {%- endfor %}
+
+{% endif %}
+
+{{ lsnrinst.listener_name }} =
+  (DESCRIPTION =
+{% if oracle_listeners_config[lsnrinst.listener_name]['address'] is defined %}
+    (ADDRESS_LIST=
+  {%- for item in  oracle_listeners_config[lsnrinst.listener_name]['address'] %}
+    {%- if item.host is defined %}
+
+      (ADDRESS = (PROTOCOL = {{ item.protocol | default('TCP') }})(HOST = {{item.host}})(PORT = {{item.port | default(listener_port) }}))
+    {%- elif item.key is defined %}
+      (ADDRESS = (PROTOCOL = {{ item.protocol | default('IPC') }})(KEY = {{ item.key }}))
+    {%- endif %}
+  {%- endfor %}
+
+    )
+  )
+{%- else %}
+    (ADDRESS = (PROTOCOL = TCP)(HOST = {{ ansible_host }})(PORT = {{ item.host}})(PORT = {{item.port | default(listener_port) }}))
+  )
+{%- endif %}
+
+{# config_sid_list is used as a helper. jinja2 doesn't allow the exposing of variables from inside a loop to outside before version 2.10! #}
+{%- set config_sid_list = 0 %}
+{# The following loop is executed only once for the header 'SID_LIST_... #}
+{%- for testsid in oracle_databases if testsid.listener_name is defined and testsid.listener_name == lsnrinst.listener_name and config_sid_list == 0 %}
+  {%- set config_sid_list =  1 %}
+
+SID_LIST_{{ lsnrinst.listener_name }} =
+{# loop over oracle_database when testsid.listener_name was found for lsnrinst.listener_name #}
+  {%- for sid in oracle_databases if sid.listener_name is defined and sid.listener_name == lsnrinst.listener_name %}
+{%- set sid_name = sid.oracle_db_instance_name | default(sid.oracle_db_name) %}
+{%- set sid_name_dgmgrl = sid.oracle_db_unique_name | default(sid.oracle_db_name) %}
+  (SID_LIST =
+    (SID_DESC =
+    {% if db_homes_config[sid.home]['oracle_home'] is defined %}
+  (ORACLE_HOME = {{db_homes_config[sid.home]['oracle_home']}})
+    {% else %}
+  (ORACLE_HOME = {{oracle_base}}/{{db_homes_config[sid.home]['version']}}/{{db_homes_config[sid.home]['home']}})
+    {% endif %}
+  (SID_NAME = {{ sid_name }})
+    )
+{# added for compatibility against Oracle 11.2#}
+    (SID_DESC =
+    {% if db_homes_config[sid.home]['oracle_home'] is defined %}
+  (ORACLE_HOME = {{db_homes_config[sid.home]['oracle_home']}})
+    {% else %}
+  (ORACLE_HOME = {{oracle_base}}/{{db_homes_config[sid.home]['version']}}/{{db_homes_config[sid.home]['home']}})
+    {% endif %}
+  (SID_NAME = {{ sid_name }})
+      (GLOBAL_DBNAME = {{ sid_name_dgmgrl }}_DGMGRL)
+    )
+  {% endfor %}
+)
+{% endfor %}

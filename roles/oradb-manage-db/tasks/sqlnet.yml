@@ -1,0 +1,31 @@
+- debug: msg="sqlnet in ORACLE_HOME {{listener_home}}"
+  tags: sqlnet2
+
+- name: sqlnet.ora | create IFILE entry in sqlnet.ora
+  lineinfile:
+    line: "IFILE={{ listener_home }}/network/admin/sqlnet_ansible.ora"
+    regexp: "^IFILE=/"
+    insertbefore: BOF
+    path: "{{ listener_home }}/network/admin/sqlnet.ora"
+    backup: True
+    create: True
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    state: present
+    mode: 0644
+  tags: sqlnet2
+
+- name: sqlnet.ora | create custom configuration in sqlnet_ansible.ora
+  lineinfile:
+    path: "{{ listener_home }}/network/admin/sqlnet_ansible.ora"
+    line: "{{ item.name}}={{item.value }}"
+    regexp: "^{{ item.name }}="
+    backup: True
+    create: True
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    state: present
+    mode: 0644
+  with_items:
+    - "{{ sqlnet_config[sqlnetinst.sqlnet] }}"
+  tags: sqlnet2

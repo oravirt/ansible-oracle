@@ -1,46 +1,83 @@
----
- - name: Host configuration
-   hosts: vbox-rac-dc1
-   user: vagrant
-   sudo: yes
-   roles:
-      - common
-      - orahost
 
- - name: Storage Configuration 
-   hosts: vbox-rac-dc1
-   user: vagrant
-   sudo: yes
-   roles:
-      - orahost-storage
+- name: Host configuration
+  hosts: vbox-rac-dc1
+  user: vagrant
+  become: yes
+  roles:
+     - common
+     - orahost
 
- - name: Oracle Grid Infrastructure installation
-   hosts: vbox-rac-dc1
-   user: vagrant
-   sudo: yes
-   roles:
-      - oraswgi-install
+- name: ssh configuration
+  hosts: vbox-rac-dc1
+  user: vagrant
+  become: yes
+  serial: 1
+  roles:
+     - {role: orahost-ssh, when: configure_cluster and not old_ssh_config}
 
- - name: ASM Configuration, Database Server Installation & Database Creation
-   hosts: vbox-rac-dc1
-   user: vagrant
-   sudo: yes
-   roles:
-      - oraasm-createdg
-      - oraswdb-install
-      - oradb-create
+- name: Storage Configuration
+  hosts: vbox-rac-dc1
+  user: vagrant
+  become: yes
+  roles:
+     - orahost-storage
 
- - name: Install cx_oracle
-   hosts: vbox-rac-dc1
-   user: vagrant
-   sudo: yes
-   roles:
-      - cxoracle
+- name: Oracle Grid Infrastructure installation
+  hosts: vbox-rac-dc1
+  user: vagrant
+  become: yes
+  roles:
+     - oraswgi-install
 
- - name: Configure Logrotate
-   hosts: vbox-rac-dc1
-   user: vagrant
-   sudo: yes
-   roles:
-      - orahost-logrotate
+- name: Install cx_oracle
+  hosts: vbox-rac-dc1
+  user: vagrant
+  become: yes
+  roles:
+     - cxoracle
 
+- name: ASM Diskgroup configuration
+  hosts: vbox-rac-dc1
+  user: vagrant
+  become: yes
+  roles:
+     - {role: oraasm-createdg, when: old_diskgroup_config}
+     - {role: oraasm-manage-diskgroups, when: not old_diskgroup_config}
+
+
+- name: Database Server Installation & Database Creation
+  hosts: vbox-rac-dc1
+  user: vagrant
+  become: yes
+  roles:
+     - oraswdb-install
+     - {role: oraswdb-manage-patches, when: apply_patches_db}
+     - oradb-manage-db
+
+- name: Configure Logrotate
+  hosts: vbox-rac-dc1
+  user: vagrant
+  become: yes
+  roles:
+     - orahost-logrotate
+
+- name: Customize database
+  hosts: vbox-rac-dc1
+  user: vagrant
+  sudo: yes
+  roles:
+     - oradb-manage-pdb
+     - oradb-manage-tablespace
+     - oradb-manage-parameters
+     - oradb-manage-redo
+     - oradb-manage-roles
+     - oradb-manage-users
+     - oradb-manage-grants
+     - oradb-manage-services
+
+- name: Run Datapatch
+  hosts: vbox-si-rac-dc1
+  user: vagrant
+  become: yes
+  roles:
+      - {role: oradb-datapatch, when: apply_patches_db}

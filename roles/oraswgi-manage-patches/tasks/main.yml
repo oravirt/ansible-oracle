@@ -1,0 +1,203 @@
+---
+  - name: gi-opatch | check if GI has been configured
+    stat: path=/etc/oracle/olr.loc
+    register: olrloc
+
+  - name: gi-opatch | set fact for patch_before_rootsh
+    set_fact:
+        patch_before_rootsh: False
+    when: olrloc.stat.exists and patch_before_rootsh
+
+  - name: gi-opatch | Create patch-base directory (version specific)
+    file:
+       dest={{ oracle_patch_stage }}/{{ oracle_install_version_gi }}
+       mode=775
+       owner={{ grid_install_user }}
+       group={{ oracle_group }}
+       state=directory
+    tags:
+      - directories
+    #when: apply_patches_gi
+
+  - include: transfer-files.yml
+    when: oracle_sw_copy
+
+  - include: unpack-files.yml
+    when: oracle_sw_unpack and apply_patches_gi
+
+  - include: opatch-upgrade.yml
+    when: apply_patches_gi
+
+  - name: gi-opatch | Check current opatch version
+    oracle_opatch:
+           oracle_home={{ oracle_home_gi }}
+           state=opatchversion
+    register: current_opatch_version
+    tags: current_opatch_version
+
+  - name: gi-opatch | Configure ocm.rsp (1)
+    template:
+         src=ocmrsp.expect.j2
+         dest={{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect
+         mode=0777
+         force=yes
+    when: apply_patches_gi and current_opatch_version is defined and current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
+    become: yes
+    become_user: "{{ grid_install_user }}"
+    tags:
+      - ocmconfig
+
+  - name: gi-opatch | Configure ocm.rsp (2)
+    shell: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect"
+    when: apply_patches_gi and current_opatch_version is defined and current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
+    become: yes
+    become_user: "{{ grid_install_user }}"
+    changed_when: False
+    tags:
+      - ocmconfig
+
+  - name: gi-opatch | Manage opatchauto patches for GI (after software only install)
+    oracle_opatch:
+        oracle_home={{ oracle_home_gi }}
+        patch_base={{ oracle_patch_install }}/{{ oracle_install_version_gi}}/{{ item.0.path | default (item.0.patchid)}}/{{ item.1}}
+        patch_id={{item.1}}
+        patch_version={{ item.1.patchversion |default(omit)}}
+        opatchauto=False
+        conflict_check=True
+        ocm_response_file={{ ocm_response_file | default(omit)}}
+        output=verbose
+        state={{ item.0.state }}
+    with_subelements:
+       - "{{gi_patches[oracle_install_version_gi]['opatchauto']}}"
+       - subpatches
+    #run_once: "{{ configure_cluster}}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
+    tags:
+      - apply_psu_grid
+    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and patch_before_rootsh and not olrloc.stat.exists
+    register: psuapplym
+
+  - name: gi-opatch | Manage opatchauto patches for GI
+    oracle_opatch:
+        oracle_home={{ oracle_home_gi }}
+        patch_base={{ oracle_patch_install }}/{{ oracle_install_version_gi}}/{{ item.path | default (item.patchid)}}/
+        patch_id={{item.patchid}}
+        patch_version={{ item.patchversion |default(omit)}}
+        opatchauto=True
+        conflict_check=True
+        ocm_response_file={{ ocm_response_file | default(omit)}}
+        output=verbose
+        state={{ item.state }}
+    with_items:
+       - "{{gi_patches[oracle_install_version_gi]['opatchauto']}}"
+    #run_once: "{{ configure_cluster}}"
+    tags:
+      - apply_psu_grid
+    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatchauto'] is defined and not patch_before_rootsh and olrloc.stat.exists
+    register: psuapplym
+
+  - name: gi-opatch | Manage non opatchauto patches for GI
+    oracle_opatch:
+        oracle_home={{ oracle_home_gi }}
+        patch_base={{ oracle_patch_install }}/{{ oracle_install_version_gi}}/{{ item.path | default (item.patchid)}}/
+        patch_id={{item.patchid}}
+        patch_version={{ item.patchversion |default(omit)}}
+        opatchauto=False
+        conflict_check=True
+        ocm_response_file={{ ocm_response_file | default(omit)}}
+        output=verbose
+        state={{ item.state }}
+    with_items:
+       - "{{gi_patches[oracle_install_version_gi]['opatch']}}"
+    #run_once: "{{ configure_cluster}}"
+    become: yes
+    become_user: "{{ grid_install_user }}"
+    tags:
+      - apply_psu_grid
+    when: apply_patches_gi and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatch'] is defined and patch_before_rootsh and not olrloc.stat.exists
+    register: psuapplym
+  #
+  #
+  # - name: Apply PSU to GI (v11.2) (Master node)
+  #   shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
+  #   with_together:
+  #   - "{{oracle_sw_patches}}"
+  #   - "{{gi_applied_patches.results}}"
+  #   run_once: "{{ configure_cluster}}"
+  #   tags: apply_psu_grid
+  #   when: apply_patches_gi and '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
+  #   register: psuapplym
+  #
+  # - debug: var=psuapplym.stdout_lines
+  #   run_once: "{{ configure_cluster}}"
+  #   when: apply_patches_gi
+  #   tags:
+  #     - psuapplym
+  #
+  # - name: Check if stuff is running
+  #   shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
+  #   run_once: "{{ configure_cluster}}"
+  #   tags:
+  #    - crsctl
+  #   register: crsctl
+  #   when: apply_patches_gi #and not {{ item.1.stdout }} != 0
+  #
+  # - debug: var=crsctl.stdout_lines
+  #   tags:
+  #    - crsctl
+  #   run_once: "{{ configure_cluster}}"
+  #   #when: master_node
+  #
+  # - name: Apply PSU to GI (v12.1) (other nodes)
+  #   shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
+  #   with_together:
+  #   - "{{oracle_sw_patches}}"
+  #   - "{{gi_applied_patches.results}}"
+  #   tags:
+  #     - apply_psu_grid
+  #   #when: not master_node and apply_patches_gi and  '12.1' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
+  #   when: configure_cluster and inventory_hostname != cluster_master and apply_patches_gi and  '12.1' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
+  #   register: psuapplyo
+  #
+  # - name: Apply PSU to GI (v11.2) (other nodes)
+  #   shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
+  #   with_together:
+  #   - "{{oracle_sw_patches}}"
+  #   - "{{gi_applied_patches.results}}"
+  #   tags: apply_psu_grid
+  #   #when: not master_node and apply_patches_gi and '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
+  #   when: configure_cluster and inventory_hostname != cluster_master and apply_patches_gi and  '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
+  #   register: psuapplyo
+  #
+  # - debug: var=psuapplyo.stdout_lines
+  #   when: configure_cluster and inventory_hostname != cluster_master and apply_patches_gi and psuapplyo is defined
+  #   tags:
+  #     - psuapplyo
+  #
+  # - name: gi-opatch | Check if stuff is running
+  #   shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
+  #   tags:
+  #    - crsctl-opatch
+  #   register: crsctl
+  #   when: apply_patches_gi
+  #
+  # - debug: var=crsctl.stdout_lines
+  #   tags:
+  #    - crsctl-opatch
+  #   when: apply_patches_gi
+  #
+  # - name: gi-opatch | Check opatch lspatches
+  #   shell: "{{ oracle_home_gi }}/OPatch/opatch lsinventory"
+  #   become: yes
+  #   become_user: "{{ grid_install_user }}"
+  #   register: opatchls
+  #   when: apply_patches_gi
+  #
+  #   tags:
+  #    - opatchls
+  #
+  # - debug: var=opatchls.stdout_lines
+  #   when: apply_patches_gi
+  #   tags:
+  #    - opatchls

@@ -1,0 +1,15 @@
+configure_cluster: True
+oracle_install_version_gi: 18.3.0.0
+oracle_gi_cluster_type: STANDARD
+oracle_home_gi: "/u01/app/grid/product/{{ oracle_install_version_gi}}/grid"
+
+oracle_scan: vbox-rac-dc1.internal.lab
+oracle_vip: -vip
+oracle_scan_port: 1521
+oracle_asm_init_dg: crs
+oracle_gi_nic_pub: "{% if ansible_distribution_major_version == '6' %}eth1{% elif ansible_distribution_major_version == '7' %}enp0s8{% endif %}"
+oracle_gi_nic_priv: "{% if ansible_distribution_major_version == '6' %}eth2{% elif ansible_distribution_major_version == '7' %}enp0s9{% endif %}"
+oracle_gi_gns_subdomain: dbnode.internal.lab
+oracle_gi_gns_vip: dbnode-cluster-gns.internal.lab.
+
+apply_patches_gi: False

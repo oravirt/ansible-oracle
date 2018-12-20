@@ -1,0 +1,164 @@
+- name: manage-db | check if GI is present
+  stat: path=/etc/oracle/olr.loc
+  register: olrloc
+  tags: update_oratab
+
+- name: manage-db | set fact with ORACLE_HOME
+  set_fact:
+       oracle_home_db: "{%- if db_homes_config[dbh.home]['oracle_home'] is defined  -%}
+                            {{db_homes_config[dbh.home]['oracle_home']}}
+                        {%- else -%}
+                             {{oracle_base}}/{{db_homes_config[dbh.home]['version']}}/{{db_homes_config[dbh.home]['home']}}
+                        {%- endif -%}"
+#
+# - name: manage-db | check if database exists (GI)
+#   shell: "{{ oracle_home_db }}/bin/srvctl config database | grep -w {{ dbh.oracle_db_name}}"
+#   environment: "{{ oracle_env_dbca }}"
+#   run_once: "{{ configure_cluster }}"
+#   register: existing_dbs_gi
+#   changed_when: False
+#   failed_when: False
+#   when: olrloc.stat.exists
+#   tags: create_db,dbcatemplate,debug
+#
+# - name: manage-db | set fact for create-db (GI)
+#   set_fact:
+#       create_db: True
+#   when: olrloc.stat.exists and dbh.oracle_db_name not in existing_dbs_gi.stdout
+#   tags: set_fact
+#
+#
+# - name: manage-db | check if database exists (NO GI)
+#   shell: "cat /etc/oratab | grep -w {{ dbh.oracle_db_name }}:{{ oracle_home_db }} |grep -v \"^#\"|cut -f1 -d: -s"
+#   environment: "{{ oracle_env_dbca }}"
+#   run_once: "{{ configure_cluster }}"
+#   register: existing_dbs_nogi
+#   changed_when: False
+#   failed_when: False
+#   when: not olrloc.stat.exists
+#   tags: create_db,dbcatemplate,debug
+#
+# - name: manage-db | set fact for create-db (NO GI)
+#   set_fact:
+#       create_db: True
+#   when: not olrloc.stat.exists and dbh.oracle_db_name not in existing_dbs_nogi.stdout
+#   tags: set_fact
+
+- debug: msg="Maintaining DB - {{dbh.oracle_db_name}}, ORACLE_HOME - {{ oracle_home_db }}"
+  run_once: "{{ configure_cluster }}"
+  when: dbh.state|lower == 'present'
+
+
+- name: manage-db | add dotprofile
+  template:
+    src: dotprofile-db.j2
+    dest: "/home/{{ oracle_user}}/.profile_{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_name) }}"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0660
+  when: dbh.state|lower == 'present'
+  tags: create_db,dotprofile_db
+
+- name: manage-db | Copy custom dbca Templates for Database to ORACLE_HOME/assistants/dbca/templates
+  template:
+         src={{ dbh.dbca_templatename }}
+         dest={{ oracle_home_db }}/assistants/dbca/templates/{{ dbh.oracle_db_name }}_{{ dbh.dbca_templatename }}
+         owner={{ oracle_user }}
+         group={{ oracle_group }}
+         mode=640
+  when: dbh.state|lower == 'present' and dbh.dbca_templatename is defined and dbh.dbca_templatename not in('New_Database.dbt','General_Purpose.dbc')
+  tags:
+    - customdbcatemplate
+    - dbcatemplate
+
+- name: manage-db | Prepare installation template
+  template:
+    src: "dbca-create-db.rsp.{{ db_version}}.j2"
+    dest: "{{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0660
+  run_once: "{{ configure_cluster }}"
+  when: dbh.state|lower == 'present'
+  tags: create_db,dbcatemplate
+
+# - name: manage-db | create database
+#   shell: "time {{oracle_home_db}}/bin/dbca -createDatabase -responseFile {{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}  -silent {{ dbca_initparams }}{{dbca_initparams_extras}}"
+#   run_once: "{{ configure_cluster }}"
+#   become_user: "{{ oracle_user }}"
+#   when: dbh.state|lower == 'present'
+#   register: dbca_create
+#   tags: create_db,dbca
+
+- name: manage-db | create/manage database
+  oracle_db:
+        oracle_home={{ oracle_home_db}}
+        port={{ listener_port_template }}
+        sys_password={{ dbca_sys_pass }}
+        db_name={{ dbh.oracle_db_name }}
+        db_unique_name={{ dbh.oracle_db_unique_name |default(omit) }}
+        sid={{ dbh.oracle_db_instance_name |default(omit) }}
+        responsefile={{ oracle_rsp_stage }}/{{ oracle_dbca_rsp }}
+        archivelog={{ dbh.archivelog | default (omit)}}
+        flashback={{ dbh.flashback | default (omit)}}
+        force_logging={{ dbh.force_logging | default (omit)}}
+        initparams={{ init_params_list | default(omit)}}
+        output=verbose
+        state={{ dbh.state}}
+  run_once: "{{ configure_cluster }}"
+  become_user: "{{ oracle_user }}"
+  when: dbh.state|lower == 'present'
+  register: dbca_create
+  tags: create_db,manage_db,dbca
+
+
+
+
+# - debug: var=dbca_create.stdout_lines
+#   when: dbca_create.changed
+#   run_once: "{{ configure_cluster }}"
+
+- name: manage-db | Customize oratab for autostart
+  lineinfile:
+          dest=/etc/oratab
+          line="{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_name) }}:{{ oracle_home_db }}:Y"
+          state=present
+  when: autostartup_service and not olrloc.stat.exists and dbh.state == 'present'
+  tags: update_oratab
+
+- name: manage-db | Customize oratab for autostart
+  lineinfile:
+         dest=/etc/oratab
+         line="{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_name) }}:{{ oracle_home_db }}:N"
+         state=absent
+  when: autostartup_service and not olrloc.stat.exists and dbh.state == 'present'
+  become: yes
+  tags: update_oratab
+
+- debug: msg="Removing DB - {{dbh.oracle_db_name}}, ORACLE_HOME - {{ oracle_home_db }}"
+  run_once: "{{ configure_cluster }}"
+  when: dbh.state|lower == 'absent'
+
+- name: manage-db | remove database
+  oracle_db:
+        oracle_home={{ oracle_home_db }}
+        port={{ listener_port_template }}
+        sys_password={{ dbca_sys_pass }}
+        db_name={{ dbh.oracle_db_name }}
+        output=verbose
+        state={{ dbh.state}}
+  run_once: "{{ configure_cluster }}"
+  become_user: "{{ oracle_user }}"
+  when: dbh.state|lower == 'absent'
+  register: dbca_remove
+  tags: remove_db,dbca
+
+- debug: var=dbca_remove.stdout_lines
+  when: dbca_remove.changed
+
+- name: manage-db | remove dotprofile
+  file:
+     path: "/home/{{ oracle_user}}/.profile_{{ dbh.oracle_db_name }}"
+     state: absent
+  when: dbh.state|lower == 'absent'
+  tags: create_cdb,dotprofile_db

@@ -92,8 +92,6 @@ ORACLE_BASE={{oracle_base}}
 #-------------------------------------------------------------------------------
 # The OSDBA_GROUP is the OS group which is to be granted SYSDBA privileges.
 #-------------------------------------------------------------------------------
-{% if role_separation==True %}
-
 oracle.install.asm.OSDBA={{ asmdba_group }}
 
 ##-------------------------------------------------------------------------------
@@ -101,30 +99,13 @@ oracle.install.asm.OSDBA={{ asmdba_group }}
 ## The value to be specified for OSOPER group is optional.
 ##-------------------------------------------------------------------------------
 oracle.install.asm.OSOPER={{ asmoper_group }}
-#
+
 ##-------------------------------------------------------------------------------
 ## The OSASM_GROUP is the OS group which is to be granted OSASM privileges. This
 ## must be different than the previous two.
 ##-------------------------------------------------------------------------------
 oracle.install.asm.OSASM={{ asmadmin_group }}
 
-   {% else %}
-
-oracle.install.asm.OSDBA={{ dba_group }}
-
-#-------------------------------------------------------------------------------
-## The OPER_GROUP is the OS group which is to be granted OSOPER privileges.
-## The value to be specified for OSOPER group is optional.
-##-------------------------------------------------------------------------------
-oracle.install.asm.OSOPER={{ oper_group }}
-
- ##-------------------------------------------------------------------------------
-# The OSASM_GROUP is the OS group which is to be granted OSASM privileges. This
-# must be different than the previous two.
-#-------------------------------------------------------------------------------
-oracle.install.asm.OSASM={{ dba_group }}
-
-{% endif %}
 
 ################################################################################
 #                                                                              #
@@ -134,13 +115,13 @@ oracle.install.asm.OSASM={{ dba_group }}
 #-------------------------------------------------------------------------------
 # Specify a name for SCAN
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.gpnp.scanName={% if configure_cluster==True %}{{ oracle_scan }}{% else %}{% endif %}
+oracle.install.crs.config.gpnp.scanName={% if configure_cluster %}{{ oracle_scan }}{% else %}{% endif %}
 
 #-------------------------------------------------------------------------------
 # Specify a unused port number for SCAN service
 #-------------------------------------------------------------------------------
 
-oracle.install.crs.config.gpnp.scanPort={% if configure_cluster==True %}{{ oracle_scan_port }}{% else %}{% endif %}
+oracle.install.crs.config.gpnp.scanPort={% if configure_cluster %}{{ oracle_scan_port }}{% else %}{% endif %}
 
 
 ################################################################################
@@ -267,17 +248,17 @@ oracle.install.crs.config.sites=
 {%  if oracle_gi_cluster_type|upper  == "STANDARD"  or oracle_gi_cluster_type|upper == 'STANDALONE' %}
 
 {%  if ansible_domain  == ""  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host}}:{{ host }}{{ oracle_vip }}:HUB{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}:HUB{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
   {% else  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host}}.{{ ansible_domain }}:{{ host }}{{ oracle_vip }}.{{ ansible_domain }}:HUB{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}.{{ ansible_domain }}:HUB{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
 {% endif %}
 
 {% elif oracle_gi_cluster_type|upper == 'FLEX'  %}
 
 {%  if ansible_domain  == ""  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup_hub] -%} {{host}}:{{ host }}{{ oracle_vip }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
  {% else  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup_hub] -%} {{host}}.{{ ansible_domain }}:{{ host }}{{ oracle_vip }}.{{ ansible_domain }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}.{{ ansible_domain }}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}.{{ ansible_domain }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}.{{ ansible_domain }}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
 
  {% endif %}
 
@@ -297,7 +278,7 @@ oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for ho
 # For example: eth0:140.87.24.0:1,eth1:10.2.1.0:2,eth2:140.87.52.0:3
 #
 #-------------------------------------------------------------------------------
-{%  if configure_cluster  == True %}
+{%  if configure_cluster %}
 {% if oracle_gi_cluster_type|upper  == "FLEX" or oracle_gi_cluster_type|upper == 'STANDALONE'   %}
 oracle.install.crs.config.networkInterfaceList={{ oracle_gi_nic_pub }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_pub].ipv4.network }}:1,{{ oracle_gi_nic_priv }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_priv].ipv4.network }}:5
 {%  elif oracle_gi_cluster_type|upper  == "STANDARD" %}
@@ -398,7 +379,7 @@ oracle.install.asmOnNAS.gimrLocation=
 #-------------------------------------------------------------------------------
 # Password for SYS user of Oracle ASM
 #-------------------------------------------------------------------------------
-oracle.install.asm.SYSASMPassword={{ oracle_password }}
+oracle.install.asm.SYSASMPassword={%if sysasmpassword is defined %}{{ sysasmpassword}}{% else %}{{default_gipass}}{% endif %}
 
 #-------------------------------------------------------------------------------
 # The ASM DiskGroup
@@ -491,7 +472,7 @@ oracle.install.asm.diskGroup.diskDiscoveryString={% if device_persistence == 'as
 # Password for ASMSNMP account
 # ASMSNMP account is used by Oracle Enterprise Manager to monitor Oracle ASM instances
 #-------------------------------------------------------------------------------
-oracle.install.asm.monitorPassword={{ oracle_password }}
+oracle.install.asm.monitorPassword={%if asmmonitorpassword is defined %}{{asmmonitorpassword}}{% else %}{{default_gipass}}{% endif %}
 
 #-------------------------------------------------------------------------------
 # GIMR Storage data ASM DiskGroup

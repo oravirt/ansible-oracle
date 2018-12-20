@@ -7,3 +7,8 @@
         - "{{ logrotate_config }}"
   when: logrotate_config is defined
   tags: logrotate
+
+- name: Manage Cleanup-Scripts
+  template: src=oracle_cleanup.j2 dest=/etc/cron.daily/oracle_cleanup.sh mode=744
+  when: logrotate_config is defined
+  tags: cleanup

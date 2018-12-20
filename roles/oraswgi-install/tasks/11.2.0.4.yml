@@ -1,90 +1,112 @@
 ---
 
-- name: Extract files to stage-area (GI)
-  unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no
+- name: install-home-gi | Extract files to stage-area (GI)
+  unarchive:
+       src={{ oracle_stage_remote }}/{{ item.filename }}
+       dest={{ oracle_stage }}/{{ item.version }}
+       copy=no
+       creates={{ oracle_stage }}/{{ item.version }}/{{ item.creates}}
   with_items: "{{oracle_sw_image_gi}}"
-  sudo: yes
-  sudo_user: "{{ grid_install_user }}"
+  become: yes
+  become_user: "{{ grid_install_user }}"
   tags:
     - oragridswunpack
-  when: checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and oracle_sw_copy|bool and oracle_sw_unpack|bool
+  when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi  == item.version and oracle_sw_copy and oracle_sw_unpack
 
-- name: Extract files to stage-area (GI) (from remote location)
-  unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_stage }}/{{ item.version }} copy=no
+- name: install-home-gi | Extract files to stage-area (GI) (from remote location)
+  unarchive:
+       src={{ oracle_stage_remote }}/{{ item.filename }}
+       dest={{ oracle_stage }}/{{ item.version }}
+       copy=no
+       creates={{ oracle_stage }}/{{ item.version }}/{{ item.creates}}
   with_items: "{{oracle_sw_image_gi}}"
-  sudo: yes
-  sudo_user: "{{ grid_install_user }}"
+  become: yes
+  become_user: "{{ grid_install_user }}"
   tags:
   - oragridswunpack
-  when: checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy|bool and oracle_sw_unpack|bool
+  when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and not oracle_sw_copy and oracle_sw_unpack
 
-- name: Install cvuqdisk rpm
+- name: install-home-gi | Install cvuqdisk rpm
   yum: name="{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/grid/rpm/{{ cvuqdisk_rpm }}" state=present
   when: configure_cluster
   tags: cvuqdisk
   ignore_errors: true
 
-- name: Setup response file for install (GI)
-  template: src=grid-install.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner="{{ grid_install_user }}" group={{ oracle_group }} mode=775 backup=yes
+- name: install-home-gi | Setup response file for install (GI)
+  template: src=grid-install.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner="{{ grid_install_user }}" group={{ oracle_group }} mode=600 backup=yes
   with_items: "{{asm_diskgroups}}"
+  run_once: "{{ configure_cluster}}"
   tags:
     - responsefilegi
-  when: master_node and checkgiinstall.stdout != "1" and item.diskgroup == oracle_asm_init_dg
+  when: oracle_home_gi not in checkgiinstall.stdout and item.diskgroup == oracle_asm_init_dg
 
-- name: Install Grid Infrastructure
+- name: install-home-gi | Install Grid Infrastructure
   shell: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -ignoreSysPrereqs -showProgress -silent"
-  sudo: yes
-  sudo_user: "{{ grid_install_user }}"
+  become: yes
+  become_user: "{{ grid_install_user }}"
+  run_once: "{{ configure_cluster}}"
   tags:
     - oragridinstall
-  when: master_node and checkgiinstall.stdout != "1" #and oracle_sw_unpack
+  when: oracle_home_gi not in checkgiinstall.stdout #and oracle_sw_unpack
   register: giinstall
 
 - debug: var=giinstall.stdout_lines
-  when: master_node and checkgiinstall.stdout != "1"
+  run_once: "{{ configure_cluster}}"
+  when: oracle_home_gi not in checkgiinstall.stdout
 
-- name: Run oraInstroot script after installation
+- include_role:
+        name: oraswgi-manage-patches
+  when: patch_before_rootsh and apply_patches_gi
+
+- name: install-home-gi | Run oraInstroot script after installation
   shell: "{{ oracle_inventory_loc }}/orainstRoot.sh"
-  sudo: yes
+  become: yes
   tags:
     - runroot
-  when: checkgiinstall.stdout != "1"
+  when: oracle_home_gi not in checkgiinstall.stdout
 
-- name: Run root script after installation (Master Node)
+- name: install-home-gi | Run root script after installation (Master Node)
   shell: "{{ oracle_home_gi }}/root.sh"
-  sudo: yes
+  become: yes
+  run_once: "{{ configure_cluster}}"
   tags:
     - runroot
-  when: master_node and checkgiinstall.stdout != "1"
+  when: oracle_home_gi not in checkgiinstall.stdout
   register: rootmaster
 
 - debug: var=rootmaster.stdout_lines
-  when: master_node and checkgiinstall.stdout != "1"
+  run_once: "{{ configure_cluster}}"
+  when: oracle_home_gi not in checkgiinstall.stdout
 
-- name: Run root script after installation (Other Nodes)
+- name: install-home-gi | Run root script after installation (Other Nodes)
   shell: "sleep {{ item.0 * 60 }}; {{ oracle_home_gi }}/root.sh"
-  sudo: yes
+  become: yes
   with_indexed_items: "{{groups[hostgroup]}}"
   tags:
     - runroot
-  when: not master_node and checkgiinstall.stdout != "1" and inventory_hostname == item.1
+  #when: oracle_home_gi not in checkgiinstall.stdout  and inventory_hostname == item.1
+  when: configure_cluster and inventory_hostname != cluster_master and inventory_hostname == item.1 and oracle_home_gi not in checkgiinstall.stdout
   register: rootother
 
 - debug: var=rootother.stdout_lines
-  when: not master_node and checkgiinstall.stdout != "1"
+  #when: not master_node and oracle_home_gi not in checkgiinstall.stdout
+  when: configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
+  ignore_errors: True
 
-- name: Setup response file for configToolAllCommands
+- name: install-home-gi | Setup response file for configToolAllCommands
   template: src=configtoolallcommands.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/configtoolallcommands.rsp owner="{{ grid_install_user }}" group={{ oracle_group }} mode=755 backup=yes
+  run_once: "{{ configure_cluster}}"
   tags:
     - responsefileconfigtool
-  when: master_node and run_configtoolallcommand  and checkgiinstall.stdout != "1"
+  when: run_configtoolallcommand  and oracle_home_gi not in checkgiinstall.stdout
 
-- name: Run configToolAllCommands
+- name: install-home-gi | Run configToolAllCommands
   shell: "{{ oracle_home_gi }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_rsp_stage }}/configtoolallcommands.rsp"
-  sudo: yes
-  sudo_user: "{{ grid_install_user }}"
+  become: yes
+  become_user: "{{ grid_install_user }}"
+  run_once: "{{ configure_cluster}}"
   tags:
     - runconfigtool
-  when: master_node and run_configtoolallcommand and checkgiinstall.stdout != "1"
+  when: run_configtoolallcommand and oracle_home_gi not in checkgiinstall.stdout
   ignore_errors: true
   register: configtool

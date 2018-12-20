@@ -1,0 +1,100 @@
+# Used as of 2014-12-07
+---
+  hostgroup: racattack
+  role_separation: true
+  device_persistence: asmlib
+
+  oracle_groups:
+    - { group: asmdba, gid: 54318 }
+    - { group: asmoper, gid: 54319 }
+    - { group: asmadmin, gid: 54320 }
+    - { group: oinstall, gid: 54321 }
+    - { group: dba, gid: 54322 }
+    - { group: backupdba, gid: 54323 }
+    - { group: oper, gid: 54324 }
+    - { group: dgdba, gid: 54325 }
+    - { group: kmdba, gid: 54326 }
+
+  oracle_users:         # Passwd :oracle
+    - { username: oracle, uid: 54321, primgroup: oinstall, othergroups: "dba,asmdba,backupdba,dgdba,kmdba,oper", passwd: "$6$VwR.53R4$HtKoSj3TxZCc4nWoqCrnBx8ldjJ2e7pfe1KKEvjkctAK653RL5FfsPRh5SuhrZEcGElba.G68EPHG3dV5z7ty." }
+  grid_users:           # Passwd :grid
+    - { username: grid, uid: 54320, primgroup: oinstall, othergroups: "asmadmin,asmdba,asmoper,dba", passwd: "$6$/yJx24id$K8gB.l5GEMJlv9Q.v1bulyHiRRqZlZaUwoInNEixd9FBRxj9wyZYyyWzgOkRg9gBMfheH/kgRjranYpnAINRI1" }
+
+  oracle_sw_copy: false
+  oracle_sw_unpack: true
+  oracle_stage: /media/sf_12cR1
+  oracle_stage_remote: /media/sf_12cR1
+  oracle_rsp_stage: /media/sf_12cR1/rsp
+
+  configure_interconnect: false
+  configure_ssh: true
+  configure_host_disks: false
+
+  configure_cluster: true
+  install_os_packages: false
+  disable_selinux: false
+
+################ Grid Infrastructure specifics ################
+  oracle_install_version_gi: 12.1.0.2
+
+  oracle_scan: collabn-cluster-scan.racattack
+  oracle_vip: -vip
+  oracle_scan_port: 1521
+  oracle_asm_init_dg: data
+  oracle_gi_nic_pub: eth1
+  oracle_gi_nic_priv: eth2
+  oracle_gi_gns_subdomain: collabn.racattack
+  oracle_gi_gns_vip: collabn-cluster-gns.racattack.
+
+  oracle_sw_image_db:
+       - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2 }
+       - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2 }
+#       - { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1 }
+#       - { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1 }
+#       - { filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4 }
+#       - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4 }
+
+  oracle_databases:                                               # Dictionary describing the databases to be installed
+        - home: rachome1                                                   # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
+          oracle_version_db: 12.1.0.2                         # Oracle versiono
+          oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+          oracle_db_name: racdba                                 # Database name
+          oracle_db_type: RAC                                   # Type of database (RAC,RACONENODE,SI)
+          is_container: "false"                                # (true/false) Is the database a container database
+          pdb_prefix: pdb
+          num_pdbs: 1
+          is_racone: "false"                                   # (true/false) Is the database a RAC ONE NODE Database
+          storage_type: ASM                                     # Database storage to be used. ASM or FS.
+          service_name: racdb_serv                               # Inital service to be created (not in use yet)
+          oracle_init_params: "open_cursors=300,processes=500" # Specific parameters to be set during installation. Comma-separated list
+          oracle_db_mem_percent: 25                            # Amount of RAM to be used for SGA
+          oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+          redolog_size_in_mb: 100
+          state: present
+
+
+  oracle_dbf_dir_asm: "DATA"
+  oracle_reco_dir_asm: "FRA"
+  host_fs_layout:
+      u01:
+        {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora, fstype: ext4}
+
+  asm_diskgroups:
+    - diskgroup: data
+      properties:
+        - {redundancy: external, ausize: 1}
+      attributes:
+        - {name: compatible.rdbms, value: 11.2.0.3.0}
+        - {name: compatible.asm, value: "{{ oracle_install_version_gi }}"}
+      disk:
+        - {device: /dev/sdc, asmlabel: asmdisk01}
+        - {device: /dev/sdd, asmlabel: asmdisk02}
+        - {device: /dev/sde, asmlabel: asmdisk03}
+    - diskgroup: fra
+      properties:
+        - {redundancy: external, ausize: 1}
+      attributes:
+        - {name: compatible.rdbms, value: 11.2.0.3.0}
+        - {name: compatible.asm, value: "{{ oracle_install_version_gi }}"}
+      disk:
+        - {device: /dev/sdf, asmlabel: asmdisk04}

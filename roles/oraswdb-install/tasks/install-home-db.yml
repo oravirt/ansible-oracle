@@ -1,0 +1,93 @@
+- name: install-home-db | set fact with ORACLE_HOME
+  set_fact:
+       oracle_home_db: "{%- if db_homes_config[dbh.home]['oracle_home'] is defined  -%}
+                            {{db_homes_config[dbh.home]['oracle_home']}}
+                        {%- else -%}
+                             {{oracle_base}}/{{db_homes_config[dbh.home]['version']}}/{{db_homes_config[dbh.home]['home']}}
+                        {%- endif -%}"
+
+- name: install-home-db | Check if DB-server is already installed
+  shell: cat "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" |grep -w {{ oracle_home_db  }} |awk  '{print $3}' | cut -f2 -d'"'
+  run_once: "{{ configure_cluster }}"
+  register: existing_dbhome
+  changed_when: False
+  failed_when: False
+  tags: install_home,existing_dbhome,checkdbswinstall
+
+- debug: msg="Installing ORACLE_HOME - {{ oracle_home_db }}"
+  when: oracle_home_db not in existing_dbhome.stdout_lines
+
+- name: install-home-db | add dotprofile
+  template:
+    src: dotprofile-home.j2
+    dest: "/home/{{ oracle_user}}/{{ oracle_profile_name}}"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0660
+  #when: oracle_home_db not in existing_dbhome.stdout_lines
+  tags: create_db,dotprofile_db
+
+- name: install-home-db | Setup response file for install (DB)
+  template:
+    src: "db-install.rsp.{{ db_version}}.j2"
+    dest: "{{ oracle_rsp_stage }}/{{ oracle_db_responsefile }}"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0600
+  run_once: "{{ configure_cluster }}"
+  when: oracle_home_db not in existing_dbhome.stdout_lines
+  register:
+  tags: responsefileswdb
+
+- include_tasks: "{{ db_version }}.yml"
+
+# oracle_EE_options = '' => Nothing to do
+# licence options in 11.2+ must be changed by chopt
+# => use this method for all >= 11.2 (Doc ID 948061.1)
+# test -f => reduce number of executions when > 1 database in oracle_databases for same ORACLE_HOME
+# we cannot use default/main.yml here. => complicated structure for 'enabled' 'disabled'...
+- name: install-home-db | Change Database options with chopt
+  shell: "test -f {{ oracle_home_db }}/install/{{ item.state | replace(true, 'enable') | replace(false, 'disable') }}_{{item.option}}.log || {{ oracle_home_db }}/bin/chopt {{ item.state | replace(true, 'enable') | replace(false, 'disable') }} {{item.option}}"
+  with_items:
+    - "{{oracle_EE_options}}"
+  become: yes
+  become_user: "{{ oracle_user }}"
+  register: choptout
+  changed_when: '"Writing" in choptout.stdout'
+  when: db_homes_config[dbh.home]['edition'] == 'EE' and oracle_EE_options is defined and disable_EE_options
+  loop_control:
+    label: "{{ oracle_home_db }} {{ item.state | replace(true, 'enable') | replace(false, 'disable') }} {{item.option}}"
+  tags:
+    - dbchopt
+
+- name: install-home-db | Run root script after installation
+  shell: "{{ oracle_home_db }}/root.sh"
+  run_once: "{{ configure_cluster}}"
+  when: oradbinstall.changed
+  tags:
+    - runroot
+
+- name: install-home-db | Generate glogin.sql
+  template: src=glogin.sql.j2 dest="{{ oracle_home_db }}/sqlplus/admin/glogin.sql" backup=yes
+  become: yes
+  become_user: "{{ oracle_user }}"
+  tags:
+    - glogindb
+
+- name: install-home-db | Check opatch lspatches (DB)
+  shell: "{{ oracle_home_db }}/OPatch/opatch lspatches"
+  become: yes
+  become_user: "{{ oracle_user }}"
+  run_once: "{{ configure_cluster}}"
+  when: oradbinstall
+  changed_when: False
+  register: opatchls
+  tags:
+   - opatchls
+
+- debug: var=opatchls.stdout_lines
+  run_once: "{{ configure_cluster}}"
+  when: opatchls is defined
+  tags:
+   - opatchls
+  ignore_errors: true

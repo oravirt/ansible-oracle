@@ -1,0 +1,15 @@
+- name: install-home-db | Transfer oracle installfiles to server (www - get_url)
+  get_url:
+      url={{ oracle_sw_source_www }}/{{ item[0].filename }}
+      dest={{ oracle_stage }}
+      mode=775
+      force=no
+  with_nested:
+    - "{{oracle_sw_image_db}}"
+    - "{{db_homes_installed}}"
+  become: yes
+  become_user: "{{ oracle_user }}"
+  run_once: "{{ configure_cluster}}"
+  when: item[0].version == db_homes_config[item[1].home]['version'] and item[1].state|lower == 'present' and not is_sw_source_local and oracle_sw_copy
+  tags:
+    - oradbsw

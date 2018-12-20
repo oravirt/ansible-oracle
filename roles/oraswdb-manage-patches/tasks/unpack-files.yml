@@ -1,0 +1,31 @@
+
+
+- name: db-opatch | Extract patch files to patch base
+  unarchive:
+      src={{ oracle_stage }}/{{ item[0].filename }}
+      dest={{ oracle_patch_stage }}/{{ db_version }}
+      creates={{ oracle_patch_stage }}/{{ db_version }}/{{ item[0].creates | default (omit) }}
+      copy=no
+  become: yes
+  become_user: "{{ oracle_user }}"
+  with_nested:
+     - "{{oracle_sw_patches}}"
+     - "{{db_homes_config[dbh.home]['opatchauto']}}"
+  when: apply_patches_db and item[1].patchid == item[0].patchid and item[1].state == 'present' and oracle_sw_copy and oracle_sw_unpack and db_homes_config[dbh.home]['opatchauto'] is defined
+  tags:
+    - oraswdbpsuunpack1
+
+- name: db-opatch | Extract patch files to patch base (from remote location)
+  unarchive:
+      src={{ oracle_stage_remote }}/{{ item.0.filename }}
+      dest={{ oracle_patch_stage }}/{{ db_version }}
+      creates={{ oracle_patch_stage }}/{{ db_version }}/{{ item[0].creates | default (omit) }}
+      copy=no
+  become: yes
+  become_user: "{{ oracle_user }}"
+  with_nested:
+     - "{{oracle_sw_patches}}"
+     - "{{db_homes_config[dbh.home]['opatchauto']}}"
+  when: apply_patches_db and item[1].patchid == item[0].patchid and item[1].state == 'present' and not oracle_sw_copy and oracle_sw_unpack and db_homes_config[dbh.home]['opatchauto'] is defined
+  tags:
+    - oraswdbpsuunpack2

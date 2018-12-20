@@ -1,27 +1,71 @@
 ---
 
 
- - name: Host configuration
-   hosts: vbox-si-asm
-   user: vagrant
-   become: yes
-   roles:
-      - common
-      - orahost
-      - orahost-storage
+- name: Host configuration
+  hosts: vbox-si-asm
+  user: vagrant
+  become: yes
+  roles:
+     - common
+     - orahost
+     - orahost-storage
 
- - name: Oracle Grid Infrastructure installation & ASM Configuration
-   hosts: vbox-si-asm
-   user: vagrant
-   become: yes
-   roles:
-      - oraswgi-install
-      - oraasm-createdg
+- name: Oracle Grid Infrastructure installation
+  hosts: vbox-si-asm
+  user: vagrant
+  become: yes
+  roles:
+     - oraswgi-install
 
- - name: Database Server Installation & Database Creation
-   hosts: vbox-si-asm
-   user: vagrant
-   become: yes
-   roles:
+- name: Install cx_oracle
+  hosts: vbox-si-asm
+  user: vagrant
+  become: yes
+  roles:
+     - cxoracle
+
+- name: ASM Diskgroup configuration
+  hosts: vbox-si-asm
+  user: vagrant
+  become: yes
+  roles:
+     - {role: oraasm-createdg, when: old_diskgroup_config}
+     - {role: oraasm-manage-diskgroups, when: not old_diskgroup_config}
+
+- name: Database Server Installation & Database Creation
+  hosts: vbox-si-asm
+  user: vagrant
+  become: yes
+  roles:
       - oraswdb-install
-      - oradb-create
+      - {role: oraswdb-manage-patches, when: apply_patches_db}
+      - oradb-manage-db
+
+- name: Configure Logrotate
+  hosts: vbox-si-asm
+  user: vagrant
+  become: yes
+  roles:
+     - orahost-logrotate
+
+
+- name: Customize database(s)
+  hosts: vbox-si-asm
+  user: vagrant
+  become: yes
+  roles:
+     - oradb-manage-pdb
+     - oradb-manage-tablespace
+     - oradb-manage-parameters
+     - oradb-manage-redo
+     - oradb-manage-roles
+     - oradb-manage-users
+     - oradb-manage-grants
+     - oradb-manage-services
+
+- name: Run Datapatch
+  hosts: vbox-si-asm
+  user: vagrant
+  become: yes
+  roles:
+      - {role: oradb-datapatch, when: apply_patches_db}

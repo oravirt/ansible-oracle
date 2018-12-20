@@ -1,0 +1,59 @@
+---
+# tasks file fororadb-manage-users
+
+- name: Manage users (db/cdb)
+  oracle_user:
+          hostname={{ ansible_hostname }}
+          port={{ listener_port_template }}
+          service_name={{ db_service_name }}
+          user={{ db_user }}
+          password={{ db_password_cdb }}
+          mode="{{ db_mode}}"
+          schema={{ item.1.schema }}
+          schema_password={{ user_cdb_password }}
+          profile={{ item.1.profile |default (omit) }}
+          state={{ item.1.state }}
+          default_tablespace={{ item.1.default_tablespace |default (omit)}}
+          container={{ item.1.container |default(omit) }}
+          update_password={{ item.1.update_password | default('on_create') }}
+          grants={{ item.1.grants |default (omit) }}
+  with_subelements:
+      - "{{ oracle_databases }}"
+      - users
+      - flags:
+        skip_missing: True
+  environment: "{{oracle_env}}"
+  when: oracle_databases is defined and item.0.state|lower == 'present' and item.1 is defined
+  run_once: "{{ configure_cluster }}"
+  become_user: "{{oracle_user}}"
+  loop_control:
+      label: "port: {{ listener_port_template }} service: {{ db_service_name }} schema: {{ item.1.schema }} state:{{ item.1.state }}"
+  tags: users
+
+- name: Manage users (pdb)
+  oracle_user:
+          hostname={{ ansible_hostname }}
+          port={{ listener_port_template }}
+          service_name={{ item.0.pdb_name }}
+          user={{ db_user }}
+          password={{ db_password_pdb }}
+          mode="{{ db_mode}}"
+          schema={{ item.1.schema }}
+          schema_password={{ user_pdb_password }}
+          profile={{ item.1.profile |default (omit) }}
+          state={{ item.1.state }}
+          default_tablespace={{ item.1.default_tablespace |default (omit)}}
+          update_password={{ item.1.update_password | default('on_create') }}
+          grants={{ item.1.grants |default (omit) }}
+  with_subelements:
+      - "{{ oracle_pdbs }}"
+      - users
+      - flags:
+        skip_missing: True
+  environment: "{{oracle_env}}"
+  when: oracle_pdbs is defined and item.0.state|lower == 'present' and item.1 is defined
+  run_once: "{{ configure_cluster }}"
+  become_user: "{{oracle_user}}"
+  loop_control:
+      label: "port: {{ listener_port_template }} service: {{ item.0.pdb_name }} schema: {{ item.1.schema }} state:{{ item.1.state }}"
+  tags: users

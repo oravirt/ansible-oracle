@@ -1,0 +1,41 @@
+# {{ ansible_managed }}
+#
+#export PS1='[$LOGNAME'@ home-'$ORACLE_HOME `basename $PWD`]$'
+
+
+# Set up the Oracle parameters
+        umask 022
+        ORACLE_BASE={{ oracle_base }}
+        export ORACLE_BASE
+        ORACLE_HOME={{ oracle_home_db }}
+        export ORACLE_HOME
+        NLS_LANG=american_america.al32utf8
+        export NLS_LANG
+        ORA_NLS33=$ORACLE_HOME/ocommon/nls/admin/data
+        export ORA_NLS33
+        SHLIB_PATH=$ORACLE_HOME/lib
+        export SHLIB_PATH
+        LD_LIBRARY_PATH=$ORACLE_HOME/lib
+        export LD_LIBRARY_PATH
+        TNS_ADMIN=$ORACLE_HOME/network/admin
+        export TNS_ADMIN
+        SQLPATH=/home/oracle/.Scripts
+        export SQLPATH
+        ORACLE_SID=
+        export ORACLE_SID
+        export ORA_DB_UNQ_NAME=
+        export NLS_DATE_FORMAT='YYYY-MM-DD HH24:MI:SS'
+
+
+
+export PATH=$ORACLE_HOME/bin:$ORACLE_HOME/OPatch:$PATH:$SQLPATH:$GG_HOME/
+
+
+# Set Up Aliases:
+        alias asmcmd='. oraenv ;rlwrap asmcmd -p'
+        alias rman='rlwrap rman'
+        alias sid='. oraenv'
+        alias sqlp='. oraenv; rlwrap sqlplus'
+        alias dbh='cd $ORACLE_HOME'
+        alias dbb='cd $ORACLE_BASE'
+        alias c='clear'

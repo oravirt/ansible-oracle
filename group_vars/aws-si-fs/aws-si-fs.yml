@@ -1,0 +1,94 @@
+---
+  hostgroup: aws-si-fs
+
+  oracle_user: oracle
+  oracle_group: oinstall
+
+  is_sw_source_local: False
+  oracle_sw_source_www: 
+  install_from_nfs: false
+  oracle_sw_copy: True
+  oracle_sw_unpack: true
+  oracle_stage: /u01/stage
+  oracle_stage_remote: /tmp
+  autostartup_service: true
+
+  configure_ntp: true
+  configure_motd: true
+  configure_host_disks: true
+
+  extrarepos_enabled: "rhui-REGION-rhel-server-extras,rhui-REGION-rhel-server-optional"
+  install_os_packages: True
+  configure_epel_repo: True
+  configure_public_yum_repo: True
+  disable_selinux: True
+
+
+  oracle_databases:                                               # Dictionary describing the databases to be installed
+        - home: db1                                            # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.2.0.1/db1)
+          oracle_version_db: 12.2.0.1                         # Oracle versiono (12.2.0.1,12.1.0.2,12.1.0.1,11.2.0.4,11.2.0.3)
+          oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+          oracle_db_name: orclcdb                                 # Database name
+          oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
+          is_container: True                                # (true/false) Is the database a container database
+          pdb_prefix: orclpdb
+          num_pdbs: 1
+          storage_type: FS                                     # Database storage to be used. ASM or FS.
+          oracle_db_mem_totalmb: 1024                            # Amount of RAM to be used for SGA
+          oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+          redolog_size_in_mb: 100
+          datafile_dest: /u02
+          recoveryfile_dest: /u02
+          listener_name: LISTENER                              # This home will have a listener configured
+          listener_port: 1521
+          state: present
+
+# This will create another database using the same ORACLE_HOME as above (/u10/app/oracle/12.2.0.1/db1, but is not running a listener)
+        # - home: db1                                            # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.2.0.1/db1)
+        #   oracle_version_db: 12.2.0.1                          # Oracle versiono (12.2.0.1,12.1.0.2,12.1.0.1,11.2.0.4,11.2.0.3)
+        #   oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+        #   oracle_db_name:                                  # Database name
+        #   oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
+        #   oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
+        #   is_container: false                                # (true/false) Is the database a container database
+        #   pdb_prefix: shit
+        #   num_pdbs: 0
+        #   storage_type: FS                                     # Database storage to be used. ASM or FS.
+        #   oracle_db_mem_totalmb: 1024                            # Amount of RAM to be used for SGA
+        #   oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+        #   redolog_size_in_mb: 100
+        #   datafile_dest: /u02
+        #   recoveryfile_dest: /u02
+        #   state: present
+
+# This will create another ORACLE_HOME (/u10/app/oracle/12.1.0.2/db1, a db called xxx but is not running a listener)
+        # - home: db1                                            # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.2.0.1/db1)
+        #   oracle_version_db: 12.1.0.2                          # Oracle versiono (12.2.0.1,12.1.0.2,12.1.0.1,11.2.0.4,11.2.0.3)
+        #   oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+        #   oracle_db_name: xxx                                 # Database name
+        #   oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
+        #   oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
+        #   is_container: false                                # (true/false) Is the database a container database
+        #   pdb_prefix: pdb
+        #   num_pdbs: 0
+        #   storage_type: FS                                     # Database storage to be used. ASM or FS.
+        #   oracle_db_mem_totalmb: 1024                            # Amount of RAM to be used for SGA
+        #   oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+        #   redolog_size_in_mb: 100
+        #   datafile_dest: /u02
+        #   recoveryfile_dest: /u02
+        #   state: present
+
+  host_fs_layout:
+   - vgname: vgora
+     state: present
+     filesystem:
+       - {mntp: /u01, lvname: lvora, lvsize: 100%FREE, fstype: ext4}
+     disk:
+       - {device: /dev/xvdb, pvname: /dev/xvdb}
+   - vgname: vgoradata
+     state: present
+     filesystem:
+       - {mntp: /u02, lvname: lvoradata, lvsize: 100%FREE, fstype: xfs}
+     disk:
+       - {device: /dev/xvdc, pvname: /dev/xvdc1}

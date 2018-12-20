@@ -1,10 +1,10 @@
 ---
-   install_cx_oracle: true
-   use_proxy: false
-   http_proxy:
-   oracle_base: /u01/app/oracle
-   oracle_home: "{% if item.oracle_home is defined %}{{ item.oracle_home }}{% else %}{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}{% endif %}"
-   oracle_env:
-         ORACLE_HOME: "{{ oracle_home }}"
-   extra_args: "{% if use_proxy==true %}--proxy={{ http_proxy }}{% else %}{% endif %}"
-
+install_cx_oracle: true
+use_proxy: false
+http_proxy:
+oracle_base: /u01/app/oracle
+#oracle_home: "{% if item.oracle_home is defined %}{{ item.oracle_home }}{% else %}{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}{% endif %}"
+#oracle_env:
+#      ORACLE_HOME: "{{ oracle_home }}"
+extra_args: "{% if use_proxy %}--proxy={{ http_proxy }}{% else %}{% endif %}"
+#cx_oracle_umask: 0022

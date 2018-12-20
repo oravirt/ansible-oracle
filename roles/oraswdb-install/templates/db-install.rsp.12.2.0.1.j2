@@ -62,7 +62,7 @@ ORACLE_BASE={{ oracle_base }}
 
 #-------------------------------------------------------------------------------
 
-oracle.install.db.InstallEdition={{ item.0.oracle_edition | default ('EE') }}
+oracle.install.db.InstallEdition={{ db_homes_config[dbh.home]['edition'] | default ('EE') }}
 ###############################################################################
 #                                                                             #
 # PRIVILEGED OPERATING SYSTEM GROUPS                                          #
@@ -130,11 +130,11 @@ oracle.install.db.rac.configurationType=ADMIN_MANAGED
 #
 # Example : oracle.install.db.CLUSTER_NODES=node1,node2
 #------------------------------------------------------------------------------
-{% if configure_cluster==True %}
+{% if configure_cluster %}
 {% if oracle_gi_cluster_type |upper == 'FLEX' %}
-oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup_hub] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
+oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% else %}
-oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
+oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% endif %}
 {% else %}
 {% endif %}
@@ -147,22 +147,14 @@ oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host}} {%
 #
 # If left blank, it will be assumed to be false.
 #------------------------------------------------------------------------------
-{% if item.0.oracle_db_type|upper == 'RACONENODE' %}
-oracle.install.db.isRACOneInstall=true
-{% else %}
-oracle.install.db.isRACOneInstall=
-{% endif %}
+# oracle.install.db.isRACOneInstall=
 
 #------------------------------------------------------------------------------
 # Value is required only if oracle.install.db.isRACOneInstall is true.
 #
 # Specify the name for RAC One Node Service
 #------------------------------------------------------------------------------
-{% if item.0.oracle_db_type|upper == 'RACONENODE' %}
-oracle.install.db.racOneServiceName={{ item.0.service_name }}
-{% else %}
-oracle.install.db.racOneServiceName=
-{% endif %}
+# oracle.install.db.racOneServiceName=
 
 #------------------------------------------------------------------------------
 # Value is required only if RAC database type is POLICY_MANAGED

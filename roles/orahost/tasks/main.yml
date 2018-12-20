@@ -3,14 +3,18 @@
 
   - name: Check for correct OS family & min version
     assert:
-      that: "ansible_os_family == '{{ os_family_supported }}'"
-      that: "ansible_distribution_version >= '{{ os_min_supported_version }}'"
+      that:
+        - "ansible_os_family == '{{ os_family_supported }}'"
+        - "ansible_distribution_version | version_compare('{{ os_min_supported_version }}', '>=')"
     tags:
      - oscheck
 
   - name: Install packages required by Oracle on OL/RHEL
-    yum: name={{ item }} state=installed
-    with_items: "{{oracle_packages}}"
+    yum:
+       name: "{{ oracle_packages }}"
+       state: installed
+       enablerepo: "{{ extrarepos_enabled |default (omit, True) }}"
+       disablerepo: "{{ extrarepos_disabled |default (omit, True) }}"
     when: install_os_packages and ansible_os_family == 'RedHat'
     tags: os_packages, oscheck
 
@@ -21,21 +25,30 @@
     tags: os_packages, oscheck
 
   - name: Install packages required by Oracle for ASMlib on OL/RHEL
-    yum: name={{ item }} state=installed
-    with_items: "{{oracle_asm_packages}}"
-    when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'RedHat'
+    yum:
+       name: "{{ oracle_asm_packages }}"
+       state: installed
+       enablerepo: "{{ extrarepos_enabled |default (omit, True) }}"
+       disablerepo: "{{ extrarepos_disabled |default (omit, True) }}"
+    when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'RedHat' and asm_diskgroups is defined
     tags: os_packages, oscheck
 
   - name: Install packages required by Oracle for ASMlib on SLES
     zypper: name={{ item }} state=installed
     with_items: "{{ oracle_asm_packages_sles }}"
-    when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'Suse'
+    when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'Suse' and asm_diskgroups is defined
     tags: os_packages, oscheck, asm1
+
+  - name: Check if firewall is installed
+    yum: list={{firewall_service}} disablerepo=*
+    when: disable_firewall and ansible_os_family == 'RedHat'
+    tags: iptables,firewalld
+    register: firewall
 
   - name: Disable firewall
     service: name={{ firewall_service }} state=stopped enabled=no
-    when: disable_firewall and ansible_os_family == 'RedHat'
-    tags: iptables
+    when: disable_firewall and ansible_os_family == 'RedHat' and firewall.results
+    tags: iptables,firewalld
     register: iptables
 
   - name: Disable selinux (permanently)
@@ -47,19 +60,23 @@
   - name: Disable selinux (runtime)
     shell: setenforce 0
     when: disable_selinux and ansible_os_family == 'RedHat'
+    changed_when: disable_selinux_runtime.rc == 0
+    failed_when: disable_selinux_runtime.rc > 0 and "SELinux is disabled" not in disable_selinux_runtime.stderr
+    register: disable_selinux_runtime
     tags: selinux
-    ignore_errors: true
 
   - name: Check dns for host
     command: nslookup {{ ansible_hostname }}
     register: ns
     ignore_errors: True
+    changed_when: False
     tags: etchosts
 
   - name: Add host to /etc/hosts if needed
     #lineinfile: dest=/etc/hosts regexp='.*{{ ansible_fqdn }}$' line="{{ ansible_default_ipv4.address }} {{ ansible_hostname }} {{ ansible_fqdn }}" state=present
     lineinfile: dest=/etc/hosts regexp='.*{{ ansible_fqdn }}$' line="{{ etc_hosts_ip }} {{ ansible_hostname }} {{ ansible_fqdn }}" state=present
-    when: "'find {{ ansible_hostname }}: NXDOMAIN' in ns.stdout or 'find {{ ansible_hostname }}: SERVFAIL' in ns.stdout or configure_etc_hosts"
+    #when: "'find {{ ansible_hostname }}: NXDOMAIN' in ns.stdout or 'find {{ ansible_hostname }}: SERVFAIL' in ns.stdout or configure_etc_hosts"
+    when: "(': NXDOMAIN' in ns.stdout) or (' No answer' in ns.stdout) or configure_etc_hosts"
     tags: etchosts
 
 #  - name: Add local node's ip & hostname to /etc/hosts
@@ -102,14 +119,15 @@
   - name: ssh-keys | Generate SSH keys
     local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys
     ignore_errors: True
-    when: configure_ssh and master_node and configure_cluster
+    run_once: "{{ configure_cluster}}"
+    when: configure_ssh and configure_cluster and old_ssh_config
     become: false
     tags:
      - sshkeys
 
   - name: ssh-keys | Add ssh-keys & authorized_keys to oracle user
     copy: src={{ item[1] }} dest=/home/{{ item[0].username }}/.ssh  owner={{ item[0].username }} group={{ item[0].primgroup }} force=yes mode=600
-    when: configure_ssh and configure_cluster
+    when: configure_ssh and configure_cluster and old_ssh_config
     with_nested:
         - "{{oracle_users}}"
         - "{{ssh_keys}}"
@@ -118,7 +136,7 @@
 
   - name: ssh-keys | Add ssh-keys & authorized_keys to grid user
     copy: src={{ item[1] }} dest=/home/{{ item[0].username }}/.ssh  owner={{ item[0].username }} group={{ item[0].primgroup }} force=yes mode=600
-    when: configure_ssh and configure_cluster and role_separation
+    when: configure_ssh and configure_cluster and role_separation and old_ssh_config
     with_nested:
         - "{{grid_users}}"
         - "{{ssh_keys}}"
@@ -126,10 +144,10 @@
      - sshkeys
 
   - name: ssh-keys | Add short name to known_hosts
-    local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{inventory_hostname}} 2> /dev/null >> {{keyfile}}
+    local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_hostname }} 2> /dev/null >> {{keyfile}}
     ignore_errors: True
     become: false
-    when: configure_ssh and configure_cluster
+    when: configure_ssh and configure_cluster and old_ssh_config
     tags:
      - sshkeys
 
@@ -137,7 +155,7 @@
     local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_fqdn}} 2> /dev/null >> {{keyfile}}
     ignore_errors: True
     become: false
-    when: configure_ssh and configure_cluster
+    when: configure_ssh and configure_cluster and old_ssh_config
     tags:
      - sshkeys
 
@@ -145,21 +163,21 @@
     local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_default_ipv4.address}} 2> /dev/null >> {{keyfile}}
     ignore_errors: True
     become: false
-    when: configure_ssh and configure_cluster
+    when: configure_ssh and configure_cluster and old_ssh_config
     tags:
      - sshkeys
 
   - name: ssh-keys | Copy known_hosts to oracle user
     copy: src={{keyfile}} dest=/home/{{ item.username }}/.ssh/known_hosts owner={{ item.username }} group={{ item.primgroup }}
     with_items: "{{oracle_users}}"
-    when: configure_ssh and configure_cluster
+    when: configure_ssh and configure_cluster and old_ssh_config
     tags:
      - sshkeys
 
   - name: ssh-keys | Copy known_hosts to grid user
     copy: src={{keyfile}} dest=/home/{{ item.username }}/.ssh/known_hosts owner={{ item.username }} group={{ item.primgroup }}
     with_items: "{{grid_users}}"
-    when: configure_ssh and configure_cluster and role_separation
+    when: configure_ssh and configure_cluster and role_separation and old_ssh_config
     tags:
      - sshkeys
 
@@ -168,7 +186,8 @@
     with_items:
         - "{{ ssh_keys }}"
         - "{{ keyfile }}"
-    when: master_node and configure_ssh and configure_cluster
+    run_once: "{{ configure_cluster}}"
+    when: configure_ssh and configure_cluster and old_ssh_config
     ignore_errors: true
     become: false
     tags:
@@ -181,14 +200,15 @@
         - filesystem
     tags: hostfs
 
+  # create partition only when device != pvname
   - name: filesystem | Create partition and pv
-    shell:  parted -a optimal {{ item.1.device }} "mklabel gpt mkpart primary 1 -1"
+    shell:  parted -a optimal -s {{ item.1.device }} "mklabel gpt mkpart primary 1 -1"
     args:
        creates: "{{ item.1.pvname }}"
     with_subelements:
         - "{{host_fs_layout}}"
         - disk
-    when: configure_host_disks
+    when: configure_host_disks and item.1.device != item.1.pvname
     tags: hostfs
 
   - name: filesystem | Create vg
@@ -228,6 +248,10 @@
         - filesystem
     tags: hostfs
 
+  - name: filesystem | Create directory for oraInventory
+    file: path={{ oracle_inventory_loc }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=775
+    tags: hostfs
+
   - name: Oracle-recommended kernel settings
     sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes ignoreerrors=yes
     with_items: "{{oracle_sysctl}}"
@@ -255,6 +279,7 @@
     tags: seclimit
 
   - include: "{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"
+    tags: tphnuma
     #when: ansible_os_family == 'RedHat'
 
 
@@ -279,33 +304,33 @@
     file: dest={{ oracle_rsp_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     tags: stagedir
 
-  - name: Create udev stage directory
+  - name: udev | Create udev stage directory
     file: dest={{ oracle_stage }}/udev mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
     when: device_persistence == 'udev'
 
-
-  - name: Asmlib | Configure Oracle Asmlib (1)
-    template: src=oracleasm-configure.expect.j2  dest={{ oracle_rsp_stage }}/asmlib-configure.expect owner=root mode=0777 force=yes
-    when: device_persistence == 'asmlib'
+  - name: Asmlib | Add configuration
+    template: src=oracleasm.j2 dest=/etc/sysconfig/oracleasm-_dev_oracleasm
+    register: asmlibconfig
+    when: device_persistence|lower == 'asmlib' and asm_diskgroups is defined
     tags:
       - asmlibconfig
-    register: asmlib_expect_config
 
-  - name: Asmlib | Configure Oracle Asmlib (2)
-    shell: "{{ oracle_rsp_stage }}/asmlib-configure.expect"
-    when: device_persistence == 'asmlib' and asmlib_expect_config.changed
+  - name: Asmlib | Add configuration (link)
+    file: src=/etc/sysconfig/oracleasm-_dev_oracleasm dest=/etc/sysconfig/oracleasm state=link force=yes
+    register: asmlibconfig
+    when: device_persistence|lower == 'asmlib' and asm_diskgroups is defined
     tags:
       - asmlibconfig
 
   - name: Asmlib | Enable and start Oracle Asmlib
     service: name=oracleasm  state=started  enabled=yes
-    when: device_persistence == 'asmlib'
+    when: device_persistence == 'asmlib' and asm_diskgroups is defined
     tags:
       - asmlibconfig
 
   - name: Asmlib | Restart Asmlib
     service: name=oracleasm  state=restarted
-    when: device_persistence == 'asmlib' and asmlib_expect_config.changed
+    when: asm_diskgroups is defined and device_persistence == 'asmlib' and asmlibconfig.changed
     tags:
       - asmlibconfig
 

@@ -1,0 +1,20 @@
+hostgroup: "{{ group_names[0] }}"
+oracle_user: oracle
+
+db_user: sys
+db_password: "{% if dbpasswords is defined and dbpasswords[item.oracle_db_name] is defined and dbpasswords[item.oracle_db_name][db_user] is defined%}{{dbpasswords[item.oracle_db_name][db_user]}}{% else %}{{ default_dbpass}}{% endif%}"
+
+db_service_name: "{%- if item.oracle_db_unique_name is defined -%}
+                       {{ item.oracle_db_unique_name }}
+                  {%- else -%}
+                       {{ item.oracle_db_name }}
+                  {%- endif -%}"
+
+listener_port_template: "{% if item.listener_port is defined %}{{ item.listener_port }}{% else %}{{ listener_port }}{% endif %}"
+listener_port: 1521
+
+oracle_env:
+      ORACLE_HOME: "{{ oracle_home_db}}"
+      LD_LIBRARY_PATH: "{{ oracle_home_db}}/lib"
+
+fail_on_db_not_exist: False

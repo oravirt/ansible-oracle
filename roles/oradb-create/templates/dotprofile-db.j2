@@ -1,9 +1,13 @@
+#jinja2: trim_blocks:True
 # {{ ansible_managed }}
 #
-export PS1='[$LOGNAME'@'$ORACLE_SID `basename $PWD`]$'
+{% if shell_ps1 is defined %}
+export PS1={{ shell_ps1 }}
+{% endif %}
+get_sid=$(ps -ef | grep "ora_pmon_$ORACLE_DBNAME" |grep -v grep | sed 's/^.*pmon_//g')
 
 
-# Set up the Oracle parameters
+# Set up the Oracle environment variables
         umask 022
         ORACLE_BASE={{ oracle_base }}
         export ORACLE_BASE
@@ -19,25 +23,20 @@ export PS1='[$LOGNAME'@'$ORACLE_SID `basename $PWD`]$'
         export LD_LIBRARY_PATH
         SQLPATH=/home/oracle/.Scripts
         export SQLPATH
-        ORACLE_SID={{ item.1.stdout }}
-        export ORACLE_SID
-        export ORA_DB_UNQ_NAME=
+        export ORACLE_DBNAME={{ dbh.oracle_db_name }}
+        export ORACLE_SID=${get_sid:-$ORACLE_DBNAME}
+        export ORA_DB_UNQ_NAME={% if dbh.oracle_db_unique_name is defined %}{{ dbh.oracle_db_unique_name }}{% else %}{{ dbh.oracle_db_name }}{% endif %}
+        
         export NLS_DATE_FORMAT='YYYY-MM-DD HH24:MI:SS'
 
 
 
 export PATH=$ORACLE_HOME/bin:$ORACLE_HOME/OPatch:$PATH:$SQLPATH:$GG_HOME/
 
-
 # Set Up Aliases:
-        alias asmcmd='. oraenv ;rlwrap asmcmd -p'
-        alias sqlplus='rlwrap sqlplus'
-        alias rman='rlwrap rman'
-        alias sid='. oraenv'
-        alias sqlp='. oraenv; sqlplus'
-        alias sqlsys='. oraenv ;rlwrap sqlplus "/ as sysdba"'
-        alias dbh='cd $ORACLE_HOME'
-        alias dbb='cd $ORACLE_BASE'
-        alias c='clear'
-        alias talert='tail -200f $ORACLE_BASE/diag/rdbms/$ORA_DB_UNQ_NAME/$ORACLE_SID/trace/alert_$ORACLE_SID.log'
-        alias ggsci='rlwrap $GG_HOME/ggsci'
+{% if shell_aliases is defined %}
+{% for alias in shell_aliases %}
+        alias {{ alias }}
+{% endfor %}
+{% endif %}
+

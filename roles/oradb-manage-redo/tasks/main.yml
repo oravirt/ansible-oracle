@@ -1,0 +1,20 @@
+- name: Manage redologs
+  oracle_redo:
+        hostname={{ ansible_hostname }}
+        service_name={{ db_service_name }}
+        port={{ listener_port_template }}
+        user={{ db_user }}
+        password={{ db_password_cdb }}
+        mode={{ db_mode }}
+        size={{ item.redolog_size }}
+        groups={{ item.redolog_groups }}
+  environment: "{{oracle_env}}"
+  run_once: "{{ configure_cluster}}"
+  with_items:
+      - "{{oracle_databases}}"
+  when: oracle_databases is defined and item.redolog_size is defined and item.redolog_groups is defined and item.state|lower == 'present'
+  become_user: "{{ oracle_user }}"
+  loop_control:
+      label: "port: {{ listener_port_template }} service: {{ db_service_name }} groups: {{ item.redolog_groups }} size: {{ item.redolog_size }}"
+  register: param_change
+  tags: redolog

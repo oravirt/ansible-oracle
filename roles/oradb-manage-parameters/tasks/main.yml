@@ -1,0 +1,107 @@
+- name: Manage parameters (db/cdb)
+  oracle_parameter:
+        hostname={{ ansible_hostname }}
+        service_name={{ db_service_name }}
+        port={{ listener_port_template }}
+        user={{ db_user }}
+        password={{ db_password_cdb }}
+        mode={{ db_mode }}
+        name={{ item.1.name }}
+        value={{ item.1.value }}
+        state={{ item.1.state }}
+        scope={{ item.1.scope | default ('both') }}
+  environment: "{{oracle_env}}"
+  run_once: "{{ configure_cluster}}"
+  with_subelements:
+      - "{{oracle_databases}}"
+      - init_parameters
+      - flags:
+        skip_missing: True
+  when: oracle_databases is defined and item.0.state|lower == 'present' and item.1 is defined
+  become_user: "{{ oracle_user }}"
+  loop_control:
+      label: "port: {{ listener_port_template }} service: {{ db_service_name }} name: {{ item.1.name }} value: {{ item.1.value }} scope: {{ item.1.scope | default ('both') }} state:{{ item.1.state }}"
+  register: param_change
+  tags: initparams
+
+- name: Manage parameters (pdb)
+  oracle_parameter:
+        hostname={{ ansible_hostname }}
+        service_name={{ item.0.pdb_name }}
+        port={{ listener_port_template }}
+        user={{ db_user }}
+        password={{ db_password_pdb }}
+        mode={{ db_mode }}
+        name={{ item.1.name }}
+        value={{ item.1.value }}
+        state={{ item.1.state }}
+        scope={{ item.1.scope | default ('both') }}
+  environment: "{{oracle_env}}"
+  run_once: "{{ configure_cluster}}"
+  with_subelements:
+      - "{{oracle_pdbs}}"
+      - init_parameters
+      - flags:
+        skip_missing: True
+  when: oracle_pdbs is defined and item.0.state|lower == 'present' and item.1 is defined
+  become_user: "{{ oracle_user }}"
+  loop_control:
+      label: "port: {{ listener_port_template }} service: {{ item.0.pdb_name }} name: {{ item.1.name }} value: {{ item.1.value }} scope: {{ item.1.scope | default ('both') }} state:{{ item.1.state }}"
+  register: param_change
+  tags: initparams
+
+
+  # - name: Manage parameters (pdb)
+  #   oracle_parameter:
+  #         hostname={{ hostname }}
+  #         service_name={{ service }}
+  #         user={{ set_init_user }}
+  #         password={{ item.0.oracle_db_passwd }}
+  #         mode={{ set_init_mode }}
+  #         name={{ item.1.name }}
+  #         value={{ item.1.value }}
+  #         state={{ item.1.state }}
+  #         scope={{ item.1.scope }}
+  #   environment: oracle_env
+  #   with_subelements:
+  #       - "{{oracle_pdbs}}"
+  #       - init_parameters
+  #   when: set_init and master_node and oracle_pdbs is defined and item.1 is defined
+  #   sudo_user: oracle
+  #   register: param_change
+  #   tags: initparams
+  #
+
+  # - name: Restart database (stop)
+  #   shell: "{{ oracle_home_srv }}/bin/srvctl stop database -d {{ item.oracle_db_name }}"
+  #   environment: oracle_env_srv
+  #   with_items: "{{oracle_databases}}"
+  #   sudo: yes
+  #   sudo_user: oracle
+  #   when: param_change.changed and set_init and restart_db and master_node
+  #   tags: initparam
+  #
+  # - name: Restart database (start)
+  #   shell: "{{ oracle_home_srv }}/bin/srvctl start database -d {{ item.oracle_db_name }}"
+  #   environment: oracle_env_srv
+  #   sudo: yes
+  #   sudo_user: oracle
+  #   with_items: "{{oracle_databases}}"
+  #   when: param_change.changed and set_init and restart_db and master_node
+  #   tags: initparam
+  #
+  # - name: Check if database is running
+  #   shell: "{{ oracle_home_srv }}/bin/srvctl status database -d {{ item.oracle_db_name }}"
+  #   environment: oracle_env_srv
+  #   register: check_db_up
+  #   with_items: "{{oracle_databases}}"
+  #   sudo: yes
+  #   sudo_user: oracle
+  #   when: restart_db and param_change.changed and master_node
+  #   tags: initparam
+  #
+  # - name: Check if database is running
+  #   debug: msg={{ item }}
+  #   with_items: "{{check_db_up.results}}"
+  #   when: restart_db and param_change.changed and master_node
+  #   tags: initparam

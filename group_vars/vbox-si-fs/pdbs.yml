@@ -1,0 +1,55 @@
+oracle_pdbs:
+  - home: 18300-base
+    pdb_name: orclpdb1
+    datafile_dest: /u02/oradata/
+    cdb: orclcdb
+    state: present
+    tablespaces:
+         - { name: users, size: 10M, bigfile: True, autoextend: false , next: 5M, maxsize: 500M, content: permanent, state: present }
+         - { name: appuser1_data, size: 10M, bigfile: True, autoextend: false , next: 5M, maxsize: 500M, content: permanent, state: present }
+    init_parameters:
+         - {name: db_create_file_dest, value: '/u02/oradata/', scope: both, state: present}
+    services:
+           - { name: app1_service,  state: started }
+    users:
+      - schema: appuser1
+        default_tablespace: appuser1_data
+        grants:
+           - approle1
+        state: present
+    roles:
+      - name: approle1
+        grants:
+             - create session
+             - create table
+             - select any table
+             - select any dictionary
+        state: present
+
+  # - pdb_name: pdb121
+  #   cdb: db121
+  #   home: db1
+  #   oracle_version_db: 12.1.0.2
+  #   datafile_dest: /u02/oradata/
+  #   state: present
+  #   tablespaces:
+  #        - { name: users, size: 10M, bigfile: True, autoextend: false , next: 5M, maxsize: 500M, content: permanent, state: present }
+  #        - { name: appuser2_data, size: 10M, bigfile: True, autoextend: false , next: 5M, maxsize: 500M, content: permanent, state: present }
+  #   init_parameters:
+  #        - {name: db_create_file_dest, value: '/u02/oradata/', scope: both, state: present}
+  #   services:
+  #          - { name: app2_service,  state: started }
+  #   users:
+  #     - schema: appuser2
+  #       default_tablespace: appuser2_data
+  #       grants:
+  #          - approle2
+  #       state: present
+  #   roles:
+  #     - name: approle2
+  #       grants:
+  #            - create session
+  #            - create table
+  #            - select any table
+  #            - select any dictionary
+  #       state: present

@@ -1,0 +1,53 @@
+---
+- name: ssh-keys | get public key for oracle user
+  shell: cat /home/{{oracle_user}}/.ssh/id_rsa.pub
+  register: oracle_key
+  tags:
+    - sshkeys
+
+- name: ssh-keys | get public key for grid user
+  shell: cat /home/{{grid_user}}/.ssh/id_rsa.pub
+  register: grid_key
+  when: role_separation
+  tags:
+    - sshkeys
+
+- name: ssh-keys | Add keys for {{oracle_user}} user
+  authorized_key: user={{oracle_user}} key="{{ item[1] }}"
+  delegate_to: "{{ item[0] }}"
+  with_nested:
+    - "{{groups[hostgroup]}}"
+    - "{{ oracle_key.stdout }}"
+  tags:
+      - sshkeys
+  when: oracle_key is defined
+
+- name: ssh-keys | Add keys for {{grid_user}} user
+  authorized_key: user={{grid_user}} key="{{ item[1] }}"
+  delegate_to: "{{ item[0] }}"
+  with_nested:
+    - "{{groups[hostgroup]}}"
+    - "{{ grid_key.stdout }}"
+  tags:
+      - sshkeys
+  when: role_separation and grid_key is defined
+
+- name: ssh-keys | create .known_hosts
+  file:
+      path: "/home/{{item}}/.ssh/known_hosts"
+      state: touch
+      owner: "{{ item }}"
+      group: "{{ oracle_group }}"
+  with_items:
+      - "{{oracle_user}}"
+      - "{% if role_separation%}{{grid_user}}{% else %}[]{%endif%}"
+  changed_when: False
+  tags: sshkeys,known_hosts
+
+- include: known-hosts.yml
+  with_items:
+      - "{{oracle_user}}"
+      - "{% if role_separation%}{{grid_user}}{% else %}[]{%endif%}"
+  loop_control:
+    loop_var: user
+  tags: sshkeys,known_hosts

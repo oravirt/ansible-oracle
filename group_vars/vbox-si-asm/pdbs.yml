@@ -1,0 +1,26 @@
+oracle_pdbs:
+  - home: 18300-base
+    pdb_name: orclpdb
+    cdb: orclcdb
+    state: present
+    tablespaces:
+         - { name: users, size: 10M, bigfile: True, autoextend: false , next: 5M, maxsize: 500M, content: permanent, state: present }
+         - { name: appuser1_data, size: 10M, bigfile: True, autoextend: false , next: 5M, maxsize: 500M, content: permanent, state: present }
+    init_parameters:
+         - {name: db_create_file_dest, value: '+DATA', scope: both, state: present}
+    services:
+           - { name: app1_service,  state: started }
+    users:
+      - schema: appuser1
+        default_tablespace: appuser1_data
+        grants:
+           - approle1
+        state: present
+    roles:
+      - name: approle1
+        grants:
+             - create session
+             - create table
+             - select any table
+             - select any dictionary
+        state: present

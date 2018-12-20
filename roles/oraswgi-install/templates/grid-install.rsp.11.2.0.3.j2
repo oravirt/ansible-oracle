@@ -1,5 +1,5 @@
-# {{ ansible_managed }}                                                                                                                                                                                                               
-# # 
+# {{ ansible_managed }}
+# #
 ###############################################################################
 ## Copyright(c) Oracle Corporation 1998,2013. All rights reserved.           ##
 ##                                                                           ##
@@ -35,7 +35,7 @@
 ##                                                                           ##
 ###############################################################################
 #------------------------------------------------------------------------------
-# Do not change the following system generated value. 
+# Do not change the following system generated value.
 #------------------------------------------------------------------------------
 oracle.install.responseFileVersion=/oracle/install/rspfmt_crsinstall_response_schema_v11_2_0
 
@@ -48,7 +48,7 @@ oracle.install.responseFileVersion=/oracle/install/rspfmt_crsinstall_response_sc
 #-------------------------------------------------------------------------------
 # Specify the hostname of the system as set during the install. It can be used
 # to force the installation to use an alternative hostname rather than using the
-# first hostname found on the system. (e.g., for systems with multiple hostnames 
+# first hostname found on the system. (e.g., for systems with multiple hostnames
 # and network interfaces)
 #-------------------------------------------------------------------------------
 ORACLE_HOSTNAME={{ ansible_hostname }}
@@ -61,31 +61,31 @@ ORACLE_HOSTNAME={{ ansible_hostname }}
 INVENTORY_LOCATION={{ oracle_inventory_loc }}
 
 #-------------------------------------------------------------------------------
-# Specify the languages in which the components will be installed.             
-# 
-# en   : English                  ja   : Japanese                  
-# fr   : French                   ko   : Korean                    
-# ar   : Arabic                   es   : Latin American Spanish    
-# bn   : Bengali                  lv   : Latvian                   
-# pt_BR: Brazilian Portuguese     lt   : Lithuanian                
-# bg   : Bulgarian                ms   : Malay                     
-# fr_CA: Canadian French          es_MX: Mexican Spanish           
-# ca   : Catalan                  no   : Norwegian                 
-# hr   : Croatian                 pl   : Polish                    
-# cs   : Czech                    pt   : Portuguese                
-# da   : Danish                   ro   : Romanian                  
-# nl   : Dutch                    ru   : Russian                   
-# ar_EG: Egyptian                 zh_CN: Simplified Chinese        
-# en_GB: English (Great Britain)  sk   : Slovak                    
-# et   : Estonian                 sl   : Slovenian                 
-# fi   : Finnish                  es_ES: Spanish                   
-# de   : German                   sv   : Swedish                   
-# el   : Greek                    th   : Thai                      
-# iw   : Hebrew                   zh_TW: Traditional Chinese       
-# hu   : Hungarian                tr   : Turkish                   
-# is   : Icelandic                uk   : Ukrainian                 
-# in   : Indonesian               vi   : Vietnamese                
-# it   : Italian                                                   
+# Specify the languages in which the components will be installed.
+#
+# en   : English                  ja   : Japanese
+# fr   : French                   ko   : Korean
+# ar   : Arabic                   es   : Latin American Spanish
+# bn   : Bengali                  lv   : Latvian
+# pt_BR: Brazilian Portuguese     lt   : Lithuanian
+# bg   : Bulgarian                ms   : Malay
+# fr_CA: Canadian French          es_MX: Mexican Spanish
+# ca   : Catalan                  no   : Norwegian
+# hr   : Croatian                 pl   : Polish
+# cs   : Czech                    pt   : Portuguese
+# da   : Danish                   ro   : Romanian
+# nl   : Dutch                    ru   : Russian
+# ar_EG: Egyptian                 zh_CN: Simplified Chinese
+# en_GB: English (Great Britain)  sk   : Slovak
+# et   : Estonian                 sl   : Slovenian
+# fi   : Finnish                  es_ES: Spanish
+# de   : German                   sv   : Swedish
+# el   : Greek                    th   : Thai
+# iw   : Hebrew                   zh_TW: Traditional Chinese
+# hu   : Hungarian                tr   : Turkish
+# is   : Icelandic                uk   : Ukrainian
+# in   : Indonesian               vi   : Vietnamese
+# it   : Italian
 #
 # all_langs   : All languages
 #
@@ -103,7 +103,7 @@ SELECTED_LANGUAGES=en
 #   - CRS_CONFIG : To configure Grid Infrastructure for cluster
 #   - HA_CONFIG  : To configure Grid Infrastructure for stand alone server
 #   - UPGRADE    : To upgrade clusterware software of earlier release
-#   - CRS_SWONLY : To install clusterware files only (can be configured for cluster 
+#   - CRS_SWONLY : To install clusterware files only (can be configured for cluster
 #                or stand alone server later)
 #-------------------------------------------------------------------------------
 oracle.install.option={{ oracle_install_option_gi }}
@@ -133,39 +133,19 @@ ORACLE_HOME={{ oracle_home_gi }}
 # The DBA_GROUP is the OS group which is to be granted OSDBA privileges.
 #-------------------------------------------------------------------------------
 
-{% if role_separation==True %}
-#
 oracle.install.asm.OSDBA={{ asmdba_group }}
 
-#-------------------------------------------------------------------------------
-# The OPER_GROUP is the OS group which is to be granted OSOPER privileges.
-# The value to be specified for OSOPER group is optional.
-#-------------------------------------------------------------------------------
-oracle.install.asm.OSOPER={{ asmoper_group }}
-
-#-------------------------------------------------------------------------------
-# The OSASM_GROUP is the OS group which is to be granted OSASM privileges. This
-# must be different than the previous two.
-#-------------------------------------------------------------------------------
-oracle.install.asm.OSASM={{ asmadmin_group }}
-
-   {% else %}
-
-oracle.install.asm.OSDBA={{ dba_group }}
-
-#-------------------------------------------------------------------------------
+##-------------------------------------------------------------------------------
 ## The OPER_GROUP is the OS group which is to be granted OSOPER privileges.
 ## The value to be specified for OSOPER group is optional.
 ##-------------------------------------------------------------------------------
-oracle.install.asm.OSOPER={{ oper_group }}
-
+oracle.install.asm.OSOPER={{ asmoper_group }}
+#
 ##-------------------------------------------------------------------------------
-# The OSASM_GROUP is the OS group which is to be granted OSASM privileges. This
-# must be different than the previous two.
-#-------------------------------------------------------------------------------
-oracle.install.asm.OSASM={{ dba_group }}
-
-{% endif %}
+## The OSASM_GROUP is the OS group which is to be granted OSASM privileges. This
+## must be different than the previous two.
+##-------------------------------------------------------------------------------
+oracle.install.asm.OSASM={{ asmadmin_group }}
 
 ################################################################################
 #                                                                              #
@@ -175,12 +155,12 @@ oracle.install.asm.OSASM={{ dba_group }}
 #-------------------------------------------------------------------------------
 # Specify a name for SCAN
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.gpnp.scanName={% if configure_cluster==True %}{{ oracle_scan }}{% else %}{% endif %}
+oracle.install.crs.config.gpnp.scanName={% if configure_cluster %}{{ oracle_scan }}{% else %}{% endif %}
 
 #-------------------------------------------------------------------------------
 # Specify a unused port number for SCAN service
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.gpnp.scanPort={% if configure_cluster==True %}{{ oracle_scan_port }}{% else %}{% endif %}
+oracle.install.crs.config.gpnp.scanPort={% if configure_cluster %}{{ oracle_scan_port }}{% else %}{% endif %}
 
 ################################################################################
 #                                                                              #
@@ -190,11 +170,11 @@ oracle.install.crs.config.gpnp.scanPort={% if configure_cluster==True %}{{ oracl
 #-------------------------------------------------------------------------------
 # Specify a name for the Cluster you are creating.
 #
-# The maximum length allowed for clustername is 15 characters. The name can be 
+# The maximum length allowed for clustername is 15 characters. The name can be
 # any combination of lower and uppercase alphabets (A - Z), (0 - 9), hyphen(-)
 # and underscore(_).
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.clusterName={% if configure_cluster==True %}{{ oracle_cluster_name }}{% else %}{% endif %}
+oracle.install.crs.config.clusterName={% if configure_cluster %}{{ oracle_cluster_name }}{% else %}{% endif %}
 
 #-------------------------------------------------------------------------------
 # Specify 'true' if you would like to configure Grid Naming Service(GNS), else
@@ -216,10 +196,10 @@ oracle.install.crs.config.gpnp.gnsVIPAddress=
 oracle.install.crs.config.autoConfigureClusterNodeVIP=
 
 #-------------------------------------------------------------------------------
-# Specify a list of public node names, and virtual hostnames that have to be 
+# Specify a list of public node names, and virtual hostnames that have to be
 # part of the cluster.
 #
-# The list should a comma-separated list of nodes.  Each entry in the list 
+# The list should a comma-separated list of nodes.  Each entry in the list
 # should be a colon-separated string that contains 2 fields.
 #
 # The fields should be ordered as follows:
@@ -231,9 +211,9 @@ oracle.install.crs.config.autoConfigureClusterNodeVIP=
 # Example: oracle.install.crs.config.clusterNodes=node1:node1-vip,node2:node2-vip
 #-------------------------------------------------------------------------------
 {%  if ansible_domain  == ""  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host}}:{{ host }}{{ oracle_vip }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
 {% else  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for host in groups[hostgroup] -%} {{host}}.{{ ansible_domain }}:{{ host }}{{ oracle_vip }}.{{ ansible_domain }} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}.{{ ansible_domain }} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
 {% endif %}
 
 
@@ -246,7 +226,7 @@ oracle.install.crs.config.clusterNodes={% if configure_cluster==True %}{% for ho
 # For example: eth0:140.87.24.0:1,eth1:10.2.1.0:2,eth2:140.87.52.0:3
 #
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.networkInterfaceList={% if configure_cluster==True %}{{ oracle_gi_nic_pub }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_pub].ipv4.network }}:1,{{ oracle_gi_nic_priv }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_priv].ipv4.network }}:2{% else %}{% endif %}
+oracle.install.crs.config.networkInterfaceList={% if configure_cluster %}{{ oracle_gi_nic_pub }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_pub].ipv4.network }}:1,{{ oracle_gi_nic_priv }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_priv].ipv4.network }}:2{% else %}{% endif %}
 
 
 ################################################################################
@@ -259,27 +239,27 @@ oracle.install.crs.config.networkInterfaceList={% if configure_cluster==True %}{
 # Specify the type of storage to use for Oracle Cluster Registry(OCR) and Voting
 # Disks files
 #   - ASM_STORAGE
-#   - FILE_SYSTEM_STORAGE 
+#   - FILE_SYSTEM_STORAGE
 #-------------------------------------------------------------------------------
 oracle.install.crs.config.storageOption=ASM_STORAGE
 
 #-------------------------------------------------------------------------------
-# THIS PROPERTY NEEDS TO BE FILLED ONLY IN CASE OF WINDOWS INSTALL. 
+# THIS PROPERTY NEEDS TO BE FILLED ONLY IN CASE OF WINDOWS INSTALL.
 # Specify a comma separated list of strings where each string is as shown below:
 # Disk Number:Partition Number:Drive Letter:Format Option
-# The Disk Number and Partition Number should refer to the location which has to 
-# be formatted. The Drive Letter should refer to the drive letter that has to be 
+# The Disk Number and Partition Number should refer to the location which has to
+# be formatted. The Drive Letter should refer to the drive letter that has to be
 # assigned. "Format Option" can be either of the following -
 #   - SOFTWARE : Format to place software binaries.
 #   - DATA     : Format to place the OCR/VDSK files.
 #
 # For example: 1:2:P:DATA,1:3:Q:SOFTWARE,1:4:R:DATA,1:5:S:DATA
 #
-#------------------------------------------------------------------------------- 
+#-------------------------------------------------------------------------------
 oracle.install.crs.config.sharedFileSystemStorage.diskDriveMapping=
 
 #-------------------------------------------------------------------------------
-# These properties are applicable only if FILE_SYSTEM_STORAGE is chosen for 
+# These properties are applicable only if FILE_SYSTEM_STORAGE is chosen for
 # storing OCR and voting disk
 # Specify the location(s) and redundancy for OCR and voting disks
 # In case of windows, mention the drive location that is specified to be
@@ -329,7 +309,8 @@ oracle.install.crs.config.ipmi.bmcPassword=
 #-------------------------------------------------------------------------------
 # Specify a password for SYSASM user of the ASM instance
 #-------------------------------------------------------------------------------
-oracle.install.asm.SYSASMPassword={{ oracle_password }}
+oracle.install.asm.SYSASMPassword={{ sysasmpassword}}
+
 
 #-------------------------------------------------------------------------------
 # The ASM DiskGroup
@@ -341,7 +322,7 @@ oracle.install.asm.diskGroup.name={{ oracle_asm_init_dg }}
 
 #-------------------------------------------------------------------------------
 # Redundancy level to be used by ASM.
-# It can be one of the following  
+# It can be one of the following
 #   - NORMAL
 #   - HIGH
 #   - EXTERNAL
@@ -353,7 +334,7 @@ oracle.install.asm.diskGroup.redundancy={% for a in item.properties %}{{ a.redun
 
 #-------------------------------------------------------------------------------
 # Allocation unit size to be used by ASM.
-# It can be one of the following values 
+# It can be one of the following values
 #   - 1
 #   - 2
 #   - 4
@@ -370,7 +351,7 @@ oracle.install.asm.diskGroup.AUSize={% for a in item.properties %}{{ a.ausize }}
 #-------------------------------------------------------------------------------
 # List of disks to create a ASM DiskGroup
 #
-# Example: 
+# Example:
 #     For Unix based Operating System:
 #     oracle.install.asm.diskGroup.disks=/oracle/asm/disk1,/oracle/asm/disk2
 #     For Windows based Operating System:
@@ -394,7 +375,7 @@ oracle.install.asm.diskGroup.diskDiscoveryString={% if device_persistence=='asml
 #-------------------------------------------------------------------------------
 # oracle.install.asm.monitorPassword=password
 #-------------------------------------------------------------------------------
-oracle.install.asm.monitorPassword={{ oracle_password }}
+oracle.install.asm.monitorPassword={{ asmmonitorpassword |default (omit)}}
 
 ################################################################################
 #                                                                              #
@@ -404,7 +385,7 @@ oracle.install.asm.monitorPassword={{ oracle_password }}
 #-------------------------------------------------------------------------------
 # Specify nodes for Upgrade.
 # For upgrade on Windows, installer overrides the value of this parameter to include
-# all the nodes of the cluster. However, the stack is upgraded one node at a time. 
+# all the nodes of the cluster. However, the stack is upgraded one node at a time.
 # Hence, this parameter may be left blank for Windows.
 # Example: oracle.install.crs.upgrade.clusterNodes=node1,node2
 #-------------------------------------------------------------------------------
@@ -426,7 +407,7 @@ oracle.installer.autoupdates.option=
 #------------------------------------------------------------------------------
 # In case MYORACLESUPPORT_DOWNLOAD option is chosen, specify the location where
 # the updates are to be downloaded.
-# In case OFFLINE_UPDATES option is chosen, specify the location where the updates 
+# In case OFFLINE_UPDATES option is chosen, specify the location where the updates
 # are present.
 #------------------------------------------------------------------------------
 oracle.installer.autoupdates.downloadUpdatesLoc=
@@ -449,35 +430,34 @@ AUTOUPDATES_MYORACLESUPPORT_PASSWORD=
 #------------------------------------------------------------------------------
 # Specify the Proxy server name. Length should be greater than zero.
 #
-# Example    : PROXY_HOST=proxy.domain.com 
+# Example    : PROXY_HOST=proxy.domain.com
 #------------------------------------------------------------------------------
 PROXY_HOST=
 
 #------------------------------------------------------------------------------
 # Specify the proxy port number. Should be Numeric and at least 2 chars.
 #
-# Example    : PROXY_PORT=25 
+# Example    : PROXY_PORT=25
 #------------------------------------------------------------------------------
 PROXY_PORT=
 #------------------------------------------------------------------------------
-# Specify the proxy user name. Leave PROXY_USER and PROXY_PWD 
+# Specify the proxy user name. Leave PROXY_USER and PROXY_PWD
 # blank if your proxy server requires no authentication.
 #
-# Example    : PROXY_USER=username 
+# Example    : PROXY_USER=username
 #------------------------------------------------------------------------------
 PROXY_USER=
 #------------------------------------------------------------------------------
-# Specify the proxy password. Leave PROXY_USER and PROXY_PWD  
+# Specify the proxy password. Leave PROXY_USER and PROXY_PWD
 # blank if your proxy server requires no authentication.
 #
-# Example    : PROXY_PWD=password 
+# Example    : PROXY_PWD=password
 #------------------------------------------------------------------------------
 PROXY_PWD=
 
 #------------------------------------------------------------------------------
-# Specify the proxy realm. 
+# Specify the proxy realm.
 #
-# Example    : PROXY_REALM=metalink 
+# Example    : PROXY_REALM=metalink
 #------------------------------------------------------------------------------
 PROXY_REALM=
-

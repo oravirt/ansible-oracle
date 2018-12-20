@@ -1,0 +1,20 @@
+
+apply_patches_db: False
+
+db_homes_config:
+{% for a in oracle_databases %}
+  {{ a.home }}-{{ a.oracle_version_db }}:
+     home: {{ a.home}}
+     {% if a.oracle_home %}
+     oracle_home: {{ a.oracle_home }}
+     {% endif %}
+     version: {{ a.oracle_version_db }}
+     edition: {{ a.oracle_edition }}
+{% endfor %}
+
+db_homes_installed:
+{% for a in oracle_databases %}
+     - home: {{ a.home }}-{{ a.oracle_version_db }}
+       apply_patches: False
+       state: present
+{% endfor %}

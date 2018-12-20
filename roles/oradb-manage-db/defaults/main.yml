@@ -1,0 +1,160 @@
+---
+
+  hostgroup: "{{ group_names[0] }}"
+  oracle_dbca_rsp: "dbca_{{ dbh.oracle_db_name }}.rsp"        # Name of responsefile used by dbca. One per database
+  oracle_netca_rsp: "netca_{{ dbh.home }}_{{ listener_name_template }}.rsp"
+  oracle_user: oracle                        # User that will own the Oracle Installations.
+  oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+  oracle_group: oinstall                          # Primary group for oracle_user.
+  oracle_dba_group: dba                          # Primary group for oracle_user.
+  grid_dba_group: asmdba                          # Primary group for oracle_user.
+
+  oracle_env_dbca:
+        ORACLE_HOME: "{{ oracle_home_db}}"
+        LD_LIBRARY_PATH: "{{ oracle_home_db}}/lib"
+
+  oracle_stage: /u01/stage
+  oracle_rsp_stage: "{{ oracle_stage }}/rsp"
+  oracle_inventory_loc: /u01/app/oraInventory
+  oracle_base: /u01/app/oracle
+  oracle_profile_name: ".profile_{{ item.oracle_db_name }}"       # Name of profile-file. Sets up the environment for that database. One per database
+  oracle_dbf_dir_fs: /u01/oradata/                                # If storage_type=FS this is where the database is placed.
+  oracle_reco_dir_fs: /u01/fra/                                   # If storage_type=FS this is where the fast recovery area is placed.
+  oracle_dbf_dir_asm: '+DATA'                                        # If storage_type=ASM this is where the database is placed.
+  oracle_reco_dir_asm: '+FRA'                                        # If storage_type=ASM this is where the fast recovery area is placed
+  datafile_dest: "{% if dbh.storage_type|upper == 'FS' %}{{ oracle_dbf_dir_fs }}{% elif dbh.storage_type|upper == 'ASM' %}{{ oracle_dbf_dir_asm }}{% else %}{% endif %}"
+  recoveryfile_dest: "{% if dbh.storage_type|upper == 'FS' %}{{ oracle_reco_dir_fs }}{% elif dbh.storage_type|upper == 'ASM' %}{{ oracle_reco_dir_asm }}{% else %}{% endif %}"
+  # datafile_dest: "{% if item.0.storage_type|upper == 'FS' %}{{ oracle_dbf_dir_fs }}{% elif item.0.storage_type|upper == 'ASM' %}{{ oracle_dbf_dir_asm }}{% else %}{% endif %}"
+  # recoveryfile_dest: "{% if item.0.storage_type|upper == 'FS' %}{{ oracle_reco_dir_fs }}{% elif item.0.storage_type|upper == 'ASM' %}{{ oracle_reco_dir_asm }}{% else %}{% endif %}"
+
+  configure_cluster: false
+  #oracle_install_option_gi: "none"
+  oracle_gi_cluster_type: STANDARD
+  hostgroup_hub: "{{ hostgroup }}-hub"
+  hostgroup_leaf: "{{ hostgroup }}-leaf"
+  create_listener: "{%- if oracle_install_option_gi is defined -%}
+                       False
+                    {%- elif oracle_install_option_gi is undefined -%}
+                          {%- if dbh is defined and dbh.listener_name is defined -%}
+                             True
+                          {%- else -%}
+                             False
+                          {%- endif -%}
+                     {%- endif -%}"
+
+  listener_name_template: "{% if dbh is defined and dbh.listener_name is defined %}{{ dbh.listener_name }}{% else %}{{ listener_name }}{% endif %}"
+  listener_protocols_template: "{% if dbh.listener_protocols is defined %}{{ dbh.listener_protocols }}{% else %}{{ listener_protocols }}{% endif %}"
+  listener_port_template: "{% if dbh.listener_port is defined %}{{ dbh.listener_port }}{% else %}{{ listener_port }}{% endif %}"
+  listener_name: LISTENER
+  listener_protocols: TCP
+  listener_port: 1521
+
+  listener_home: "{%- if lsnrinst is defined -%}
+                    {%- if db_homes_config[lsnrinst.home]['oracle_home'] is defined -%}{{db_homes_config[lsnrinst.home]['oracle_home']}}
+                    {%- else -%}{{oracle_base}}/{{db_homes_config[lsnrinst.home]['version']}}/{{db_homes_config[lsnrinst.home]['home']}}
+                    {%- endif -%}
+                  {%- elif tnsinst is defined -%}
+                    {%- if db_homes_config[tnsinst.home]['oracle_home'] is defined -%}{{db_homes_config[tnsinst.home]['oracle_home']}}
+                    {%- else -%}{{oracle_base}}/{{db_homes_config[tnsinst.home]['version']}}/{{db_homes_config[tnsinst.home]['home']}}
+                    {%- endif -%}
+                  {%- elif sqlnetinst is defined -%}
+                    {%- if db_homes_config[sqlnetinst.home]['oracle_home'] is defined -%}{{db_homes_config[sqlnetinst.home]['oracle_home']}}
+                    {%- else -%}{{oracle_base}}/{{db_homes_config[sqlnetinst.home]['version']}}/{{db_homes_config[sqlnetinst.home]['home']}}
+                    {%- endif -%}
+                  {%- endif -%}"
+
+  oracle_env_lsnrctl:
+        ORACLE_BASE: "{{ oracle_base }}"
+        ORACLE_HOME: "{{ listener_home }}"
+        LD_LIBRARY_PATH: "{{ listener_home }}/lib"
+        PATH: "{{ listener_home}}/bin:$PATH:/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin"
+  autostartup_service: false
+
+
+  # Everything between the lines START-OF-PASSWORDS & END-OF-PASSWORDS can be
+# put in an external passwords.yml file and be encrypted by Vault.
+# The file should be put in 'group_vars/<your-config>/passwords.yml'
+# This example will be broken out to a passwords.yml as soon as is allowed in ansible
+
+## START-OF-PASSWORDS
+  # GI
+  default_gipass: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
+  sysasmpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
+  asmmonitorpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
+   # DB
+  #default_dbpass: Oracle123
+  default_dbpass: "{% if item is defined and item.oracle_db_passwd is defined %}{{ item.oracle_db_passwd}}{% elif dbh is defined and dbh.oracle_db_passwd is defined %}{{ dbh.oracle_db_passwd }}{% else %}Oracle123{% endif %}"
+  dbpasswords:
+         orcl:
+           sys: Oracle_456
+           system: Oracle_456
+           dbsnmp: Oracle_456
+           pdbadmin: Oracle_456
+
+## END-OF-PASSWORDS
+
+  dbca_templatename: General_Purpose.dbc
+  # dbca_initparams: "{% if '12.2' in dbh.oracle_version_db %} -initParams db_name={{dbh.oracle_db_name}}{% if dbh.oracle_db_unique_name is defined %},db_unique_name={{dbh.oracle_db_unique_name}}{% endif %}{% endif %}"
+  # dbca_initparams_extras: "{% if '12.2' in dbh.oracle_version_db and dbh.storage_type|upper == 'FS' and dbh.init_parameters is defined %}{% for a in  dbh.init_parameters %}{% if loop.first -%},{% endif %}{{ a.name }}={{ a.value}}{% if not loop.last -%},{% endif %}{% endfor %}{% endif %}"
+  dbca_sys_pass: "{% if dbpasswords[dbh.oracle_db_name] is defined %}{% if dbpasswords[dbh.oracle_db_name]['sys'] is defined %}{{dbpasswords[dbh.oracle_db_name]['sys']}}{% else %}{{default_dbpass}}{% endif %}{% else %}{{default_dbpass}}{% endif %}"
+  dbca_system_pass: "{% if dbpasswords[dbh.oracle_db_name] is defined %}{% if dbpasswords[dbh.oracle_db_name]['system'] is defined %}{{dbpasswords[dbh.oracle_db_name]['system']}}{% else %}{{default_dbpass}}{% endif %}{% else %}{{default_dbpass}}{% endif %}"
+  # dbca_redolog: "{% if dbh.redolog_size_in_mb is defined %} -redoLogFileSize {{dbh.redolog_size_in_mb}}{% endif %}"
+  init_params_list: "{%- if dbh.init_parameters is defined  -%}
+                        {%- for p in  dbh.init_parameters -%}
+                          {%- if p.dbca | default(True) -%}
+                             {{ p.name }}={{ p.value}}{%- if not loop.last -%},{%- endif -%}
+                          {%- endif -%}
+                        {%- endfor -%}
+                     {%- endif -%}"
+
+  shell_ps1: "'[$LOGNAME'@'$ORACLE_SID `basename $PWD`]$'"
+  shell_aliases:
+     - "asmcmd='. oraenv ;rlwrap asmcmd -p'"
+     - "sqlsyso='. oraenv ;rlwrap sqlplus \"/ as sysdba\"'"
+     - "dgmgrl='rlwrap dgmgrl'"
+     - "rman='rlwrap rman'"
+     - "sid='export ORACLE_SID=$(ps -ef | grep \"ora_pmon_$ORACLE_DBNAME\" |grep -v grep | sed 's/^.*pmon_//g')'"
+     - "sqlp='rlwrap sqlplus'"
+     - "sqlsys='rlwrap sqlplus \"/ as sysdba\"'"
+     - "dbh='cd $ORACLE_HOME'"
+     - "dbb='cd $ORACLE_BASE'"
+     - "talert='tail -500f $ORACLE_BASE/diag/rdbms/$ORA_DB_UNQ_NAME/$ORACLE_SID/trace/alert_$ORACLE_SID.log'"
+     - "lalert='less $ORACLE_BASE/diag/rdbms/$ORA_DB_UNQ_NAME/$ORACLE_SID/trace/alert_$ORACLE_SID.log'"
+     - "lsnrstart='lsnrctl start $LSNRNAME'"
+     - "lsnrstop='lsnrctl stop $LSNRNAME'"
+     - "lsnrstatus='lsnrctl status $LSNRNAME'"
+     - "lsnrservice='lsnrctl services $LSNRNAME'"
+
+  # db_homes_config:
+  #   12201-base:
+  #     home: db1
+  #     version: 12.2.0.1
+  #     edition: EE
+  #   12102-base:
+  #     home: db1
+  #     version: 12.1.0.2
+  #     edition: EE
+  #   11204-base:
+  #     home: db1
+  #     version: 11.2.0.4
+  #     edition: EE
+
+
+# This is an example layout of a database installation
+  oracle_databases:                                            # Dictionary describing the databases to be installed
+        - home: 18300-base                                            # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)                          # The edition of database-server (EE,SE,SEONE)
+          oracle_db_name: orcl                                 # Database name
+          oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
+          is_container: False                                  # (true/false) Is the database a container database
+          pdb_prefix: pdb
+          num_pdbs: 1
+          storage_type: FS                                     # Database storage to be used. ASM or FS.
+          oracle_db_mem_totalmb: 1024                          # Amount of RAM to be used for SGA + PGA
+          oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+          redolog_size: 100M
+          redolog_groups: 3
+          archivelog: False
+          flashback: False
+          force_logging: False
+          listener_name: LISTENER
+          state: present                                        # present | absent

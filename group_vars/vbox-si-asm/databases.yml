@@ -1,0 +1,84 @@
+oracle_databases:                                               # Dictionary describing the databases to be installed
+      - home: 18300-base                                                   # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.2.0.1/racdb)
+        oracle_db_name: orclcdb                                 # Database name
+        oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
+        is_container: True                                # (true/false) Is the database a container database
+        storage_type: ASM                                     # Database storage to be used. ASM or FS.
+        oracle_db_mem_totalmb: 1024                            # Amount of RAM to be used for SGA
+        oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+        redolog_size: 75M
+        redolog_groups: 3
+        datafile_dest: '+DATA'
+        recoveryfile_dest: '+FRA'
+        archivelog: False
+        flashback: False
+        force_logging: False
+        state: present
+        tablespaces:
+             - { name: users, size: 10M, bigfile: True, autoextend: false , next: 5M, maxsize: 500M, content: permanent, state: present }
+        init_parameters:
+             - {name: db_create_file_dest, value: '+DATA', scope: both, state: present}
+             - {name: db_create_online_log_dest_1, value: '+FRA', scope: both, state: present}
+             - {name: db_recovery_file_dest, value: '+FRA', scope: both, state: present}
+             - {name: db_recovery_file_dest_size, value: 20G, scope: both, state: present}
+        # services:
+        #      - { name: service2,  state: present }
+        # users:
+        #   - schema: c##dba
+        #     container: all
+        #     grants:
+        #          - dba
+        #     state: present
+
+
+## The following will create a new database (non-cdb) running from the same home as above (/u01/app/oracle/12.2.0.1/db1)
+      # - home: db1                                            # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.2.0.1/db1)
+      #   oracle_version_db: 12.2.0.1                          # Oracle versiono (12.2.0.1,12.2.0.1,12.1.0.1,11.2.0.4,11.2.0.3)
+      #   oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+      #   oracle_db_name: blergh                                  # Database name
+      #   oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
+      #   is_container: True                                # (true/false) Is the database a container database
+      #   storage_type: ASM                                     # Database storage to be used. ASM or FS.
+      #   oracle_db_mem_totalmb: 1024                            # Amount of RAM to be used for SGA
+      #   oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+      #   redolog_size_in_mb: 100
+      #   datafile_dest: '+DATA'
+      #   recoveryfile_dest: '+FRA'
+      #   state: present
+      #   init_parameters:
+      #        # - {name: db_create_file_dest, value: '+DATA', scope: both, state: present}
+      #        # - {name: db_recovery_file_dest, value: '+FRA', scope: both, state: present}
+      #        - {name: db_recovery_file_dest_size, value: 20G, scope: both, state: present}
+        # tablespaces:
+        #      - { name: blerghapp1_data, size: 10M, bigfile: True, autoextend: True, next: 5M, maxsize: 500M, content: permanent, state: present }
+        # services:
+        #      - { name: blerghapp1_service,  state: started }
+        # users:
+        #   - schema: blerghapp1
+        #     default_tablespace: blerghapp1_data
+        #     state: present
+        #     grants:
+        #          - approle1
+        # roles:
+        #   - name: approle1
+        #     grants:
+        #          - create session
+        #          - create table
+        #          - select any table
+        #          - select any dictionary
+        #     state: present
+
+## The following will install a new ORACLE_HOME with version 11.2.0.4 and a database called running out of that home
+      # - home: db1                                            # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.2.0.1/db1)
+      #   oracle_version_db: 11.2.0.4                          # Oracle versiono (12.2.0.1,12.2.0.1,12.1.0.1,11.2.0.4,11.2.0.3)
+      #   oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+      #   oracle_db_name: fsdb                                 # Database name
+      #   oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
+      #   is_container: false                                # (true/false) Is the database a container database
+      #   storage_type: ASM                                     # Database storage to be used. ASM or FS.
+      #   oracle_db_mem_totalmb: 1024                            # Amount of RAM to be used for SGA
+      #   oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+      #   redolog_size_in_mb: 100
+      #   datafile_dest: '+DATA'
+      #   recoveryfile_dest: '+FRA'
+      #   state: present

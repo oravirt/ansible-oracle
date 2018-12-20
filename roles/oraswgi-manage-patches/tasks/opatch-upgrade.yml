@@ -1,0 +1,56 @@
+- name: gi-opatch | Check current opatch version
+  oracle_opatch:
+         oracle_home={{ oracle_home_gi }}
+         state=opatchversion
+  register: current_opatch_version
+  tags: current_opatch_version
+  when: gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined
+
+- debug: var=current_opatch_version.msg
+  tags: current_opatch_version
+  when: current_opatch_version.changed
+
+# - name: gi-opatch | Remove old OPatch
+#   file:
+#       dest="{{ oracle_home_gi }}/OPatch"
+#       state=absent
+#   become: yes
+#   when: apply_patches_gi and (current_opatch_version.msg is version_compare(gi_patches[oracle_install_version_gi]['opatch_minversion'], '<'))
+
+- name: gi-opatch | Extract OPatch to GI Home
+  unarchive:
+      src={{ oracle_stage }}/{{ item.filename }}
+      dest={{ oracle_home_gi }}
+      copy=no
+      owner={{ grid_install_user }}
+      group={{ oracle_group }}
+  become: yes
+  with_items: "{{oracle_opatch_patch}}"
+  when: apply_patches_gi and item.version == oracle_install_version_gi and oracle_sw_copy and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined  and gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined and (current_opatch_version.msg is version_compare(gi_patches[oracle_install_version_gi]['opatch_minversion'], '<'))
+  tags:
+    - oragridpatchunpack
+
+- name: gi-opatch | Extract OPatch to GI Home (from remote location)
+  unarchive:
+      src={{ oracle_stage_remote }}/{{ item.filename }}
+      dest={{ oracle_home_gi }}
+      copy=no
+      owner={{ grid_install_user }}
+      group={{ oracle_group }}
+  become: yes
+  with_items: "{{oracle_opatch_patch}}"
+  when: apply_patches_gi and item.version == oracle_install_version_gi and not oracle_sw_copy and gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined and (current_opatch_version.msg is version_compare(gi_patches[oracle_install_version_gi]['opatch_minversion'], '<'))
+  tags:
+    - oragridpatchunpack
+
+- name: gi-opatch | Check current opatch version
+  oracle_opatch:
+         oracle_home={{ oracle_home_gi }}
+         state=opatchversion
+  register: current_opatch_version
+  tags: current_opatch_version
+  when: gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined
+
+- debug: var=current_opatch_version.msg
+  tags: current_opatch_version
+  when: current_opatch_version.changed

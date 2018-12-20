@@ -1,0 +1,44 @@
+old_diskgroup_config: False
+asm_diskgroups:
+  - diskgroup: crs
+    state: present
+    properties:
+      - {redundancy: external, ausize: 4}
+    attributes:
+    - {name: compatible.asm, value: "{{ oracle_install_version_gi }}.0"}
+    - {name: compatible.rdbms, value: 11.2.0.4.0}
+    disk:
+      - {device: /dev/sdc, asmlabel: crs01}
+      #- {device: /dev/sdd, asmlabel: crs02}
+      #- {device: /dev/sde, asmlabel: crs03}
+  - diskgroup: data
+    state: present
+    properties:
+      - {redundancy: external, ausize: 4}
+    attributes:
+      - {name: compatible.asm, value: "{{ oracle_install_version_gi }}.0"}
+      - {name: compatible.rdbms, value: 11.2.0.4.0}
+    disk:
+      - {device: /dev/sdd, asmlabel: data01}
+      #- {device: /dev/sdg, asmlabel: data02}
+  - diskgroup: fra
+    state: present
+    properties:
+      - {redundancy: external, ausize: 4}
+    attributes:
+      - {name: compatible.asm, value: "{{ oracle_install_version_gi }}.0"}
+      - {name: compatible.rdbms, value: 11.2.0.4.0}
+    disk:
+      - {device: /dev/sde, asmlabel: fra01}
+      - {device: /dev/sdf, asmlabel: fra02}
+  # - diskgroup: testdg
+  #   properties:
+  #     - {redundancy: external, ausize: 4}
+  #   attributes:
+  #     - {name: compatible.rdbms, value: 11.2.0.4.0}
+  #     - {name: compatible.asm, value: "{{ oracle_install_version_gi }}.0"}
+  #   disk:
+  #     - {device: /dev/sdf, asmlabel: test01}
+  #     - {device: /dev/sdg, asmlabel: test02}
+  #     - {device: /dev/sdh, asmlabel: test03}
+  #     - {device: /dev/sdi, asmlabel: test04}

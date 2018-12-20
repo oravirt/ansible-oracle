@@ -1,0 +1,10 @@
+alter session set container = "&1";
+define gname=idle
+column global_name new_value gname
+set heading off
+set termout off
+col global_name noprint
+select upper(sys_context ('userenv', 'session_user') || ' @ ' ||sys_context ('userenv', 'instance_name') || ':' || sys_context('userenv', 'con_name')) global_name from dual;
+set sqlprompt '&gname:> '
+set heading on
+set termout on

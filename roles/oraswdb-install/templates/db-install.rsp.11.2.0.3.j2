@@ -105,7 +105,7 @@ ORACLE_BASE={{ oracle_base }}
 #   - SEONE  : Standard Edition One
 #   - PE     : Personal Edition (WINDOWS ONLY)
 #------------------------------------------------------------------------------
-oracle.install.db.InstallEdition={{ item.0.oracle_edition }}
+oracle.install.db.InstallEdition={{ db_homes_config[dbh.home]['edition'] | default ('EE') }}
 
 #------------------------------------------------------------------------------
 # This variable is used to enable or disable custom install and is considered
@@ -152,23 +152,23 @@ oracle.install.db.optionalComponents=oracle.rdbms.partitioning:11.2.0.4.0,oracle
 #------------------------------------------------------------------------------
 # The DBA_GROUP is the OS group which is to be granted OSDBA privileges.
 #------------------------------------------------------------------------------
-oracle.install.db.DBA_GROUP={{ oracle_group }}
+oracle.install.db.DBA_GROUP={{ dba_group }}
 
 #------------------------------------------------------------------------------
 # The OPER_GROUP is the OS group which is to be granted OSOPER privileges.
 # The value to be specified for OSOPER group is optional.
 #------------------------------------------------------------------------------
-oracle.install.db.OPER_GROUP={{ oracle_group }}
+oracle.install.db.OPER_GROUP={{ dba_group }}
 
 #------------------------------------------------------------------------------
 # Specify the cluster node names selected during the installation.
 # Example : oracle.install.db.CLUSTER_NODES=node1,node2
 #------------------------------------------------------------------------------
-{% if configure_cluster==True %}
+{% if configure_cluster %}
 {% if oracle_gi_cluster_type |upper == 'FLEX' %}
-oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup_hub] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
+oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% else %}
-oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
+oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% endif %}
 {% else %}
 {% endif %}
@@ -182,20 +182,10 @@ oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host}} {%
 #
 # If left blank, it will be assumed to be false
 #------------------------------------------------------------------------------
-{% if item.0.oracle_db_type|upper == 'RACONENODE' %}
-oracle.install.db.isRACOneInstall=true
-{% else %}
-oracle.install.db.isRACOneInstall=
-{% endif %}
 
 #------------------------------------------------------------------------------
 # Specify the name for RAC One Node Service.
 #------------------------------------------------------------------------------
-{% if item.0.oracle_db_type|upper == 'RACONENODE' %}
-oracle.install.db.racOneServiceName={{ item.0.service_name }}
-{% else %}
-oracle.install.db.racOneServiceName=
-{% endif %}
 
 #------------------------------------------------------------------------------
 # Specify the type of database to create.

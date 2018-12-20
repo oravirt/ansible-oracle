@@ -1,0 +1,47 @@
+# - name: Manage pdb(s)
+#   oracle_pdb:
+#       name={{ item.pdb_name }}
+#       sourcedb={{ item.cdb }}
+#       datafile_dest={{ item.datafile_dest |default(omit) }}
+#       save_state={{ item.save_state | default(omit)}}
+#       pdb_admin_username={{ pdbadmin_user | default(omit)}}
+#       pdb_admin_password={{ pdbadmin_password | default(omit)}}
+#       host={{ ansible_hostname }}
+#       username={{ db_user | default('sys') }}
+#       password={{ db_password_cdb }}
+#       mode={{ db_mode }}
+#       service_name={{ item.cdb }}
+#       state={{ item.state |default(omit) }}
+#   environment: "{{oracle_env}}"
+#   run_once: "{{ configure_cluster}}"
+#   with_items:
+#       - "{{ oracle_pdbs | default ([]) }}"
+#   become_user: "{{ oracle_user }}"
+#   when: oracle_pdbs is defined and
+#   tags: pdb
+
+- name: Manage pdb(s)
+  oracle_pdb:
+      name={{ item[1].pdb_name }}
+      sourcedb={{ item[1].cdb }}
+      datafile_dest={{ item[1].datafile_dest |default(omit) }}
+      save_state={{ item[1].save_state | default(omit)}}
+      pdb_admin_username={{ pdbadmin_user | default(omit)}}
+      pdb_admin_password={{ pdbadmin_password | default(omit)}}
+      host={{ ansible_hostname }}
+      username={{ db_user | default('sys') }}
+      password={{ db_password_cdb }}
+      mode={{ db_mode }}
+      service_name={{ item[0].oracle_db_unique_name | default(item[0].oracle_db_name) }}
+      port={{ listener_port_template }}
+      state={{ item[1].state |default(omit) }}
+  environment: "{{oracle_env}}"
+  run_once: "{{ configure_cluster}}"
+  with_nested:
+      - "{{ oracle_databases | default ([]) }}"
+      - "{{ oracle_pdbs | default ([]) }}"
+  become_user: "{{ oracle_user }}"
+  loop_control:
+      label: "CDB: {{ item[1].cdb }}, PDB: {{ item[1].pdb_name }}, {{ item.1.home }}, state: {{ item[1].state }}"
+  when: oracle_databases is defined and oracle_pdbs is defined and item[0].state|upper == 'PRESENT' and item[1].cdb == item[0].oracle_db_name and item[0].is_container
+  tags: pdb

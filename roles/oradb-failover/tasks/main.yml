@@ -20,7 +20,7 @@
 
   - name: Setup check script for DB Failover
     template: src=act_db.pl.j2 dest="{{ oracle_home_gi_cl }}/crs/public/act_db_{{ item.oracle_db_name }}.pl" backup=yes mode=755
-    sudo_user: "{{ oracle_user }}"
+    become_user: "{{ oracle_user }}"
     with_items: oracle_databases
     when: item.oracle_db_type|upper  == 'SIFO' and oracle_install_option_gi == 'CRS_CONFIG'
     tags:
@@ -28,7 +28,7 @@
 
   - name: Setup CRS attribute scripts for DB Failover
     template: src=attributes.txt.j2 dest="{{ oracle_stage }}/rsp/attributes_{{ item.oracle_db_name }}_crs.rsp" backup=yes
-    sudo_user: "{{ oracle_user }}"
+    become_user: "{{ oracle_user }}"
     with_items: oracle_databases
     when: item.oracle_db_type|upper  == 'SIFO' and oracle_install_option_gi == 'CRS_CONFIG'
     tags:

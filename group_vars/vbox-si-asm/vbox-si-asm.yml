@@ -1,0 +1,41 @@
+---
+  hostgroup: vbox-si-asm
+  role_separation: True
+  device_persistence: asmlib
+  storage_type: ASM
+  #multipath: dm-multipath
+
+
+  oracle_user: oracle
+  oracle_group: oinstall
+
+  install_from_nfs: false
+  oracle_sw_copy: False
+  oracle_sw_unpack: True
+  #is_sw_source_local: False
+  #oracle_sw_source_www: http://192.168.0.24/orasw/
+  # oracle_sw_source_local: /Users/miksan/Downloads/oracle/
+  oracle_stage: /u01/stage
+  oracle_stage_remote: /media/swrepo
+
+  configure_ntp: true
+  configure_motd: true
+  configure_interconnect: false
+  configure_ssh: true
+  configure_host_disks: true
+
+  configure_hugepages: False
+
+  install_os_packages: False
+  configure_epel_repo: False
+  configure_public_yum_repo: False
+  disable_selinux: false
+
+
+  host_fs_layout:
+   - vgname: vgora
+     state: present
+     filesystem:
+       - {mntp: /u01, lvname: lvora, lvsize: 100%FREE, fstype: ext4}
+     disk:
+       - {device: /dev/sdb, pvname: /dev/sdb1}

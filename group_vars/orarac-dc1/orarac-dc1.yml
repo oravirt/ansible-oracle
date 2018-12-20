@@ -1,0 +1,121 @@
+---
+  hostgroup: "{{ group_names[0] }}"
+  is_sw_source_local: true
+  configure_public_yum_repo: true
+  configure_epel_repo: true
+  configure_gloginsql: true
+  oracle_sw_copy: false
+  oracle_sw_unpack: true
+  oracle_stage_remote: /nfs/software/orasw
+  install_from_nfs: false
+
+  role_separation: false
+  device_persistence: asmlib
+
+  configure_interconnect: true
+  configure_ssh: true
+  configure_host_disks: true
+
+  configure_cluster: true
+  install_os_packages: true
+  oracle_base: /u01/app/oracle
+
+################ Grid Infrastructure specifics ################
+  oracle_install_version_gi: 12.2.0.1
+  oracle_gi_cluster_type: standard
+
+  oracle_scan: orarac-scan-dc1.discworld.net
+  oracle_vip: -vip
+  oracle_gi_nic_pub: eth0
+  oracle_gi_nic_priv: eth1
+  oracle_scan_port: 1521
+  oracle_asm_init_dg: crs
+
+
+
+  oracle_databases:                                               # Dictionary describing the databases to be installed
+        - home: db1                                                   # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
+          oracle_version_db: 12.1.0.2                          # Oracle version
+          oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+          oracle_db_name: orclcdb                                 # Database name
+          oracle_db_type: RAC                                  # Type of database (RAC,RACONENODE,SI,SIFO)
+          is_container: true                                # (true/false) Is the database a container database
+          pdb_prefix: pdb
+          num_pdbs: 0
+          storage_type: ASM                                     # Database storage to be used. ASM or FS.
+          init_parameters:
+               - { name: db_recovery_file_dest_size, value: 4G, state: present, scope: both }
+               - { name: db_recovery_file_dest, value: '+FRA', state: present, scope: both }
+               - { name: pga_aggregate_target, value: 500M, state: present, scope: both }
+               - { name: _parallel_statement_queuing, value: "false", state: present, scope: both }
+               - { name: sga_target, value: 1G, state: present, scope: spfile }
+               - { name: sga_max_size, value: 1G, state: present, scope: spfile }
+               - { name: open_cursors, value: 400, state: present, scope: both }
+               - { name: processes, value: 700, state: present, scope: spfile }
+          oracle_db_mem_totalmb: 1024                            # Amount of RAM to be used for SGA
+          oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+          redolog_size_in_mb: 100
+          state: present
+
+        # - home: db1                                                   # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
+        #   oracle_version_db: 12.1.0.2                          # Oracle version
+        #   oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+        #   oracle_db_name: asmdb12                                 # Database name
+        #   oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
+        #   oracle_db_type: RAC                                  # Type of database (RAC,RACONENODE,SI,SIFO)
+        #   is_container: true                                # (true/false) Is the database a container database
+        #   pdb_prefix: mypdb1
+        #   num_pdbs: 1
+        #   storage_type: ASM                                     # Database storage to be used. ASM or FS.
+        #   init_parameters:
+        #          - { name: db_recovery_file_dest_size, value: 4G, state: present, scope: both }
+        #          - { name: db_recovery_file_dest, value: '+FRA', state: present, scope: both }
+        #          - { name: pga_aggregate_target, value: 500M, state: present, scope: both }
+        #          - { name: _parallel_statement_queuing, value: "false", state: present, scope: both }
+        #          - { name: sga_target, value: 1G, state: present, scope: spfile }
+        #          - { name: sga_max_size, value: 1G, state: present, scope: spfile }
+        #          - { name: open_cursors, value: 400, state: present, scope: both }
+        #          - { name: processes, value: 700, state: present, scope: spfile }
+        #   oracle_db_mem_totalmb: 1024                            # Amount of RAM to be used for SGA
+        #   oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+        #   redolog_size_in_mb: 100
+        #   state: present
+
+  datafile_dest: "DATA"
+  recoveryfile_dest: "FRA"
+
+
+  asm_diskgroups:
+    - diskgroup: crs
+      properties:
+        - {redundancy: external, ausize: 4}
+      attributes:
+        - {name: 'compatible.rdbms', value: 11.2.0.4.0}
+        - {name: 'compatible.asm', value: "{{ oracle_install_version_gi }}"}
+      disk:
+        - {device: /dev/sdc, asmlabel: crs01}
+    - diskgroup: data
+      properties:
+        - {redundancy: external, ausize: 4}
+      attributes:
+        - {name: compatible.rdbms, value: 11.2.0.4.0}
+        - {name: compatible.asm, value: "{{ oracle_install_version_gi }}"}
+      disk:
+        - {device: /dev/sdd, asmlabel: data01}
+    - diskgroup: fra
+      properties:
+        - {redundancy: external, ausize: 4}
+      attributes:
+        - {name: compatible.rdbms, value: 11.2.0.4.0}
+        - {name: compatible.asm, value: "{{ oracle_install_version_gi }}"}
+      disk:
+        - {device: /dev/sde, asmlabel: fra01}
+    - diskgroup: acfs
+      properties:
+        - {redundancy: external, ausize: 4}
+      attributes:
+        - {name: compatible.rdbms, value: 11.2.0.4.0}
+        - {name: compatible.asm, value: "{{ oracle_install_version_gi }}"}
+        - {name: compatible.advm, value: "{{ oracle_install_version_gi }}"}
+      disk:
+        - {device: /dev/sdf, asmlabel: acfs01}

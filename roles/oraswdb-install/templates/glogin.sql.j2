@@ -1,0 +1,29 @@
+--
+-- Copyright (c) 1988, 2011, Oracle and/or its affiliates.
+-- All rights reserved.
+--
+-- NAME
+--   glogin.sql
+--
+-- DESCRIPTION
+--   SQL*Plus global login "site profile" file
+--
+--   Add any SQL*Plus commands here that are to be executed when a
+--   user starts SQL*Plus, or uses the SQL*Plus CONNECT command.
+--
+-- USAGE
+--   This script is automatically run
+--
+{% if db_homes_config[dbh.home]['glogin'] is defined %}
+{% for line in db_homes_config[dbh.home]['glogin'] %}
+{{ line }}
+{% endfor %}
+{% elif db_homes_config[dbh.home]['version'] >= '12.1.0.1' %}
+{% for item in glogin_default_cdb %}
+{{ item }}
+{% endfor %}
+{% else %}
+{% for item in glogin_default_nocdb %}
+{{ item }}
+{% endfor %}
+{% endif %}

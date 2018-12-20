@@ -1,0 +1,9 @@
+oracle_pdbs:
+{% for a in oracle_databases %}
+{% for n in range(0, a.num_pdbs) %}
+  - pdb_name: {{ a.pdb_prefix}}{{ loop.index}}
+    cdb: {{ a.oracle_db_name }}
+    home: {{ a.home }}-{{ a.oracle_version_db }}
+    state: {{ a.state }}
+{% endfor %}
+{% endfor %}

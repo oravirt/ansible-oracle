@@ -207,7 +207,7 @@ RACONENODESERVICENAME={{ item.0.service_name }}
 # Default value : <db_name> specified in GDBNAME
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-SID = "{{ item.0.oracle_db_name }}"
+SID = {{ item.0.oracle_db_instance_name | default(item.0.oracle_db_name) }}
 
 #-----------------------------------------------------------------------------
 # Name          : CREATEASCONTAINERDATABASE
@@ -217,7 +217,7 @@ SID = "{{ item.0.oracle_db_name }}"
 # Default value : false
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-CREATEASCONTAINERDATABASE = "{{ item.0.is_container }}"
+CREATEASCONTAINERDATABASE = {% if item.0.is_container is defined %}{{ item.0.is_container }}{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : NUMBEROFPDBS
@@ -227,7 +227,7 @@ CREATEASCONTAINERDATABASE = "{{ item.0.is_container }}"
 # Default value : 0
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-NUMBEROFPDBS = "{{ item.0.num_pdbs }}"
+NUMBEROFPDBS = {% if item.0.is_container and item.0.num_pdbs is defined %}{{ item.0.num_pdbs }}{%endif%}
 
 #-----------------------------------------------------------------------------
 # Name          : PDBNAME
@@ -237,7 +237,7 @@ NUMBEROFPDBS = "{{ item.0.num_pdbs }}"
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-PDBNAME = "{{ item.0.pdb_prefix }}"
+PDBNAME = {% if item.0.is_container and item.0.pdb_prefix is defined %}{{ item.0.pdb_prefix }}{%endif%}
 
 #-----------------------------------------------------------------------------
 # Name          : PDBADMINPASSWORD
@@ -247,7 +247,11 @@ PDBNAME = "{{ item.0.pdb_prefix }}"
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-PDBADMINPASSWORD = "{{ item.0.oracle_db_passwd }}"
+{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name] is defined and dbpasswords[item.0.oracle_db_name]['pdbadmin'] is defined %}
+PDBADMINPASSWORD = "{{dbpasswords[item.0.oracle_db_name]['pdbadmin']}}"
+{% else %}
+PDBADMINPASSWORD = "{{default_dbpass }}"
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : NODELIST
@@ -257,9 +261,9 @@ PDBADMINPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Default value : None
 # Mandatory     : No (Yes for RAC database-centric database )
 #-----------------------------------------------------------------------------
-{% if configure_cluster==True and item.0.oracle_db_type|upper != "SI" and item.0.oracle_db_type|upper != "SIFO"  and oracle_gi_cluster_type |upper == 'FLEX' %}
+{% if configure_cluster and item.0.oracle_db_type|upper != "SI" and item.0.oracle_db_type|upper != "SIFO"  and oracle_gi_cluster_type |upper == 'FLEX' %}
 NODELIST={% for host in groups[hostgroup_hub] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
-{% elif configure_cluster==True and item.0.oracle_db_type|upper != "SI" and item.0.oracle_db_type|upper != "SIFO"  and oracle_gi_cluster_type |upper != 'FLEX' %}
+{% elif configure_cluster and item.0.oracle_db_type|upper != "SI" and item.0.oracle_db_type|upper != "SIFO"  and oracle_gi_cluster_type |upper != 'FLEX' %}
 NODELIST={% for host in groups[hostgroup] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% else %}
 #NODELIST=
@@ -273,7 +277,11 @@ NODELIST={% for host in groups[hostgroup] -%} {{host}} {%- if not loop.last -%} 
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-TEMPLATENAME = "General_Purpose.dbc"
+{% if item.0.dbca_templatename is defined %}
+TEMPLATENAME = "{{item.0.dbca_templatename}}"
+{% else %}
+TEMPLATENAME = "{{dbca_templatename}}"
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : OBFUSCATEDPASSWORDS
@@ -294,8 +302,11 @@ TEMPLATENAME = "General_Purpose.dbc"
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-SYSPASSWORD = "{{ item.0.oracle_db_passwd }}"
-
+{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name] is defined and dbpasswords[item.0.oracle_db_name]['sys'] is defined%}
+SYSPASSWORD = "{{dbpasswords[item.0.oracle_db_name]['sys']}}"
+{% else %}
+SYSPASSWORD = "{{default_dbpass }}"
+{% endif %}
 #-----------------------------------------------------------------------------
 # Name          : SYSTEMPASSWORD
 # Datatype      : String
@@ -304,7 +315,11 @@ SYSPASSWORD = "{{ item.0.oracle_db_passwd }}"
 # Default value : None
 # Mandatory     : Yes
 #-----------------------------------------------------------------------------
-SYSTEMPASSWORD = "{{ item.0.oracle_db_passwd }}"
+{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name] is defined and dbpasswords[item.0.oracle_db_name]['system'] is defined %}
+SYSTEMPASSWORD = "{{dbpasswords[item.0.oracle_db_name]['system']}}"
+{% else %}
+SYSTEMPASSWORD = "{{default_dbpass }}"
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : SERVICEUSERPASSWORD
@@ -358,7 +373,11 @@ EMCONFIGURATION = "NONE"
 # Mandatory     : Yes, if EMCONFIGURATION is specified or
 #                 the value of RUNCVUCHECKS is TRUE
 #-----------------------------------------------------------------------------
-DBSNMPPASSWORD = "{{ item.0.oracle_db_passwd }}"
+{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name] is defined and dbpasswords[item.0.oracle_db_name]['dbsnmp'] is defined %}
+DBSNMPPASSWORD = "{{dbpasswords[item.0.oracle_db_name]['dbsnmp']}}"
+{% else %}
+DBSNMPPASSWORD = "{{default_dbpass }}"
+{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : OMSHOST
@@ -524,7 +543,7 @@ DISKGROUPNAME={{ datafile_dest }}
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-ASMSNMP_PASSWORD="{{ item.0.oracle_db_passwd }}"
+ASMSNMP_PASSWORD={%if asmmonitorpassword is defined %}{{asmmonitorpassword}}{% else %}{{default_gipass}}{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : RECOVERYGROUPNAME

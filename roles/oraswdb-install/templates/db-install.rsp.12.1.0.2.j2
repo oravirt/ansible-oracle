@@ -104,7 +104,7 @@ ORACLE_BASE={{ oracle_base }}
 #   - EE     : Enterprise Edition
 
 #-------------------------------------------------------------------------------
-oracle.install.db.InstallEdition={{ item.0.oracle_edition }}
+oracle.install.db.InstallEdition={{ db_homes_config[dbh.home]['edition'] | default ('EE') }}
 
 ###############################################################################
 #                                                                             #
@@ -122,28 +122,28 @@ oracle.install.db.InstallEdition={{ item.0.oracle_edition }}
 #------------------------------------------------------------------------------
 # The DBA_GROUP is the OS group which is to be granted OSDBA privileges.
 #-------------------------------------------------------------------------------
-oracle.install.db.DBA_GROUP={{ oracle_group }}
+oracle.install.db.DBA_GROUP={{ dba_group }}
 
 #------------------------------------------------------------------------------
 # The OPER_GROUP is the OS group which is to be granted OSOPER privileges.
 # The value to be specified for OSOPER group is optional.
 #------------------------------------------------------------------------------
-oracle.install.db.OPER_GROUP={{ oracle_group }}
+oracle.install.db.OPER_GROUP={{ dba_group }}
 
 #------------------------------------------------------------------------------
 # The BACKUPDBA_GROUP is the OS group which is to be granted OSBACKUPDBA privileges.
 #------------------------------------------------------------------------------
-oracle.install.db.BACKUPDBA_GROUP={{ oracle_group }}
+oracle.install.db.BACKUPDBA_GROUP={{ dba_group }}
 
 #------------------------------------------------------------------------------
 # The DGDBA_GROUP is the OS group which is to be granted OSDGDBA privileges.
 #------------------------------------------------------------------------------
-oracle.install.db.DGDBA_GROUP={{ oracle_group }}
+oracle.install.db.DGDBA_GROUP={{ dba_group }}
 
 #------------------------------------------------------------------------------
 # The KMDBA_GROUP is the OS group which is to be granted OSKMDBA privileges.
 #------------------------------------------------------------------------------
-oracle.install.db.KMDBA_GROUP={{ oracle_group }}
+oracle.install.db.KMDBA_GROUP={{ dba_group }}
 
 ###############################################################################
 #                                                                             #
@@ -168,11 +168,11 @@ oracle.install.db.rac.configurationType=ADMIN_MANAGED
 #
 # Example : oracle.install.db.CLUSTER_NODES=node1,node2
 #------------------------------------------------------------------------------
-{% if configure_cluster==True %}
+{% if configure_cluster %}
 {% if oracle_gi_cluster_type |upper == 'FLEX' %}
-oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup_hub] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
+oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% else %}
-oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
+oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% endif %}
 {% else %}
 {% endif %}
@@ -186,21 +186,12 @@ oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host}} {%
 #
 # If left blank, it will be assumed to be false.
 #------------------------------------------------------------------------------
-{% if item.0.oracle_db_type|upper == 'RACONENODE' %}
-oracle.install.db.isRACOneInstall=true
-{% else %}
-oracle.install.db.isRACOneInstall=
-{% endif %}
+
 #------------------------------------------------------------------------------
 # Value is required only if oracle.install.db.isRACOneInstall is true.
 #
 # Specify the name for RAC One Node Service
 #------------------------------------------------------------------------------
-{% if item.0.oracle_db_type|upper == 'RACONENODE' %}
-oracle.install.db.racOneServiceName={{ item.0.service_name }}
-{% else %}
-oracle.install.db.racOneServiceName=
-{% endif %}
 
 
 #------------------------------------------------------------------------------
@@ -489,7 +480,7 @@ PROXY_PWD=
 #------------------------------------------------------------------------------
 COLLECTOR_SUPPORTHUB_URL=
 
-{% if item.0.oracle_version_db=='12.1.0.1' %}
+{% if db_homes_config[dbh.home]['version']=='12.1.0.1' %}
 # Example    : PROXY_REALM=metalink
 PROXY_REALM=
 #  Example   : AUTOUPDATES_MYORACLESUPPORT_USERNAME=abc@oracle.com

@@ -1,0 +1,17 @@
+- name: oradb-datapatch | Run datapatch
+  oracle_datapatch:
+        oracle_home={{ oracle_home_db }}
+        db_name={{ item.oracle_db_name }}
+        oracle_db_unique_name={{ item.oracle_db_unique_name |default(omit)}}
+        output=verbose
+        fail_on_db_not_exist={{ fail_on_db_not_exist }}
+        user={{ db_user }}
+        password={{db_password}}
+        hostname={{ansible_fqdn}}
+        service_name={{ db_service_name }}
+        port={{ listener_port_template }}
+  with_items: "{{ oracle_databases }}"
+  when: item.state|lower == 'present'
+  become: True
+  become_user: "{{ oracle_user }}"
+  tags: datapatch

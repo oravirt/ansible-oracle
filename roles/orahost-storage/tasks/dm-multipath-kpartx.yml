@@ -3,8 +3,9 @@
   - name: ASM-storage | run kpartx to add partition
     shell: kpartx -a {{ item.1.device}}
     args:
-     creates: "{{ item.1.device}}p1"
+     creates: "{{ item.1.device}}{{partition_suffix}}"
     with_subelements:
       - "{{asm_diskgroups}}"
       - disk
+    when: asm_diskgroups is defined
     tags: kpartx

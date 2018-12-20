@@ -1,44 +1,59 @@
+# ansible-oracle
 
+- Installs Oracle RAC, RAC One Node and normal single instances.
+- Start with one or more clean machine(s), end up with a fully configured RAC Cluster.
 
-<b> Requirements:
+### Getting started
 
-- Ansible >= 1.6
+Pre-requisites:
+
+- Ansible >= 2.4
 - Oracle Linux (or any RHEL-based Linux System) >= 6.4
-- Oracle Database/Grid Infrastructure 12.2.0.1, 12.1.0.1, 12.1.0.2, 11.2.0.4, 11.2.0.3
+- Oracle Database/Grid Infrastructure 18.3.0.0, 12.2.0.1, 12.1.0.1, 12.1.0.2, 11.2.0.4, 11.2.0.3
+- For example configurations, look in:
+```
+  SI/FS:   group_vars/vbox-si-fs.  - vagrant config: http://github.com/oravirt/vagrant-vbox-si-fs
+  SI/ASM:  group_vars/vbox-si-asm  - vagrant config: http://github.com/oravirt/vagrant-vbox-si-asm
+  RAC/ASM: group_vars/vbox-rac-dc1 - vagrant config: http://github.com/oravirt/vagrant-vbox-rac
+```
 
-</b>
+By default, installs a single instance 18.3.0.0 database on a filesystem.
 
-At the moment you can install Oracle RAC, RAC One Node and normal single instances.
-You can take a freshly installed machine and configure it from ground up. It'll configure users, profiles, kernel parameters, storage and install the database server and create one or more databases.
-It also supports role separation when installing Grid Infrastructure, meaning a 'grid' user owns and runs the GI and the 'oracle' user owns and runs the databases.
+1. Clone this repository:
+   `git clone --recursive https://github.com/oravirt/ansible-oracle`
 
-By default, you can install a single instance 12.1.0.2 database on filesystem, without having to change any parameters. Just put the following files in /tmp on the control-machine:
-- linuxamd64_12102_database_1of2.zip
-- linuxamd64_12102_database_2of2.zip
+2. Add the following file to `/tmp` on the controlmachine
+   - `LINUX.X64_180000_db_home.zip`
 
-I'm creating a bunch of examples which illustrates how to use/run the different roles. They can be found here: http://oravirt.wordpress.com/category/ansible-oracle. 
+3. Create an Ansible inventory file
+   ```
+   [myhostgroup]
+    dbhost
+   ```
 
-As this is based on the EL6 platform the lowest supported Oracle version will be 11.2.0.3, as per Oracle's certification matrix.
+4. Run the playbook:
 
-<b>Note: </b>
-- You'll need to manually download the Oracle software and make it available to the control-machine (either locally or on a web-server, or through a nfs-share) before running the playbook. By default the 
-path to the software is /tmp on the control-machine.
-- All roles are built on Oracle Linux 6, but should work with any EL6-based system.
-- Storage options only supports block devices at the moment (FS & ASM). Will add support for NFS
+   `ansible-playbook single-instance-db-on-fs.yml -e hostgroup=myhostgroup -i /path/to/inventory`
 
-<b>The different roles are:</b>
+   where the `-i` part is optional
 
-<b> common: </b>
+
+### Roles
+
+A lot of these roles uses Ansible modules that comes from [ansible-oracle-modules](https://github.com/oravirt/ansible-oracle-modules)
+
+**common**
+
 This will configure stuff common to all machines
-- Install some generic packages 
-- Configure ntp 
-- Possibly add a default/deploy user.
+- Install some generic packages
+- Configure ntp
 
-<b>orahost:</b>
+
+**orahost**
+
 This will configure the host specific Oracle stuff:
 - Add a user & group
 - Create directory structures
-- Generate ssh-keys and set up passwordless ssh between clusternodes in case of RAC/RAC One node
 - Handle filesystem storage (partition devices, creates vg/lv and a filesystem (ext4, xfs, btrfs) etc). If you want to create your database on a filesystem (instead of ASM) this is where you define the layout.
 - Install required packages
 - Change kernel paramemeters
@@ -47,15 +62,25 @@ This will configure the host specific Oracle stuff:
 - Disables transparent hugepages
 - Disables NUMA (if needed)
 - Configures the interconnect network (if needed)
-- Configures Oracle ASMLib 
+- Configures Oracle ASMLib
 
-<b>orahost-storage:</b>
+
+**orahost-ssh**
+
+Configures passwordless ssh between clusternodes if setting up RAC (`configure_cluster=True`)
+- Uses existing ssh-keys
+
+
+**orahost-storage**
+
 This role configures storage that shoud be used by ASM.
 - Partitions devices (using parted)
 - Create ASMlib labels or sets up udev-rules for device name persistence
 
-<b>oraswgi-install:</b>
-This role will install and configure Oracle Grid Infrastructure. Tested with 12.1.0.1/12.1.0.2 & 11.2.0.4/11.2.0.3
+
+**oraswgi-install**
+
+This role will install and configure Oracle Grid Infrastructure (RAC/SI)
 - Adds a .profile_grid to the oracle user
 - Sets up directory structures
 - Copies the install-files to the servers, or installs from a remote location (e.g nfs share)
@@ -63,50 +88,125 @@ This role will install and configure Oracle Grid Infrastructure. Tested with 12.
 
 
 
-<b>oraasm-configureasm:</b>
-This role will create and configure the ASM-instance with an initial diskgroup.
+**oraasm-manage-diskgroups**
 
-- Generates a shellscript that uses asmca to create the ASM instance
+This role will statefully manage the lifecycle of an ASM diskgroup
+- Uses the **oracle_asmdg** module
+- Create/delete diskgroup.
+- Add/remove disks
+- Manage attributes for the DG
 
-<b>oraasm-createdg:</b>
-This role will create the diskgroup(s) that should be used for database storage. Uses asmca to create diskgroups.
-- Generates a shellscript that uses asmca to create the diskgroups. 
+**oraswdb-install**
 
-<b>oraswdb-install:</b>
 This role will install the oracle database server(s). It is possible to run more than 1 database from each home. It performs both Single Instance/RAC installations.
-- Creates a .profile_databasename
+- Creates a .profile with the correct environment
 - Creates directory structures
-- Transfers installfiles to server(s)
 - Installs the database-server(s)
 
-<b>oradb-create:</b>
-This role creates the databases (RAC/RAC One Node, Single Instance). Possible to create container databases. Performs a dbca silent run to create the database.
-Note:
-At the moment there is no listener configured when creating a database on a filesystem (i.e no grid infrastructure present). Will be added later though.
-- Generates a responsefile to be used by dbca
-- Creates the db using dbca
-- Changes parameters based on input.
+
+**oradb-manage-db**
+
+This role statefully manages the lifecycle of a database
+- Uses the **oracle_db** module
+- Creates/deletes: `state: present/absent`
+- Maintains archivelog/force_logging True/False
+
+**oraswgi-manage-patches**
+
+Manage patches in a GI environment
+- Uses the **oracle_opatch** module
+- Manages opatchauto type of patches as well as 'normal' one-offs
+
+**oraswdb-manage-patches**
+
+Statefully manage patches in a DB environment
+- Uses the **oracle_opatch** module
+- Manages opatchauto type of patches as well as 'normal' one-offs
 
 
-<b>oraswgi-opatch:</b>
-This role will use opatch to apply a patch to a Grid Infrastructure home. At the moment it is basically written to apply PSU's, not one-off patches. It'll probably work but it is not designed for that.
-Does an initial check to see if the patches are already applied, and skips through all steps if they are.
+**cxoracle**
+
+Installs cx_Oracle in preparation for using [ansible-oracle-modules](https://github.com/oravirt/ansible-oracle-modules)
 
 
-<b>*** THE FOLLOWING ROLES ARE NOT FINISHED/NOT WORKING PROPERLY YET ****</b>
+**orahost-cron**
 
-<b>oraswgi-clone:</b>
-This role will use a previously installed/patched Grid Infrastructure installation to perform a new Grid Infrastructure installation using the clone method
-
-<b>oraswracdb-clone:</b>
-This role will take a previously installed/patched Oracle Database Server installation to perform a new database server installation using the clone method.
+Configures cron schedules if needed
 
 
+**orahost-logrotate**
 
-<b>TODO</b>
-- Add service to database as part of db-creation
-- Add support for NFS storage
-- Cleanup
-- .........
 
-********************************
+**oradb-manage-<*>**
+
+Statefully manages various aspects of the DB. They all use modules from [ansible-oracle-modules](https://github.com/oravirt/ansible-oracle-modules)
+
+- **oradb-manage-pdb**
+- **oradb-manage-tablespace**
+- **oradb-manage-parameters**
+- **oradb-manage-roles**
+- **oradb-manage-users**
+- **oradb-manage-grants**
+- **oradb-manage-redo**
+- **oradb-manage-services**
+
+
+
+### Deprecated roles
+
+_**oraasm-createdg (use oraasm-manage-diskgroups instead)**_
+
+_**oradb-create (use oradb-manage-db instead)**_
+
+_**oradb-delete (use oradb-manage-db instead)**_
+
+_**oraswgi-opatch (use oraswgi-manage-patches instead)**_
+
+
+
+### Note
+
+These are the Oracle binaries that are pre-configured to be used. They have to be manually downloaded and made available (either locally, from a web endpoint or through a nfs-share)
+
+For 18.3.0.0:
+```
+    LINUX.X64_180000_db_home.zip
+    LINUX.X64_180000_grid_home.zip
+ ```
+
+
+For 12.2.0.1:
+```
+    linuxx64_12201_database.zip
+    linuxx64_12201_grid_home.zip
+ ```
+
+For 12.1.0.2
+```
+    linuxamd64_12102_database_1of2.zip
+    linuxamd64_12102_database_2of2.zip
+    linuxamd64_12102_grid_1of2.zip
+    linuxamd64_12102_grid_2of2.zip
+ ```
+
+For 12.1.0.1:
+```
+    linuxamd64_12c_database_1of2.zip
+    linuxamd64_12c_database_2of2.zip
+    linuxamd64_12c_grid_1of2.zip
+    linuxamd64_12c_grid_2of2.zip
+ ```
+
+For 11.2.0.4:
+```
+    p13390677_112040_Linux-x86-64_1of7.zip
+    p13390677_112040_Linux-x86-64_2of7.zip
+    p13390677_112040_Linux-x86-64_3of7.zip
+ ```
+
+ For 11.2.0.3:
+ ```
+    p10404530_112030_Linux-x86-64_1of7.zip
+    p10404530_112030_Linux-x86-64_2of7.zip
+    p10404530_112030_Linux-x86-64_3of7.zip
+ ```

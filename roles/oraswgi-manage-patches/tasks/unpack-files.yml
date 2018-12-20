@@ -1,0 +1,31 @@
+
+
+- name: gi-opatch | Extract GI psu files to patch base
+  unarchive:
+      src={{ oracle_stage }}/{{ item[0].filename }}
+      dest={{ oracle_patch_stage }}/{{ oracle_install_version_gi }}
+      creates={{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item[0].creates | default (omit) }}
+      copy=no
+  become: yes
+  become_user: "{{ grid_install_user }}"
+  with_nested:
+     - "{{oracle_sw_patches}}"
+     - "{{gi_patches[oracle_install_version_gi]['opatchauto']}}"
+  when: apply_patches_gi and item[1].patchid == item[0].patchid and item[1].state == 'present' and oracle_sw_copy and oracle_sw_unpack and gi_patches[oracle_install_version_gi]['opatchauto'] is defined
+  tags:
+    - oragridpsuunpack1
+
+- name: gi-opatch | Extract GI psu files to patch base (from remote location)
+  unarchive:
+      src={{ oracle_stage_remote }}/{{ item.0.filename }}
+      dest={{ oracle_patch_stage }}/{{ oracle_install_version_gi }}
+      creates={{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item[0].creates | default (omit) }}
+      copy=no
+  become: yes
+  become_user: "{{ grid_install_user }}"
+  with_nested:
+     - "{{oracle_sw_patches}}"
+     - "{{gi_patches[oracle_install_version_gi]['opatchauto']}}"
+  when: apply_patches_gi and item[1].patchid == item[0].patchid and item[1].state == 'present' and not oracle_sw_copy and oracle_sw_unpack and gi_patches[oracle_install_version_gi]['opatchauto'] is defined
+  tags:
+    - oragridpsuunpack2

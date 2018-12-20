@@ -1,0 +1,23 @@
+configure_cluster: false
+oracle_base: /u01/app/oracle
+oracle_user: oracle
+db_user: sys
+#db_password_cdb: "{% if dbpasswords is defined and dbpasswords[item.cdb] is defined and dbpasswords[item.cdb][db_user] is defined%}{{dbpasswords[item.cdb][db_user]}}{% else %}{{ default_dbpass}}{% endif%}"
+db_password_cdb: "{% if dbpasswords is defined and dbpasswords[item[1].cdb] is defined and dbpasswords[item[1].cdb][db_user] is defined%}{{dbpasswords[item[1].cdb][db_user]}}{% else %}{{ default_dbpass}}{% endif%}"
+
+db_mode: sysdba
+
+pdbadmin_user: pdbadmin
+pdbadmin_password: "{% if dbpasswords is defined and dbpasswords[item[1].cdb] is defined and dbpasswords[item[1].cdb][item[1].pdb_name] is defined and dbpasswords[item[1].cdb][item[1].pdb_name][pdbadmin_user] is defined%}{{dbpasswords[item[1].cdb][item[1].pdb_name][pdbadmin_user]}}{% else %}{{ default_dbpass}}{% endif%}"
+
+listener_port_template: "{% if item.0.listener_port is defined %}{{ item.0.listener_port }}{% else %}{{ listener_port }}{% endif %}"
+listener_port: 1521
+
+oracle_env:
+       ORACLE_HOME: "{{ oracle_home_db }}"
+       LD_LIBRARY_PATH: "{{ oracle_home_db }}/lib"
+
+# oracle_pdbs:
+#   - pdb_name: orclpdb
+#     cdb: orclcdb
+#     state: present

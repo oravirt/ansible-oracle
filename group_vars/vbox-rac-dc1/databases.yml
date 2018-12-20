@@ -1,0 +1,31 @@
+oracle_databases:
+      - home: 18300-base
+        oracle_db_name: orclcdb
+        oracle_db_type: RAC
+        is_container: True
+        storage_type: ASM
+        oracle_db_mem_totalmb: 1024
+        oracle_database_type: MULTIPURPOSE
+        redolog_size: 75M
+        redolog_groups: 3
+        datafile_dest: '+DATA'
+        recoveryfile_dest: '+FRA'
+        archivelog: True
+        flashback: False
+        force_logging: False
+        state: present
+        # tablespaces:
+             # - { name: users, size: 10M, bigfile: True, autoextend: false , next: 5M, maxsize: 500M, content: permanent, state: present }
+        init_parameters:
+             - {name: db_create_file_dest, value: '+DATA', scope: both, state: present}
+             - {name: db_create_online_log_dest_1, value: '+FRA', scope: both, state: present}
+             - {name: db_recovery_file_dest, value: '+FRA', scope: both, state: present}
+             - {name: db_recovery_file_dest_size, value: 20G, scope: both, state: present}
+        # services:
+        #      - { name: service2,  state: present }
+        # users:
+        #   - schema: c##dba
+        #     container: all
+        #     grants:
+        #          - dba
+        #     state: present

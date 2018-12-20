@@ -1,0 +1,57 @@
+#jinja2: trim_blocks:True
+# {{ ansible_managed }}
+#
+{% if shell_ps1 is defined %}
+export PS1={{ shell_ps1 }}
+{% endif %}
+get_sid=$(ps -ef | grep "ora_pmon_$ORACLE_DBNAME" |grep -v grep | sed 's/^.*pmon_//g')
+
+
+# Set up the Oracle environment variables
+        umask 022
+        ORACLE_BASE={{ oracle_base }}
+        export ORACLE_BASE
+        ORACLE_HOME={{ oracle_home_db }}
+        export ORACLE_HOME
+        NLS_LANG=american_america.al32utf8
+        export NLS_LANG
+        ORA_NLS33=$ORACLE_HOME/ocommon/nls/admin/data
+        export ORA_NLS33
+        SHLIB_PATH=$ORACLE_HOME/lib
+        export SHLIB_PATH
+        LD_LIBRARY_PATH=$ORACLE_HOME/lib
+        export LD_LIBRARY_PATH
+        SQLPATH=/home/oracle/.Scripts
+        export SQLPATH
+        export ORACLE_DBNAME={{ dbh.oracle_db_name }}
+        get_sid=$(ps -ef | grep "ora_pmon_$ORACLE_DBNAME" |grep -v grep | sed 's/^.*pmon_//g')
+        export ORACLE_SID=${get_sid:-$ORACLE_DBNAME}
+        export ORA_DB_UNQ_NAME={% if dbh.oracle_db_unique_name is defined %}{{ dbh.oracle_db_unique_name }}{% else %}{{ dbh.oracle_db_name }}{% endif %}
+        export NLS_DATE_FORMAT='YYYY-MM-DD HH24:MI:SS'
+
+{# Remove possible old LSNRNAME from environmet
+   Maybe we cannot set it because it is not defined for this database...
+#}
+        unset LSNRNAME
+{% if dbh.listener_name is defined %}
+        LSNRNAME={{ dbh.listener_name }}
+        export LSNRNAME
+{% endif %}
+
+{# create environemt variables when rman is configured in oracle_databases #}
+{% if dbh.rman_jobs is defined %}        
+# setup some variables for oradb-rman
+        export RMANTNS_ADMIN={{ rman_tns_admin  | default(dbh.rman_tns_admin  | default(oracle_base + '/rman/network/admin')) }}
+        export RMANLOGDIR={{ rman_log_dir       | default(dbh.rman_log_dir    | default(oracle_base + '/rman/log/')) }}
+        export RMANSCRIPTDIR={{ rman_script_dir | default(dbh.rman_script_dir | default(oracle_base + '/rman/script')) }}
+{% endif %}
+
+export PATH=$ORACLE_HOME/bin:$ORACLE_HOME/OPatch:$PATH:$SQLPATH:$GG_HOME/:$ORACLE_BASE/bin
+
+# Set Up Aliases:
+{% if shell_aliases is defined %}
+{% for alias in shell_aliases %}
+        alias {{ alias }}
+{% endfor %}
+{% endif %}
+

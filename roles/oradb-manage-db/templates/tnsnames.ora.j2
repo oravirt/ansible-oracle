@@ -1,0 +1,44 @@
+{#
+
+https://www.oracle.com/technetwork/database/availability/client-failover-2280805.pdf
+SALES=
+  (DESCRIPTION=
+    (FAILOVER=on)
+    (CONNECT_TIMEOUT=5)(TRANSPORT_CONNECT_TIMEOUT=3)(RETRY_COUNT=3)
+    (ADDRESS_LIST=
+      (LOAD_BALANCE=on)
+      (ADDRESS=(PROTOCOL=TCP)(HOST=prmy-scan)(PORT=1521))
+      (ADDRESS=(PROTOCOL=TCP)(HOST=stby-scan)(PORT=1521))
+    )
+    (CONNECT_DATA=(SERVICE_NAME=oltpworkload))
+  )
+#}
+
+# do not edit the configuration manually.
+# The execution of ansible-oracle automatically replace all manual changes!
+{{ tnsinst.tnsname | upper }} =
+ (DESCRIPTION =
+   (FAILOVER={{ oracle_tnsnames_config[tnsinst.tnsname]['failover'] | default('yes')}})
+   (CONNECT_TIMEOUT={{ oracle_tnsnames_config[tnsinst.tnsname]['connect_timeout'] | default('5')}})
+   (TRANSPORT_CONNECT_TIMEOUT={{ oracle_tnsnames_config[tnsinst.tnsname]['transport_connect_timeout'] | default('3')}})
+   (RETRY_COUNT={{ oracle_tnsnames_config[tnsinst.tnsname]['retry_count'] | default('3')}})
+   (ADDRESS_LIST =
+     (LOAD_BALANCE={{ oracle_tnsnames_config[tnsinst.tnsname]['load_balance'] | default('on')}})
+{% for addr in  oracle_tnsnames_config[tnsinst.tnsname]['address']  %}
+     (ADDRESS = (PROTOCOL = {{addr.tcp | default ('TCP')}})(Host = {{addr.host}})(Port = {{addr.port | default(listener_port) }}))
+{% endfor %}
+   )
+   (CONNECT_DATA =
+{%- if oracle_tnsnames_config[tnsinst.tnsname]['connect'] is defined %}
+  {%- if oracle_tnsnames_config[tnsinst.tnsname]['connect']['service_name'] is defined %}
+
+     (SERVICE_NAME = {{oracle_tnsnames_config[tnsinst.tnsname]['connect']['service_name']}})
+  {%- elif oracle_tnsnames_config[tnsinst.tnsname]['connect']['sid_name'] is defined %}
+
+     (SID = {{oracle_tnsnames_config[tnsinst.tnsname]['connect']['sid_name']}})
+  {%- endif %}
+{%- endif %}
+
+     (SERVER =  {{oracle_tnsnames_config[tnsinst.tnsname]['connect']['SERVER']| default ('DEDICATED')}})
+   )
+ )
