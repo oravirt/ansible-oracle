@@ -30,3 +30,12 @@ logrotate_config:
             - rotate 3
             - dateext
             - compress
+        - name: oracle_rman
+          file: "{{ rman_cron_logdir | default('/var/log/oracle/rman/log') }}/*.log {{ oracle_base }}/admin/*/rman/*.log {{ oracle_base }}/admin/*/rman/log/*.log"
+          options:
+            - missingok
+            - notifempty
+            - compress
+            - weekly
+            - rotate 24
+            - dateext
