@@ -108,7 +108,7 @@ def check_role_exists(module, msg, cursor, role, auth):
     try:
             cursor.execute(sql)
             result = (cursor.fetchone())
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
             error, = exc.args
             msg[0] = error.message+ 'sql: ' + sql
             return False
@@ -156,7 +156,7 @@ def create_role(module, msg, cursor, role, auth, auth_conf):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg[0] = 'Blergh, something went wrong while creating the role - %s sql: %s' % (error.message, sql)
         return False
@@ -205,7 +205,7 @@ def modify_role(module, msg, cursor, role, auth, auth_conf):
 
         try:
             cursor.execute(sql)
-        except cx_Oracle.DatabaseError, exc:
+        except cx_Oracle.DatabaseError as exc:
             error, = exc.args
             msg[0] = 'Blergh, something went wrong while altering the role - %s sql: %s' % (error.message, sql)
             return False
@@ -223,7 +223,7 @@ def get_role_specs(module, msg, cursor, role):
     try:
         cursor.execute(sql)
         result = (cursor.fetchall()[0][0])
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg[0] = 'Blergh, something went wrong while getting the role auth scheme - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg[0], changed=False)
@@ -245,7 +245,7 @@ def drop_role(module, msg, cursor, role):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg[0] = 'Blergh, something went wrong while dropping the role - %s sql: %s' % (error.message, sql)
         return False
@@ -313,7 +313,7 @@ def main():
         elif (not(user) or not(password)):
             module.fail_json(msg='Missing username or password for cx_Oracle')
 
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg[0], changed=False)
