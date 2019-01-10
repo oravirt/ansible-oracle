@@ -123,7 +123,7 @@ def check_user_exists(module, msg, cursor, schema):
     try:
             cursor.execute(sql)
             result = cursor.fetchone()[0]
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
             error, = exc.args
             msg = error.message+ 'sql: ' + sql
             return False
@@ -148,7 +148,7 @@ def check_role_exists(module, msg, cursor, role):
     try:
             cursor.execute(sql)
             result = (cursor.fetchone())
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
             error, = exc.args
             msg = error.message+ 'sql: ' + sql
             return False
@@ -221,7 +221,7 @@ def get_dir_privs(module, msg, cursor, schema, directory_privs, grants_mode):
     if len(grant_list_dir) > 0:
        for a in grant_list_dir:
            total_sql_dir.append(a)
-           
+
     if grants_mode.lower() == 'enforce':
         if len(revoke_list_dir) > 0:
            for a in revoke_list_dir:
@@ -291,7 +291,7 @@ def get_obj_privs (module, msg, cursor, schema, object_privs, grants_mode):
     if len(grant_list) > 0:
         for a in grant_list:
             total_sql_obj.append(a)
-            
+
     if grants_mode.lower() == 'enforce':
         if len(revoke_list) > 0:
             for a in revoke_list:
@@ -379,7 +379,7 @@ def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs,
             grants_to_add = clean_string(grants_to_add)
             add_sql += 'grant %s to %s' % (grants_to_add, schema)
             total_sql.append(add_sql)
-        
+
         if grants_mode.lower() == 'enforce':
             if any(grants_to_remove):
                 grants_to_remove = ','.join(grants_to_remove)
@@ -410,7 +410,7 @@ def execute_sql(module, msg, cursor, sql):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
@@ -458,7 +458,7 @@ def remove_grants(module, msg, cursor, schema, remove_grants_list, object_privs,
 
         try:
             cursor.execute(sql)
-        except cx_Oracle.DatabaseError, exc:
+        except cx_Oracle.DatabaseError as exc:
             error, = exc.args
             msg = 'Something went wrong while removing all grants from the schema/role - %s sql: %s' % (error.message, sql)
             return False
@@ -478,7 +478,7 @@ def remove_grants(module, msg, cursor, schema, remove_grants_list, object_privs,
 
         try:
             cursor.execute(sql)
-        except cx_Oracle.DatabaseError, exc:
+        except cx_Oracle.DatabaseError as exc:
             error, = exc.args
             msg = 'Blergh, something went wrong while removing grants from the schema/role - %s sql: %s' % (error.message, sql)
             return False
@@ -496,7 +496,7 @@ def get_current_role_grants(module, msg, cursor, schema):
     try:
             cursor.execute(sql)
             result = cursor.fetchall()
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
             error, = exc.args
             msg = error.message+ 'sql: ' + sql
             return False
@@ -518,7 +518,7 @@ def get_current_sys_grants(module, msg, cursor, schema):
     try:
             cursor.execute(sql)
             result = cursor.fetchall()
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
             error, = exc.args
             msg = error.message+ 'sql: ' + sql
             return False
@@ -535,7 +535,7 @@ def execute_sql_get(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
         result = (cursor.fetchall())
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
@@ -609,7 +609,7 @@ def main():
         elif (not(user) or not(password)):
             module.fail_json(msg='Missing username or password for cx_Oracle')
 
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg, changed=False)

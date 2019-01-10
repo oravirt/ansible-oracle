@@ -220,7 +220,7 @@ def execute_sql_get(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
         result = (cursor.fetchall())
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
@@ -234,7 +234,7 @@ def execute_sql(module, msg, cursor, sql):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
@@ -295,7 +295,7 @@ def main():
         elif (not(user) or not(password)):
             module.fail_json(msg='Missing username or password for cx_Oracle')
 
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg = 'Could not connect to DB: %s, connect descriptor: %s, username: %s, pass: %s' % (error.message, connect,user,password)
         module.fail_json(msg=msg, changed=False)
