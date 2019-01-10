@@ -307,7 +307,7 @@ def remove_patch (module, msg, oracle_home, patch_base, patch_id, opatchauto, oc
 #     try:
 #         cursor.execute(sql)
 #         result = (cursor.fetchall())
-#     except cx_Oracle.DatabaseError, exc:
+#     except cx_Oracle.DatabaseError as exc:
 #         error, = exc.args
 #         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
 #         module.fail_json(msg=msg, changed=False)
@@ -318,7 +318,7 @@ def remove_patch (module, msg, oracle_home, patch_base, patch_id, opatchauto, oc
 #
 #     try:
 #         cursor.execute(sql)
-#     except cx_Oracle.DatabaseError, exc:
+#     except cx_Oracle.DatabaseError as exc:
 #         error, = exc.args
 #         msg = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
 #         module.fail_json(msg=msg, changed=False)
@@ -340,7 +340,7 @@ def remove_patch (module, msg, oracle_home, patch_base, patch_id, opatchauto, oc
 #         elif (not(user) or not(password)):
 #             module.fail_json(msg='Missing username or password for cx_Oracle')
 #
-#     except cx_Oracle.DatabaseError, exc:
+#     except cx_Oracle.DatabaseError as exc:
 #             error, = exc.args
 #             msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
 #             module.fail_json(msg=msg, changed=False)
