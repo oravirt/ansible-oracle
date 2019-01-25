@@ -46,7 +46,6 @@ options:
         description:
             - The script you want to execute. Doesn't handle selects
         required: false
-        default: 1521
 notes:
     - cx_Oracle needs to be installed
     - Oracle client libraries need to be installed along with ORACLE_HOME and LD_LIBRARY_PATH settings.
@@ -104,6 +103,7 @@ def execute_sql(module, cursor, conn, sql):
         docommit = False
 
     try:
+        # module.exit_json(msg=sql.strip())
         cursor.execute(sql)
     except cx_Oracle.DatabaseError as exc:
         error, = exc.args
@@ -220,18 +220,23 @@ def main():
                 module.exit_json(msg=msg, changed=True)
     else:
         sqlfile = read_file(module, script)
-        sqlfile = clean_sqlfile(sqlfile)
-        sqldelim = ';'
-        if 'create or replace' in sqlfile.lower():
-            sqldelim = '/'
-
-        sql = sqlfile.split(sqldelim)
-        for q in sql:
-            if len(q) > 0:
-                execute_sql(module, cursor, conn, q)
+        if len(sqlfile) > 0:
+            sqlfile = clean_sqlfile(sqlfile)
+            
+            if sqlfile.endswith('/') or ('create or replace') in sqlfile.lower():
+                sqldelim = '/'
             else:
-                msg = 'Finished running script %s' % script
-                module.exit_json(msg=msg, changed=True)
+                sqldelim = ';'
+            
+            sqlfile = sqlfile.strip(sqldelim)
+            sql = sqlfile.split(sqldelim)
+            
+            for q in sql:
+                execute_sql(module, cursor, conn, q)
+            msg = 'Finished running script %s \nContents: \n%s' % (script, sqlfile)
+            module.exit_json(msg=msg, changed=True)
+        else:
+            module.fail_json(msg='SQL file seems to be empty')
 
     module.exit_json(msg="Unhandled exit", changed=False)
 
