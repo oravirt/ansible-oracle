@@ -22,6 +22,17 @@ options:
         required: True
         default: None
         aliases: ['db','database_name','name']
+    sid:
+        description:
+            - The instance name
+        required: False
+        default: None
+    db_unique_name:
+        description:
+            - The database db_unique_name
+        required: False
+        default: None
+        aliases: ['dbunqn','unique_name']
     output:
         description:
             - The type of output you want.
@@ -92,7 +103,7 @@ def get_version(module, msg, oracle_home):
         return stdout.split(' ')[2][0:4]
 
 # Check if the database exists
-def check_db_exists(module, msg, oracle_home, db_name, db_unique_name ):
+def check_db_exists(module, msg, oracle_home, db_name, sid, db_unique_name ):
 
     if gimanaged:
         if db_unique_name != None:
@@ -115,25 +126,40 @@ def check_db_exists(module, msg, oracle_home, db_name, db_unique_name ):
         if os.path.exists(oratabfile):
             with open(oratabfile) as oratab:
                 for line in oratab:
-            		if line.startswith('#') or line.startswith(' '):
-            			continue
-            		elif re.search(db_name +':', line):
-            			existingdbs.append(line)
+                    if line.startswith('#') or line.startswith(' '):
+                        continue
+                    elif re.search(db_name +':', line) or re.search(sid +':', line):
+                        existingdbs.append(line)
 
         if not existingdbs: #<-- db doesn't exist
             return False
         else:
-            return True
+            for dbs in existingdbs:
+                if sid != '':
+                    if '%s:' % db_name in dbs or '%s:' % sid in dbs:
+                        if dbs.split(':')[1] != oracle_home.rstrip('/'): #<-- DB is created, but with a different ORACLE_HOME
+                            msg = 'Database %s already exists in a different ORACLE_HOME (%s)' % (db_name, dbs.split(':')[1])
+                            module.fail_json(msg=msg, changed=False)
+                        elif dbs.split(':')[1] == oracle_home.rstrip('/'):  #<-- Database already exist
+                            return True
+                    else:
+                        if '%s:' % db_name in dbs:
+                            if dbs.split(':')[1]!= oracle_home.rstrip('/'): #<-- DB is created, but with a different ORACLE_HOME
+                                msg = 'Database %s already exists in a different ORACLE_HOME (%s)' % (db_name, dbs.split(':')[1])
+                                module.fail_json(msg=msg, changed=False)
+                        elif dbs.split(':')[1] == oracle_home.rstrip('/'):  #<-- Database already exist
+                            return True
 
-def run_datapatch(module, msg, hsotname, oracle_home, db_name):
 
-    cursor = getconn(module,msg, hostname)
-    sid_sql = 'select instance_name from v$instance'
-    sid_ = execute_sql_get(module,msg,cursor,sid_sql)
-    os.environ['ORACLE_SID'] = sid_[0][0]
+def run_datapatch(module, msg, hostname, oracle_home, db_name, sid):
 
     if major_version > '11.2':
-        command = '%s/OPatch/datapatch -verbose -db %s' % (oracle_home, db_name)
+        if sid is not None:
+            os.environ['ORACLE_SID'] = sid
+        else:
+            os.environ['ORACLE_SID'] = db_name
+
+        command = '%s/OPatch/datapatch -verbose' % (oracle_home)
         (rc, stdout, stderr) = module.run_command(command)
         if rc != 0:
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
@@ -249,6 +275,7 @@ def main():
         argument_spec = dict(
             oracle_home         = dict(default=None, aliases = ['oh']),
             db_name             = dict(required=True, aliases = ['db','database_name','name']),
+            sid                 = dict(required=False),
             db_unique_name      = dict(required=False, aliases = ['dbunqn','unique_name']),
             fail_on_db_not_exist = dict(default=True, type='bool'),
             output              = dict(default="short", choices = ["short","verbose"]),
@@ -265,6 +292,7 @@ def main():
 
     oracle_home         = module.params["oracle_home"]
     db_name             = module.params["db_name"]
+    sid                 = module.params["sid"]
     db_unique_name      = module.params["db_unique_name"]
     fail_on_db_not_exist  = module.params["fail_on_db_not_exist"]
     output              = module.params["output"]
@@ -306,8 +334,8 @@ def main():
         service_name = db_name
     # Get the Oracle version
     major_version = get_version(module,msg,oracle_home)
-    if check_db_exists(module,msg,oracle_home,db_name,db_unique_name):
-        if run_datapatch(module,msg,hostname,oracle_home,db_name):
+    if check_db_exists(module,msg,oracle_home,db_name,sid,db_unique_name):
+        if run_datapatch(module,msg,hostname,oracle_home,db_name,sid):
             msg = 'Datapatch run successfully for database: %s' % (db_name)
             module.exit_json(msg=msg, changed=True)
         else:
