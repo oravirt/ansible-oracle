@@ -1,8 +1,34 @@
+- name: oradb-datapatch | Start listener
+  shell: "export PATH=${ORACLE_HOME}/bin:${PATH}; lsnrctl start {{ lsnrinst.listener_name }} /dev/null; exit 0"
+  environment: "{{ oracle_env_lsnrctl }}"
+  become_user: "{{ oracle_user }}"
+  with_items: "{{ listener_installed }}"
+  loop_control:
+     loop_var: lsnrinst
+     label: "LISTENER: {{ lsnrinst.listener_name }} ORACLE_HOME: {{ listener_home }}"
+  when: lsnrinst.state|lower == 'present'
+
+- name: oradb-datapatch | Start database (non GI)
+  oracle_db:
+     oracle_home={{ oracle_home_db}}
+     db_name={{ dbh.oracle_db_name }}
+     db_unique_name={{ dbh.oracle_db_unique_name |default(omit) }}
+     sid={{ dbh.oracle_db_instance_name |default(omit) }}
+     state=started
+  become_user: "{{ oracle_user }}"
+  with_items: "{{ oracle_databases }}"
+  when: dbh.oracle_db_type == 'SI'
+  loop_control:
+     loop_var: dbh
+     label: "home: {{ dbh.home }} db_name: {{ dbh.oracle_db_name }}"
+  tags: startdb
+
 - name: oradb-datapatch | Run datapatch
   oracle_datapatch:
         oracle_home={{ oracle_home_db }}
         db_name={{ item.oracle_db_name }}
-        oracle_db_unique_name={{ item.oracle_db_unique_name |default(omit)}}
+        db_unique_name={{ item.oracle_db_unique_name |default(omit)}}
+        sid={{ item.oracle_db_instance_name |default(omit) }}
         output=verbose
         fail_on_db_not_exist={{ fail_on_db_not_exist }}
         user={{ db_user }}
@@ -14,4 +40,6 @@
   when: item.state|lower == 'present'
   become: True
   become_user: "{{ oracle_user }}"
+  loop_control:
+     label: "home: {{ item.home }} db_name: {{ item.oracle_db_name }}"
   tags: datapatch
