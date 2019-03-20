@@ -31,3 +31,12 @@ oracle_env_lsnrctl:
 
 autostartup_service: false
 fail_on_db_not_exist: False
+
+oracle_db_home:  "{%- if item is defined -%}
+                    {%- if db_homes_config[item.home]['oracle_home'] is defined  -%}
+                         {{db_homes_config[item.home]['oracle_home']}}
+                    {%- else -%}
+                         {{oracle_base}}/{{db_homes_config[item.home]['version']}}/{{db_homes_config[item.home]['home']}}
+                    {%- endif -%}
+                 {%- endif -%}"
+
