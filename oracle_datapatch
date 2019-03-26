@@ -128,7 +128,7 @@ def check_db_exists(module, msg, oracle_home, db_name, sid, db_unique_name ):
                 for line in oratab:
                     if line.startswith('#') or line.startswith(' '):
                         continue
-                    elif re.search(db_name +':', line) or re.search(sid +':', line):
+                    elif re.search('^%s:' % db_name, line) or (sid is not None and re.search('^%s:' % sid, line)):
                         existingdbs.append(line)
 
         if not existingdbs: #<-- db doesn't exist
