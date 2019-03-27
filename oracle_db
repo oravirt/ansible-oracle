@@ -36,7 +36,7 @@ options:
 	sys_password:
 		description:
 			- Password for the sys user
-		required: True
+		required: False
 		default: None
 		aliases: ['syspw','sysdbapassword','sysdbapw']
 	system_password:
@@ -731,7 +731,7 @@ def start_db (module,msg, oracle_home, db_name, db_unique_name, sid):
 		(stdout,stderr) = p.communicate(startup_sql.encode('utf-8'))
 		rc = p.returncode
 		if rc != 0:
-			msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, shutdown_sql)
+			msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, startup_sql)
 			module.fail_json(msg=msg, changed=False)
 		else:
 			return True
@@ -851,7 +851,7 @@ def main():
 			db_name             = dict(required=True, aliases = ['db','database_name','name']),
 			sid                 = dict(required=False),
 			db_unique_name      = dict(required=False, aliases = ['dbunqn','unique_name']),
-			sys_password        = dict(required=True, no_log=True, aliases = ['syspw','sysdbapassword','sysdbapw']),
+			sys_password        = dict(required=False, no_log=True, aliases = ['syspw','sysdbapassword','sysdbapw']),
 			system_password     = dict(required=False, no_log=True, aliases = ['systempw']),
 			dbsnmp_password     = dict(required=False, no_log=True, aliases = ['dbsnmppw']),
 			responsefile        = dict(required=False),
@@ -879,7 +879,7 @@ def main():
 			flashback           = dict(default=False, type='bool'),
 			datapatch           = dict(default=True, type='bool'),
 			output              = dict(default="short", choices = ["short","verbose"]),
-			state               = dict(default="present", choices = ["present", "absent"]),
+			state               = dict(default="present", choices = ["present", "absent", "started"]),
 			hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
 			port                = dict(required=False, default = 1521),
 
@@ -958,7 +958,22 @@ def main():
 	# Get the Oracle version
 	major_version = get_version(module,msg,oracle_home)
 
-	if state == 'present':
+	if state == 'started':
+		msg = "oracle_home: %s db_name: %s sid: %s db_unique_name: %s" % (oracle_home, db_name, sid, db_unique_name)
+		if not check_db_exists(module, msg, oracle_home,db_name, sid, db_unique_name):
+			msg = "Database not found. %s" % msg
+			module.fail_json(msg=msg, changed=False)
+		else:
+			if start_db (module, msg, oracle_home, db_name, db_unique_name, sid):
+				msg = "Database started."
+				module.exit_json(msg=msg, changed=True)
+			else:
+				msg = "Startup failed. %s" % msg
+				module.fail_json(msg=msg, changed=False)
+
+
+
+	elif state == 'present':
 		if not check_db_exists(module, msg, oracle_home,db_name, sid, db_unique_name):
 			if create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb, local_undo, datafile_dest, recoveryfile_dest,
 						storage_type, dbconfig_type, racone_service, characterset, memory_percentage, memory_totalmb, nodelist, db_type, amm, initparams, customscripts,datapatch):
