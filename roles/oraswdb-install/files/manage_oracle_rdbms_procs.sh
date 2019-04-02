@@ -4,7 +4,7 @@
 #
 # Thorsten Bruhns (thorsten.bruhns@googlemail.com)
 #
-# The startup-scritp is bundeled with ansible-oracle
+# The startup-scritp is bundled with ansible-oracle
 # The .profile_<ORACLE_SID> files are needed for starting listeners
 #
 # Limitations:
@@ -34,9 +34,7 @@ PROGPATH=`echo $0 | sed -e 's,[\\/][^\\/][^\\/]*$,,'`
 
 function print_usage() {
     echo "Usage:"
-    echo "  $PROGNAME -a <start|stop>"
-    echo "  $PROGNAME -m <abort|immediate>"
-    echo "  $PROGNAME -h"
+    echo "  $PROGNAME -a <start|stop> [-m abort|immediate] [-s SID] [-h]"
 }
 
 function print_help() {
@@ -46,13 +44,14 @@ function print_help() {
     echo "Start/Stop Oracle Listeners and Instances on Host"
     echo ""
     echo "-a/--action <start|stop> Start/Stop of all components"
-    echo "-m/--mode <abort|immediate> Shutdown Mode for all Databases"
+    echo "-m/--mode <abort|immediate> Shutdown Mode for all databases"
+    echo "-s/--ORACLE_SID SID of database to perform action on"
 }
 
 setenv()
 {
-    SHORTOPTS="ha:m:"
-    LONGOPTS="help,action:mode:"
+    SHORTOPTS="ha:m:s:"
+    LONGOPTS="help,action:mode:,ORACLE_SID:"
 
     ARGS=$(getopt -s bash --options $SHORTOPTS  --longoptions $LONGOPTS --name $PROGNAME -- "$@" ) 
     if [ ${?} -ne 0 ] ; then
@@ -234,15 +233,32 @@ function do_sidline() {
 
     else
 
-        echo "wrong  action found on command line."
+        echo "wrong action found on command line."
         print_usage
         exit 99
 
     fi
 }
 
-
 setenv $*
-for sidline in $(cat /etc/oratab | grep -v "^#" ) ; do
-    do_sidline ${sidline}
-done
+if [[ ! -z "${ORACLE_SID}" ]] ; then
+    for sidline in $(cat /etc/oratab | grep -v "^#" ) ; do
+        ORA_SID=$(echo $sidline | cut -d":" -f1)
+        if [[ "$ORA_SID" = "${ORACLE_SID}" ]] ; then
+            found=1
+            # Assume specified database is to be started even if start is N in oratab
+            sidline="${sidline::-1}Y"
+            do_sidline ${sidline}
+        fi
+    done
+    if [[ -z "${found}" ]] ; then
+        echo "Could not find an SID in /etc/oratab for ${ORACLE_SID}"
+        print_usage
+    fi
+else
+    for sidline in $(cat /etc/oratab | grep -v "^#" ) ; do
+        do_sidline ${sidline}
+    done
+fi
+
+
