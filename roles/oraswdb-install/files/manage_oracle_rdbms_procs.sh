@@ -78,8 +78,8 @@ setenv()
                   shift 2;;
     
               -s|--ORACLE_SID)
-                  ORACLE_SID=${2}
-                  export ORACLE_SID
+                  SID=${2}
+                  export SID
                   shift 2;;
     
               --)
@@ -241,24 +241,20 @@ function do_sidline() {
 }
 
 setenv $*
-if [[ ! -z "${ORACLE_SID}" ]] ; then
-    for sidline in $(cat /etc/oratab | grep -v "^#" ) ; do
-        ORA_SID=$(echo $sidline | cut -d":" -f1)
-        if [[ "$ORA_SID" = "${ORACLE_SID}" ]] ; then
-            found=1
-            # Assume specified database is to be started even if start is N in oratab
-            sidline="${sidline::-1}Y"
-            do_sidline ${sidline}
-        fi
-    done
-    if [[ -z "${found}" ]] ; then
-        echo "Could not find an SID in /etc/oratab for ${ORACLE_SID}"
-        print_usage
-    fi
+if [[ ! -z "${SID}" ]] ; then
+  filter_SID=${SID}
+  grep "^${filter_SID}:" /etc/oratab > /dev/null 2>&1
+  if [ $? -ne 0 ] ; then
+    echo "Could not find an SID in /etc/oratab for ${SID}"
+    print_usage
+  fi
 else
-    for sidline in $(cat /etc/oratab | grep -v "^#" ) ; do
-        do_sidline ${sidline}
-    done
+  filter_SID=".*"
 fi
+
+for sidline in $(cat /etc/oratab | grep -v "^#" | grep "^${filter_SID}:" ) ; do
+  echo "for ${sidline}"
+  do_sidline ${sidline}
+done
 
 
