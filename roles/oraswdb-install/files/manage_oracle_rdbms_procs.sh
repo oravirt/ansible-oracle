@@ -4,7 +4,7 @@
 #
 # Thorsten Bruhns (thorsten.bruhns@googlemail.com)
 #
-# The startup-scritp is bundeled with ansible-oracle
+# The startup-scritp is bundled with ansible-oracle
 # The .profile_<ORACLE_SID> files are needed for starting listeners
 #
 # Limitations:
@@ -34,9 +34,7 @@ PROGPATH=`echo $0 | sed -e 's,[\\/][^\\/][^\\/]*$,,'`
 
 function print_usage() {
     echo "Usage:"
-    echo "  $PROGNAME -a <start|stop>"
-    echo "  $PROGNAME -m <abort|immediate>"
-    echo "  $PROGNAME -h"
+    echo "  $PROGNAME -a <start|stop> [-m abort|immediate] [-s SID] [-h]"
 }
 
 function print_help() {
@@ -46,13 +44,14 @@ function print_help() {
     echo "Start/Stop Oracle Listeners and Instances on Host"
     echo ""
     echo "-a/--action <start|stop> Start/Stop of all components"
-    echo "-m/--mode <abort|immediate> Shutdown Mode for all Databases"
+    echo "-m/--mode <abort|immediate> Shutdown Mode for all databases"
+    echo "-s/--ORACLE_SID SID of database to perform action on"
 }
 
 setenv()
 {
-    SHORTOPTS="ha:m:"
-    LONGOPTS="help,action:mode:"
+    SHORTOPTS="ha:m:s:"
+    LONGOPTS="help,action:mode:,ORACLE_SID:"
 
     ARGS=$(getopt -s bash --options $SHORTOPTS  --longoptions $LONGOPTS --name $PROGNAME -- "$@" ) 
     if [ ${?} -ne 0 ] ; then
@@ -79,8 +78,8 @@ setenv()
                   shift 2;;
     
               -s|--ORACLE_SID)
-                  ORACLE_SID=${2}
-                  export ORACLE_SID
+                  SID=${2}
+                  export SID
                   shift 2;;
     
               --)
@@ -234,15 +233,28 @@ function do_sidline() {
 
     else
 
-        echo "wrong  action found on command line."
+        echo "wrong action found on command line."
         print_usage
         exit 99
 
     fi
 }
 
-
 setenv $*
-for sidline in $(cat /etc/oratab | grep -v "^#" ) ; do
-    do_sidline ${sidline}
+if [[ ! -z "${SID}" ]] ; then
+  filter_SID=${SID}
+  grep "^${filter_SID}:" /etc/oratab > /dev/null 2>&1
+  if [ $? -ne 0 ] ; then
+    echo "Could not find an SID in /etc/oratab for ${SID}"
+    print_usage
+  fi
+else
+  filter_SID=".*"
+fi
+
+for sidline in $(cat /etc/oratab | grep -v "^#" | grep "^${filter_SID}:" ) ; do
+  echo "for ${sidline}"
+  do_sidline ${sidline}
 done
+
+
