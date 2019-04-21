@@ -6,9 +6,9 @@
   loop_control:
      loop_var: lsnrinst
      label: "LISTENER: {{ lsnrinst.listener_name }} ORACLE_HOME: {{ listener_home }}"
-  when: lsnrinst.state|lower == 'present'
+  when: listener_installed is defined and lsnrinst.state|lower == 'present'
 
-- name: oradb-datapatch | Start database (non GI)
+- name: oradb-datapatch | Start database
   oracle_db:
 #     oracle_home={{ oracle_home_db}}
      oracle_home={{ oracle_db_home}}
@@ -18,7 +18,6 @@
      state=started
   become_user: "{{ oracle_user }}"
   with_items: "{{ oracle_databases }}"
-  when: item.oracle_db_type == 'SI'
   loop_control:
      label: "home: {{ item.home }} db_name: {{ item.oracle_db_name }}"
   tags: startdb
