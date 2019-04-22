@@ -63,6 +63,11 @@ options:
             - Stop Instances and Listener before applying a patch in ORACLE_HOME
         required: False
         default: False
+    rolling:
+        description:
+            - Should a patch installed in rolling upgrade mode?
+        required: False
+        default: True
     ocm_response_file:
         description:
             - The OCM responsefile needed for OPatch versions < '12.2.0.1.5' (basically for DB/GI versions < 12.1)
@@ -216,7 +221,7 @@ def analyze_patch (module, msg, oracle_home, patch_base, opatchauto):
         else:
             return True
 
-def apply_patch (module, msg, oracle_home, patch_base, patch_id, patch_version, opatchauto, ocm_response_file, offline, stop_processes, output):
+def apply_patch (module, msg, oracle_home, patch_base, patch_id, patch_version, opatchauto, ocm_response_file, offline, stop_processes, rolling, output):
     '''
     Applies the patch
     '''
@@ -226,6 +231,7 @@ def apply_patch (module, msg, oracle_home, patch_base, patch_id, patch_version, 
             module.fail_json(msg='Prereq checks failed')
 
     if opatchauto:
+        opoptions = ''
         if major_version < '12.1':
             opatch_cmd = 'opatch auto'
             if offline:
@@ -236,7 +242,10 @@ def apply_patch (module, msg, oracle_home, patch_base, patch_id, patch_version, 
             oh = ' -oh'
             opatch_cmd = 'opatchauto apply'
 
-        command = '%s/OPatch/%s %s %s %s' % (oracle_home,opatch_cmd, patch_base,oh,oracle_home)
+            if not rolling:
+                opoptions += ' -nonrolling '
+
+        command = '%s/OPatch/%s %s %s %s %s' % (oracle_home,opatch_cmd, opoptions, patch_base,oh,oracle_home)
 
     else:
         if stop_processes:
@@ -436,6 +445,7 @@ def main():
             patch_version       = dict(required=None, aliases = ['version']),
             opatch_minversion   = dict(default=None, aliases = ['opmv']),
             opatchauto          = dict(default='False', type='bool',aliases = ['autopatch']),
+            rolling             = dict(default='True', type='bool',aliases = ['rolling']),
             conflict_check      = dict(default='True', type='bool'),
             ocm_response_file   = dict(required=None,aliases = ['ocmrf']),
             offline             = dict(default='False', type='bool'),
@@ -458,6 +468,7 @@ def main():
     patch_version       = module.params["patch_version"]
     opatch_minversion   = module.params["opatch_minversion"]
     opatchauto          = module.params["opatchauto"]
+    rolling             = module.params["rolling"]
     conflict_check      = module.params["conflict_check"]
     ocm_response_file   = module.params["ocm_response_file"]
     offline             = module.params["offline"]
@@ -516,7 +527,7 @@ def main():
 
     if state == 'present':
         if not check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatchauto):
-            if apply_patch(module, msg, oracle_home, patch_base, patch_id,patch_version, opatchauto,ocm_response_file,offline,stop_processes,output):
+            if apply_patch(module, msg, oracle_home, patch_base, patch_id,patch_version, opatchauto,ocm_response_file,offline,stop_processes,rolling,output):
                 if patch_version is not None:
                     msg = 'Patch %s (%s) successfully applied to %s' % (patch_id,patch_version, oracle_home)
                 else:
