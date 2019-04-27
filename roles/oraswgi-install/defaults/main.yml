@@ -89,8 +89,8 @@
   patch_before_rootsh: True
   apply_patches_gi: False
 
-  #oracle_asm_storage_option: LOCAL_ASM_STORAGE  # LOCAL_ASM_STORAGE | FLEX_ASM_STORAGE
-  oracle_asm_storage_option: "{% if '12.2' in oracle_install_version_gi or '18' in oracle_install_version_gi %}FLEX_ASM_STORAGE{% else %}LOCAL_ASM_STORAGE{% endif %}"
+  oracle_asm_storage_option: "{% if oracle_install_version_gi is version('12.2', '>=') %}FLEX_ASM_STORAGE{% else %}LOCAL_ASM_STORAGE{% endif %}"
+
   configure_cluster: false
   oracle_gi_gns_subdomain: a.b.c
   oracle_gi_gns_vip: gnsvip.a.b.c
@@ -107,6 +107,7 @@
 
 
   oracle_sw_image_gi:                                              # Files containing the installation media for Grid Infrastructure
+       - { filename: LINUX.X64_193000_grid_home.zip, version: 19.3.0.0, creates: 'install/.img.bin' }
        - { filename: LINUX.X64_180000_grid_home.zip, version: 18.3.0.0, creates: 'install/.img.bin' }
        - { filename: linuxx64_12201_grid_home.zip, version: 12.2.0.1, creates: 'xdk/mesg/lsxja.msb' }
        - { filename: linuxamd64_12102_grid_1of2.zip, version: 12.1.0.2, creates: 'grid/stage/sizes/oracle.crs.12.1.0.2.0.sizes.properties' }
