@@ -19,13 +19,16 @@
       - directories
     #when: apply_patches_gi
 
-  - include: transfer-files.yml
+  - name: include transfer-files.yml
+    include: transfer-files.yml
     when: oracle_sw_copy
 
-  - include: unpack-files.yml
+  - name: include unpack-files.yml
+    include: unpack-files.yml
     when: oracle_sw_unpack and apply_patches_gi
 
-  - include: opatch-upgrade.yml
+  - name: include opatch-upgrade.yml
+    include: opatch-upgrade.yml
     when: apply_patches_gi
 
   - name: gi-opatch | Check current opatch version

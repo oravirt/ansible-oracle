@@ -61,8 +61,8 @@
       - oragridsw
     when: oracle_home_gi not in checkgiinstall.stdout and is_sw_source_local and oracle_install_version_gi == item.version and oracle_sw_copy
 
-
-  - include_tasks: "{{ oracle_install_version_gi }}.yml"
+  - name: include_tasks "{{ oracle_install_version_gi }}.yml"
+    include_tasks: "{{ oracle_install_version_gi }}.yml"
 
   - name: install-home-gi | Check if stuff is running
     shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
@@ -100,7 +100,8 @@
       - glogingi
     when: oracle_home_gi not in checkgiinstall.stdout
 
-  - include_role:
+  - name: include_role oraswgi-manage-patches
+    include_role:
           name: oraswgi-manage-patches
     when: not patch_before_rootsh and apply_patches_gi
 
