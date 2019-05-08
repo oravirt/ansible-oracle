@@ -206,7 +206,7 @@ def query_ldap_users():
                 users.append(userinfo)
             except:
                 pass
-    except ldap.LDAPError, e:
+    except ldap.LDAPError as e:
         module.fail_json(msg="Error querying LDAP: %s" % e, changed=False)
     return users
 
@@ -256,7 +256,7 @@ def main():
         lconn = ldap.initialize(module.params['ldap_connect'])
         lconn.set_option(ldap.OPT_REFERRALS, 0)
         lconn.simple_bind_s(module.params['ldap_binddn'], module.params['ldap_bindpassword'])
-    except ldap.LDAPError, e:
+    except ldap.LDAPError as e:
         module.fail_json(msg="LDAP connection error: %s" % e)
     lparam = {
         'basedn': module.params['ldap_user_basedn'],
@@ -294,7 +294,7 @@ def main():
         elif (not(user) or not(password)):
             module.fail_json(msg='Missing username or password for cx_Oracle')
 
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg[0], changed=False)
