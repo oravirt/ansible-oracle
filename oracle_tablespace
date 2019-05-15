@@ -171,6 +171,9 @@ def create_tablespace(module, msg, cursor, tablespace, state, datafile, numfiles
     else:
         skip_datafile = True
 
+    if not size:
+        msg = 'Error: Missing parameter - size'
+        module.fail_json(msg=msg, changed=False)
 
     if bigfile:
         if datafile is not None:
@@ -648,7 +651,7 @@ def drop_tablespace(msg, cursor, tablespace):
         cursor.execute(sql)
     except cx_Oracle.DatabaseError as exc:
         error, = exc.args
-        msg = 'Blergh, something went wrong while dropping the tablespace - %s sql: %s' % (error.message, sql)
+        msg = 'Something went wrong while dropping the tablespace - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
 
     return True
@@ -670,7 +673,7 @@ def execute_sql(module, msg, cursor, sql):
         cursor.execute(sql)
     except cx_Oracle.DatabaseError as exc:
         error, = exc.args
-        msg = 'Blergh, something went wrong while executing - %s sql: %s' % (error.message, sql)
+        msg = 'Something went wrong while executing - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
         return False
 
