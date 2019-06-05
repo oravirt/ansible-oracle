@@ -201,7 +201,7 @@ def main():
             port          = dict(default=1521, type='int'),
             service_name  = dict(required=True),
             user          = dict(required=False),
-            password      = dict(required=False),
+            password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
             state         = dict(default="present", choices=["present", "absent"]),
             privs         = dict(required=True, type='list', aliases=['priv']),
@@ -217,7 +217,7 @@ def main():
     if not cx_oracle_exists:
         module.fail_json(msg="The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set")
     # Check input parameters
-    re_priv = re.compile('^[A-Za-z]+[A-Za-z ]*[A-Za-z]+$')
+    re_priv = re.compile('^[A-Za-z0-9_]+[A-Za-z0-9_ ]*[A-Za-z0-9_]+$')
     re_role = re.compile('^[A-Za-z0-9_\$#\- ]+$')
     re_obj = re.compile('^[A-Za-z0-9_\$#\- ]*\.[A-Za-z0-9_\$#\%\- ]+$')
     for p in module.params['privs']:
@@ -264,7 +264,7 @@ def main():
         elif (not(user) or not(password)):
             module.fail_json(msg='Missing username or password for cx_Oracle')
 
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg[0], changed=False)

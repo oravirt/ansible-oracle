@@ -162,7 +162,7 @@ def main():
         elif (not(user) or not(password)):
             module.fail_json(msg='Missing username or password for cx_Oracle')
 
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg[0], changed=False)
@@ -331,7 +331,7 @@ def main():
         v_group_msg = cur.var(cx_Oracle.STRING)
         cur.execute(redosql,
             {'redosize': size, 'redogroups': groups , 'o_size_changed': v_size_changed, 'o_group_changed': v_group_changed, 'o_size_msg': v_size_msg, 'o_group_msg': v_group_msg})
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg = '%s' % (error.message)
         module.fail_json(msg=msg, changed=False)

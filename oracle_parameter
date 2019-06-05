@@ -101,7 +101,7 @@ def check_parameter_exists(module, mode, msg, cursor, name):
     try:
             cursor.execute(sql)
             result = (cursor.fetchone())
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
             error, = exc.args
             msg[0] = error.message+ 'sql: ' + sql
             return False
@@ -147,7 +147,7 @@ def modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
     sql = 'alter system set %s = %s scope=%s sid=\'%s\'' % (name, value, scope, sid)
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg[0] = 'Blergh, something went wrong while changing the value - %s sql: %s' % (error.message, sql)
         return False
@@ -193,7 +193,7 @@ def reset_parameter(module, mode, msg, cursor, name, value, scope, sid):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         if error.code == 32010:
             name = clean_string(name)
@@ -227,7 +227,7 @@ def get_curr_value(module, mode, msg, cursor, name, scope):
         result = (cursor.fetchall()[0][0])
 
 
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg[0] = 'Blergh, something went wrong while getting current value - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg[0], changed=False)
@@ -298,7 +298,7 @@ def main():
         elif (not(user) or not(password)):
             module.fail_json(msg='Missing username or password for cx_Oracle')
 
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg[0], changed=False)

@@ -138,7 +138,7 @@ def check_tablespace_exists(module, msg, cursor, tablespace):
             #result = cursor.fetchone()[0]
             result = cursor.fetchall()
             count = cursor.rowcount
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
             error, = exc.args
             msg = error.message+ 'sql: ' + sql
             return False
@@ -171,6 +171,9 @@ def create_tablespace(module, msg, cursor, tablespace, state, datafile, numfiles
     else:
         skip_datafile = True
 
+    if not size:
+        msg = 'Error: Missing parameter - size'
+        module.fail_json(msg=msg, changed=False)
 
     if bigfile:
         if datafile is not None:
@@ -581,7 +584,7 @@ def ensure_tablespace_attributes (module,msg,cursor,tablespace, autoextend, next
 
         cursor.execute(ensure_sql,
             {'tablespace': tablespace,'autoextend': str(autoextend), 'nextsize': nextsize, 'maxsize': maxsize, 'o_autoextend_changed': v_autoextend_change, 'o_nextsize_changed': v_nextsize_change,'o_maxsize_changed': v_maxsize_change})
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg = '%s' % (error.message)
         module.fail_json(msg=msg, changed=False)
@@ -605,7 +608,7 @@ def get_tablespace_files(module, msg, cursor, tablespace):
     try:
             cursor.execute(sql)
             result = cursor.fetchall()
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
             error, = exc.args
             msg = error.message+ ': sql: ' + sql
             module.fail_json(msg=msg)
@@ -630,7 +633,7 @@ def manage_tablespace(msg, cursor, tablespace, state):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg = error.message+ 'sql: ' + sql
         return False
@@ -646,9 +649,9 @@ def drop_tablespace(msg, cursor, tablespace):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
-        msg = 'Blergh, something went wrong while dropping the tablespace - %s sql: %s' % (error.message, sql)
+        msg = 'Something went wrong while dropping the tablespace - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
 
     return True
@@ -658,7 +661,7 @@ def execute_sql_get(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
         result = (cursor.fetchall())
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
@@ -668,9 +671,9 @@ def execute_sql_get(module, msg, cursor, sql):
 def execute_sql(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
-        msg = 'Blergh, something went wrong while executing - %s sql: %s' % (error.message, sql)
+        msg = 'Something went wrong while executing - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
         return False
 
@@ -749,7 +752,7 @@ def main():
         elif (not(user) or not(password)):
             module.fail_json(msg='Missing username or password for cx_Oracle')
 
-    except cx_Oracle.DatabaseError, exc:
+    except cx_Oracle.DatabaseError as exc:
         error, = exc.args
         msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
         module.fail_json(msg=msg, changed=False)
