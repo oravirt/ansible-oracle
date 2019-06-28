@@ -341,7 +341,7 @@ def stop_process(module, oracle_home):
                    if msg:
                        module.fail_json(msg=msg, changed=False)
 
-def remove_patch (module, msg, oracle_home, patch_base, patch_id, opatchauto, ocm_response_file,output):
+def remove_patch (module, msg, oracle_home, patch_base, patch_id, opatchauto, ocm_response_file, stop_processes, output):
     '''
     Removes the patch
     '''
@@ -354,6 +354,9 @@ def remove_patch (module, msg, oracle_home, patch_base, patch_id, opatchauto, oc
 
         command = '%s/OPatch/%s %s -oh %s ' % (oracle_home,opatch_cmd, patch_base, oracle_home)
     else:
+        if stop_processes:
+            stop_process(module, oracle_home)
+
         opatch_cmd = 'opatch rollback'
         command = '%s/OPatch/%s -id %s -silent' % (oracle_home,opatch_cmd, patch_id)
 
@@ -547,7 +550,7 @@ def main():
 
     elif state == 'absent':
         if check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatchauto):
-            if remove_patch(module, msg, oracle_home, patch_base, patch_id, opatchauto,ocm_response_file, output):
+            if remove_patch(module, msg, oracle_home, patch_base, patch_id, opatchauto,ocm_response_file, stop_processes, output):
                 if patch_version is not None:
                     msg = 'Patch %s (%s) successfully removed from %s' % (patch_id,patch_version, oracle_home)
                 else:
