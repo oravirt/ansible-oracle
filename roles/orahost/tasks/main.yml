@@ -66,17 +66,15 @@
     tags: selinux
 
   - name: Check dns for host
-    command: nslookup {{ ansible_hostname }}
+    command: host {{ ansible_hostname }}
     register: ns
     ignore_errors: True
     changed_when: False
     tags: etchosts
 
   - name: Add host to /etc/hosts if needed
-    #lineinfile: dest=/etc/hosts regexp='.*{{ ansible_fqdn }}$' line="{{ ansible_default_ipv4.address }} {{ ansible_hostname }} {{ ansible_fqdn }}" state=present
     lineinfile: dest=/etc/hosts regexp='.*{{ ansible_fqdn }}$' line="{{ etc_hosts_ip }} {{ ansible_hostname }} {{ ansible_fqdn }}" state=present
-    #when: "'find {{ ansible_hostname }}: NXDOMAIN' in ns.stdout or 'find {{ ansible_hostname }}: SERVFAIL' in ns.stdout or configure_etc_hosts"
-    when: "(': NXDOMAIN' in ns.stdout) or (' No answer' in ns.stdout) or configure_etc_hosts"
+    when: "ns.rc != 0 or configure_etc_hosts"
     tags: etchosts
 
 #  - name: Add local node's ip & hostname to /etc/hosts
