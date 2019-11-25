@@ -37,6 +37,15 @@ options:
         required: False
         default: None
         aliases: ['version_added']
+    exclude_upi:
+        description:
+            - The unique patch identifier that should not be rolled back
+              e.g 22990084
+            - This option will be honored only when state=absent.
+            - It helps to write idempotent playbooks when changing interim patches that are dependent on a specific PSU/RU.
+        required: False
+        default: None
+        aliases: ['exclude_unique_patch_id']
     opatch_minversion:
         description:
             - The minimum version of opatch needed
@@ -155,7 +164,7 @@ def get_file_owner(module, msg, oracle_home):
         msg = 'Could not determine owner of %s ' % (checkfile)
         module.fail_json(msg=msg)
 
-def check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatchauto):
+def check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatchauto, exclude_upi):
     '''
     Gets all patches already applied and compares to the
     intended patch
@@ -169,8 +178,8 @@ def check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatc
     (rc, stdout, stderr) = module.run_command(command)
     #module.exit_json(msg=stdout, changed=False)
     if rc != 0:
-      msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
-      module.fail_json(msg=msg, changed=False)
+        msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
+        module.fail_json(msg=msg, changed=False)
     else:
         if opatchauto:
             chk = '%s' % (patch_version)
@@ -180,7 +189,17 @@ def check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatc
             chk = '%s' % (patch_id)
 
         if chk in stdout:
-            return True
+            if exclude_upi is None:
+                return True
+            else:
+                command += ' -id %s' % patch_id
+                (rc, stdout, stderr) = module.run_command(command)
+                if rc != 0:
+                    msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
+                    module.fail_json(msg=msg, changed=False)
+                else:
+                    chk = 'unique_patch_id:%s' % exclude_upi
+                    return (chk not in stdout)
         else:
             return False
 
@@ -450,6 +469,7 @@ def main():
             patch_base          = dict(default=None, aliases = ['path','source','patch_source','phBaseDir']),
             patch_id            = dict(default=None, aliases = ['id']),
             patch_version       = dict(required=None, aliases = ['version']),
+            exclude_upi         = dict(required=None, aliases = ['exclude_unique_patch_id']),
             opatch_minversion   = dict(default=None, aliases = ['opmv']),
             opatchauto          = dict(default='False', type='bool',aliases = ['autopatch']),
             rolling             = dict(default='True', type='bool',aliases = ['rolling']),
@@ -461,7 +481,7 @@ def main():
             output              = dict(default="short", choices = ["short","verbose"]),
             state               = dict(default="present", choices = ["present", "absent", "opatchversion"]),
             hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
-            port                = dict(required=False, default = 1521),
+            port                = dict(required=False, type='int', default = 1521),
 
 
 
@@ -473,6 +493,7 @@ def main():
     patch_base          = module.params["patch_base"]
     patch_id            = module.params["patch_id"]
     patch_version       = module.params["patch_version"]
+    exclude_upi         = module.params["exclude_upi"]
     opatch_minversion   = module.params["opatch_minversion"]
     opatchauto          = module.params["opatchauto"]
     rolling             = module.params["rolling"]
@@ -533,7 +554,7 @@ def main():
         module.exit_json(msg=opatch_version,changed=False)
 
     if state == 'present':
-        if not check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatchauto):
+        if not check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatchauto, None):
             if apply_patch(module, msg, oracle_home, patch_base, patch_id,patch_version, opatchauto,ocm_response_file,offline,stop_processes,rolling,output):
                 if patch_version is not None:
                     msg = 'Patch %s (%s) successfully applied to %s' % (patch_id,patch_version, oracle_home)
@@ -549,7 +570,7 @@ def main():
             module.exit_json(msg=msg, changed=False)
 
     elif state == 'absent':
-        if check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatchauto):
+        if check_patch_applied(module, msg, oracle_home, patch_id, patch_version, opatchauto, exclude_upi):
             if remove_patch(module, msg, oracle_home, patch_base, patch_id, opatchauto,ocm_response_file, stop_processes, output):
                 if patch_version is not None:
                     msg = 'Patch %s (%s) successfully removed from %s' % (patch_id,patch_version, oracle_home)
@@ -560,8 +581,9 @@ def main():
                 module.fail_json(msg=msg, changed=False)
         else:
             if patch_version is not None:
-                msg = 'Patch %s (%s) is not applied to %s' % (patch_id,patch_version, oracle_home)
-
+                msg = 'Patch %s (%s) is not applied to %s' % (patch_id, patch_version, oracle_home)
+            elif exclude_upi is not None:
+                msg = 'Patch %s (UPI %s) has already been applied and will not be removed from %s' % (patch_id, exclude_upi, oracle_home)
             else:
                 msg = 'Patch %s is not applied to %s' % (patch_id, oracle_home)
 
