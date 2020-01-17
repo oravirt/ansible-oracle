@@ -151,7 +151,6 @@ import re
 import shlex
 import shutil
 from subprocess import Popen, PIPE
-import tempfile
 from threading import Timer
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils._text import to_native, to_text
@@ -248,7 +247,7 @@ def check_creates_sql(sql):
     return False if not result or result == "0" else True
 
 
-def run_catcon_pl(catcon_pl, scope, pdb_list):
+def run_catcon_pl(catcon_pl, pdb_list):
     # after pre-processing in main() the parameter scope is not necessary any more
     global oracle_home, changed, result, err_msg
 
@@ -291,7 +290,7 @@ def run_catcon_pl(catcon_pl, scope, pdb_list):
 
 
 def main():
-    global oracle_home
+    global oracle_home, changed, result, err_msg
 
     module = AnsibleModule(
         argument_spec = dict(
@@ -360,7 +359,7 @@ def main():
             sqlscript = "@" + sqlscript
         result = run_sql(sqlscript, username, password, scope, pdb_list)
     elif catcon_pl is not None:
-        run_catcon_pl(catcon_pl, scope, pdb_list)
+        run_catcon_pl(catcon_pl, pdb_list)
 
     if not err_msg:
         if sqlselect is not None:
