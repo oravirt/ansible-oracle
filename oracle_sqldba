@@ -222,7 +222,7 @@ def run_sql(sql, username, password, scope, pdb_list):
             t.start()
         [sout, serr] = p.communicate(input = sql_cmd)
     except Exception as e:
-        err_msg = 'Could not call sqlplus. %s. called: %s.' % (to_native(e), sql_cmd)
+        err_msg = 'Could not call sqlplus. %s. called: %s.' % (to_native(e), " ".join(sqlplus()))
         return "ERR"
     finally:
         if timeout > 0 and t is not None:
@@ -350,21 +350,22 @@ def main():
         if sqlselect.endswith(";"):
             sqlselect.rstrip(";")
         sqlselect = "select dbms_xmlgen.getxml('" + sqlselect.replace("'", "''") + "') from dual;"
-        run_sql(sqlselect, username, password, scope, pdb_list)
+        result = run_sql(sqlselect, username, password, scope, pdb_list)
     elif sql is not None:
         if not sql.endswith(";"):
             sql += ";"
-        run_sql(sql, username, password, scope, pdb_list)
+        result = run_sql(sql, username, password, scope, pdb_list)
     elif sqlscript is not None:
         if not sqlscript.startswith("@"):
             sqlscript = "@" + sqlscript
-        run_sql(sqlscript, username, password, scope, pdb_list)
+        result = run_sql(sqlscript, username, password, scope, pdb_list)
     elif catcon_pl is not None:
         run_catcon_pl(catcon_pl, scope, pdb_list)
 
     if not err_msg:
         if sqlselect is not None:
-            module.exit_json(msg = result, changed = False, state = dictify(ET.fromstring(result)))
+            res_dict = dictify(ET.fromstring(result)) if result else {"ROW": []}
+            module.exit_json(msg = result, changed = False, state = res_dict)
         else:
             module.exit_json(msg = result, changed = changed)
     else:
