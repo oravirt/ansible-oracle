@@ -1,0 +1,333 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+DOCUMENTATION = '''
+---
+module: oracle_acfs
+short_description: Manage diskgroups in an Oracle database
+description:
+	- Manage ACFS filesystems
+version_added: "2.1.0.0"
+options:
+	volume_name:
+		description:
+			- The name of volume
+		required: true
+		default: None
+		aliases: ['volume','volume_name']
+	diskgroup:
+	state:
+		description:
+			- The intended state of the diskgroup. 'status' will just show the status of the diskgroup
+		default: present
+		choices: ['present','absent','status']
+	username:
+		description:
+			- The ASM username
+		required: false
+		default: sys
+		aliases: ['un']
+	password:
+		description:
+			- The password for the ASM user
+		required: false
+		default: None
+		aliases: ['pw']
+	service_name:
+		description:
+			- The diskgroup_name to connect to the database if using dbms_diskgroup.
+		required: false
+		default: +ASM
+		aliases: ['sn']
+	hostname:
+		description:
+			- The host of the database if using dbms_diskgroup
+		required: false
+		default: localhost
+		aliases: ['host']
+	port:
+		description:
+			- The listener port to connect to the database if using dbms_diskgroup
+		required: false
+		default: 1521
+	oracle_home:
+		description:
+			- The GI ORACLE_HOME
+		required: false
+		default: None
+		aliases: ['oh']
+
+
+
+notes:
+	- cx_Oracle needs to be installed
+requirements: [ "cx_Oracle" ]
+author: Mikael Sandström, oravirt@gmail.com, @oravirt
+'''
+
+EXAMPLES = '''
+
+'''
+import os
+
+try:
+	import cx_Oracle
+except ImportError:
+	cx_oracle_exists = False
+else:
+	cx_oracle_exists = True
+
+
+# Check if the diskgroup exists
+def check_volume_exists(cursor, module, msg, name, diskgroup):
+
+	sql = '''
+          select count (*) from v$asm_volume v,v$asm_diskgroup g
+          where v.group_number = g.group_number
+          and lower (g.name) = \'%s\'
+          and lower (v.volume_name) = \'%s\'
+          ''' % (diskgroup.lower(),name.lower())
+	result = execute_sql_get(module, msg, cursor, sql)
+	#msg = 'Normal Result is: %s, [0] is: %s, [0][0] is: %s, len is: %s, type is: %s' % (result,result[0],result[0][0],len(result), type(result))
+	#module.exit_json(msg=msg)
+	if result[0][0] > 0:
+		return True
+	else:
+		return False
+
+def add_filesystem(cursor, module, msg, oracle_home, volume_name, diskgroup, mountpoint, mountowner, mountgroup, mountperm, mountusers):
+
+
+	device_sql = '''
+	          select volume_device from v$asm_volume v,v$asm_diskgroup g
+	          where v.group_number = g.group_number
+	          and lower (g.name) = \'%s\'
+	          and lower (v.volume_name) = \'%s\'
+	          ''' % (diskgroup.lower(),volume_name.lower())
+	# module.exit_json(msg=device_sql, changed=False)
+
+	_device_name = execute_sql_get(module,msg,cursor,device_sql)
+
+
+	if not _check_filesystem_exist(cursor, module, msg, oracle_home, _device_name):
+		if _format_filesystem(module,msg,_device_name[0][0]):
+			command = '''
+					%s/bin/srvctl add filesystem -device %s -path %s
+					-user %s -mountowner %s -mountgroup %s
+					-mountperm %s -fstype ACFS
+					''' % (oracle_home,_device_name[0][0],mountpoint,mountusers, mountowner, mountgroup, mountperm)
+			(rc, stdout, stderr) = module.run_command(command)
+			if rc != 0:
+				msg = 'Error, stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
+				module.fail_json(msg=msg, changed=False)
+			else:
+				return True
+	else:
+		# msg = 'Filesystem: %s already exists on volume: %s (%s)' % (mountpoint,volume_name.upper(),_device_name[0][0])
+		# module.exit_json(msg=msg, changed=False)
+		return True
+
+def ensure_filesystem (cursor, module, msg, oracle_home, volume_name, diskgroup, mountpoint, mountowner, mountgroup, mountperm, mountusers):
+	if state == 'present':
+		if _start_filesystem(cursor, module, msg, oracle_home, volume_name, diskgroup, mountpoint):
+			msg = 'Filesystem %s successfully started' % (mountpoint)
+			module.exit_json(msg=msg, changed=True)
+
+	elif state == 'absent':
+		if _stop_filesystem(cursor, module, msg, oracle_home, volume_name, diskgroup, mountpoint):
+			msg = 'Filesystem %s successfully stopped' % (mountpoint)
+			module.exit_json(msg=msg, changed=True)
+
+def _check_filesystem_exist(cursor, module, msg, oracle_home, _device_name):
+
+	checkcommand = '%s/bin/srvctl status filesystem -device %s' % (oracle_home,_device_name[0][0])
+	(rc, stdout, stderr) = module.run_command(checkcommand)
+	if rc != 0:
+		if 'PRCA-1070' in stdout:
+			return False
+		else:
+			msg = 'Error, stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
+			module.fail_json(msg=msg, changed=False)
+
+	else:
+		return True
+
+
+
+def _start_filesystem(cursor, module, msg, oracle_home, volume_name, diskgroup, mountpoint):
+
+	command = '%s/bin/srvctl start filesystem -diskgroup %s -volume %s' % (oracle_home,diskgroup,volume_name)
+	(rc, stdout, stderr) = module.run_command(command)
+	if rc != 0:
+		if 'CRS-5702' in stdout:
+			msg = 'Filesystem %s already running' % (mountpoint)
+			module.exit_json(msg=msg, changed=False)
+
+		else:
+			msg = 'Error, stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
+			module.fail_json(msg=msg, changed=False)
+	else:
+		return True
+
+def _stop_filesystem (cursor, module, msg, oracle_home, volume_name, diskgroup, mountpoint):
+	command = '%s/bin/srvctl stop filesystem -device %s' % (oracle_home,diskgroup, volume_name)
+	(rc, stdout, stderr) = module.run_command(command)
+	if rc != 0:
+		msg = 'Error, stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
+		module.fail_json(msg=msg, changed=False)
+	else:
+		return True
+
+def _remove_filesystem(module, msg, _device_name):
+
+	command = '%s/bin/srvctl remove filesystem -device %s' % (oracle_home,_device_name[0][0])
+	(rc, stdout, stderr) = module.run_command(command)
+	if rc != 0:
+		msg = 'Error, stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
+		module.fail_json(msg=msg, changed=False)
+	else:
+		return True
+
+def _format_filesystem(module, msg, _device_name):
+
+	command = '/usr/sbin/mkfs -t acfs %s' % (_device_name)
+	(rc, stdout, stderr) = module.run_command(command)
+	if rc != 0:
+		if 'ACFS-01010' in stderr: # <-- Device already formatted
+			return True
+		else:
+			msg = 'Error, stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
+			module.fail_json(msg=msg, changed=False)
+	else:
+		return True
+
+
+
+def execute_sql_get(module, msg, cursor, sql):
+
+	#module.exit_json(msg="In execute_sql_get", changed=False)
+	try:
+		cursor.execute(sql)
+		result = (cursor.fetchall())
+	except cx_Oracle.DatabaseError as exc:
+		error, = exc.args
+		msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
+		module.fail_json(msg=msg, changed=False)
+		return False
+
+	return result
+
+
+def execute_sql(module, msg, cursor, sql):
+
+	try:
+		cursor.execute(sql)
+	except cx_Oracle.DatabaseError as exc:
+		error, = exc.args
+		msg = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
+		module.fail_json(msg=msg, changed=False)
+		return False
+	return True
+
+
+
+def main():
+
+	msg = ''
+	cursor = None
+	mode = 'sysasm'
+	global state
+
+	module = AnsibleModule(
+		argument_spec = dict(
+			volume_name         = dict(required=True, aliases = ['volume']),
+			diskgroup           = dict(required=False, aliases = ['dg']),
+			mountpoint          = dict(required=True, aliases = ['mntp']),
+			mountowner          = dict(required=False),
+			mountgroup          = dict(required=False),
+			mountperm           = dict(required=False),
+			mountusers               = dict(required=False),
+			state               = dict(default="present", choices = ["present", "absent", "stopped", "started"]),
+			user                = dict(required=False, aliases = ['un','username']),
+			password            = dict(required=False, no_log=True, aliases = ['pw']),
+			hostname            = dict(required=False, default = 'localhost', aliases = ['host']),
+			port                = dict(required=False, default = 1521),
+			service_name        = dict(required=False, default = '+ASM', aliases = ['sn']),
+			oracle_home         = dict(required=False, aliases = ['oh']),
+
+
+
+		),
+
+	)
+
+	volume_name         = module.params["volume_name"]
+	diskgroup           = module.params["diskgroup"]
+	mountpoint          = module.params["mountpoint"]
+	mountowner			= module.params["mountowner"]
+	mountgroup			= module.params["mountgroup"]
+	mountperm			= module.params["mountperm"]
+	mountusers          = module.params["mountusers"]
+	state               = module.params["state"]
+	user                = module.params["user"]
+	password            = module.params["password"]
+	hostname            = module.params["hostname"]
+	port                = module.params["port"]
+	service_name        = module.params["service_name"]
+	oracle_home         = module.params["oracle_home"]
+
+
+	if not cx_oracle_exists:
+		msg = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
+		module.fail_json(msg=msg)
+
+	wallet_connect = '/@%s' % service_name
+	try:
+		if (not user and not password) : # If neither user or password is supplied, the use of an oracle wallet is assumed
+			connect = wallet_connect
+			conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSASM)
+		elif (user and password):
+			dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+			connect = dsn
+			conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSASM)
+		elif (not(user) or not(password)):
+			module.fail_json(msg='Missing username or password for cx_Oracle')
+
+	except cx_Oracle.DatabaseError as exc:
+		error, = exc.args
+		msg = 'Could not connect to ASM: %s, connect descriptor: %s' % (error.message, connect)
+		module.fail_json(msg=msg, changed=False)
+
+	cursor = conn.cursor()
+
+	if state == 'present':
+		if check_volume_exists(cursor, module, msg, volume_name, diskgroup):
+			 if add_filesystem (cursor, module, msg, oracle_home, volume_name, diskgroup, mountpoint, mountowner, mountgroup, mountperm, mountusers):
+				 # msg = 'Successfully added filesystem %s in volume %s' % (mountpoint, volume_name.upper())
+				 # module.exit_json(msg=msg, changed=True)
+				 ensure_filesystem (cursor, module, msg, oracle_home, volume_name, diskgroup, mountpoint, mountowner, mountgroup, mountperm, mountusers)
+			 else:
+				 msg = 'say what?!'
+				 module.fail_json(msg=msg, changed=False)
+		# else:
+		# 	ensure_diskgroup_state(cursor, module, msg, name, state, disks, attribute_name, attribute_value)
+
+	elif state == 'absent' :
+		if check_diskgroup_exists(cursor, module, msg, name):
+			if remove_diskgroup(cursor, module, msg, oracle_home, name):
+				msg = 'Diskgroup %s successfully removed' % (name)
+				module.exit_json(msg=msg, changed=True)
+			else:
+				module.exit_json(msg=msg, changed=False)
+		else:
+			msg = 'Diskgroup %s doesn\'t exist' % (name)
+			module.exit_json(msg=msg, changed=False)
+
+	module.fail_json(msg="Unhandled exit", changed=False)
+
+
+
+
+from ansible.module_utils.basic import *
+if __name__ == '__main__':
+	main()
