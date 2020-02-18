@@ -301,7 +301,7 @@ def get_obj_privs (module, msg, cursor, schema, object_privs, grants_mode):
 
     return total_sql_obj
 # Add grants to the schema/role
-def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs, directory_privs, grants_mode):
+def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs, directory_privs, grants_mode, container):
 
     add_sql = ''
     remove_sql = ''
@@ -331,7 +331,7 @@ def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs,
             total_sql.append(o)
 
 
-    #module.exit_json(msg=total_sql)
+    # module.exit_json(msg=total_sql)
     exceptions_list=['DBA']
     exceptions_priv=['UNLIMITED TABLESPACE']
 
@@ -355,7 +355,6 @@ def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs,
     if any(curr_sys_grants):
         total_current.extend(curr_sys_grants)
 
-
     # Get the difference between current grants and wanted grants
     grants_to_add=set(wanted_grants_list).difference(total_current)
     grants_to_remove=set(total_current).difference(wanted_grants_list)
@@ -378,7 +377,10 @@ def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs,
             grants_to_add = ','.join(grants_to_add)
             grants_to_add = clean_string(grants_to_add)
             add_sql += 'grant %s to %s' % (grants_to_add, schema)
+            if container:
+                add_sql += ' container=%s' % (container)
             total_sql.append(add_sql)
+
 
         if grants_mode.lower() == 'enforce':
             if any(grants_to_remove):
@@ -390,7 +392,7 @@ def ensure_grants(module, msg, cursor, schema, wanted_grants_list, object_privs,
             pass
 
 
-    #module.exit_json(msg=total_sql)
+    # module.exit_json(msg=total_sql)
     if len(total_sql) > 0:
         if ensure_grants_state_sql(module,msg,cursor,total_sql):
             module.exit_json(msg=total_sql, changed=True)
@@ -556,11 +558,12 @@ def main():
             password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
             schema        = dict(default=None),
-            role        = dict(default=None),
+            role          = dict(default=None),
             grants         = dict(default=None, type="list"),
             object_privs   = dict(default=None, type="list",aliases=['objprivs']),
             directory_privs   = dict(default=None, type="list",aliases=['dirprivs']),
             grants_mode   = dict(default="enforce", choices=["append", "enforce"],aliases=['privs_mode']),
+            container     = dict(default=None),
             state         = dict(default="present", choices=["present", "absent", "REMOVEALL"])
 
         ),
@@ -579,6 +582,7 @@ def main():
     object_privs = module.params["object_privs"]
     directory_privs = module.params["directory_privs"]
     grants_mode = module.params["grants_mode"]
+    container = module.params["container"]
     state = module.params["state"]
 
 
@@ -618,7 +622,7 @@ def main():
 
     if state == 'present' and schema:
         if check_user_exists(module, msg, cursor, schema):
-            if ensure_grants(module, msg, cursor, schema, grants, object_privs, directory_privs, grants_mode):
+            if ensure_grants(module, msg, cursor, schema, grants, object_privs, directory_privs, grants_mode, container):
                 #msg = 'The grant(s) (%s) have been added to %s successfully' % (grants, schema)
                 module.exit_json(msg=msg, changed=True)
             else:
@@ -629,7 +633,7 @@ def main():
 
     elif state == 'present' and role:
         if check_role_exists(module, msg, cursor, role):
-            ensure_grants(module, msg, cursor, role, grants, object_privs,directory_privs, grants_mode)
+            ensure_grants(module, msg, cursor, role, grants, object_privs,directory_privs, grants_mode, container)
                 #msg = 'The grant(s) (%s) have been added to %s successfully' % (grants, schema)
             module.exit_json(msg=msg, changed=False)
             # else:

@@ -132,8 +132,8 @@ def check_diskgroup_exists(cursor, module, msg, name):
 
 	sql = 'select count(*) from gv$asm_diskgroup where lower (name) = \'%s\'' % (name.lower())
 	result = execute_sql_get(module, msg, cursor, sql)
-	#msg[0] = 'Normal Result is: %s, [0] is: %s, [0][0] is: %s, len is: %s, type is: %s' % (result,result[0],result[0][0],len(result), type(result))
-	#module.exit_json(msg=msg[0])
+	#msg = 'Normal Result is: %s, [0] is: %s, [0][0] is: %s, len is: %s, type is: %s' % (result,result[0],result[0][0],len(result), type(result))
+	#module.exit_json(msg=msg)
 	if result[0][0] > 0:
 		return True
 	else:
@@ -166,13 +166,15 @@ def create_diskgroup(cursor, module, msg, oracle_home, name, disks, redundancy, 
 				if 'CRS-5702' in stdout: #'Edge-case', where there is only one instance in the cluster. The diskgroup is already running after create statement so this command errors
 					return True
 				else:
-					msg[0] = 'Error, couldn\'t mount the dg on all nodes. stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
-					return False
+					msg = 'Error, couldn\'t mount the dg on all nodes. stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
+					module.fail_json(msg=msg, changed=False)
 			else:
 				return True
 		else:
 			return True
 	else:
+		msg = 'error in exec sql create'
+		module.fail_json(msg=msg, changed=False)
 		return False
 
 
@@ -187,7 +189,7 @@ def remove_diskgroup(cursor, module, msg, oracle_home, name):
 		command = '%s/bin/srvctl stop diskgroup -g %s' % (oracle_home, name.lower())
 		(rc, stdout, stderr) = module.run_command(command)
 		if rc != 0:
-			msg[0] = 'Error, couldn\'t unmount the dg. stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
+			msg = 'Error, couldn\'t unmount the dg. stdout: %s, stderr: %s, command is %s' % (stdout, stderr, command)
 			return False
 
 		if execute_sql(module, msg, cursor, mountsql):
@@ -261,8 +263,8 @@ def ensure_diskgroup_state(cursor, module, msg, name, state, disks, attribute_na
 	add_disk =  "','".join(list_add)
 	remove_disk=  "','".join(remove_disks)
 	if sorted(list_current_path) == sorted(list_wanted) and change_attr == False:
-		msg[0] = "Diskgroup %s is in the intended state" % (name)
-		module.exit_json(msg=msg[0], changed=False)
+		msg = "Diskgroup %s is in the intended state" % (name)
+		module.exit_json(msg=msg, changed=False)
 
 	if len(list_add)>= 1:
 		change_disk = True
@@ -278,8 +280,8 @@ def ensure_diskgroup_state(cursor, module, msg, name, state, disks, attribute_na
 		total_sql.append(disk_sql)
 
 	if ensure_diskgroup_state_sql(module,msg,cursor,total_sql):
-		msg[0] = 'Diskgroup %s has been put in the intended state' % (name)
-		module.exit_json(msg=msg[0], changed=True)
+		msg = 'Diskgroup %s has been put in the intended state' % (name)
+		module.exit_json(msg=msg, changed=True)
 	else:
 		return False
 
@@ -318,8 +320,8 @@ def execute_sql_get(module, msg, cursor, sql):
 		result = (cursor.fetchall())
 	except cx_Oracle.DatabaseError as exc:
 		error, = exc.args
-		msg[0] = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
-		module.fail_json(msg=msg[0], changed=False)
+		msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
+		module.fail_json(msg=msg, changed=False)
 		return False
 
 	return result
@@ -331,8 +333,8 @@ def execute_sql(module, msg, cursor, sql):
 		cursor.execute(sql)
 	except cx_Oracle.DatabaseError as exc:
 		error, = exc.args
-		msg[0] = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
-		module.fail_json(msg=msg[0], changed=False)
+		msg = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
+		module.fail_json(msg=msg, changed=False)
 		return False
 	return True
 
@@ -349,7 +351,7 @@ def main():
 		argument_spec = dict(
 			name                = dict(required=True, aliases = ['diskgroup','dg']),
 			disks               = dict(required=False, type='list'),
-			redundancy          = dict(default="external", choices = ["external","normal","high"]),
+			redundancy          = dict(default="external", choices = ["external","normal","high","flex"]),
 			attribute_name      = dict(required=False, type='list', aliases=['an']),
 			attribute_value     = dict(required=False, type='list', aliases=['av']),
 			state               = dict(default="present", choices = ["present", "absent", "status"]),
@@ -381,8 +383,8 @@ def main():
 
 
 	if not cx_oracle_exists:
-		msg[0] = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
-		module.fail_json(msg=msg[0])
+		msg = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
+		module.fail_json(msg=msg)
 
 	wallet_connect = '/@%s' % service_name
 	try:
@@ -398,8 +400,8 @@ def main():
 
 	except cx_Oracle.DatabaseError as exc:
 		error, = exc.args
-		msg[0] = 'Could not connect to ASM: %s, connect descriptor: %s, username: %s, pass: %s' % (error.message, connect,user,password)
-		module.fail_json(msg=msg[0], changed=False)
+		msg = 'Could not connect to ASM: %s, connect descriptor: %s, username: %s, pass: %s' % (error.message, connect,user,password)
+		module.fail_json(msg=msg, changed=False)
 
 	cursor = conn.cursor()
 
@@ -412,8 +414,8 @@ def main():
 		elif 'ORACLE_HOME' in os.environ:
 			oracle_home = os.environ['ORACLE_HOME']
 		else:
-			msg[0] = 'ORACLE_HOME variable not set. Please set it and re-run the command'
-			module.fail_json(msg=msg[0], changed=False)
+			msg = 'ORACLE_HOME variable not set. Please set it and re-run the command'
+			module.fail_json(msg=msg, changed=False)
 	else:
 		rac = False
 
@@ -421,31 +423,32 @@ def main():
 	if state == 'present':
 		if not check_diskgroup_exists(cursor, module, msg, name):
 			 if create_diskgroup(cursor, module, msg, oracle_home, name, disks, redundancy, attribute_name, attribute_value):
-				 msg[0] = 'Successfully created diskgroup %s ' % (name)
-				 module.exit_json(msg=msg[0], changed=True)
+				 msg = 'Successfully created diskgroup %s ' % (name)
+				 module.exit_json(msg=msg, changed=True)
 			 else:
-				 module.fail_json(msg=msg[0], changed=False)
+				 msg = 'say what?!'
+				 module.fail_json(msg=msg, changed=False)
 		else:
 			ensure_diskgroup_state(cursor, module, msg, name, state, disks, attribute_name, attribute_value)
 
 	elif state == 'absent' :
 		if check_diskgroup_exists(cursor, module, msg, name):
 			if remove_diskgroup(cursor, module, msg, oracle_home, name):
-				msg[0] = 'Diskgroup %s successfully removed' % (name)
-				module.exit_json(msg=msg[0], changed=True)
+				msg = 'Diskgroup %s successfully removed' % (name)
+				module.exit_json(msg=msg, changed=True)
 			else:
-				module.exit_json(msg=msg[0], changed=False)
+				module.exit_json(msg=msg, changed=False)
 		else:
-			msg[0] = 'Diskgroup %s doesn\'t exist' % (name)
-			module.exit_json(msg=msg[0], changed=False)
+			msg = 'Diskgroup %s doesn\'t exist' % (name)
+			module.exit_json(msg=msg, changed=False)
 
 	elif state == 'status' :
 		if check_diskgroup_exists(cursor, module, msg, name):
 			result = get_current_disks(cursor, module, msg, name)
-				#msg[0] = 'Diskgroup %s successfully removed' % (name)
+				#msg = 'Diskgroup %s successfully removed' % (name)
 			module.exit_json(msg=result, changed=False)
 		else:
-			module.exit_json(msg=msg[0], changed=False)
+			module.exit_json(msg=msg, changed=False)
 
 
 	module.exit_json(msg="Unhandled exit", changed=False)

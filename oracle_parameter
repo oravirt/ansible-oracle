@@ -103,21 +103,19 @@ def check_parameter_exists(module, mode, msg, cursor, name):
             result = (cursor.fetchone())
     except cx_Oracle.DatabaseError as exc:
             error, = exc.args
-            msg[0] = error.message+ 'sql: ' + sql
+            msg = error.message+ 'sql: ' + sql
             return False
 
     if result > 0:
         return True
     else:
-        msg[0] = 'The parameter (%s) doesn\'t exist' % name
+        msg = 'The parameter (%s) doesn\'t exist' % name
         return False
 
 
 
 
-def modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
-
-
+def modify_parameter(module, mode, msg, cursor, name, value, comment, scope, sid):
 
     contains = re.compile(r'[?*$%#()!\s,._/=+-]')
     starters = ('+','_','"','"_','/')
@@ -144,16 +142,21 @@ def modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
     if contains.search(value):
         value = quote_value(value)
 
-    sql = 'alter system set %s = %s scope=%s sid=\'%s\'' % (name, value, scope, sid)
+    sql = 'alter system set %s=%s ' % (name, value)
+    if comment is not None:
+        sql += ' comment=\'%s\'' % (comment)
+    # module.fail_json(msg=sql)
+    sql += 'scope=%s sid=\'%s\'' % (scope,sid)
     try:
         cursor.execute(sql)
     except cx_Oracle.DatabaseError as exc:
         error, = exc.args
-        msg[0] = 'Blergh, something went wrong while changing the value - %s sql: %s' % (error.message, sql)
-        return False
+        msg = 'Blergh, something went wrong while changing the value - %s sql: %s' % (error.message, sql)
+        module.fail_json(msg=msg, changed=False)
 
     name = clean_string(name)
-    msg[0] = 'The parameter (%s) has been changed successfully, new: %s, old: %s' % (name, value, currval)
+    msg = 'The parameter (%s) has been changed successfully, new: %s, old: %s' % (name, value, currval)
+    module.exit_json(msg=msg, changed=True)
     return True
 
 def quote_value(value):
@@ -167,7 +170,7 @@ def quote_value(value):
 def quote_name(name):
 
     if len(name) > 0:
-        return """\"%s\"""" % (name)
+        return '"%s"' % (name)
     else:
         return name
 
@@ -189,7 +192,7 @@ def reset_parameter(module, mode, msg, cursor, name, value, scope, sid):
     if name.startswith(starters):
         name = quote_name(name)
 
-    sql = 'alter system reset %s scope=spfile sid=\'%s\'' % (name,sid)
+    sql = 'alter system reset %s scope=%s sid=\'%s\'' % (name,scope,sid)
 
     try:
         cursor.execute(sql)
@@ -197,19 +200,21 @@ def reset_parameter(module, mode, msg, cursor, name, value, scope, sid):
         error, = exc.args
         if error.code == 32010:
             name = clean_string(name)
-            msg[0] = 'The parameter (%s) is already set to its default value' % (name)
-            module.exit_json(msg=msg[0], changed=False)
+            msg = 'The parameter (%s) is already set to its default value' % (name)
+            module.exit_json(msg=msg, changed=False)
             return True
 
-        msg[0] = 'Blergh, something went wrong while resetting the parameter - %s sql: %s' % (error.message, sql)
+        msg = 'Blergh, something went wrong while resetting the parameter - %s sql: %s' % (error.message, sql)
         return False
 
     name = clean_string(name)
-    msg[0] = 'The parameter (%s) has been reset to its default value' % (name)
+    msg = 'The parameter (%s) has been reset to its default value' % (name)
     return True
 
 
 def get_curr_value(module, mode, msg, cursor, name, scope):
+
+    name = clean_string(name)
 
     if scope == 'spfile':
         parameter_source = 'v$spparameter'
@@ -217,8 +222,10 @@ def get_curr_value(module, mode, msg, cursor, name, scope):
         parameter_source = 'v$parameter'
 
     if mode == 'sysdba':
-        name = clean_string(name)
-        sql = 'select lower(y.ksppstdvl) from sys.x$ksppi x, sys.x$ksppcv y where x.indx = y.indx and x.ksppinm = lower(\'%s\')' % (name)
+        if scope == 'spfile':
+            sql = 'select lower(KSPSPFFTCTXSPDVALUE) from x$kspspfile where lower(KSPSPFFTCTXSPNAME) = lower(\'%s\')' % (name)
+        else:
+            sql = 'select lower(y.ksppstdvl) from sys.x$ksppi x, sys.x$ksppcv y where x.indx = y.indx and x.ksppinm = lower(\'%s\')' % (name)
     else:
         sql = 'select lower(display_value) from %s where name = lower(\'%s\')' % (parameter_source, name)
 
@@ -226,13 +233,10 @@ def get_curr_value(module, mode, msg, cursor, name, scope):
         cursor.execute(sql)
         result = (cursor.fetchall()[0][0])
 
-
     except cx_Oracle.DatabaseError as exc:
         error, = exc.args
-        msg[0] = 'Blergh, something went wrong while getting current value - %s sql: %s' % (error.message, sql)
-        module.fail_json(msg=msg[0], changed=False)
-        return False
-
+        msg = 'Blergh, something went wrong while getting current value - %s sql: %s' % (error.message, sql)
+        module.fail_json(msg=msg, changed=False)
 
     return result
 
@@ -250,6 +254,7 @@ def main():
             mode          = dict(default='normal', choices=["normal","sysdba"]),
             name          = dict(default=None, aliases = ['parameter']),
             value         = dict(default=None),
+            comment       = dict(default=None),
             state         = dict(default="present", choices=["present", "absent","reset"]),
             scope         = dict(default="both", choices=["both", "spfile", "memory"]),
             sid           = dict(default="*"),
@@ -265,6 +270,7 @@ def main():
     mode = module.params["mode"]
     name = module.params["name"]
     value = module.params["value"]
+    comment = module.params["comment"]
     state = module.params["state"]
     scope = module.params["scope"]
     sid = module.params["sid"]
@@ -300,32 +306,32 @@ def main():
 
     except cx_Oracle.DatabaseError as exc:
         error, = exc.args
-        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
-        module.fail_json(msg=msg[0], changed=False)
+        msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
+        module.fail_json(msg=msg, changed=False)
 
     cursor = conn.cursor()
 
     if state == 'present':
         if check_parameter_exists(module, mode, msg, cursor, name):
-            if modify_parameter(module, mode, msg, cursor, name, value, scope, sid):
-                module.exit_json(msg=msg[0], changed=True)
+            if modify_parameter(module, mode, msg, cursor, name, value, comment, scope, sid):
+                module.exit_json(msg=msg, changed=True)
             else:
-                module.fail_json(msg=msg[0], changed=False)
+                module.fail_json(msg=msg, changed=False)
         else:
-            module.fail_json(msg=msg[0], changed=False)
+            module.fail_json(msg=msg, changed=False)
 
     elif state == 'reset' or state == 'absent':
         if check_parameter_exists(module, mode, msg, cursor, name):
-            if reset_parameter(module, mode, msg, cursor, name, value, scope, sid):
-                module.exit_json(msg=msg[0], changed=True)
+            if reset_parameter(module, mode, msg, cursor, name, value, comment, scope, sid):
+                module.exit_json(msg=msg, changed=True)
             else:
-                module.fail_json(msg=msg[0], changed=False)
+                module.fail_json(msg=msg, changed=False)
         else:
-            module.fail_json(msg=msg[0], changed=False)
+            module.fail_json(msg=msg, changed=False)
 
 
 
-    module.exit_json(msg=msg[0], changed=False)
+    module.exit_json(msg=msg, changed=False)
 
 
 

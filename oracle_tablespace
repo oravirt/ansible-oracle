@@ -171,9 +171,13 @@ def create_tablespace(module, msg, cursor, tablespace, state, datafile, numfiles
     else:
         skip_datafile = True
 
-    if not size:
-        msg = 'Error: Missing parameter - size'
-        module.fail_json(msg=msg, changed=False)
+    if not size and not autoextend and not maxsize:
+        size = '100M'
+        autoextend = True
+        nextsize = '1M'
+        maxsize = 'unlimited'
+        # msg = 'Error: Missing parameter - size'
+        # module.fail_json(msg=msg, changed=False)
 
     if bigfile:
         if datafile is not None:
@@ -324,6 +328,10 @@ def ensure_tablespace_state (module,msg,cursor,tablespace, state, datafile, numf
     else:
         skip_datafile = True
 
+    if not size and not autoextend and not maxsize:
+        size = '100M'
+        autoextend = True
+        maxsize = 'unlimited'
 
 
     statussql = 'select status from dba_tablespaces where tablespace_name = upper(\'%s\')' % (tablespace)
