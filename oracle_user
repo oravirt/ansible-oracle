@@ -227,7 +227,7 @@ def modify_user(module, msg, cursor, schema, schema_password, schema_password_ha
 			if schema_password_hash:
 				sql += ' identified by values \'%s\'' % (schema_password_hash)
 			elif schema_password:
-				sql += ' identified by %s ' % (schema_password)
+				sql += ' identified by \"%s\" ' % (schema_password)
 		elif authentication_type == 'external':
 			sql += ' identified externally '
 			sql_get_curr_def += ' ,lower(authentication_type)'
