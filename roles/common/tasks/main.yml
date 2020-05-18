@@ -24,11 +24,22 @@
     tags:
      - epelrepo
 
-  - name: Get newest repo-file for OL (public-yum)
-    get_url: dest={{ repo_dir}}/{{ ol_repo_file }}  url=http://public-yum.oracle.com/{{ ol_repo_file }} backup=yes
+  # Do not use the old public-yum.repo on OL7 after January 2019 anymore
+  # Check for /usr/bin/ol_yum_configure.sh in newer systems
+  - name: Check for ol_yum_configure.sh
+    stat:
+      path: /usr/bin/ol_yum_configure.sh
+    register: olyumconfigfile
     when: configure_public_yum_repo and ansible_distribution == 'OracleLinux'
     tags:
-     - ol6repo
+      - olrepo
+
+  # Update public-yum.repo only on old versions of OL7
+  - name: Get newest repo-file for OL (public-yum)
+    get_url: dest={{ repo_dir}}/{{ ol_repo_file }}  url=http://public-yum.oracle.com/{{ ol_repo_file }} backup=yes
+    when: not olyumconfigfile.stat.exists | default(false) and configure_public_yum_repo and ansible_distribution == 'OracleLinux'
+    tags:
+     - olrepo
 
   - name: Install common packages OL/RHEL
     yum: name={{ common_packages }} state=installed
