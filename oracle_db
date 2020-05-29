@@ -594,10 +594,14 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
 
 	change_restart_sql = []
 	change_db_sql = []
-	supp_log_check_sql = 'select SUPPLEMENTAL_LOG_DATA_MIN,SUPPLEMENTAL_LOG_DATA_PL,SUPPLEMENTAL_LOG_DATA_SR,SUPPLEMENTAL_LOG_DATA_PK,SUPPLEMENTAL_LOG_DATA_UI from v$database'
 	log_check_sql = 'select log_mode,force_logging, flashback_on from v$database'
-	supp_log_check_ = execute_sql_get(module,msg,cursor,supp_log_check_sql)
 	log_check_ = execute_sql_get(module,msg,cursor,log_check_sql)
+
+	if major_version >= '19.0':
+		supp_log_check_sql = 'select SUPPLEMENTAL_LOG_DATA_MIN,SUPPLEMENTAL_LOG_DATA_PL,SUPPLEMENTAL_LOG_DATA_SR,SUPPLEMENTAL_LOG_DATA_PK,SUPPLEMENTAL_LOG_DATA_UI from v$database'
+		supp_log_check_ = execute_sql_get(module,msg,cursor,supp_log_check_sql)
+		if supp_log_check_[0][0] != slcomp:
+			change_db_sql.append(slsql)
 
 	if israc_[0][0] == 'NO':
 		israc = False
@@ -656,9 +660,6 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
 
 	if log_check_[0][2] != fbcomp:
 		change_db_sql.append(fbsql)
-
-	if supp_log_check_[0][0] != slcomp:
-		change_db_sql.append(slsql)
 
 	if len(change_db_sql) > 0 or len(change_restart_sql) > 0:
 
