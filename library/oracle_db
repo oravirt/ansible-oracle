@@ -601,6 +601,14 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
 		supp_log_check_sql = 'select SUPPLEMENTAL_LOG_DATA_MIN,SUPPLEMENTAL_LOG_DATA_PL,SUPPLEMENTAL_LOG_DATA_SR,SUPPLEMENTAL_LOG_DATA_PK,SUPPLEMENTAL_LOG_DATA_UI from v$database'
 		supp_log_check_ = execute_sql_get(module,msg,cursor,supp_log_check_sql)
 		if supp_log_check_[0][0] != slcomp:
+
+			if supplemental_logging == True:
+				slcomp = 'YES'
+				slsql = alterdb_sql + ' add supplemental log data'
+			else:
+				slcomp = 'NO'
+				slsql = alterdb_sql +  ' drop supplemental log data'
+
 			change_db_sql.append(slsql)
 
 	if israc_[0][0] == 'NO':
@@ -628,13 +636,6 @@ def ensure_db_state (module,msg,oracle_home,db_name,db_unique_name,sid, archivel
 	else:
 		fbcomp = 'NO'
 		fbsql = alterdb_sql +  ' flashback off'
-
-	if supplemental_logging == True:
-		slcomp = 'YES'
-		slsql = alterdb_sql + ' add supplemental log data'
-	else:
-		slcomp = 'NO'
-		slsql = alterdb_sql +  ' drop supplemental log data'
 
 	if def_tbs_type[0] != default_tablespace_type:
 		deftbstypesql = 'alter database set default %s tablespace ' % (default_tablespace_type)
