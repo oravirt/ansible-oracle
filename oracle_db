@@ -703,7 +703,8 @@ def apply_restart_changes(module,msg,oracle_home,db_name,db_unique_name,sid,inst
 			for sql in change_restart_sql:
 				execute_sql(module,msg,cursor,sql)
 				if stop_db(module,msg,oracle_home,db_name,db_unique_name,sid):
-					if start_db(module,msg,oracle_home,db_name,db_unique_name, sid):
+					start_db_state = start_db(module,msg,oracle_home,db_name,db_unique_name, sid)
+					if start_db_state in ('ok', 'changed'):
 						if newdb:
 							msg = 'Database %s successfully created (%s) ' % (db_name, archcomp)
 							if output == 'verbose':
@@ -762,13 +763,25 @@ def start_db (module,msg, oracle_home, db_name, db_unique_name, sid):
 	if gimanaged:
 		if db_unique_name is not None:
 			db_name = db_unique_name
-		command = '%s/bin/srvctl start database -d %s' % (oracle_home,db_name)
+		command = '%s/bin/srvctl status database -d %s' % (oracle_home,db_name)
 		(rc, stdout, stderr) = module.run_command(command)
 		if rc != 0:
 			msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
 			module.fail_json(msg=msg, changed=False)
+		elif 'Database is running' in stdout:
+			return 'ok'
+		elif 'Database is not running' in stdout:
+
+			command = '%s/bin/srvctl start database -d %s' % (oracle_home,db_name)
+			(rc, stdout, stderr) = module.run_command(command)
+			if rc != 0:
+				msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
+				module.fail_json(msg=msg, changed=False)
+			else:
+				return 'changed'
 		else:
-			return True
+			msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
+			module.fail_json(msg=msg, changed=False)
 	else:
 		if sid is not None:
 			os.environ['ORACLE_SID'] = sid
@@ -789,7 +802,7 @@ def start_db (module,msg, oracle_home, db_name, db_unique_name, sid):
 			msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, startup_sql)
 			module.fail_json(msg=msg, changed=False)
 		else:
-			return True
+			return 'changed'
 
 
 def start_instance (module,msg, oracle_home, db_name, db_unique_name,sid, open_mode, instance_name, host_name, israc):
@@ -1033,9 +1046,13 @@ def main():
 			msg = "Database not found. %s" % msg
 			module.fail_json(msg=msg, changed=False)
 		else:
-			if start_db (module, msg, oracle_home, db_name, db_unique_name, sid):
+			start_db_state = start_db (module, msg, oracle_home, db_name, db_unique_name, sid)
+                        if start_db_state == 'changed':
 				msg = "Database started."
 				module.exit_json(msg=msg, changed=True)
+                        if start_db_state == 'ok':
+				msg = "Database already running."
+				module.exit_json(msg=msg, changed=False)
 			else:
 				msg = "Startup failed. %s" % msg
 				module.fail_json(msg=msg, changed=False)
