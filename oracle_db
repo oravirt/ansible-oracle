@@ -282,6 +282,8 @@ oracle_db:
 '''
 import os, re, time
 
+msg = ['']
+
 try:
 	import cx_Oracle
 except ImportError:
@@ -301,7 +303,8 @@ def get_version(module, msg, oracle_home):
 
 
 # Check if the database exists
-def check_db_exists(module, msg, oracle_home, db_name, sid, db_unique_name ):
+def check_db_exists(module, oracle_home, db_name, sid, db_unique_name ):
+	global msg
 
 	if sid is None:
 		sid = ''
@@ -391,8 +394,14 @@ def create_db (module, msg, oracle_home, sys_password, system_password, dbsnmp_p
 		if system_password is not None:
 			command += ' -systemPassword \"%s\"' % (system_password)
 		else:
-			system_password = sys_password
-			command += ' -systemPassword \"%s\"' % (system_password)
+			pw_found = False
+			with open(responsefile) as rspfile:
+				for line in rspfile:
+					if re.match('systemPassword=.+', line):
+						pw_found = True
+						break
+			if not pw_found:
+				command += ' -systemPassword \"%s\"' % (sys_password)
 		if dbsnmp_password is not None:
 			command += ' -dbsnmpPassword \"%s\"' % (dbsnmp_password)
 		else:
@@ -897,8 +906,8 @@ def getconn(module,msg):
 
 def main():
 
-	msg = ['']
 	cursor = None
+	global msg
 	global gimanaged
 	global major_version
 	global user
@@ -1044,7 +1053,7 @@ def main():
 
 	if state == 'started':
 		msg = "oracle_home: %s db_name: %s sid: %s db_unique_name: %s" % (oracle_home, db_name, sid, db_unique_name)
-		if not check_db_exists(module, msg, oracle_home,db_name, sid, db_unique_name):
+		if not check_db_exists(module, oracle_home,db_name, sid, db_unique_name):
 			msg = "Database not found. %s" % msg
 			module.fail_json(msg=msg, changed=False)
 		else:
@@ -1062,7 +1071,7 @@ def main():
 
 
 	elif state == 'present':
-		if not check_db_exists(module, msg, oracle_home,db_name, sid, db_unique_name):
+		if not check_db_exists(module, oracle_home,db_name, sid, db_unique_name):
 			if create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb, local_undo, datafile_dest, recoveryfile_dest,
 						storage_type, dbconfig_type, racone_service, characterset, memory_percentage, memory_totalmb, nodelist, db_type, amm, initparams, customscripts,datapatch, domain):
 				newdb = True
@@ -1075,7 +1084,7 @@ def main():
 			# module.exit_json(msg=msg, changed=False)
 
 	elif state == 'absent':
-		if check_db_exists(module, msg, oracle_home, db_name, sid, db_unique_name):
+		if check_db_exists(module, oracle_home, db_name, sid, db_unique_name):
 			if remove_db(module, msg, oracle_home, db_name, sid, db_unique_name, sys_password):
 				msg = 'Successfully removed database %s' % (db_name)
 				module.exit_json(msg=msg, changed=True)
