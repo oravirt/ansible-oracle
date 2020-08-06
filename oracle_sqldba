@@ -39,10 +39,11 @@ options:
     creates_sql:
         description:
             - This is the check query to ensure idempotence.
-            - Must be a single SQL select that results to no rows or a plain 0 if the catcon_pl/sqlscript/sql has to be executed. Any other result let the catcon_pl/sqlscript/sql execute.
+            - Must be a single SQL select that results to no rows or a plain 0 if the catcon_pl/sqlscript/sql has to be executed. Any other result prevent the execution of catcon_pl/sqlscript/sql.
             - The catcon_pl/sqlscript/sql will be executed unconditionally if creates_sql is omitted.
             - Creates_sql must be omitted when sqlselect is used.
             - Creates_sql is executed with sqlplus / as sysdba in the root container. Write the sql query according to this fact.
+            - If pdb_list is given (implicitely whith all_pdbs) creates_sql is executed in every PDB incl. CDB$ROOT. The pdb_list will be shortened according to the results of creates_sql in the PDBs.
         required: false
         default: None
     username:
@@ -71,6 +72,7 @@ options:
             - Optional list of PDB names
             - Space separated, as catcon.pl wants
             - Gets used only if scope is "pdbs"
+            - Will be automatically filled and used when scope = all_pdbs and action like sql%
         required: false
         default: None
     oracle_home:
@@ -79,6 +81,13 @@ options:
     oracle_db_name:
         description:
             - SID or DB_NAME, needed for BEQ connect
+    nls_lang:
+        description:
+            - set NLS_LANG to the given value
+    chdir:
+        description:
+            - Working directory for SQL/script execution
+
 author: Dietmar Uhlig, Robotron (www.robotron.de)
 '''
 
@@ -150,6 +159,7 @@ import os
 import re
 import shlex
 import shutil
+import tempfile
 from subprocess import Popen, PIPE
 from threading import Timer
 from ansible.module_utils.basic import AnsibleModule
@@ -161,9 +171,11 @@ changed = False
 result = ""
 err_msg = None
 oracle_home = ""
+pdb_list = ""
+sql_process = None
 
 # Maximum runtime for sqlplus and catcon.pl in seconds. 0 means no timeout.
-timeout = 900
+timeout = 0
 
 # dictify is based on https://stackoverflow.com/questions/2148119/how-to-convert-an-xml-string-to-a-dictionary/10077069#10077069
 def dictify(r,root=True):
@@ -194,63 +206,100 @@ def conn(username, password):
     else:
         return "conn " + "/".join([username, password]) + "\n"
 
-def sql_input(sql, username, password, scope, pdb_list):
+def sql_input(sql, username, password, pdb):
     sql_scr  = "set heading off echo off feedback off termout on\n"
     sql_scr += "set long 1000000 pagesize 0 linesize 1000 trimspool on\n"
     sql_scr += conn(username, password)
 
-    if scope == 'pdbs':
-        sql_scr += "whenever sqlerror exit\n"
-        for pdb in pdb_list.split():
-            sql_scr += "alter session set container = " + pdb + ";\n"
-            sql_scr += sql + "\n"
-    else:
-        sql_scr += sql + "\n"
+    if pdb is not None:
+        sql_scr += "alter session set container = " + pdb + ";\n"
+    sql_scr += sql + "\n"
     sql_scr += "exit;\n"
     return sql_scr
 
-def run_sql(sql, username, password, scope, pdb_list):
-    global changed, err_msg
+def kill_process():
+    global err_msg, sql_process
+
+    sql_process.kill()
+    err_msg = "Timeout occured after %d seconds. " % timeout
+
+def run_sql_p(sql, username, password, scope, pdb_list):
+    global changed, err_msg, sql_process
+
+    err_msg = ""
+    result = ""
+    if scope == 'pdbs':
+        for pdb in pdb_list.split():
+            result += run_sql(sql, username, password, pdb)
+    else:
+        result = run_sql(sql, username, password, None)
+    return result
+
+def run_sql(sql, username, password, pdb):
+    global changed, err_msg, sql_process
 
     t = None
     try:
-        sql_cmd = sql_input(sql, username, password, scope, pdb_list)
-        p = Popen(sqlplus(), stdin = PIPE, stdout = PIPE, stderr = PIPE)
+        sql_cmd = sql_input(sql, username, password, pdb)
+        sql_process = Popen(sqlplus(), stdin = PIPE, stdout = PIPE, stderr = PIPE)
         if timeout > 0:
-            t = Timer(timeout, p.kill)
+            t = Timer(timeout, kill_process)
             t.start()
-        [sout, serr] = p.communicate(input = sql_cmd)
+        [sout, serr] = sql_process.communicate(input = sql_cmd)
     except Exception as e:
-        err_msg = 'Could not call sqlplus. %s. called: %s.' % (to_native(e), " ".join(sqlplus()))
-        return "ERR"
+        err_msg += 'Could not call sqlplus. %s. called: %s.' % (to_native(e), " ".join(sqlplus()))
+        return "[ERR]"
     finally:
         if timeout > 0 and t is not None:
             t.cancel()
-    if p.returncode != 0:
-        err_msg = "called: " + sql_cmd + "\nresult: " + sout + ". stderr = " + serr + "."
-        return "ERR"
-    sqlplus_err = re.compile("^(ORA|TNS|SP2)-", re.MULTILINE)
-    if sqlplus_err.search(sout):
-        err_msg = "sqlplus# " + sql_cmd + ": " + sout + "."
-        return "ERR"
+    if sql_process.returncode != 0:
+        err_msg += "called: %s\nreturncode: %d\nresult: %s. stderr = %s." % (sql_cmd, sql_process.returncode, sout, serr)
+        return "[ERR]"
+    sqlerr_pat = re.compile("^(ORA|TNS|SP2)-[0-9]+", re.MULTILINE)
+    sqlplus_err = sqlerr_pat.search(sout)
+    if sqlplus_err:
+        err_msg += "[ERR] sqlplus: %s\nERR Code: %s.\n" % (sql_cmd, sqlplus_err.group())
+        return "[ERR]\n%s\n" % sout.strip()
 
     changed = True
     return sout.strip()
 
 
-def check_creates_sql(sql):
-    global result
+def check_creates_sql(sql, scope):
+    global pdb_list
 
     if not sql.endswith(";"):
         sql += ";"
-    result = run_sql(sql, None, None, None, None)
-    return False if not result or result == "0" else True
+    if scope == 'cdb':
+        res = run_sql(sql, None, None, None)
+        # error handling see call of check_creates_sql
+        return False if not res or res == "0" else True
+    else:
+        checked_pdb_list = ""
+        for pdb in pdb_list.split():
+            res = run_sql(sql, None, None, pdb)
+            # error handling see call of check_creates_sql
+            if not res or res == "0":
+                checked_pdb_list += " " + pdb
+        pdb_list = checked_pdb_list.lstrip()
+        return True if pdb_list == "" else False
 
 
-def run_catcon_pl(catcon_pl, pdb_list):
+def is_container():
+    return run_sql("select cdb from gv$database;", None, None, None) == 'YES'
+
+def get_all_pdbs():
+    global result, pdb_list
+
+    sql  = "select listagg(pdb_name, ' ') within group (order by pdb_name) from dba_pdbs where status = 'NORMAL' and pdb_name <> 'PDB$SEED';"
+    pdb_list = 'CDB$ROOT ' + run_sql(sql, None, None, None)
+
+
+def run_catcon_pl(catcon_pl):
     # after pre-processing in main() the parameter scope is not necessary any more
-    global oracle_home, changed, result, err_msg
+    global oracle_home, changed, result, err_msg, pdb_list, sql_process
 
+    err_msg = ""
     catcon_pl = re.sub("^(\$ORACLE_HOME|\?)", oracle_home, catcon_pl)
     logdir = tempfile.mkdtemp()
     catcon_cmd = [ os.path.join(oracle_home, "perl", "bin", "perl"),
@@ -265,13 +314,13 @@ def run_catcon_pl(catcon_pl, pdb_list):
         catcon_cmd += [ "-a", "1" ]
     catcon_cmd += [ "--" ] + cc_script
     try:
-        p = Popen(catcon_cmd, stdout = PIPE, stderr = PIPE)
+        sql_process = Popen(catcon_cmd, stdout = PIPE, stderr = PIPE)
         if timeout > 0:
-            t = Timer(timeout, p.kill)
+            t = Timer(timeout, kill_process)
             t.start()
-        [sout, serr] = p.communicate()
+        [sout, serr] = sql_process.communicate()
     except Exception as e:
-        err_msg = 'Could not call perl. %s. called: %s.' % (to_native(e), " ".join(catcon_cmd))
+        err_msg += 'Could not call perl. %s. called: %s.' % (to_native(e), " ".join(catcon_cmd))
         return
     finally:
         if timeout > 0:
@@ -281,16 +330,16 @@ def run_catcon_pl(catcon_pl, pdb_list):
         except OSError as exc:
             if exc.errno != errno.ENOENT:
                 raise
-    if p.returncode != 0:
-        err_msg = "called: " + " ".join(catcon_cmd) + "\nresult: " + sout + ".\nstderr = " + serr + "."
+    if sql_process.returncode != 0:
+        err_msg += "called: %s\nreturncode: %d\nresult: %s\nstderr = %s." % (" ".join(catcon_cmd), sql_process.returncode, sout, serr)
         return
-    result = sout
+    result += sout
     changed = True
 
 
 
 def main():
-    global oracle_home, changed, result, err_msg
+    global oracle_home, changed, result, err_msg, pdb_list
 
     module = AnsibleModule(
         argument_spec = dict(
@@ -304,7 +353,9 @@ def main():
             scope          = dict(required = False, choices = ["default", "db", "cdb", "pdbs", "all_pdbs"], default = 'default'),
             pdb_list       = dict(required = False),
             oracle_home    = dict(required = True),
-            oracle_db_name = dict(required = True)
+            oracle_db_name = dict(required = True),
+            nls_lang       = dict(required = False),
+            chdir          = dict(required = False)
         ),
         mutually_exclusive=[['sql', 'sqlscript', 'catcon_pl', 'sqlselect'], ['sqlselect', 'creates_sql']]
     )
@@ -320,46 +371,64 @@ def main():
     pdb_list       = module.params["pdb_list"]
     oracle_home    = module.params["oracle_home"]
     oracle_db_name = module.params["oracle_db_name"]
+    nls_lang       = module.params["nls_lang"]
+    workdir        = module.params["chdir"]
 
     os.environ["ORACLE_HOME"] = oracle_home
     os.environ["ORACLE_SID"] = oracle_db_name
     os.environ["PATH"] += os.pathsep + os.path.join(oracle_home, "bin")
+    if nls_lang is not None:
+        os.environ["NLS_LANG"] = nls_lang
 
     if scope == 'db':
         scope = 'cdb'
     if scope == 'default':
         scope = "all_pdbs" if catcon_pl is not None else "cdb"
-    if scope == 'pdbs' and pdb_list.strip() == "":
+    if scope == 'pdbs' and (pdb_list is None or pdb_list.strip() == ""):
         module.exit_json(msg = "scope = pdbs, but pdb_list is empty", changed = False)
     if scope == 'cdb' and catcon_pl is not None:
-        scope = pdbs
+        scope = 'pdbs'
         pdb_list = 'CDB$ROOT'
-    if scope == 'all_pdbs' and catcon_pl is None:
-        module.fail_json(msg = "scope = all_pdbs not implemented for sql, sqlscript, and sqlselect", changed = False)
+    if scope == 'all_pdbs' and (catcon_pl is None or creates_sql is not None):
+        if is_container():
+            scope = 'pdbs'
+            get_all_pdbs()
+        else:
+            scope = 'cdb'
+
+    if workdir is not None:
+        try:
+            os.chdir(workdir)
+        except Exception as e:
+            module.fail_json(msg = 'Could not chdir to %s: %s.' % (workdir, to_native(e)), changed = False)
 
     if creates_sql is not None:
-        already_done = check_creates_sql(creates_sql)
+        already_done = check_creates_sql(creates_sql, scope)
         if err_msg:
-            module.fail_json(msg = err_msg, changed = False)
+            module.fail_json(msg = "%s\n%s" % (result, err_msg), changed = False)
         else:
             if already_done:
                 module.exit_json(msg = result, changed = False)
 
+    if pdb_list is not None:
+        result = "Run on these PDBs: %s\n" % pdb_list
+        
     if sqlselect is not None:
         if sqlselect.endswith(";"):
             sqlselect.rstrip(";")
         sqlselect = "select dbms_xmlgen.getxml('" + sqlselect.replace("'", "''") + "') from dual;"
-        result = run_sql(sqlselect, username, password, scope, pdb_list)
+        result = run_sql_p(sqlselect, username, password, scope, pdb_list)
     elif sql is not None:
-        if not sql.endswith(";"):
+        sql = os.linesep.join([s for s in sql.splitlines() if s.strip()])
+        if not sql.endswith(";") and not sql.endswith("/"):
             sql += ";"
-        result = run_sql(sql, username, password, scope, pdb_list)
+        result += run_sql_p(sql, username, password, scope, pdb_list)
     elif sqlscript is not None:
         if not sqlscript.startswith("@"):
             sqlscript = "@" + sqlscript
-        result = run_sql(sqlscript, username, password, scope, pdb_list)
+        result += run_sql_p(sqlscript, username, password, scope, pdb_list)
     elif catcon_pl is not None:
-        run_catcon_pl(catcon_pl, pdb_list)
+        run_catcon_pl(catcon_pl)
 
     if not err_msg:
         if sqlselect is not None:
@@ -368,7 +437,7 @@ def main():
         else:
             module.exit_json(msg = result, changed = changed)
     else:
-        module.fail_json(msg = err_msg, changed = False)
+        module.fail_json(msg = "%s\n%s" % (result, err_msg), changed = changed)
 
 
 if __name__ == '__main__':
