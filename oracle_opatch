@@ -296,16 +296,20 @@ def stop_process(module, oracle_home):
                elif len(line.split(':')) >= 2 and line.split(':')[1] == oracle_home:
 
                    # Find listener for ORACLE_HOME
-                   p = subprocess.Popen('ps -elf| grep "[0-9] %s/bin/tnslsnr"' % (line.split(':')[1]) , shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                   p = subprocess.Popen('ps -o cmd -C tnslsnr | grep "^%s/bin/tnslsnr "' % (line) , shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                    output, error = p.communicate()
                    p_status = p.wait()
 
                    if output:
                        for lline in output.split('\n'):
 
-                           linelist = lline.split(' ')
-                           if len(lline) > 3:
-                               listener_name = linelist[-2]
+                           proclen = len("%s/bin/tnslsnr " % (oracle_home))
+
+                           # remove executable from ps output, split by ' '
+                           # => 1st element is listener_name
+                           # ps example: /.../bin/tnslsnr LISTENER -inherit
+                           listener_name = lline[proclen:].split(' ')[0]
+                           if len(listener_name) > 0:
                                lsnrctl_bin = '%s/bin/lsnrctl' % (oracle_home)
                                try:
                                    p = subprocess.check_call([lsnrctl_bin, 'stop', '%s' % listener_name])
