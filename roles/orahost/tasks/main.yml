@@ -5,7 +5,8 @@
     assert:
       that:
         - "ansible_os_family == '{{ os_family_supported }}'"
-        - "ansible_distribution_version | version_compare('{{ os_min_supported_version }}', '>=')"
+#        - "ansible_distribution_version | version_compare('{{ os_min_supported_version }}', '>=')"
+        - "ansible_distribution_version is version('{{ os_min_supported_version }}', '>=')"
     tags:
      - oscheck
 
@@ -101,14 +102,14 @@
      - user
 
   - name: User | Add Oracle user to sudoers
-    template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0600
+    template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0440
     with_items: "{{oracle_users}}"
     when: configure_oracle_sudo
     tags:
      - sudoadd
 
   - name: User | Add Grid user to sudoers
-    template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0600
+    template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0440
     with_items: "{{grid_users}}"
     when: role_separation and configure_oracle_sudo
     tags:
