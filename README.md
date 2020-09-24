@@ -7,7 +7,7 @@
 
 Pre-requisites:
 
-- Ansible >= 2.4
+- Ansible >= 2.5
 - Oracle Linux (or any RHEL-based Linux System) >= 6.4
 - Oracle Database/Grid Infrastructure 18.3.0.0, 12.2.0.1, 12.1.0.1, 12.1.0.2, 11.2.0.4, 11.2.0.3
 - For example configurations, look in:
