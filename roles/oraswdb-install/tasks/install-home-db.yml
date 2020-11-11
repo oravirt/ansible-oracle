@@ -44,10 +44,14 @@
 # oracle_EE_options = '' => Nothing to do
 # licence options in 11.2+ must be changed by chopt
 # => use this method for all >= 11.2 (Doc ID 948061.1)
-# test -f => reduce number of executions when > 1 database in oracle_databases for same ORACLE_HOME
+# touch a statefile instead checking the logfile from chopt
 # we cannot use default/main.yml here. => complicated structure for 'enabled' 'disabled'...
 - name: install-home-db | Change Database options with chopt
-  shell: "test -f {{ oracle_home_db }}/install/{{ item.state | replace(true, 'enable') | replace(false, 'disable') }}_{{item.option}}.log || {{ oracle_home_db }}/bin/chopt {{ item.state | replace(true, 'enable') | replace(false, 'disable') }} {{item.option}}"
+  shell: |
+    {{ oracle_home_db }}/bin/chopt {{ item.state | replace(true, 'enable') | replace(false, 'disable') }} {{item.option}} \
+    && touch {{ oracle_home_db }}/install/chopt_{{item.option}}_{{ item.state }}.state
+  args: 
+    creates: "{{ oracle_home_db }}/install/chopt_{{item.option}}_{{ item.state }}.state"
   with_items:
     - "{{oracle_EE_options}}"
   become: yes
