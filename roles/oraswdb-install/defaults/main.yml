@@ -78,6 +78,10 @@
                    {%- elif ansible_os_family == 'Suse'   and ansible_distribution_major_version | int >= 12 %}systemd
                    {%- else %}{% if ansible_service_mgr is defined %}{{ ansible_service_mgr }}{% else %}init{% endif %}{% endif %}"
 
+  forcechopt: false
+  # choptcheck is a dummy for 'creates' during chopt-task to force an execution
+  choptcheck: "{% if forcechopt | bool %}dochopt{% endif %}"
+
   disable_EE_options: True
   oracle_EE_options: "{%- if   db_homes_config[dbh.home]['version'] in ('18.3.0.0') %}{{ oracle_EE_options_183 }}
                       {%- elif db_homes_config[dbh.home]['version'] in ('19.3.0.0') %}{{ oracle_EE_options_193 }}
