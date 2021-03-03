@@ -22,7 +22,7 @@
     create: True
     group: "{{ oracle_group }}"
     owner: "{{ oracle_user }}"
-    state: present
+    state: "{{ tnsinst.state | default('present') }}"
     mode: 0644
     insertafter: "EOF"
     marker: "# {mark} Ansible managed for  {{ tnsinst.tnsname }}"
