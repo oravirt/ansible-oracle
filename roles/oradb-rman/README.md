@@ -136,6 +136,16 @@ The following variables are global. They are not part of oracle_databases!
 
   This parameter must be defined. Otherwise the assert of the role will fail, because there is no usable default for this directory.
 
+* rman_fra_backupdir
+
+  The target directory when you use the templates to backup the FRA to another disk (usually nfs).
+
+* rmanautofs and rmanautofsmount
+
+  When `rmanautofs: true`, then autofs is implemented to mount `rmanautofsmount` similar to "/net".
+  Usually, you may then specify the nfs server and the corresponding export in `rman_channel_disk`.
+
+
 ## Howtos
 ### How to configure the RMAN scripts?
 The role copies the templatefiles from role/oradb-rman/templates to $ORACLE_BASE/admin/<DB_NAME>/rman. The name in the list defines the name of the template with .j2 as extension.
@@ -145,6 +155,6 @@ The role copies the templatefiles from role/oradb-rman/templates to $ORACLE_BASE
 The dictionary elements name, disabled, day, weekday, hour, minute are mandatory. The creation of cron only starts when every element is defined.
 
 ### How to use custom RMAN scripts?
-Copy the script into the template directory `role/oradb-rman/templates` and add a `- name: <filename>` at `rman_jobs`. The filename must end with `.rman.j2` regardless of Junja2 in the file. You could use your own variables in the custom files and add entries to `rman_jobs`. They will be added as item.1.<dictionaryelement> to the template.
+Copy the script into the template directory `role/oradb-rman/templates` and add a `- name: <filename>` at `rman_jobs`. The filename must end with `.rman.j2` regardless of Jinja2 in the file. You could use your own variables in the custom files and add entries to `rman_jobs`. They will be added as item.1.<dictionaryelement> to the template.
 Please do not edit existing files. They could be changed in future releases of oradb-rman.
 
