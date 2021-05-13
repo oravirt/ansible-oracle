@@ -5,7 +5,7 @@
     assert:
       that:
         - "ansible_os_family == '{{ os_family_supported }}'"
-        - "ansible_distribution_version | version_compare('{{ os_min_supported_version }}', '>=')"
+        - "ansible_facts['distribution_version'] is version('{{ os_min_supported_version }}', '>=')"
     tags:
      - oscheck
 
@@ -19,8 +19,7 @@
     tags: os_packages, oscheck
 
   - name: Install packages required by Oracle on SLES
-    zypper: name={{ item }} state=installed
-    with_items: "{{ oracle_packages_sles }}"
+    zypper: name={{ oracle_packages_sles }} state=installed
     when: install_os_packages and ansible_os_family == 'Suse'
     tags: os_packages, oscheck
 
@@ -34,8 +33,7 @@
     tags: os_packages, oscheck
 
   - name: Install packages required by Oracle for ASMlib on SLES
-    zypper: name={{ item }} state=installed
-    with_items: "{{ oracle_asm_packages_sles }}"
+    zypper: name={{ oracle_asm_packages_sles }} state=installed
     when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'Suse' and asm_diskgroups is defined
     tags: os_packages, oscheck, asm1
 

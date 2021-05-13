@@ -17,6 +17,10 @@
 #     - "~/.ssh/authorized_keys"
 #    tags:
 #     - keys
+  - name: Check for correct Ansible Version (>= 2.8)
+    assert:
+      that:
+        - "ansible_version.full is version('2.8', '>=')"
 
   - name: Install EPEL Repo
     yum: name={{ epel_rpm }} state=installed
@@ -48,8 +52,7 @@
       - commonpackages
 
   - name: Install common packages SLES12
-    zypper: name={{ item }} state=installed
-    with_items: "{{ common_packages_sles }}"
+    zypper: name={{ common_packages_sles }} state=installed
     when: install_os_packages and ansible_os_family == 'Suse'
     tags:
       - commonpackages
