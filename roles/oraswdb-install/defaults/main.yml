@@ -1,5 +1,4 @@
 ---
-# master_node: true
 
 hostgroup: "{{ group_names[0] }}"
 hostgroup_hub: "{{ hostgroup }}-hub"
@@ -74,6 +73,14 @@ forcechopt: false
 # choptcheck is a dummy for 'creates' during chopt-task to force an execution
 choptcheck: "{% if forcechopt | bool %}dochopt{% endif %}"
 
+# ulimit and systemd has diferent definitions for the unit.
+# sysctlfactor as a factor on top of the value from ulimit.
+ulimit_systemd_mapping:
+  'hard nproc': {name: LimitNPROC}
+  'hard nofile': {name: LimitNOFILE}
+  'hard stack': {name: LimitSTACK, sysctlfactor: 1024}
+  'hard memlock': {name: LimitMEMLOCK, sysctlfactor: 1024}
+
 disable_EE_options: true
 
 oracle_EE_options: "{%- if   db_homes_config[dbh.home]['version'] in ('18.3.0.0') %}{{ oracle_EE_options_183 }}
@@ -138,6 +145,7 @@ oracle_directories:
 glogin_default_nocdb:
   - "set sqlprompt \"_user @ _connect_identifier:>\""
   - "set time on"
+
 glogin_default_cdb:
   - "define gname=idle"
   - "column global_name new_value gname"
