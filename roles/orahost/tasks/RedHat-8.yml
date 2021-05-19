@@ -1,0 +1,17 @@
+- name: Disable Transparent Hugepages (runtime)
+  shell: if test -f {{ item.path }}; then {{ item.disable }} {{ item.path }}; fi;
+  with_items:
+      - "{{ transparent_hugepage_disable }}"
+  tags: tphnuma
+
+- name: Disable Transparent Hugepages (permanently)
+  lineinfile: dest={{ item.rclocal}} line="{{ item.disable }} {{ item.path }}" state=present
+  with_items:
+      - "{{ transparent_hugepage_disable }}"
+  tags: tphnuma
+
+- name: Fix permissions on /etc/rc.d/rc.local
+  file: path={{ item.rclocal}} mode=755
+  with_items:
+      - "{{ transparent_hugepage_disable }}"
+  tags: tphnuma
