@@ -138,14 +138,14 @@ def check_user_exists(msg, cursor, schema):
 	except cx_Oracle.DatabaseError as exc:
 			error, = exc.args
 			msg = error.message+ 'sql: ' + sql
-			return False
+			module.fail_json(msg=msg)
 
 	if result > 0:
 		msg = 'The schema (%s) already exists' % schema
 		return True
 
 # Create the user/schema
-def create_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, profile, authentication_type, state, container, container_data, grants):
+def create_user(module, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, profile, authentication_type, state, container, container_data, grants):
 	grants_list=[]
 	total_sql = []
 	if not (schema):
@@ -199,12 +199,12 @@ def create_user(module, msg, cursor, schema, schema_password, schema_password_ha
 
 	# module.exit_json(msg=total_sql, changed=True)
 	for a in total_sql:
-		execute_sql(module, msg, cursor, a)
+		execute_sql(module, cursor, a)
 
 	return True
 
 # Get the current password hash for the user
-def get_user_password_hash(module, msg, cursor, schema):
+def get_user_password_hash(module, cursor, schema):
 	sql = 'select password from sys.user$ where name = upper(\'%s\')' % schema
 	try:
 			cursor.execute(sql)
@@ -217,7 +217,7 @@ def get_user_password_hash(module, msg, cursor, schema):
 	return pwhashresult
 
 # Modify the user/schema
-def modify_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, update_password, profile, authentication_type, state, container_data):
+def modify_user(module, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, update_password, profile, authentication_type, state, container_data):
 
 	sql_get_curr_def = 'select lower(account_status)'
 	sql = 'alter user %s' % schema
@@ -227,7 +227,7 @@ def modify_user(module, msg, cursor, schema, schema_password, schema_password_ha
 			if schema_password_hash:
 				sql += ' identified by values \'%s\'' % (schema_password_hash)
 			elif schema_password:
-				sql += ' identified by \"%s\" ' % (schema_password)
+				sql += ' identified by %s ' % (schema_password)
 		elif authentication_type == 'external':
 			sql += ' identified externally '
 			sql_get_curr_def += ' ,lower(authentication_type)'
@@ -284,49 +284,51 @@ def modify_user(module, msg, cursor, schema, schema_password, schema_password_ha
 	sql_get_curr_def += ' from dba_users where username = upper(\'%s\')' % schema
 
 	if update_password == 'always':
-		old_pw_hash = get_user_password_hash(module, msg, cursor, schema)
+		old_pw_hash = get_user_password_hash(module, cursor, schema)
 
-	curr_defaults = execute_sql_get(module, msg, cursor, sql_get_curr_def)
+	wanted_list = [x.lower() for x in wanted_list]
+	curr_defaults = execute_sql_get(module, cursor, sql_get_curr_def)
 	curr_defaults = [list(t) for t in curr_defaults]
 
 	if (schema_password_hash):
 		if update_password == 'always':
-			if (wanted_list in curr_defaults) and (old_pw_hash == schema_password_hash):
-				# Everything is kosher, exit changed=False
-				module.exit_json(msg='The schema (%s) is in the intented state' % (schema), changed=False)
-			else:
-				# Make the change and exit changed=True
-				execute_sql(module, msg, cursor, sql)
+			# if (wanted_list in curr_defaults) and (old_pw_hash == schema_password_hash):
+			# 	# Everything is kosher, exit changed=False
+			# 	module.exit_json(msg='The schema (%s) is in the intented state' % (schema), changed=False)
+			# else:
+			# 	# Make the change and exit changed=True
+				execute_sql(module, cursor, sql)
 				module.exit_json(msg='Successfully altered the user (%s)' % (schema), changed=True)
 		else:
 			if (wanted_list in curr_defaults):
 				module.exit_json(msg='The schema (%s) is in the intented state' % (schema), changed=False)
 			else:
 				# Make the change and exit changed=Truecontainer = module.params["container"]
-				execute_sql(module, msg, cursor, sql)
+				execute_sql(module, cursor, sql)
 				module.exit_json(msg='Successfully altered the user (%s)' % (schema), changed=True)
 	else:
 		if (wanted_list in curr_defaults):
 			if update_password == 'always':
+				## DISABLING THE PRE/POST-CHECK
 				# change everything and compare hash pre/post. If same => exit change=False else exit change=True
-				execute_sql(module, msg, cursor, sql)
-				new_pw_hash = get_user_password_hash(module, msg, cursor, schema)
-				if new_pw_hash == old_pw_hash:
-					module.exit_json(msg='The schema (%s) is in the intented state' % (schema), changed=False)
-				else:
-					module.exit_json(msg='Successfully altered the user (%s)' % (schema), changed=True)
+				execute_sql(module, cursor, sql)
+				# new_pw_hash = get_user_password_hash(module, cursor, schema)
+				# if new_pw_hash == old_pw_hash:
+				# 	module.exit_json(msg='The schema (%s) is in the intented state' % (schema), changed=False)
+				# else:
+				module.exit_json(msg='Successfully altered the user (%s)' % (schema), changed=True)
 			else:
 				 module.exit_json(msg='The schema (%s) is in the intented state' % (schema), changed=False)
 		else:
 			# do the complete change -> exit with change=True
 			# module.exit_json(msg=sql)
-			execute_sql(module, msg, cursor, sql)
+			execute_sql(module, cursor, sql)
 			module.exit_json(msg='Successfully altered the user (%s, %s)' % (schema, sql), changed=True)
 
 	return True
 
 # Run the actual modification
-def execute_sql(module, msg, cursor, sql):
+def execute_sql(module, cursor, sql):
 
 	try:
 		cursor.execute(sql)
@@ -334,11 +336,10 @@ def execute_sql(module, msg, cursor, sql):
 		error, = exc.args
 		msg = 'Blergh, something went wrong while executing sql - %s sql: %s' % (error.message, sql)
 		module.fail_json(msg=msg, changed=False)
-		return False
 
 	return True
 
-def execute_sql_get(module, msg, cursor, sql):
+def execute_sql_get(module, cursor, sql):
 
 	try:
 			cursor.execute(sql)
@@ -352,7 +353,7 @@ def execute_sql_get(module, msg, cursor, sql):
 
 
 # Drop the user
-def drop_user(module, msg, cursor, schema):
+def drop_user(module, cursor, schema):
 	black_list = ['sys','system','dbsnmp']
 	if schema.lower() in black_list:
 
@@ -366,7 +367,7 @@ def drop_user(module, msg, cursor, schema):
 	except cx_Oracle.DatabaseError as exc:
 		error, = exc.args
 		msg = 'Blergh, something went wrong while dropping the schema - %s sql: %s' % (error.message, sql)
-		return False
+		module.fail_json(msg=msg)
 
 	return True
 
@@ -463,30 +464,26 @@ def main():
 
 	if state not in ('absent'):
 		if not check_user_exists(msg, cursor, schema):
-			if create_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, profile, authentication_type, state, container, container_data, grants):
+			if create_user(module, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, profile, authentication_type, state, container, container_data, grants):
 				msg = 'The schema %s has been created successfully' % (schema)
 				module.exit_json(msg=msg, changed=True)
-			else:
-				module.fail_json(msg=msg, changed=False)
 		else:
-			modify_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, update_password, profile, authentication_type, state, container_data)
+			modify_user(module, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, update_password, profile, authentication_type, state, container_data)
 
 	# elif state in ('unlocked','locked', ''):
 	# 	if not check_user_exists(msg, cursor, schema):
-	# 		# if create_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, profile, authentication_type, state, container, grants):
+	# 		# if create_user(module, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, profile, authentication_type, state, container, grants):
 	# 		msg = 'The schema %s doesn\'t exist' % schema
 	# 		module.fail_json(msg=msg, changed=False)
 	# 	else:
-	# 		modify_user(module, msg, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, update_password, profile, authentication_type, state)
+	# 		modify_user(module, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, update_password, profile, authentication_type, state)
 
 
 	elif state == 'absent':
 		if check_user_exists(msg, cursor, schema):
-			if drop_user(module, msg, cursor, schema):
+			if drop_user(module, cursor, schema):
 				msg = 'The schema (%s) has been dropped successfully' % schema
 				module.exit_json(msg=msg, changed=True)
-			else:
-				module.fail_json(msg=msg[0], changed=False)
 		else:
 			module.exit_json(msg='The schema (%s) doesn\'t exist' % schema, changed=False)
 
