@@ -1049,12 +1049,12 @@ def main():
 			module.fail_json(msg=msg, changed=False)
 		else:
 			start_db_state = start_db (module, msg, oracle_home, db_name, db_unique_name, sid)
-                        if start_db_state == 'changed':
+			if start_db_state == 'changed':
 				msg = "Database started."
 				module.exit_json(msg=msg, changed=True)
-                        if start_db_state == 'ok':
-				msg = "Database already running."
-				module.exit_json(msg=msg, changed=False)
+			elif start_db_state == 'ok':
+					msg = "Database already running."
+					module.exit_json(msg=msg, changed=False)
 			else:
 				msg = "Startup failed. %s" % msg
 				module.fail_json(msg=msg, changed=False)
