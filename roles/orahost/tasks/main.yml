@@ -258,8 +258,28 @@
   - name: Oracle hugepages
     sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes ignoreerrors=yes
     with_items: "{{oracle_hugepages}}"
+    register: systclcmd
     tags: sysctl,hugepages
 
+  # There is no safe way to allocate Hugepages in a running system.
+  # => A reboot should be done after changing the configuration
+  # => we won't reboot during installation
+  # Work Arroud:
+  # => Flush File Cache
+  # => retry a sysctl -p
+  - block:
+    - name: Flush Buffer Cache when hugepages have been changed
+      command: echo 2 > /proc/sys/vm/drop_caches
+      tags: sysctl,hugepages
+
+    - name: Try sysctl again
+      sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes
+      with_items: "{{oracle_hugepages}}"
+      tags: sysctl,hugepages
+    when:
+      - systclcmd is defined
+      - systclcmd.changed
+    tags: sysctl,hugepages
 
   - name: Oracle-recommended PAM config
     lineinfile: dest=/etc/pam.d/login state=present line="session required pam_limits.so"
