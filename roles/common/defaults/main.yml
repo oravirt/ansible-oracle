@@ -20,6 +20,9 @@
   configure_public_yum_repo: true
   configure_motd: true
   configure_ntp: true
+  ntp_type: "{%- if ansible_distribution_major_version|int>=8 %}chrony
+             {%- else %}ntp
+             {%- endif %}"
   common_packages: "{%- if ansible_distribution_major_version|int==6%}{{ common_packages_el6 }}
                     {%- elif ansible_distribution_major_version|int==7 %}{{ common_packages_el7 }}
                     {%- elif ansible_distribution_major_version|int==8 %}{{ common_packages_el8 }}
@@ -174,7 +177,7 @@
 #      - collectl
 #      - rlwrap
 #      - tigervnc-server
-      - ntp
+      - chrony
       - expect
 #      - git
       - lvm2
