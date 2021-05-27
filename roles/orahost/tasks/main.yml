@@ -69,6 +69,25 @@
     register: disable_selinux_runtime
     tags: selinux
 
+  - block:
+    - name: Set Timezone
+      timezone:
+        name: "{{ os_timezone }}"
+        hwclock: "{{ os_hwclock | default(omit) }}"
+      register: timezoneresult
+      tags: timezone
+
+    - name: Restart crond after timezone change
+      service:
+        name: crond
+        state: restarted
+      when: 
+        - timezoneresult is defined
+        - timezoneresult.changed
+      tags: timezone
+
+    when: os_timezone is defined
+
   - name: Check dns for host
     command: host {{ ansible_hostname }}
     register: ns
