@@ -9,13 +9,17 @@
     tags:
      - oscheck
 
-  - name: Install packages required by Oracle on OL/RHEL
+  # OL8/RHEL8 has all needed RPMs in orahost role!
+  - name: Install packages required by Oracle on OL/RHEL version 6 and 7
     yum:
        name: "{{ oracle_packages }}"
        state: installed
        enablerepo: "{{ extrarepos_enabled |default (omit, True) }}"
        disablerepo: "{{ extrarepos_disabled |default (omit, True) }}"
-    when: install_os_packages and ansible_os_family == 'RedHat'
+    when: 
+      - install_os_packages
+      - ansible_os_family == 'RedHat'
+      - "facter_os.release.major is version('7', '<=')"
     tags: os_packages, oscheck
 
   - name: Install packages required by Oracle on SLES
