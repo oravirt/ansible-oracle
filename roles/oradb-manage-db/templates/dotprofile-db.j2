@@ -46,7 +46,7 @@ get_sid=$(ps -ef | grep "ora_pmon_$ORACLE_DBNAME" |grep -v grep | sed 's/^.*pmon
         export RMANSCRIPTDIR={{ rman_script_dir | default(dbh.rman_script_dir | default(oracle_base + '/rman/script')) }}
 {% endif %}
 
-export PATH=$ORACLE_HOME/bin:$ORACLE_HOME/OPatch:$PATH:$SQLPATH:$GG_HOME/:$ORACLE_BASE/bin
+export PATH=$ORACLE_HOME/bin:$ORACLE_HOME/OPatch:$PATH:$SQLPATH:$GG_HOME/:$ORACLE_BASE/bin:$ORACLE_HOME/suptools/oratop
 
 # Set Up Aliases:
 {% if shell_aliases is defined %}
