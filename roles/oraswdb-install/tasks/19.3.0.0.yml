@@ -1,7 +1,7 @@
 
 - name: install-home-db | Extract files
   unarchive:
-      src={{ oracle_stage }}/{{ item[0].filename }}
+      src={{ oracle_stage }}/{{ oracle_sw_source_local }}/{{ db_homes_config[item[1].home].imagename | default(item[0].filename) }}
       dest={{ oracle_home_db }}
       copy=no
       creates="{{ oracle_home_db }}/{{ item[0].creates}}"
@@ -17,13 +17,15 @@
 
 - name: install-home-db | Extract files (from remote location)
   unarchive:
-      src={{ oracle_stage_remote }}/{{ item[0].filename }}
+      src={{ oracle_stage_remote }}/{{ db_homes_config[item[1].home].imagename | default(item[0].filename) }}
       dest={{ oracle_home_db }}
       copy=no
       creates="{{ oracle_home_db }}/{{ item[0].creates}}"
   with_nested:
     - "{{oracle_sw_image_db}}"
     - "{{db_homes_installed}}"
+  loop_control:
+    label: "{{ oracle_stage_remote }}/{{ db_homes_config[item[1].home].imagename | default(item[0].filename) | default('')}}"
   become: yes
   become_user: "{{ oracle_user }}"
   run_once: "{{ configure_cluster}}"

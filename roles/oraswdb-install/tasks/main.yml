@@ -36,7 +36,11 @@
     when: not is_sw_source_local and oracle_sw_copy
 
   - name: install-home-db | Transfer oracle installfiles to server (local)
-    copy: src={{ oracle_sw_source_local }}/{{ item[0].filename }} dest={{ oracle_stage }} mode=775 force=no
+    copy: 
+      src: "{{ oracle_sw_source_local }}/{{ db_homes_config[item[1].home].imagename | default(item[0].filename) }}"
+      dest: "{{ oracle_stage }}" 
+      mode: 775
+      force: no
     with_nested:
       - "{{oracle_sw_image_db}}"
       - "{{db_homes_installed}}"
