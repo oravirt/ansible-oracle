@@ -98,6 +98,12 @@
 
   opatcharchive: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/{% for opatchfile in oracle_opatch_patch if  opatchfile['version']==oracle_install_version_gi %}{{ opatchfile['filename'] }}{% endfor %}"
 
+  oracle_gi_image: "{%- if oracle_sw_copy %}{{ oracle_stage }}
+                  {%- else %}{{ oracle_stage_remote }}
+                  {%- endif %}
+                  {%- if oracle_install_image_gi is defined %}/{{ oracle_install_image_gi }}
+                  {%- else %}//{{ item.filename }}
+                  {%- endif %}"
 
   oracle_sw_image_gi:                                              # Files containing the installation media for Grid Infrastructure
        - { filename: LINUX.X64_193000_grid_home.zip, version: 19.3.0.0, creates: 'install/.img.bin' }
