@@ -1,0 +1,41 @@
+---
+- assert:
+    that: golden_image_dest is defined
+
+- block:
+
+  - name: Create destination directory for Golden-Image
+    file:
+      path: "{{ golden_image_dest }}/{{ dbh.home}}"
+      state: directory
+      mode: '0755'
+    with_items:
+      - "{{ db_homes_installed | unique }}"
+    loop_control:
+      label: "{{ golden_image_dest }}/{{ dbh.home | default('') }}"
+      loop_var: dbh
+    when:
+      - "db_version is version('18', '>=')"
+
+  - name: Create Golden-Image
+    command: "{{ oracle_home_db }}/runInstaller -silent -createGoldImage -destinationLocation {{ golden_image_dest }}/{{ dbh.home}}"
+    with_items:
+      - "{{ db_homes_installed | unique }}"
+    loop_control:
+      label: "{{ oracle_home_db | default('') }}"
+      loop_var: dbh
+    when:
+      - "db_version is version('18', '>=')"
+    register: createimage
+
+  - debug: msg="{{ item.stdout_lines }}"
+    with_items:
+      - "{{ createimage.results }}"
+    loop_control:
+      label: ""
+    when: createimage.results is defined
+
+  become: yes
+  become_user: "{{ oracle_user }}"
+  when:
+    - db_homes_installed is defined
