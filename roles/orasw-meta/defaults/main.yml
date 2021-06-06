@@ -114,3 +114,7 @@ db_version: "{%- if dbh is defined and db_homes_config[dbh.home] is defined -%}
                       {{db_homes_config[item.home]['version']}}
                  {%- endif -%}
              {%- endif -%}"
+
+oracle_home_gi: "{% if configure_cluster %}{{ oracle_home_gi_cl }}{% else %}{{ oracle_home_gi_so }}{% endif %}"
+oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Clustered)
+oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Stand Alone)
