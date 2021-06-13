@@ -39,6 +39,50 @@
   register:
   tags: responsefileswdb
 
+# unarchive Oracle RDBMS 12c+
+- block:
+  - name: install-home-db | Extract files
+    unarchive:
+        src={{ oracle_stage }}/{{ oracle_sw_source_local }}/{{ db_homes_config[dbh.home].imagename | default(item[0].filename) }}
+        dest={{ oracle_home_db }}
+        copy=no
+        creates="{{ oracle_home_db }}/{{ item[0].creates}}"
+    with_nested:
+      - "{{oracle_sw_image_db}}"
+      - "" # dummy to force item.0 instead of item.
+    become: yes
+    become_user: "{{ oracle_user }}"
+    run_once: "{{ configure_cluster}}"
+    when: 
+      - item[0].version == db_homes_config[dbh.home]['version'] 
+      - dbh.state|lower == 'present' 
+      - oracle_sw_copy 
+      - oracle_home_db not in existing_dbhome.stdout_lines
+    tags:
+      - oradbswunpack
+
+  - name: install-home-db | Extract files (from remote location)
+    unarchive:
+        src={{ oracle_stage_remote }}/{{ db_homes_config[dbh.home].imagename | default(item[0].filename) }}
+        dest={{ oracle_home_db }}
+        copy=no
+        creates="{{ oracle_home_db }}/{{ item[0].creates}}"
+    with_nested:
+      - "{{oracle_sw_image_db}}"
+      - "" # dummy to force item.0 instead of item.
+    become: yes
+    become_user: "{{ oracle_user }}"
+    run_once: "{{ configure_cluster}}"
+    when:
+      - item[0].version == db_homes_config[dbh.home]['version']
+      - dbh.state|lower == 'present'
+      - not oracle_sw_copy
+      - oracle_home_db not in existing_dbhome.stdout_lines
+    tags:
+      - oradbswunpack
+  when:
+    - db_homes_config[dbh.home]['version'] is version('12.2', '>=')
+
 - include_tasks: "{{ db_version }}.yml"
 
 # oracle_EE_options = '' => Nothing to do

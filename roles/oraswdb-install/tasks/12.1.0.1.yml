@@ -1,4 +1,4 @@
-
+---
 - name: install-home-db | Extract files to stage-area
   unarchive:
       src={{ oracle_stage }}/{{ item[0].filename }}
@@ -7,11 +7,14 @@
       creates="{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates}}"
   with_nested:
     - "{{oracle_sw_image_db}}"
-    - "{{db_homes_installed}}"
+    - "" # dummy to force item.0 instead of item.
   become: yes
   become_user: "{{ oracle_user }}"
   run_once: "{{ configure_cluster}}"
-  when: item[0].version == db_homes_config[item[1].home]['version'] and item[1].state|lower == 'present' and oracle_sw_copy and oracle_sw_unpack
+  when: 
+    - item[0].version == db_homes_config[dbh.home]['version']
+    - oracle_sw_copy
+    - oracle_sw_unpack
   tags:
     - oradbswunpack
 
@@ -23,11 +26,14 @@
       creates="{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates}}"
   with_nested:
     - "{{oracle_sw_image_db}}"
-    - "{{db_homes_installed}}"
+    - "" # dummy to force item.0 instead of item.
   become: yes
   become_user: "{{ oracle_user }}"
   run_once: "{{ configure_cluster}}"
-  when: item[0].version == db_homes_config[item[1].home]['version'] and item[1].state|lower == 'present'  and not oracle_sw_copy and oracle_sw_unpack
+  when:
+    - item[0].version == db_homes_config[dbh.home]['version']
+    - not oracle_sw_copy
+    - oracle_sw_unpack
   tags:
     - oradbswunpack
 
