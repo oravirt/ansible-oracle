@@ -85,6 +85,7 @@
   disable_EE_options: True
   oracle_EE_options: "{%- if   db_homes_config[dbh.home]['version'] in ('18.3.0.0') %}{{ oracle_EE_options_183 }}
                       {%- elif db_homes_config[dbh.home]['version'] in ('19.3.0.0') %}{{ oracle_EE_options_193 }}
+                      {%- elif db_homes_config[dbh.home]['version'] in ('21.3.0.0') %}{{ oracle_EE_options_213 }}
                       {%- elif db_homes_config[dbh.home]['version'] in ('12.2.0.1') %}{{ oracle_EE_options_122 }}
                       {%- elif db_homes_config[dbh.home]['version'] in ('12.1.0.1', '12.1.0.2') %}{{oracle_EE_options_121}}
                       {%- elif db_homes_config[dbh.home]['version'] == '11.2.0.4' %}{{oracle_EE_options_112}}
@@ -123,6 +124,12 @@
     - {option: partitioning , state: false }
     - {option: rat          , state: false }
 
+  oracle_EE_options_213:
+    - {option: oaa          , state: false }
+    - {option: olap         , state: false }
+    - {option: partitioning , state: false }
+    - {option: rat          , state: false }
+
   oracle_directories:
           - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
           - {name: "{{ oracle_rsp_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
@@ -151,6 +158,7 @@
         - "set time on"
 
   oracle_sw_image_db:
+       - { filename: LINUX.X64_213000_db_home.zip, version: 21.3.0.0, creates: 'install/.img.bin' }
        - { filename: LINUX.X64_193000_db_home.zip, version: 19.3.0.0, creates: 'install/.img.bin' }
        - { filename: LINUX.X64_180000_db_home.zip, version: 18.3.0.0, creates: 'install/.img.bin' }
        - { filename: linuxx64_12201_database.zip, version: 12.2.0.1, creates: 'database/runInstaller' }
