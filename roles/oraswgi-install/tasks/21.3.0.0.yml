@@ -1,0 +1,117 @@
+---
+
+  - name: install-home-gi | Extract files to ORACLE_HOME (gi)
+    unarchive: src={{ oracle_gi_image }}  dest={{ oracle_home_gi }} copy=no
+    with_items: "{{oracle_sw_image_gi}}"
+    loop_control:
+      label: "{{ oracle_gi_image | default ('') }}"
+    args:
+        creates: "{{ oracle_home_gi }}/root.sh"
+    become: yes
+    become_user: "{{ grid_install_user }}"
+    tags:
+      - oragridswunpack
+    when: 
+      - oracle_home_gi not in checkgiinstall.stdout 
+      - oracle_install_version_gi == item.version
+
+  # Check for an existing GRID_HOME before reinstallation of OPatch
+  - name: install-home-gi | Check for file GridSetup.sh
+    no_log: true
+    stat: path={{ oracle_home_gi }}/gridSetup.sh
+    register: stat_gridsetup_result
+    run_once: "{{ configure_cluster}}"
+    #when: master_node
+
+  - name: install-home-gi | State of GridSetup.sh
+    assert:
+      that: "stat_gridsetup_result.stat.exists == True"
+      msg: "Cannot find {{ oracle_home_gi }}/gridSetup.sh }}"
+    run_once: "{{ configure_cluster}}"
+    #when: master_node
+
+  - name: install-home-gi | Install cvuqdisk rpm
+    yum: name="{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}" state=present
+    when: configure_cluster
+    tags: cvuqdisk
+    ignore_errors: true
+
+  - name: install-home-gi | Recreate ORACLE_HOME (gi) on other nodes
+    file: name={{ oracle_home_gi }} state=absent
+    when: configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
+
+  - name: install-home-gi | Recreate ORACLE_HOME (gi) on other nodes
+    file: name={{ oracle_home_gi }}  mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+    when: configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
+
+  - name: install-home-gi | Setup response file for install (GI)
+    template: src=grid-install.rsp.{{ oracle_install_version_gi }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} owner="{{ grid_install_user }}" group={{ oracle_group }} mode=600 backup=yes
+    with_items: "{{asm_diskgroups}}"
+    run_once: "{{ configure_cluster}}"
+    tags:
+      - responsefilegi
+    when: oracle_home_gi not in checkgiinstall.stdout and item.diskgroup == oracle_asm_init_dg
+
+  - name: install-home-gi | Install Grid Infrastructure
+    shell: "{{ oracle_home_gi }}/gridSetup.sh -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -silent"
+    become: yes
+    become_user: "{{ grid_install_user }}"
+    run_once: "{{ configure_cluster}}"
+    tags:
+      - oragridinstall
+    when: oracle_home_gi not in checkgiinstall.stdout #and oracle_sw_unpack
+    register: giinstall
+    failed_when: giinstall.rc not in [0,6]
+
+  - debug: var=giinstall.stdout_lines
+    run_once: "{{ configure_cluster}}"
+    when: oracle_home_gi not in checkgiinstall.stdout and giinstall.changed
+
+  - include_role:
+          name: oraswgi-manage-patches
+    when: patch_before_rootsh and apply_patches_gi
+
+  - name: install-home-gi | Run oraInstroot script after installation
+    shell: "{{ oracle_inventory_loc }}/orainstRoot.sh"
+    become: yes
+    tags:
+      - runroot
+    when: oracle_home_gi not in checkgiinstall.stdout
+
+  - name: install-home-gi | Run root script after installation (Master Node)
+    shell: "{{ oracle_home_gi }}/root.sh"
+    become: yes
+    run_once: "{{ configure_cluster}}"
+    tags:
+      - runroot
+    when: oracle_home_gi not in checkgiinstall.stdout
+    register: rootmaster
+
+  - debug: var=rootmaster.stdout_lines
+    run_once: "{{ configure_cluster}}"
+    when: oracle_home_gi not in checkgiinstall.stdout
+
+  - name: install-home-gi | Run root script after installation (Other Nodes)
+    shell: "sleep {{ item.0 * 60 }}; {{ oracle_home_gi }}/root.sh"
+    become: yes
+    with_indexed_items: "{{groups[hostgroup]}}"
+    tags:
+      - runroot
+    #when: not master_node and oracle_home_gi not in checkgiinstall.stdout and inventory_hostname == item.1
+    when: configure_cluster and inventory_hostname != cluster_master and inventory_hostname == item.1 and oracle_home_gi not in checkgiinstall.stdout
+    register: rootother
+
+  - debug: var=rootother.stdout_lines
+    when: configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
+    ignore_errors: True
+
+  - name: install-home-gi | Execute ConfigTools
+    shell: "{{ oracle_home_gi }}/gridSetup.sh -executeConfigTools -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -silent"
+    become: yes
+    become_user: "{{ grid_install_user }}"
+    run_once: "{{ configure_cluster}}"
+    tags:
+      - runconfigtool
+    when: run_configtoolallcommand and oracle_home_gi not in checkgiinstall.stdout
+    ignore_errors: true
+    register: configtool
