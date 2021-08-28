@@ -23,8 +23,20 @@
         - "ansible_version.full is version('2.8', '>=')"
 
   - name: Install EPEL Repo
-    yum: name={{ epel_rpm }} state=installed
-    when: configure_epel_repo and ansible_os_family == 'RedHat'
+    block:
+      - name: Install GPG Key for EPEL
+        rpm_key:
+          state: present
+          key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_distribution_major_version  }}
+
+      - name: Add EPEL Repo
+        yum:
+          name: "{{ epel_rpm }}"
+          state: installed
+
+    when:
+      - configure_epel_repo
+      - ansible_os_family == 'RedHat'
     tags:
      - epelrepo
 
