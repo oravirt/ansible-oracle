@@ -1,26 +1,19 @@
 ---
 
   - name: install-home-gi | Extract files to ORACLE_HOME (gi)
-    unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_home_gi }} copy=no
+    unarchive: src={{ oracle_gi_image }}  dest={{ oracle_home_gi }} copy=no
     with_items: "{{oracle_sw_image_gi}}"
+    loop_control:
+      label: "{{ oracle_gi_image | default ('') }}"
     args:
         creates: "{{ oracle_home_gi }}/root.sh"
     become: yes
     become_user: "{{ grid_install_user }}"
     tags:
       - oragridswunpack
-    when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and oracle_sw_copy and oracle_sw_unpack
-
-  - name: install-home-gi | Extract files to ORACLE_HOME (gi) (from remote location)
-    unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_home_gi }} copy=no
-    with_items: "{{oracle_sw_image_gi}}"
-    args:
-        creates: "{{ oracle_home_gi }}/root.sh"
-    become: yes
-    become_user: "{{ grid_install_user }}"
-    tags:
-    - oragridswunpack
-    when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and not oracle_sw_copy
+    when: 
+      - oracle_home_gi not in checkgiinstall.stdout 
+      - oracle_install_version_gi == item.version
 
   # Check for an existing GRID_HOME before reinstallation of OPatch
   - name: install-home-gi | Check for file GridSetup.sh
