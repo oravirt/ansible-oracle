@@ -1,0 +1,30 @@
+---
+- assert:
+    that: golden_image_dest is defined
+
+# Creating Oracle Restart Golden-Image requires a running stack under 19c
+- block:
+  - name: Check for running Oracle Restart when installed
+    command: "{{ oracle_home_gi }}/bin/crsctl status server"
+    register: crscheck
+
+  - debug: msg="{{ crscheck.stdout_lines }}"
+    when: crscheck.stdout_lines is defined
+
+  - name: Create destination directory {{ golden_image_dest }} for Golden-Image
+    file:
+      path: "{{ golden_image_dest }}"
+      state: directory
+      mode: '0755'
+
+  - name: Create Golden-Image
+    command: "{{ oracle_home_gi }}/gridSetup.sh -silent -createGoldImage -destinationLocation {{ golden_image_dest }}"
+    register: createimage
+
+  - debug: msg="{{ createimage.stdout_lines }}"
+    when: createimage.stdout_lines is defined
+
+  become: yes
+  become_user: "{{ oracle_user }}"
+  when:
+    - oracle_home_gi is defined
