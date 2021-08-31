@@ -1,0 +1,17 @@
+- name: install-home-db | Install Oracle Database Server
+  shell: "{{ oracle_home_db }}/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -silent -waitforcompletion"
+  become: yes
+  become_user: "{{ oracle_user }}"
+  run_once: "{{ configure_cluster}}"
+  when: oracle_home_db not in existing_dbhome.stdout_lines
+  tags:
+    - oradbinstall
+  register: oradbinstall
+  failed_when: oradbinstall.rc not in [0,6]
+
+- debug: var=oradbinstall.stdout_lines
+  run_once: "{{ configure_cluster}}"
+  when: oracle_home_db not in existing_dbhome.stdout_lines and oradbinstall.changed
+  tags:
+   - oradbinstall
+  ignore_errors: true
