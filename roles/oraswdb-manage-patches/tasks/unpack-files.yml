@@ -41,7 +41,13 @@
   with_nested:
      - "{{oracle_sw_patches}}"
      - "{{db_homes_config[dbh.home]['opatch']}}"
-  when: apply_patches_db and item[1].patchid == item[0].patchid and item[1].state == 'present' and oracle_sw_copy and oracle_sw_unpack and db_homes_config[dbh.home]['opatch'] is defined
+  when:
+    - apply_patches_db
+    - item[1].patchid == item[0].patchid
+    - ( item[0].upi is not defined or item[1].upi is not defined or item[0].upi == item[1].upi )
+    - item[1].state == 'present'
+    - oracle_sw_copy and oracle_sw_unpack
+    - db_homes_config[dbh.home]['opatch'] is defined
   tags:
     - oraswdbpsuunpack1
 
@@ -56,6 +62,12 @@
   with_nested:
      - "{{oracle_sw_patches}}"
      - "{{db_homes_config[dbh.home]['opatch']}}"
-  when: apply_patches_db and item[1].patchid == item[0].patchid and item[1].state == 'present' and not oracle_sw_copy and oracle_sw_unpack and db_homes_config[dbh.home]['opatch'] is defined
+  when:
+    - apply_patches_db
+    - item[1].patchid == item[0].patchid
+    - ( item[0].upi is not defined or item[1].upi is not defined or item[0].upi == item[1].upi )
+    - item[1].state == 'present'
+    - not oracle_sw_copy and oracle_sw_unpack
+    - db_homes_config[dbh.home]['opatch'] is defined
   tags:
     - oraswdbpsuunpack2
