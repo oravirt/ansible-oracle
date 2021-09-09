@@ -2,13 +2,13 @@
 oracle_user: oracle                        # User that will own the Oracle Installations.
 grid_user: grid
 grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
-oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-grid_user_home: "/home/{{ grid_install_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-oracle_group: oinstall                          # Primary group for oracle_user.
+oracle_user_home: "/home/{{ oracle_user }}"       # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+grid_user_home: "/home/{{ grid_install_user }}"   # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+oracle_group: oinstall                            # Primary group for oracle_user.
 oper_group: oper
-dba_group: dba                          # Primary group for oracle_user.
+dba_group: dba                                    # Primary group for oracle_user.
 asmoper_group: asmoper
-asmdba_group: asmdba                          # Primary group for oracle_user.
+asmdba_group: asmdba                              # Primary group for oracle_user.
 asmadmin_group: asmadmin                          # Primary group for oracle_user.
 
 db_homes_config:
@@ -26,56 +26,142 @@ db_homes_config:
     edition: EE
     opatch_minversion: 12.2.0.1.12
     opatchauto:
-        - patchid: 28183653
-          patchversion: 12.2.0.1.180717
-          state: present
-          subpatches:
-              - 28163133
-              - 28163190
+      - patchid: 28183653
+        patchversion: 12.2.0.1.180717
+        state: present
+        subpatches:
+          - 28163133
+          - 28163190
     opatch: []
 
 
 db_homes_installed:
-     - home: 18300-base
-       apply_patches: False
-       state: present
-     - home: 12201-base
-       apply_patches: False
-       state: absent
-     - home: 12201-180717
-       apply_patches: True
-       state: absent
+  - home: 18300-base
+    apply_patches: false
+    state: present
+  - home: 12201-base
+    apply_patches: false
+    state: absent
+  - home: 12201-180717
+    apply_patches: true
+    state: absent
 
 
 oracle_sw_patches:
-     - { filename: p28183653_122010_Linux-x86-64.zip, patchid: 28183653, version: 12.2.0.1,  patchversion: 12.2.0.1.180717, description: GI-RU-July-2018, creates: 28183653/28163133/files/suptools/orachk.zip }
-     - { filename: p27468969_122010_Linux-x86-64.zip, patchid: 27468969, version: 12.2.0.1,  patchversion: 12.2.0.1.180417, description: GI-RU-April-2018, creates: 27468969/27674384/README.txt }
-     - { filename: p28140658_12201180417DBAPR2018RU_Linux-x86-64.zip, patchid: 28140658, version: 12.2.0.1,  patchversion: 12201180417DBAPR2018RU , description: 'PARALLEL QUERY Patch for Bug# 28140658 for Linux-x86-64 Platforms', creates: online/files/hpatch/bug28140658.pch }
-     - { filename: p27967747_121020_Linux-x86-64.zip, patchid: 27967747, version: 12.1.0.2, patchversion: 12.1.0.2.180717, description: GI-PSU-Jul-2018, creates: 27967747/27762277/etc/xml/ShiphomeDirectoryStructure.xml }
-     - { filename: p27468957_121020_Linux-x86-64.zip, patchid: 27468957, version: 12.1.0.2, patchversion: 12.1.0.2.180417, description: GI-PSU-Apr-2018, creates: 27468957/27338013/etc/config/inventory.xml }
-     - { filename: p19392646_121020_Linux-x86-64.zip, patchid: 19392646, version: 12.1.0.2, patchversion: 12.1.0.2.1, description: GI-PSU-Oct-2014 }
-     - { filename: p20485724_121020_Linux-x86-64.zip, patchid: 20485724, version: 12.1.0.2, patchversion: 12.1.0.2.3, description: GI-PSU-Apr-2015 }
-     - { filename: p21523234_121020_Linux-x86-64.zip, patchid: 21523234, version: 12.1.0.2, patchversion: 12.1.0.2.5, description: GI-PSU-Oct-2015 }
-     - { filename: p24412235_121020_Linux-x86-64.zip, patchid: 24412235, version: 12.1.0.2, patchversion: 12.1.0.2.161018, description: GI-PSU-Oct-2016 }
-     - { filename: p24968615_121020_Linux-x86-64.zip, patchid: 24968615, version: 12.1.0.2, patchversion: 12.1.0.2.170117, description: GI-PSU-Jan-2017}
-     - { filename: p25434003_121020_Linux-x86-64.zip, patchid: 25434003, version: 12.1.0.2, patchversion: 12.1.0.2.170418, description: GI-PSU-Apr-2017}
-     - { filename: p27967757_112040_Linux-x86-64.zip, patchid: 27967757, version: 11.2.0.4, patchversion: 11.2.0.4.180717, description: GI-PSU-Jul-2018, creates: 27967757/27959254/files/lib/acfstoolsdriver.sh  }
-     - { filename: p27475913_112040_Linux-x86-64.zip, patchid: 27475913, version: 11.2.0.4, patchversion: 11.2.0.4.180417, description: GI-PSU-Apr-2018, creates: 27475913/22502505/files/lib/acfstoolsdriver.sh }
-     - { filename: p25078431_11204160419forACFS_Linux-x86-64.zip, patchid: 25078431, version: 11.2.0.4, patchversion: 11.2.0.4.160419, description: '11.2.0.4.160419 for ACFS' }
-     - { filename: p19380115_112040_Linux-x86-64.zip, patchid: 19380115, version: 11.2.0.4, patchversion: 11.2.0.4.4, description: GI-PSU-Apr-2018 }
-     - { filename: p19380115_112040_Linux-x86-64.zip, patchid: 19380115, version: 11.2.0.4, patchversion: 11.2.0.4.4, description: GI-PSU-Oct-2014 }
-     - { filename: p20485808_112040_Linux-x86-64.zip, patchid: 20485808, version: 11.2.0.4, patchversion: 11.2.0.4.6, description: GI-PSU-Apr-2015 }
-     - { filename: p21523375_112040_Linux-x86-64.zip, patchid: 21523375, version: 11.2.0.4, patchversion: 11.2.0.4.8, description: GI-PSU-Oct-2015 }
+  - filename: p28183653_122010_Linux-x86-64.zip
+    patchid: 28183653
+    version: 12.2.0.1
+    patchversion: 12.2.0.1.180717
+    description: GI-RU-July-2018
+    creates: 28183653/28163133/files/suptools/orachk.zip
+  - filename: p27468969_122010_Linux-x86-64.zip
+    patchid: 27468969
+    version: 12.2.0.1
+    patchversion: 12.2.0.1.180417
+    description: GI-RU-April-2018
+    creates: 27468969/27674384/README.txt
+  - filename: p28140658_12201180417DBAPR2018RU_Linux-x86-64.zip
+    patchid: 28140658
+    version: 12.2.0.1
+    patchversion: 12201180417DBAPR2018RU
+    description: 'PARALLEL QUERY Patch for Bug# 28140658 for Linux-x86-64 Platforms'
+    creates: online/files/hpatch/bug28140658.pch
+  - filename: p27967747_121020_Linux-x86-64.zip
+    patchid: 27967747
+    version: 12.1.0.2
+    patchversion: 12.1.0.2.180717
+    description: GI-PSU-Jul-2018
+    creates: 27967747/27762277/etc/xml/ShiphomeDirectoryStructure.xml
+  - filename: p27468957_121020_Linux-x86-64.zip
+    patchid: 27468957
+    version: 12.1.0.2
+    patchversion: 12.1.0.2.180417
+    description: GI-PSU-Apr-2018
+    creates: 27468957/27338013/etc/config/inventory.xml
+  - filename: p19392646_121020_Linux-x86-64.zip
+    patchid: 19392646
+    version: 12.1.0.2
+    patchversion: 12.1.0.2.1
+    description: GI-PSU-Oct-2014
+  - filename: p20485724_121020_Linux-x86-64.zip
+    patchid: 20485724
+    version: 12.1.0.2
+    patchversion: 12.1.0.2.3
+    description: GI-PSU-Apr-2015
+  - filename: p21523234_121020_Linux-x86-64.zip
+    patchid: 21523234
+    version: 12.1.0.2
+    patchversion: 12.1.0.2.5
+    description: GI-PSU-Oct-2015
+  - filename: p24412235_121020_Linux-x86-64.zip
+    patchid: 24412235
+    version: 12.1.0.2
+    patchversion: 12.1.0.2.161018
+    description: GI-PSU-Oct-2016
+  - filename: p24968615_121020_Linux-x86-64.zip
+    patchid: 24968615
+    version: 12.1.0.2
+    patchversion: 12.1.0.2.170117
+    description: GI-PSU-Jan-2017
+  - filename: p25434003_121020_Linux-x86-64.zip
+    patchid: 25434003
+    version: 12.1.0.2
+    patchversion: 12.1.0.2.170418
+    description: GI-PSU-Apr-2017
+  - filename: p27967757_112040_Linux-x86-64.zip
+    patchid: 27967757
+    version: 11.2.0.4
+    patchversion: 11.2.0.4.180717
+    description: GI-PSU-Jul-2018
+    creates: 27967757/27959254/files/lib/acfstoolsdriver.sh
+  - filename: p27475913_112040_Linux-x86-64.zip
+    patchid: 27475913
+    version: 11.2.0.4
+    patchversion: 11.2.0.4.180417
+    description: GI-PSU-Apr-2018
+    creates: 27475913/22502505/files/lib/acfstoolsdriver.sh
+  - filename: p25078431_11204160419forACFS_Linux-x86-64.zip
+    patchid: 25078431
+    version: 11.2.0.4
+    patchversion: 11.2.0.4.160419
+    description: '11.2.0.4.160419 for ACFS'
+  - filename: p19380115_112040_Linux-x86-64.zip
+    patchid: 19380115
+    version: 11.2.0.4
+    patchversion: 11.2.0.4.4
+    description: GI-PSU-Apr-2018
+  - filename: p19380115_112040_Linux-x86-64.zip
+    patchid: 19380115
+    version: 11.2.0.4
+    patchversion: 11.2.0.4.4
+    description: GI-PSU-Oct-2014
+  - filename: p20485808_112040_Linux-x86-64.zip
+    patchid: 20485808
+    version: 11.2.0.4
+    patchversion: 11.2.0.4.6
+    description: GI-PSU-Apr-2015
+  - filename: p21523375_112040_Linux-x86-64.zip
+    patchid: 21523375
+    version: 11.2.0.4
+    patchversion: 11.2.0.4.8
+    description: GI-PSU-Oct-2015
 
 
 oracle_opatch_patch:
-     - { filename: p6880880_190000_Linux-x86-64.zip, version: 19.3.0.0 }
-     - { filename: p6880880_180000_Linux-x86-64.zip, version: 18.3.0.0 }
-     - { filename: p6880880_122010_Linux-x86-64.zip, version: 12.2.0.1 }
-     - { filename: p6880880_122010_Linux-x86-64.zip, version: 12.1.0.2 }
-     - { filename: p6880880_121010_Linux-x86-64.zip, version: 12.1.0.1 }
-     - { filename: p6880880_112000_Linux-x86-64.zip, version: 11.2.0.4 }
-     - { filename: p6880880_112000_Linux-x86-64.zip, version: 11.2.0.3 }
+  - filename: p6880880_190000_Linux-x86-64.zip
+    version: 19.3.0.0
+  - filename: p6880880_180000_Linux-x86-64.zip
+    version: 18.3.0.0
+  - filename: p6880880_122010_Linux-x86-64.zip
+    version: 12.2.0.1
+  - filename: p6880880_122010_Linux-x86-64.zip
+    version: 12.1.0.2
+  - filename: p6880880_121010_Linux-x86-64.zip
+    version: 12.1.0.1
+  - filename: p6880880_112000_Linux-x86-64.zip
+    version: 11.2.0.4
+  - filename: p6880880_112000_Linux-x86-64.zip
+    version: 11.2.0.3
 
 
 default_dbpass: Oracle123
@@ -129,5 +215,5 @@ db_version: "{%- if dbh is defined and db_homes_config[dbh.home] is defined -%}
              {%- endif -%}"
 
 oracle_home_gi: "{% if configure_cluster %}{{ oracle_home_gi_cl }}{% else %}{{ oracle_home_gi_so }}{% endif %}"
-oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Clustered)
-oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Stand Alone)
+oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid"  # ORACLE_HOME for Grid Infrastructure (Clustered)
+oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid"  # ORACLE_HOME for Grid Infrastructure (Stand Alone)
