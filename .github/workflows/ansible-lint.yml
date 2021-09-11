@@ -1,0 +1,25 @@
+name: Ansible Lint
+
+on:
+  pull_request:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-20.04
+
+    steps:
+    # Important: This sets up your GITHUB_WORKSPACE environment variable
+    - uses: actions/checkout@v2
+
+    - name: Lint roles
+      # Use custom action repo due to open PRs 43 and 48
+      uses: Rendanic/ansible-lint-action@tbr
+      with:
+        targets: |
+          roles/oraswdb-golden-image
+
+        override-deps: |
+          ansible==2.9
+
+        args: ""
