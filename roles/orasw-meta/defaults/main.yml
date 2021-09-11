@@ -172,6 +172,12 @@ oracle_home_db: "{%- if dbh is defined -%}
                     {%- else -%}
                          {{oracle_base}}/{{db_homes_config[dbh.home]['version']}}/{{db_homes_config[dbh.home]['home']}}
                     {%- endif -%}
+                 {%- elif pdb.0.home is defined %}
+                    {%- if db_homes_config[pdb.0.home]['oracle_home'] is defined  -%}
+                         {{db_homes_config[pdb.0.home]['oracle_home']}}
+                    {%- else -%}
+                         {{oracle_base}}/{{db_homes_config[pdb.0.home]['version']}}/{{db_homes_config[pdb.0.home]['home']}}
+                    {%- endif -%}
                  {%- elif item.0 is defined -%}
                     {%- if db_homes_config[item.0.home]['oracle_home'] is defined  -%}
                          {{db_homes_config[item[0].home]['oracle_home']}}
@@ -213,6 +219,14 @@ db_version: "{%- if dbh is defined and db_homes_config[dbh.home] is defined -%}
                       {{db_homes_config[item.home]['version']}}
                  {%- endif -%}
              {%- endif -%}"
+
+oracle_db_instance_name: "{%- if pdb.0.cdb is defined -%}
+                            {%- for db in oracle_databases -%}
+                              {%- if db.oracle_db_name == pdb.0.cdb -%}
+                              {{ db.oracle_db_instance_name | default(db.oracle_db_unique_name | default(db.oracle_db_name)) }}
+                              {%- endif -%}
+                            {%- endfor -%}
+                          {%- endif -%}"
 
 oracle_home_gi: "{% if configure_cluster %}{{ oracle_home_gi_cl }}{% else %}{{ oracle_home_gi_so }}{% endif %}"
 oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid"  # ORACLE_HOME for Grid Infrastructure (Clustered)
