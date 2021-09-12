@@ -1,17 +1,17 @@
 ---
 - name: install-home-db | Extract files to stage-area
   unarchive:
-      src={{ oracle_stage }}/{{ item[0].filename }}
-      dest={{ oracle_stage }}/{{ item[0].version }}
-      copy=no
-      creates="{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates}}"
+    src={{ oracle_stage }}/{{ item[0].filename }}
+    dest={{ oracle_stage }}/{{ item[0].version }}
+    copy=no
+    creates="{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates }}"
   with_nested:
-    - "{{oracle_sw_image_db}}"
-    - "" # dummy to force item.0 instead of item.
-  become: yes
+    - "{{ oracle_sw_image_db }}"
+    - ""  # dummy to force item.0 instead of item.
+  become: true
   become_user: "{{ oracle_user }}"
-  run_once: "{{ configure_cluster}}"
-  when: 
+  run_once: "{{ configure_cluster }}"
+  when:
     - item[0].version == db_homes_config[dbh.home]['version']
     - oracle_sw_copy
     - oracle_sw_unpack
@@ -20,16 +20,16 @@
 
 - name: install-home-db | Extract files to stage-area (from remote location)
   unarchive:
-      src={{ oracle_stage_remote }}/{{ item[0].filename }}
-      dest={{ oracle_stage }}/{{ item[0].version }}
-      copy=no
-      creates="{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates}}"
+    src={{ oracle_stage_remote }}/{{ item[0].filename }}
+    dest={{ oracle_stage }}/{{ item[0].version }}
+    copy=no
+    creates="{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates }}"
   with_nested:
-    - "{{oracle_sw_image_db}}"
-    - "" # dummy to force item.0 instead of item.
-  become: yes
+    - "{{ oracle_sw_image_db }}"
+    - ""  # dummy to force item.0 instead of item.
+  become: true
   become_user: "{{ oracle_user }}"
-  run_once: "{{ configure_cluster}}"
+  run_once: "{{ configure_cluster }}"
   when:
     - item[0].version == db_homes_config[dbh.home]['version']
     - not oracle_sw_copy
@@ -39,17 +39,19 @@
 
 - name: install-home-db | Install Oracle Database Server
   shell: "{{ oracle_stage_install }}/{{ db_homes_config[dbh.home]['version'] }}/database/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent -waitforcompletion"
-  become: yes
+  # noqa yaml command-instead-of-shell
+  become: true
   become_user: "{{ oracle_user }}"
-  run_once: "{{ configure_cluster}}"
+  run_once: "{{ configure_cluster }}"
   when: oracle_home_db not in existing_dbhome.stdout_lines
   tags:
     - oradbinstall
   register: oradbinstall
 
 - debug: var=oradbinstall.stdout_lines
-  run_once: "{{ configure_cluster}}"
+  # noqa unnamed-task ignore-errors
+  run_once: "{{ configure_cluster }}"
   when: oracle_home_db not in existing_dbhome.stdout_lines and oradbinstall.changed
   tags:
-   - oradbinstall
+    - oradbinstall
   ignore_errors: true
