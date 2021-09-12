@@ -4,38 +4,38 @@
 oracle_base: /u01/app/oracle
 
 oracle_install_version_gi: 12.2.0.1
-configure_cluster: False
-oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Clustered)
-oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Stand Alone)
+configure_cluster: false
+oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid"  # ORACLE_HOME for Grid Infrastructure (Clustered)
+oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid"  # ORACLE_HOME for Grid Infrastructure (Stand Alone)
 oracle_home_gi: "{% if configure_cluster %}{{ oracle_home_gi_cl }}{% else %}{{ oracle_home_gi_so }}{% endif %}"
 
 oracle_cleanup_days: 14
 oracle_trace_cleanup_days: 7
 
 logrotate_config:
-        - name: oracle_alert
-          file: "{{ oracle_base }}/diag/rdbms/*/*/trace/*alert*.log {{ oracle_base }}/diag/asm/*/*/trace/alert*+ASM*.log"
-          options:
-            - missingok
-            - notifempty
-            - weekly
-            - rotate 3
-            - dateext
-        - name: oracle_listener
-          file: "{{ oracle_base }}/diag/tnslsnr/*/*/trace/*listener*.log"
-          options:
-            - missingok
-            - notifempty
-            - weekly
-            - rotate 3
-            - dateext
-            - compress
-        - name: oracle_rman
-          file: "{{ rman_cron_logdir | default('/var/log/oracle/rman/log') }}/*.log {{ oracle_base }}/admin/*/rman/*.log {{ oracle_base }}/admin/*/rman/log/*.log"
-          options:
-            - missingok
-            - notifempty
-            - compress
-            - weekly
-            - rotate 24
-            - dateext
+  - name: oracle_alert
+    file: "{{ oracle_base }}/diag/rdbms/*/*/trace/*alert*.log {{ oracle_base }}/diag/asm/*/*/trace/alert*+ASM*.log"
+    options:
+      - missingok
+      - notifempty
+      - weekly
+      - rotate 3
+      - dateext
+  - name: oracle_listener
+    file: "{{ oracle_base }}/diag/tnslsnr/*/*/trace/*listener*.log"
+    options:
+      - missingok
+      - notifempty
+      - weekly
+      - rotate 3
+      - dateext
+      - compress
+  - name: oracle_rman
+    file: "{{ rman_cron_logdir | default('/var/log/oracle/rman/log') }}/*.log {{ oracle_base }}/admin/*/rman/*.log {{ oracle_base }}/admin/*/rman/log/*.log"
+    options:
+      - missingok
+      - notifempty
+      - compress
+      - weekly
+      - rotate 24
+      - dateext
