@@ -1,11 +1,13 @@
-- debug: msg="ORACLE_HOME {{listener_home}}"
+---
+- debug: msg="ORACLE_HOME {{ listener_home }}"  # noqa unnamed-task
   tags: listener2
 
 - name: listener | create custom configuration in listener.ora
   blockinfile:
     path: "{{ listener_home }}/network/admin/listener.ora"
-    backup: True
-    create: True
+    backup: true
+    create: true
+    mode: 0644
     group: "{{ oracle_group }}"
     owner: "{{ oracle_user }}"
     state: present
@@ -18,12 +20,14 @@
 # => Restart of role will fail at create/manage database due to TNS-12514
 - name: listener | Start Listener - ignore errors for running Listener
   shell: "export PATH=${ORACLE_HOME}/bin:${PATH}; lsnrctl start {{ lsnrinst.listener_name }} /dev/null; exit 0"
+  # noqa no-changed-when
   environment: "{{ oracle_env_lsnrctl }}"
   become_user: "{{ oracle_user }}"
   tags: listener2
 
 - name: listener | Reload Listener
   shell: "export PATH=${ORACLE_HOME}/bin:${PATH}; lsnrctl reload {{ lsnrinst.listener_name }}"
+  # noqa no-changed-when
   environment: "{{ oracle_env_lsnrctl }}"
   become_user: "{{ oracle_user }}"
   tags: listener2

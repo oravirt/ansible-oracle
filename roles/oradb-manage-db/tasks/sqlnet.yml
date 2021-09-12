@@ -1,4 +1,5 @@
-- debug: msg="sqlnet in ORACLE_HOME {{listener_home}}"
+---
+- debug: msg="sqlnet in ORACLE_HOME {{ listener_home }}"  # noqa unnamed-task
   tags: sqlnet2
 
 - name: sqlnet.ora | create IFILE entry in sqlnet.ora
@@ -7,8 +8,8 @@
     regexp: "^IFILE=/"
     insertbefore: BOF
     path: "{{ listener_home }}/network/admin/sqlnet.ora"
-    backup: True
-    create: True
+    backup: true
+    create: true
     group: "{{ oracle_group }}"
     owner: "{{ oracle_user }}"
     state: present
@@ -18,10 +19,10 @@
 - name: sqlnet.ora | create custom configuration in sqlnet_ansible.ora
   lineinfile:
     path: "{{ listener_home }}/network/admin/sqlnet_ansible.ora"
-    line: "{{ item.name}}={{item.value }}"
+    line: "{{ item.name }}={{ item.value }}"
     regexp: "^{{ item.name }}="
-    backup: True
-    create: True
+    backup: true
+    create: true
     group: "{{ oracle_group }}"
     owner: "{{ oracle_user }}"
     state: present
