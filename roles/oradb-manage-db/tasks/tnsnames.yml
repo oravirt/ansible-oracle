@@ -1,4 +1,5 @@
-- debug: msg="ORACLE_HOME {{listener_home}}"
+---
+- debug: msg="ORACLE_HOME {{ listener_home }}"  # noqa unnamed-task
   tags: tnsnames
 
 - name: tnsnames.ora | create IFILE entry in tnsnames.ora
@@ -7,8 +8,8 @@
     regexp: "^IFILE=/"
     insertbefore: BOF
     path: "{{ listener_home }}/network/admin/tnsnames.ora"
-    backup: True
-    create: True
+    backup: true
+    create: true
     group: "{{ oracle_group }}"
     owner: "{{ oracle_user }}"
     state: present
@@ -18,8 +19,8 @@
 - name: tnsnames.ora | create custom configuration in tnsnames_ansible.ora
   blockinfile:
     path: "{{ listener_home }}/network/admin/tnsnames_ansible.ora"
-    backup: True
-    create: True
+    backup: true
+    create: true
     group: "{{ oracle_group }}"
     owner: "{{ oracle_user }}"
     state: "{{ tnsinst.state | default('present') }}"

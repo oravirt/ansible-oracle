@@ -1,11 +1,12 @@
+---
 - name: udev | Create device to label mappings for udev
-  template: src=udev-label-device-mapping.txt.j2 dest={{ oracle_stage }}/udev/udev-{{ item.diskgroup }}
-  with_items: "{{asm_diskgroups}}"
+  template: src=udev-label-device-mapping.txt.j2 dest={{ oracle_stage }}/udev/udev-{{ item.diskgroup }} mode=0644
+  with_items: "{{ asm_diskgroups }}"
   when: device_persistence == 'udev' and asm_diskgroups is defined
   tags: udev
 
 - name: udev | Assemble into one mapfile
-  assemble: src={{ oracle_stage }}/udev dest={{ oracle_rsp_stage }}/udev-device-input.txt
+  assemble: src={{ oracle_stage }}/udev dest={{ oracle_rsp_stage }}/udev-device-input.txt mode=0644
   when: device_persistence == 'udev'
   tags: udev
 
@@ -16,6 +17,7 @@
 
 - name: udev | Run script to create udev rules
   shell: "{{ oracle_rsp_stage }}/setup-udev-rules.sh"
+  # noqa command-instead-of-shell
   when: device_persistence == 'udev'
   tags: udev
 
@@ -26,6 +28,7 @@
 
 - name: udev | List device aliases (register)
   shell: ls -l {{ oracle_asm_disk_string }}
+  # noqa command-instead-of-shell
   when: device_persistence == 'udev'
   tags: udev
   register: lsdevice

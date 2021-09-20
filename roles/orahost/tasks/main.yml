@@ -1,77 +1,77 @@
 # orahost playbook
 ---
 
-  - name: Check for correct OS family & min version
-    assert:
-      that:
-        - "ansible_os_family == '{{ os_family_supported }}'"
-        - "ansible_facts['distribution_version'] is version('{{ os_min_supported_version }}', '>=')"
-    tags:
-     - oscheck
+- name: Check for correct OS family & min version
+  assert:
+    that:
+      - "ansible_os_family == '{{ os_family_supported }}'"
+      - "ansible_facts['distribution_version'] is version('{{ os_min_supported_version }}', '>=')"
+  tags:
+    - oscheck
 
-  # OL8/RHEL8 has all needed RPMs in orahost role!
-  - name: Install packages required by Oracle on OL/RHEL version 6 and 7
-    yum:
-       name: "{{ oracle_packages }}"
-       state: installed
-       enablerepo: "{{ extrarepos_enabled |default (omit, True) }}"
-       disablerepo: "{{ extrarepos_disabled |default (omit, True) }}"
-    when: 
-      - install_os_packages
-      - ansible_os_family == 'RedHat'
-      - ansible_distribution_major_version is version('7', '<=')
-    tags: os_packages, oscheck
+# OL8/RHEL8 has all needed RPMs in orahost role!
+- name: Install packages required by Oracle on OL/RHEL version 6 and 7
+  yum:
+    name: "{{ oracle_packages }}"
+    state: installed
+    enablerepo: "{{ extrarepos_enabled |default (omit, True) }}"
+    disablerepo: "{{ extrarepos_disabled |default (omit, True) }}"
+  when:
+    - install_os_packages
+    - ansible_os_family == 'RedHat'
+    - ansible_distribution_major_version is version('7', '<=')
+  tags: os_packages, oscheck
 
-  - name: Install packages required by Oracle on SLES
-    zypper: name={{ oracle_packages_sles }} state=installed
-    when: install_os_packages and ansible_os_family == 'Suse'
-    tags: os_packages, oscheck
+- name: Install packages required by Oracle on SLES
+  zypper: name={{ oracle_packages_sles }} state=installed
+  when: install_os_packages and ansible_os_family == 'Suse'
+  tags: os_packages, oscheck
 
-  - name: Install packages required by Oracle for ASMlib on OL/RHEL
-    yum:
-       name: "{{ oracle_asm_packages }}"
-       state: installed
-       enablerepo: "{{ extrarepos_enabled |default (omit, True) }}"
-       disablerepo: "{{ extrarepos_disabled |default (omit, True) }}"
-    when:
-      - install_os_packages | bool
-      - ansible_os_family == 'RedHat'
-      - device_persistence == 'asmlib'
-      - asm_diskgroups is defined
-    tags: os_packages, oscheck
+- name: Install packages required by Oracle for ASMlib on OL/RHEL
+  yum:
+    name: "{{ oracle_asm_packages }}"
+    state: installed
+    enablerepo: "{{ extrarepos_enabled |default (omit, True) }}"
+    disablerepo: "{{ extrarepos_disabled |default (omit, True) }}"
+  when:
+    - install_os_packages | bool
+    - ansible_os_family == 'RedHat'
+    - device_persistence == 'asmlib'
+    - asm_diskgroups is defined
+  tags: os_packages, oscheck
 
-  - name: Install packages required by Oracle for ASMlib on SLES
-    zypper: name={{ oracle_asm_packages_sles }} state=installed
-    when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'Suse' and asm_diskgroups is defined
-    tags: os_packages, oscheck, asm1
+- name: Install packages required by Oracle for ASMlib on SLES
+  zypper: name={{ oracle_asm_packages_sles }} state=installed
+  when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'Suse' and asm_diskgroups is defined
+  tags: os_packages, oscheck, asm1
 
-  - name: Check if firewall is installed
-    yum: list={{firewall_service}} disablerepo=*
-    when: disable_firewall and ansible_os_family == 'RedHat'
-    tags: iptables,firewalld
-    register: firewall
+- name: Check if firewall is installed
+  yum: list={{ firewall_service }} disablerepo=*
+  when: disable_firewall and ansible_os_family == 'RedHat'
+  tags: iptables,firewalld
+  register: firewall
 
-  - name: Disable firewall
-    service: name={{ firewall_service }} state=stopped enabled=no
-    when: disable_firewall and ansible_os_family == 'RedHat' and firewall.results
-    tags: iptables,firewalld
-    register: iptables
+- name: Disable firewall
+  service: name={{ firewall_service }} state=stopped enabled=no
+  when: disable_firewall and ansible_os_family == 'RedHat' and firewall.results
+  tags: iptables,firewalld
+  register: iptables
 
-  - name: Disable selinux (permanently)
-    selinux: state=disabled
-    when: disable_selinux and ansible_os_family == 'RedHat'
-    tags: selinux
-    register: selinux
+- name: Disable selinux (permanently)
+  selinux: state=disabled
+  when: disable_selinux and ansible_os_family == 'RedHat'
+  tags: selinux
+  register: selinux
 
-  - name: Disable selinux (runtime)
-    shell: setenforce 0
-    when: disable_selinux and ansible_os_family == 'RedHat'
-    changed_when: disable_selinux_runtime.rc == 0
-    failed_when: disable_selinux_runtime.rc > 0 and "SELinux is disabled" not in disable_selinux_runtime.stderr
-    register: disable_selinux_runtime
-    tags: selinux
+- name: Disable selinux (runtime)  # noqa command-instead-of-shell
+  shell: setenforce 0
+  when: disable_selinux and ansible_os_family == 'RedHat'
+  changed_when: disable_selinux_runtime.rc == 0
+  failed_when: disable_selinux_runtime.rc > 0 and "SELinux is disabled" not in disable_selinux_runtime.stderr
+  register: disable_selinux_runtime
+  tags: selinux
 
-  - block:
+- block:
     - name: Set Timezone
       timezone:
         name: "{{ os_timezone }}"
@@ -83,299 +83,329 @@
       service:
         name: crond
         state: restarted
-      when: 
+      when:
         - timezoneresult is defined
         - timezoneresult.changed
       tags: timezone
 
-    when: os_timezone is defined
+  when: os_timezone is defined
 
-  - name: Check dns for host
-    command: host {{ ansible_hostname }}
-    register: ns
-    ignore_errors: True
-    changed_when: False
-    tags: etchosts
+- name: Check dns for host
+  command: host {{ ansible_hostname }}
+  register: ns
+  ignore_errors: true
+  changed_when: false
+  tags: etchosts
 
-  - name: Add host to /etc/hosts if needed
-    lineinfile: dest=/etc/hosts regexp='.*{{ ansible_fqdn }}$' line="{{ etc_hosts_ip }} {{ ansible_hostname }} {{ ansible_fqdn }}" state=present
-    when: "ns.rc != 0 or configure_etc_hosts"
-    tags: etchosts
+- name: Add host to /etc/hosts if needed
+  lineinfile: dest=/etc/hosts regexp='.*{{ ansible_fqdn }}$' line="{{ etc_hosts_ip }} {{ ansible_hostname }} {{ ansible_fqdn }}" state=present
+  when: "ns.rc != 0 or configure_etc_hosts"
+  tags: etchosts
 
 #  - name: Add local node's ip & hostname to /etc/hosts
 #    lineinfile: dest=/etc/hosts line="{{ ansible_default_ipv4.address }} {{ ansible_fqdn }} {{ ansible_hostname }} " state=present
 #    when: configure_etc_hosts and ansible_default_ipv4.address is defined
 
-  - name: User | Add group(s)
-    group: name={{ item.group }} gid={{ item.gid }} state=present
-    with_items: "{{oracle_groups}}"
-    tags:
-     - group
+- name: User | Add group(s)
+  group: name={{ item.group }} gid={{ item.gid }} state=present
+  with_items: "{{ oracle_groups }}"
+  tags:
+    - group
 
-  - name: User | Add Oracle user
-    user: name={{ item.username }}  group={{ item.primgroup }} groups={{ item.othergroups }} uid={{ item.uid }} generate_ssh_key=yes append=yes state=present password={{ item.passwd }}
-    with_items: "{{oracle_users}}"
-    tags:
-     - user
+- name: User | Add Oracle user
+  user:
+    name: "{{ item.username }}"
+    group: "{{ item.primgroup }}"
+    groups: "{{ item.othergroups }}"
+    uid: "{{ item.uid }}"
+    generate_ssh_key: true
+    append: true
+    state: present
+    password: "{{ item.passwd }}"
+  with_items: "{{ oracle_users }}"
+  tags:
+    - user
 
-  - name: User | Add Grid user
-    user: name={{ item.username }}  group={{ item.primgroup }} groups={{ item.othergroups }} uid={{ item.uid }} generate_ssh_key=yes append=yes state=present password={{ item.passwd }}
-    when: role_separation
-    with_items: "{{grid_users}}"
-    tags:
-     - user
+- name: User | Add Grid user
+  user:
+    name: "{{ item.username }}"
+    group: "{{ item.primgroup }}"
+    groups: "{{ item.othergroups }}"
+    uid: "{{ item.uid }}"
+    generate_ssh_key: true
+    append: true
+    state: present
+    password: "{{ item.passwd }}"
+  when: role_separation
+  with_items: "{{ grid_users }}"
+  tags:
+    - user
 
-  - name: User | Add Oracle user to sudoers
-    template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0600
-    with_items: "{{oracle_users}}"
-    when: configure_oracle_sudo
-    tags:
-     - sudoadd
+- name: User | Add Oracle user to sudoers
+  template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0600
+  with_items: "{{ oracle_users }}"
+  when: configure_oracle_sudo
+  tags:
+    - sudoadd
 
-  - name: User | Add Grid user to sudoers
-    template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0600
-    with_items: "{{grid_users}}"
-    when: role_separation and configure_oracle_sudo
-    tags:
-     - sudoadd
+- name: User | Add Grid user to sudoers
+  template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0600
+  with_items: "{{ grid_users }}"
+  when: role_separation and configure_oracle_sudo
+  tags:
+    - sudoadd
 
-  - name: ssh-keys | Generate SSH keys
-    local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys
-    ignore_errors: True
-    run_once: "{{ configure_cluster}}"
-    when: configure_ssh and configure_cluster and old_ssh_config
-    become: false
-    tags:
-     - sshkeys
+- name: ssh-keys | Generate SSH keys
+  local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys
+  ignore_errors: true
+  run_once: "{{ configure_cluster }}"
+  when: configure_ssh and configure_cluster and old_ssh_config
+  become: false
+  tags:
+    - sshkeys
 
-  - name: ssh-keys | Add ssh-keys & authorized_keys to oracle user
-    copy: src={{ item[1] }} dest=/home/{{ item[0].username }}/.ssh  owner={{ item[0].username }} group={{ item[0].primgroup }} force=yes mode=600
-    when: configure_ssh and configure_cluster and old_ssh_config
-    with_nested:
-        - "{{oracle_users}}"
-        - "{{ssh_keys}}"
-    tags:
-       - sshkeys
+- name: ssh-keys | Add ssh-keys & authorized_keys to oracle user
+  copy: src={{ item[1] }} dest=/home/{{ item[0].username }}/.ssh  owner={{ item[0].username }} group={{ item[0].primgroup }} force=yes mode=0600
+  when: configure_ssh and configure_cluster and old_ssh_config
+  with_nested:
+    - "{{ oracle_users }}"
+    - "{{ ssh_keys }}"
+  tags:
+    - sshkeys
 
-  - name: ssh-keys | Add ssh-keys & authorized_keys to grid user
-    copy: src={{ item[1] }} dest=/home/{{ item[0].username }}/.ssh  owner={{ item[0].username }} group={{ item[0].primgroup }} force=yes mode=600
-    when: configure_ssh and configure_cluster and role_separation and old_ssh_config
-    with_nested:
-        - "{{grid_users}}"
-        - "{{ssh_keys}}"
-    tags:
-     - sshkeys
+- name: ssh-keys | Add ssh-keys & authorized_keys to grid user
+  copy:
+    src: "{{ item[1] }}"
+    dest: "/home/{{ item[0].username }}/.ssh"
+    owner: "{{ item[0].username }}"
+    group: "{{ item[0].primgroup }}"
+    force: true
+    mode: 0600
+  when: configure_ssh and configure_cluster and role_separation and old_ssh_config
+  with_nested:
+    - "{{ grid_users }}"
+    - "{{ ssh_keys }}"
+  tags:
+    - sshkeys
 
-  - name: ssh-keys | Add short name to known_hosts
-    local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_hostname }} 2> /dev/null >> {{keyfile}}
-    ignore_errors: True
-    become: false
-    when: configure_ssh and configure_cluster and old_ssh_config
-    tags:
-     - sshkeys
+- name: ssh-keys | Add short name to known_hosts
+  local_action: shell ssh-keyscan -p {{ ansible_ssh_port|default(22) }} -H {{ ansible_hostname }} 2> /dev/null >> {{ keyfile }}
+  ignore_errors: true
+  become: false
+  when: configure_ssh and configure_cluster and old_ssh_config
+  tags:
+    - sshkeys
 
-  - name: ssh-keys | Add FQDN to known_hosts
-    local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_fqdn}} 2> /dev/null >> {{keyfile}}
-    ignore_errors: True
-    become: false
-    when: configure_ssh and configure_cluster and old_ssh_config
-    tags:
-     - sshkeys
+- name: ssh-keys | Add FQDN to known_hosts
+  local_action: shell ssh-keyscan -p {{ ansible_ssh_port|default(22) }} -H {{ ansible_fqdn }} 2> /dev/null >> {{ keyfile }}
+  ignore_errors: true
+  become: false
+  when: configure_ssh and configure_cluster and old_ssh_config
+  tags:
+    - sshkeys
 
-  - name: ssh-keys | Add IPv4 to known_hosts
-    local_action: shell ssh-keyscan -p {{ansible_ssh_port|default(22)}} -H {{ansible_default_ipv4.address}} 2> /dev/null >> {{keyfile}}
-    ignore_errors: True
-    become: false
-    when: configure_ssh and configure_cluster and old_ssh_config
-    tags:
-     - sshkeys
+- name: ssh-keys | Add IPv4 to known_hosts
+  local_action: shell ssh-keyscan -p {{ ansible_ssh_port|default(22) }} -H {{ ansible_default_ipv4.address  }} 2> /dev/null >> {{  keyfile }}
+  ignore_errors: true
+  become: false
+  when: configure_ssh and configure_cluster and old_ssh_config
+  tags:
+    - sshkeys
 
-  - name: ssh-keys | Copy known_hosts to oracle user
-    copy: src={{keyfile}} dest=/home/{{ item.username }}/.ssh/known_hosts owner={{ item.username }} group={{ item.primgroup }}
-    with_items: "{{oracle_users}}"
-    when: configure_ssh and configure_cluster and old_ssh_config
-    tags:
-     - sshkeys
+- name: ssh-keys | Copy known_hosts to oracle user
+  copy: src={{ keyfile }} dest=/home/{{ item.username }}/.ssh/known_hosts owner={{ item.username }} group={{ item.primgroup }} mode=0644
+  with_items: "{{ oracle_users }}"
+  when: configure_ssh and configure_cluster and old_ssh_config
+  tags:
+    - sshkeys
 
-  - name: ssh-keys | Copy known_hosts to grid user
-    copy: src={{keyfile}} dest=/home/{{ item.username }}/.ssh/known_hosts owner={{ item.username }} group={{ item.primgroup }}
-    with_items: "{{grid_users}}"
-    when: configure_ssh and configure_cluster and role_separation and old_ssh_config
-    tags:
-     - sshkeys
+- name: ssh-keys | Copy known_hosts to grid user
+  copy: src={{ keyfile }} dest=/home/{{ item.username }}/.ssh/known_hosts owner={{ item.username }} group={{ item.primgroup }} mode=0644
+  with_items: "{{ grid_users }}"
+  when: configure_ssh and configure_cluster and role_separation and old_ssh_config
+  tags:
+    - sshkeys
 
-  - name: ssh-keys | Remove generated keys from control machine
-    local_action: file  path="{{ item }}" state=absent
-    with_items:
-        - "{{ ssh_keys }}"
-        - "{{ keyfile }}"
-    run_once: "{{ configure_cluster}}"
-    when: configure_ssh and configure_cluster and old_ssh_config
-    ignore_errors: true
-    become: false
-    tags:
-     - sshkeys
+- name: ssh-keys | Remove generated keys from control machine
+  local_action: file  path="{{ item }}" state=absent
+  with_items:
+    - "{{ ssh_keys }}"
+    - "{{ keyfile }}"
+  run_once: "{{ configure_cluster }}"
+  when: configure_ssh and configure_cluster and old_ssh_config
+  ignore_errors: true
+  become: false
+  tags:
+    - sshkeys
 
-  - name: filesystem | Create directories
-    file: path={{ item.1.mntp }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=775
-    with_subelements:
-        - "{{host_fs_layout}}"
-        - filesystem
-    tags: hostfs
+- name: filesystem | Create directories
+  file: path={{ item.1.mntp }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=0775
+  with_subelements:
+    - "{{ host_fs_layout }}"
+    - filesystem
+  tags: hostfs
 
-  # create partition only when device != pvname
-  - name: filesystem | Create partition and pv
-    shell:  parted -a optimal -s {{ item.1.device }} "mklabel gpt mkpart primary 1 -1"
-    args:
-       creates: "{{ item.1.pvname }}"
-    with_subelements:
-        - "{{host_fs_layout}}"
-        - disk
-    when: configure_host_disks and item.1.device != item.1.pvname
-    tags: hostfs
+# create partition only when device != pvname
+- name: filesystem | Create partition and pv
+  shell: parted -a optimal -s {{ item.1.device }} "mklabel gpt mkpart primary 1 -1"
+  # noqa command-instead-of-shell
+  args:
+    creates: "{{ item.1.pvname }}"
+  with_subelements:
+    - "{{ host_fs_layout }}"
+    - disk
+  when: configure_host_disks and item.1.device != item.1.pvname
+  tags: hostfs
 
-  - name: filesystem | Create vg
-    lvg: vg={{ item.vgname }} pvs={{ host_fs_layout_vgdisks }} state={{ item.state }}
-    with_items: "{{host_fs_layout}}"
-    when: configure_host_disks
-    tags: hostfs
+- name: filesystem | Create vg
+  lvg: vg={{ item.vgname }} pvs={{ host_fs_layout_vgdisks }} state={{ item.state }}
+  with_items: "{{ host_fs_layout }}"
+  when: configure_host_disks
+  tags: hostfs
 
-  - name: filesystem | create lv
-    lvol: vg={{ item.0.vgname }} lv={{ item.1.lvname }} size={{ item.1.lvsize }} state=present shrink=no resizefs=yes
-    with_subelements:
-        - "{{host_fs_layout}}"
-        - filesystem
-    when: configure_host_disks
-    tags: hostfs
+- name: filesystem | create lv
+  lvol: vg={{ item.0.vgname }} lv={{ item.1.lvname }} size={{ item.1.lvsize }} state=present shrink=no resizefs=yes
+  with_subelements:
+    - "{{ host_fs_layout }}"
+    - filesystem
+  when: configure_host_disks
+  tags: hostfs
 
-  - name: filesystem | create fs
-    filesystem: fstype={{ item.1.fstype }} dev=/dev/{{ item.0.vgname }}/{{ item.1.lvname }} opts={{ item.1.fsopts | default(omit) }}
-    with_subelements:
-        - "{{host_fs_layout}}"
-        - filesystem
-    when: configure_host_disks
-    tags: hostfs
+- name: filesystem | create fs
+  filesystem: fstype={{ item.1.fstype }} dev=/dev/{{ item.0.vgname }}/{{ item.1.lvname }} opts={{ item.1.fsopts | default(omit) }}
+  with_subelements:
+    - "{{ host_fs_layout }}"
+    - filesystem
+  when: configure_host_disks
+  tags: hostfs
 
-  - name: filesytem | mount dir
-    mount: name={{ item.1.mntp }} src=/dev/{{ item.0.vgname }}/{{ item.1.lvname }} dump=1 passno=2 fstype={{ item.1.fstype }} opts={{ item.1.mntopts | default(omit) }} state=mounted
-    with_subelements:
-        - "{{host_fs_layout}}"
-        - filesystem
-    when: configure_host_disks
-    tags: hostfs
+- name: filesytem | mount dir
+  mount:
+    name: "{{ item.1.mntp }}"
+    src: "/dev/{{ item.0.vgname }}/{{ item.1.lvname }}"
+    dump: 1
+    passno: 2
+    fstype: "{{ item.1.fstype }}"
+    opts: "{{ item.1.mntopts | default(omit) }}"
+    state: mounted
+  with_subelements:
+    - "{{ host_fs_layout }}"
+    - filesystem
+  when: configure_host_disks
+  tags: hostfs
 
-  - name: filesystem | Change permission on directories
-    file: path={{ item.1.mntp }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=775
-    with_subelements:
-        - "{{host_fs_layout}}"
-        - filesystem
-    tags: hostfs
+- name: filesystem | Change permission on directories
+  file: path={{ item.1.mntp }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=775
+  with_subelements:
+    - "{{ host_fs_layout }}"
+    - filesystem
+  tags: hostfs
 
-  - name: filesystem | Create directory for oraInventory
-    file: path={{ oracle_inventory_loc }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=775
-    tags: hostfs
+- name: filesystem | Create directory for oraInventory
+  file: path={{ oracle_inventory_loc }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=775
+  tags: hostfs
 
-  - name: Oracle-recommended kernel settings
-    sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes ignoreerrors=yes
-    with_items: "{{oracle_sysctl}}"
-    tags: sysctl
+- name: Oracle-recommended kernel settings
+  sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes ignoreerrors=yes
+  with_items: "{{ oracle_sysctl }}"
+  tags: sysctl
 
-  - name: Oracle hugepages
-    sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes ignoreerrors=yes
-    with_items: "{{oracle_hugepages}}"
-    register: systclcmd
-    tags: sysctl,hugepages
+- name: Oracle hugepages
+  sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes ignoreerrors=yes
+  with_items: "{{ oracle_hugepages }}"
+  register: systclcmd
+  tags: sysctl,hugepages
 
-  # There is no safe way to allocate Hugepages in a running system.
-  # => A reboot should be done after changing the configuration
-  # => we won't reboot during installation
-  # Work Arroud:
-  # => Flush File Cache
-  # => retry a sysctl -p
-  - block:
+# There is no safe way to allocate Hugepages in a running system.
+# => A reboot should be done after changing the configuration
+# => we won't reboot during installation
+# Work Arroud:
+# => Flush File Cache
+# => retry a sysctl -p
+- block:
     - name: Flush Buffer Cache when hugepages have been changed
       command: echo 2 > /proc/sys/vm/drop_caches
       tags: sysctl,hugepages
 
     - name: Try sysctl again
       sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes
-      with_items: "{{oracle_hugepages}}"
+      with_items: "{{ oracle_hugepages }}"
       tags: sysctl,hugepages
-    when:
-      - systclcmd is defined
-      - systclcmd.changed
-    tags: sysctl,hugepages
+  when:
+    - systclcmd is defined
+    - systclcmd.changed
+  tags: sysctl,hugepages
 
-  - name: Oracle-recommended PAM config
-    lineinfile: dest=/etc/pam.d/login state=present line="session required pam_limits.so"
-    tags: pamconfig
+- name: Oracle-recommended PAM config
+  lineinfile: dest=/etc/pam.d/login state=present line="session required pam_limits.so"
+  tags: pamconfig
 
-  - name: Oracle-recommended security limits
-    template: src=oracle-seclimits.conf.j2 dest=/etc/security/limits.d/99-oracle-limits.conf backup=yes
-    when: ansible_os_family == 'RedHat'
-    tags: seclimit
+- name: Oracle-recommended security limits
+  template: src=oracle-seclimits.conf.j2 dest=/etc/security/limits.d/99-oracle-limits.conf backup=yes mode=0644
+  when: ansible_os_family == 'RedHat'
+  tags: seclimit
 
-  - name: Oracle-recommended security limits on SLES
-    pam_limits: domain=oracle limit_type={{ item.name.split(' ')[0] }} limit_item={{ item.name.split(' ')[1] }} value={{ item.value }}
-    with_items: "{{ oracle_seclimits }}"
-    when: ansible_os_family == 'Suse'
-    tags: seclimit
+- name: Oracle-recommended security limits on SLES
+  pam_limits: domain=oracle limit_type={{ item.name.split(' ')[0] }} limit_item={{ item.name.split(' ')[1] }} value={{ item.value }}
+  with_items: "{{ oracle_seclimits }}"
+  when: ansible_os_family == 'Suse'
+  tags: seclimit
 
-  - include: "{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"
-    tags: tphnuma
-    #when: ansible_os_family == 'RedHat'
+- include: "{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"
+  tags: tphnuma
+  # when: ansible_os_family == 'RedHat'
 
 
-  - name: Network | Setup ip-address for RAC Interconnect
-    template: src=ifcfg-eth1.j2 dest=/etc/sysconfig/network-scripts/ifcfg-{{ oracle_gi_nic_priv }} owner=root mode=0644
-    when: configure_interconnect and configure_cluster and ansible_os_family == 'RedHat'
-    tags:
-     - eth1
-    register: ic
+- name: Network | Setup ip-address for RAC Interconnect
+  template: src=ifcfg-eth1.j2 dest=/etc/sysconfig/network-scripts/ifcfg-{{ oracle_gi_nic_priv }} owner=root mode=0644
+  when: configure_interconnect and configure_cluster and ansible_os_family == 'RedHat'
+  tags:
+    - eth1
+  register: ic
 
-  - name: Network | Bring up eth1
-    service: name=network  state=restarted
-    when: configure_interconnect and configure_cluster and ic.changed and ansible_os_family == 'RedHat'
-    tags:
-     - eth1
+- name: Network | Bring up eth1
+  service: name=network  state=restarted
+  when: configure_interconnect and configure_cluster and ic.changed and ansible_os_family == 'RedHat'
+  tags:
+    - eth1
 
-  - name: Create stage directory
-    file: dest={{ oracle_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
-    tags: stagedir
+- name: Create stage directory
+  file: dest={{ oracle_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+  tags: stagedir
 
-  - name: Create rsp stage directory
-    file: dest={{ oracle_rsp_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
-    tags: stagedir
+- name: Create rsp stage directory
+  file: dest={{ oracle_rsp_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+  tags: stagedir
 
-  - name: udev | Create udev stage directory
-    file: dest={{ oracle_stage }}/udev mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
-    when: device_persistence == 'udev'
+- name: udev | Create udev stage directory
+  file: dest={{ oracle_stage }}/udev mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+  when: device_persistence == 'udev'
 
-  - name: Asmlib | Add configuration
-    template: src=oracleasm.j2 dest=/etc/sysconfig/oracleasm-_dev_oracleasm
-    register: asmlibconfig
-    when: device_persistence|lower == 'asmlib' and asm_diskgroups is defined
-    tags:
-      - asmlibconfig
+- name: Asmlib | Add configuration
+  template: src=oracleasm.j2 dest=/etc/sysconfig/oracleasm-_dev_oracleasm mode=0644
+  register: asmlibconfig
+  when: device_persistence|lower == 'asmlib' and asm_diskgroups is defined
+  tags:
+    - asmlibconfig
 
-  - name: Asmlib | Add configuration (link)
-    file: src=/etc/sysconfig/oracleasm-_dev_oracleasm dest=/etc/sysconfig/oracleasm state=link force=yes
-    register: asmlibconfig
-    when: device_persistence|lower == 'asmlib' and asm_diskgroups is defined
-    tags:
-      - asmlibconfig
+- name: Asmlib | Add configuration (link)
+  file: src=/etc/sysconfig/oracleasm-_dev_oracleasm dest=/etc/sysconfig/oracleasm state=link force=yes
+  register: asmlibconfig
+  when: device_persistence|lower == 'asmlib' and asm_diskgroups is defined
+  tags:
+    - asmlibconfig
 
-  - name: Asmlib | Enable and start Oracle Asmlib
-    service: name=oracleasm  state=started  enabled=yes
-    when: device_persistence == 'asmlib' and asm_diskgroups is defined
-    tags:
-      - asmlibconfig
+- name: Asmlib | Enable and start Oracle Asmlib
+  service: name=oracleasm  state=started  enabled=yes
+  when: device_persistence == 'asmlib' and asm_diskgroups is defined
+  tags:
+    - asmlibconfig
 
-  - name: Asmlib | Restart Asmlib
-    service: name=oracleasm  state=restarted
-    when: asm_diskgroups is defined and device_persistence == 'asmlib' and asmlibconfig.changed
-    tags:
-      - asmlibconfig
+- name: Asmlib | Restart Asmlib
+  service: name=oracleasm  state=restarted
+  when: asm_diskgroups is defined and device_persistence == 'asmlib' and asmlibconfig.changed
+  tags:
+    - asmlibconfig
 
 #  - name: VNC | Create directory
 #    file: name=/home/{{ oracle_user }}/.vnc  state=directory owner={{ oracle_user }}  group={{ oracle_group }}

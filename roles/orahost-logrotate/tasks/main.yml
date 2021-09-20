@@ -2,7 +2,7 @@
 # tasks file for orahost-logrotate
 
 - name: Manage logrotate
-  template: src=logrotate.j2 dest=/etc/logrotate.d/{{ item.name }}
+  template: src=logrotate.j2 dest=/etc/logrotate.d/{{ item.name }} mode=0644
   with_items:
         - "{{ logrotate_config }}"
   when: logrotate_config is defined

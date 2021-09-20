@@ -1,5 +1,27 @@
+---
 use_default_rules: true
 
 skip_list:
   - role-name
-  - meta-no-info
+  # must be fixed at later time
+  - deprecated-local-action
+  - deprecated-command-syntax
+  - ignore-errors
+  - var-naming
+
+exclude_paths:
+  # skip original Playbooks from ansible-oracle
+  - ./*yml
+  - .github
+  - dbhome-conversion
+  - group_vars
+  - host_vars
+  - inventory
+  - library
+
+  # old roles without usable playbooks at the moment
+  # we cannot change the code without a usable playbook...
+  - roles/oradb-failover
+  - roles/oraemagent-install
+  - roles/oraswgi-clone
+  - roles/oraswracdb-clone

@@ -1,144 +1,156 @@
 ---
 
-  #master_node: true
-  cluster_master: "{{play_hosts[0]}}"
-  role_separation: false
-  hostgroup: "{{ group_names[0] }}"
-  hostgroup_hub: "{{ hostgroup }}-hub"
-  hostgroup_leaf: "{{ hostgroup }}-leaf"
+# master_node: true
+cluster_master: "{{play_hosts[0]}}"
+role_separation: false
+hostgroup: "{{ group_names[0] }}"
+hostgroup_hub: "{{ hostgroup }}-hub"
+hostgroup_leaf: "{{ hostgroup }}-leaf"
 
-  oracle_user: oracle                        # User that will own the Oracle Installations.
-  grid_user: grid
-  grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
-  oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-  grid_user_home: "/home/{{ grid_install_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-  oracle_group: oinstall                          # Primary group for oracle_user.
-  oper_group: oper
-  dba_group: dba                          # dba
-  asmoper_group: asmoper
-  asmdba_group: asmdba                    # osdba
-  asmadmin_group: asmadmin                # osasm
+oracle_user: oracle                        # User that will own the Oracle Installations.
+grid_user: grid
+grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
+oracle_user_home: "/home/{{ oracle_user }}"  # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+grid_user_home: "/home/{{ grid_install_user }}"  # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+oracle_group: oinstall                          # Primary group for oracle_user.
+oper_group: oper
+dba_group: dba                          # dba
+asmoper_group: asmoper
+asmdba_group: asmdba                    # osdba
+asmadmin_group: asmadmin                # osasm
 
-  www_download_bin: curl                              # curl (shell module) or get_url module
-  oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
-  oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
-  is_sw_source_local: true
-  oracle_sw_copy: "{% if install_from_nfs %}False{% else %}True{% endif %}"
-  oracle_sw_unpack: "{% if install_from_nfs %}False{% else %}True{% endif %}"
+www_download_bin: curl                              # curl (shell module) or get_url module
+oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
+oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
+is_sw_source_local: true
+oracle_sw_copy: "{% if install_from_nfs %}False{% else %}True{% endif %}"
+oracle_sw_unpack: "{% if install_from_nfs %}False{% else %}True{% endif %}"
 
-  install_from_nfs: false
-  nfs_server_sw: nfsserver
-  nfs_server_sw_path: /path/to/orasw
+install_from_nfs: false
+nfs_server_sw: nfsserver
+nfs_server_sw_path: /path/to/orasw
 
-  oracle_stage: /u01/stage
-  oracle_stage_remote: "{{ oracle_stage }}"
-  oracle_stage_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
-  oracle_base: /u01/app/oracle
-  oracle_rsp_stage: "{{ oracle_stage }}/rsp"
-  oracle_inventory_loc: /u01/app/oraInventory
+oracle_stage: /u01/stage
+oracle_stage_remote: "{{ oracle_stage }}"
+oracle_stage_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
+oracle_base: /u01/app/oracle
+oracle_rsp_stage: "{{ oracle_stage }}/rsp"
+oracle_inventory_loc: /u01/app/oraInventory
 
-  oracle_directories:
-          - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_rsp_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_base }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_inventory_loc}}", owner: "{{ grid_install_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_base }}/cfgtoollogs", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_base }}/admin", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_base }}/audit", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_base }}/cfgtoollogs/dbca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_base }}/cfgtoollogs/sqlpatch", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_base }}/cfgtoollogs/netca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-
-
-  oracle_home_gi: "{% if configure_cluster %}{{ oracle_home_gi_cl }}{% else %}{{ oracle_home_gi_so }}{% endif %}"
-  oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Clustered)
-  oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid" # ORACLE_HOME for Grid Infrastructure (Stand Alone)
-  oracle_env:
-         ORACLE_HOME: "{{ oracle_home_gi }}"
-
-  oracle_profile_name_gi: ".profile_grid"    # .profile that sets up the environment for Grid Infrastructure (Cluster or Single node)
-  oracle_grid_responsefile: "grid-{{ oracle_cluster_name }}.rsp"   # Name of responsefile-name used when installing Grid oInfrastructure
-
-  # GI
-  default_gipass: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
-  sysasmpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
-  asmmonitorpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
-  # DB
-  default_dbpass: "{% if item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd}}{% else %}Oracle123{% endif%}" # The check for the old passwords are there for  backwards compatibility and only temporary, will be removed
-
-  #oracle_password: Oracle123                                       # Password used for all Grid Infrastructure related resources (e.g ASM)
-  oracle_scan: your.scan.address                                   # Scan address for Clustered Grid Infrastructure
-  oracle_vip: -vip                                                 # Suffix for the host VIP-addresses (e.g orarac01-vip)
-  oracle_scan_port: 1521                                           # Listener port for scan-listener
-  oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
-  oracle_asm_init_dg: crs
-  oracle_asm_disk_string: "{% if device_persistence == 'asmlib' %}{% elif device_persistence == 'udev' %}/dev/oracle/{% else %}{% endif %}"
-  device_persistence: asmlib
-  cvuqdisk_rpm: "{% if oracle_install_version_gi > '12.1.0.2' %}cvuqdisk-1.0.10-1.rpm{% else %}cvuqdisk-1.0.9-1.rpm{% endif %} "
-
-  oracle_cluster_name: "{{ hostgroup }}"      # Name of the cluster when setting up Clustered Grid Infrastructure
-  oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
-  oracle_gi_nic_pub: eth0                        # Default interface for 'public' traffic. Only used in RAC
-  oracle_gi_nic_priv: eth1                       # Default interface for interconnect traffic. Only used in RAC
-
-  run_configtoolallcommand: true
-  oracle_cluster_mgmdb: true
-  oracle_gi_cluster_type: STANDARD              # STANDARD | FLEX | STANDALONE (12.2 specific)
-  oracle_install_option_gi: "{% if configure_cluster %}CRS_CONFIG{% else %}HA_CONFIG{% endif %}"
-  oracle_install_version_gi: 12.2.0.1
-  patch_before_rootsh: True
-  apply_patches_gi: False
-
-  oracle_asm_storage_option: "{% if oracle_install_version_gi is version('12.2', '>=') %}FLEX_ASM_STORAGE{% else %}LOCAL_ASM_STORAGE{% endif %}"
-
-  configure_cluster: false
-  oracle_gi_gns_subdomain: a.b.c
-  oracle_gi_gns_vip: gnsvip.a.b.c
+oracle_directories:
+  - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_rsp_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_inventory_loc}}", owner: "{{ grid_install_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/admin", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/audit", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs/dbca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs/sqlpatch", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs/netca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
 
 
-  opatcharchive: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/{% for opatchfile in oracle_opatch_patch if  opatchfile['version']==oracle_install_version_gi %}{{ opatchfile['filename'] }}{% endfor %}"
+oracle_home_gi: "{% if configure_cluster %}{{ oracle_home_gi_cl }}{% else %}{{ oracle_home_gi_so }}{% endif %}"
+oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid"  # ORACLE_HOME for Grid Infrastructure (Clustered)
+oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid"  # ORACLE_HOME for Grid Infrastructure (Stand Alone)
+oracle_env:
+  ORACLE_HOME: "{{ oracle_home_gi }}"
 
-  oracle_gi_image: "{%- if oracle_sw_copy %}{{ oracle_stage }}
-                  {%- else %}{{ oracle_stage_remote }}
-                  {%- endif %}
-                  {%- if oracle_install_image_gi is defined %}/{{ oracle_install_image_gi }}
-                  {%- else %}//{{ item.filename }}
-                  {%- endif %}"
+oracle_profile_name_gi: ".profile_grid"    # .profile that sets up the environment for Grid Infrastructure (Cluster or Single node)
+oracle_grid_responsefile: "grid-{{ oracle_cluster_name }}.rsp"   # Name of responsefile-name used when installing Grid oInfrastructure
 
-  oracle_sw_image_gi:                                              # Files containing the installation media for Grid Infrastructure
-       - { filename: LINUX.X64_213000_grid_home.zip, version: 21.3.0.0, creates: 'install/.img.bin' }
-       - { filename: LINUX.X64_193000_grid_home.zip, version: 19.3.0.0, creates: 'install/.img.bin' }
-       - { filename: LINUX.X64_180000_grid_home.zip, version: 18.3.0.0, creates: 'install/.img.bin' }
-       - { filename: linuxx64_12201_grid_home.zip, version: 12.2.0.1, creates: 'xdk/mesg/lsxja.msb' }
-       - { filename: linuxamd64_12102_grid_1of2.zip, version: 12.1.0.2, creates: 'grid/stage/sizes/oracle.crs.12.1.0.2.0.sizes.properties' }
-       - { filename: linuxamd64_12102_grid_2of2.zip, version: 12.1.0.2, creates: 'grid/install/.oui' }
-       - { filename: linuxamd64_12c_grid_1of2.zip, version: 12.1.0.1 }
-       - { filename: linuxamd64_12c_grid_2of2.zip, version: 12.1.0.1 }
-       - { filename: p13390677_112040_Linux-x86-64_3of7.zip, version: 11.2.0.4, creates: 'grid/welcome.html' }
-       - { filename: p10404530_112030_Linux-x86-64_3of7.zip, version: 11.2.0.3, creates: 'grid/stage/properties/userPaths.properties' }
+# GI
 
-  # asm_diskgroups:
-  #  - diskgroup: crs
-  #    properties:
-  #      - {redundancy: external, ausize: 4}
-  #    attributes:
-  #      - {name: 'compatible.rdbms', value: 11.2.0.4.0}
-  #      - {name: compatible.asm, value: "{{ oracle_install_version_gi }}"}
-  #    disk:
-  #      - {device: /dev/sdd, asmlabel: crs01}
-  #  - diskgroup: data
-  #    properties:
-  #      - {redundancy: external, ausize: 4}
-  #    attributes:
-  #      - {name: compatible.rdbms, value: 11.2.0.4.0}
-  #      - {name: compatible.asm, value: "{{ oracle_install_version_gi }}"}
-  #    disk:
-  #      - {device: /dev/sde, asmlabel: data01}
-  #  - diskgroup: fra
-  #    properties:
-  #      - {redundancy: external, ausize: 4}
-  #    attributes:
-  #      - {name: compatible.rdbms, value: 11.2.0.4.0}
-  #      - {name: compatible.asm, value: "{{ oracle_install_version_gi }}"}
-  #    disk:
-  #      - {device: /dev/sdf, asmlabel: fra01}
+# The check for the old passwords are there for backwards compatibility and only temporary, will be removed
+default_gipass: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif %}"
+
+# The check for the old passwords are there for backwards compatibility and only temporary, will be removed
+sysasmpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}"
+
+# The check for the old passwords are there for backwards compatibility and only temporary, will be removed
+asmmonitorpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif %}"
+# DB
+
+# The check for the old passwords are there for  backwards compatibility and only temporary, will be removed
+default_dbpass: "{% if item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd}}{% else %}Oracle123{% endif %}"
+
+# oracle_password: Oracle123                                       # Password used for all Grid Infrastructure related resources (e.g ASM)
+oracle_scan: your.scan.address                                   # Scan address for Clustered Grid Infrastructure
+oracle_vip: -vip                                                 # Suffix for the host VIP-addresses (e.g orarac01-vip)
+oracle_scan_port: 1521                                           # Listener port for scan-listener
+
+# Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
+oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }}
+
+oracle_asm_init_dg: crs
+oracle_asm_disk_string: "{% if device_persistence == 'asmlib' %}{% elif device_persistence == 'udev' %}/dev/oracle/{% else %}{% endif %}"
+device_persistence: asmlib
+cvuqdisk_rpm: "{% if oracle_install_version_gi > '12.1.0.2' %}cvuqdisk-1.0.10-1.rpm{% else %}cvuqdisk-1.0.9-1.rpm{% endif %} "
+
+oracle_cluster_name: "{{ hostgroup }}"      # Name of the cluster when setting up Clustered Grid Infrastructure
+oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
+oracle_gi_nic_pub: eth0                        # Default interface for 'public' traffic. Only used in RAC
+oracle_gi_nic_priv: eth1                       # Default interface for interconnect traffic. Only used in RAC
+
+run_configtoolallcommand: true
+oracle_cluster_mgmdb: true
+oracle_gi_cluster_type: STANDARD              # STANDARD | FLEX | STANDALONE (12.2 specific)
+oracle_install_option_gi: "{% if configure_cluster %}CRS_CONFIG{% else %}HA_CONFIG{% endif %}"
+oracle_install_version_gi: 12.2.0.1
+patch_before_rootsh: true
+apply_patches_gi: false
+
+oracle_asm_storage_option: "{% if oracle_install_version_gi is version('12.2', '>=') %}FLEX_ASM_STORAGE{% else %}LOCAL_ASM_STORAGE{% endif %}"
+
+configure_cluster: false
+oracle_gi_gns_subdomain: a.b.c
+oracle_gi_gns_vip: gnsvip.a.b.c
+
+
+opatcharchive: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/{% for opatchfile in oracle_opatch_patch if opatchfile['version']==oracle_install_version_gi %}{{ opatchfile['filename'] }}{% endfor %}"
+# noqa yaml
+
+oracle_gi_image: "{%- if oracle_sw_copy %}{{ oracle_stage }}
+                {%- else %}{{ oracle_stage_remote }}
+                {%- endif %}
+                {%- if oracle_install_image_gi is defined %}/{{ oracle_install_image_gi }}
+                {%- else %}//{{ item.filename }}
+                {%- endif %}"
+
+oracle_sw_image_gi:                                              # Files containing the installation media for Grid Infrastructure
+  - {filename: LINUX.X64_213000_grid_home.zip, version: 21.3.0.0, creates: 'install/.img.bin'}
+  - {filename: LINUX.X64_193000_grid_home.zip, version: 19.3.0.0, creates: 'install/.img.bin'}
+  - {filename: LINUX.X64_180000_grid_home.zip, version: 18.3.0.0, creates: 'install/.img.bin'}
+  - {filename: linuxx64_12201_grid_home.zip, version: 12.2.0.1, creates: 'xdk/mesg/lsxja.msb'}
+  - {filename: linuxamd64_12102_grid_1of2.zip, version: 12.1.0.2, creates: 'grid/stage/sizes/oracle.crs.12.1.0.2.0.sizes.properties'}
+  - {filename: linuxamd64_12102_grid_2of2.zip, version: 12.1.0.2, creates: 'grid/install/.oui'}
+  - {filename: linuxamd64_12c_grid_1of2.zip, version: 12.1.0.1}
+  - {filename: linuxamd64_12c_grid_2of2.zip, version: 12.1.0.1}
+  - {filename: p13390677_112040_Linux-x86-64_3of7.zip, version: 11.2.0.4, creates: 'grid/welcome.html'}
+  - {filename: p10404530_112030_Linux-x86-64_3of7.zip, version: 11.2.0.3, creates: 'grid/stage/properties/userPaths.properties'}
+
+# asm_diskgroups:
+#  - diskgroup: crs
+#    properties:
+#      - {redundancy: external, ausize: 4}
+#    attributes:
+#      - {name: 'compatible.rdbms', value: 11.2.0.4.0}
+#      - {name: compatible.asm, value: "{{ oracle_install_version_gi }}"}
+#    disk:
+#      - {device: /dev/sdd, asmlabel: crs01}
+#  - diskgroup: data
+#    properties:
+#      - {redundancy: external, ausize: 4}
+#    attributes:
+#      - {name: compatible.rdbms, value: 11.2.0.4.0}
+#      - {name: compatible.asm, value: "{{ oracle_install_version_gi }}"}
+#    disk:
+#      - {device: /dev/sde, asmlabel: data01}
+#  - diskgroup: fra
+#    properties:
+#      - {redundancy: external, ausize: 4}
+#    attributes:
+#      - {name: compatible.rdbms, value: 11.2.0.4.0}
+#      - {name: compatible.asm, value: "{{ oracle_install_version_gi }}"}
+#    disk:
+#      - {device: /dev/sdf, asmlabel: fra01}

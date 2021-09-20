@@ -1,60 +1,60 @@
 ---
 
-  multipath: none                   # dm-multipath (Linux device mapper multipath)
-  device_persistence: asmlib
-  oracle_asm_disk_string: "{% if device_persistence|lower == 'asmlib' %}{% elif device_persistence |lower == 'udev' %}/dev/oracle/{% else %}{% endif %}"
-  oracle_stage: /u01/stage
-  oracle_rsp_stage: "{{ oracle_stage }}/rsp"
-  oracle_user: oracle
-  grid_user: grid
-  grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
-  oracle_group: oinstall
-  asmdba_group: asmdba
-  asmadmin_group: asmadmin
-  dba_group: dba
-  partition_devices: true
-  use_partition_devices: true
-  partition_suffix: "{% if multipath |lower == 'dm-multipath' and ansible_distribution_major_version|int == 6  %}p1{% else %}1{% endif%}"
-  asmlib_binary: /usr/sbin/oracleasm
+multipath: none                   # dm-multipath (Linux device mapper multipath)
+device_persistence: asmlib
+oracle_asm_disk_string: "{% if device_persistence|lower == 'asmlib' %}{% elif device_persistence |lower == 'udev' %}/dev/oracle/{% else %}{% endif %}"
+oracle_stage: /u01/stage
+oracle_rsp_stage: "{{ oracle_stage }}/rsp"
+oracle_user: oracle
+grid_user: grid
+grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
+oracle_group: oinstall
+asmdba_group: asmdba
+asmadmin_group: asmadmin
+dba_group: dba
+partition_devices: true
+use_partition_devices: true
+partition_suffix: "{% if multipath |lower == 'dm-multipath' and ansible_distribution_major_version|int == 6  %}p1{% else %}1{% endif%}"
+asmlib_binary: /usr/sbin/oracleasm
 
-  dnfstaboptions: "{%- if item.1.fstaboptions is defined %}{{ item.1.fstaboptions }}
-                   {%- else %}rw,bg,hard,nointr,tcp,vers=3,timeo=600,rsize=32768,wsize=32768{% endif %}"
+dnfstaboptions: "{%- if item.1.fstaboptions is defined %}{{ item.1.fstaboptions }}
+                  {%- else %}rw,bg,hard,nointr,tcp,vers=3,timeo=600,rsize=32768,wsize=32768{% endif %}"
 
-  #asm_diskgroups:
-  #  - diskgroup: crs
-  #    properties:
-  #      - {redundancy: normal, ausize: 1}
-  #    attributes:
-  #      - {name: 'compatible.rdbms', value: 11.2.0.4.0}
-  #      - {name: 'compatible.asm', value: 12.1.0.2.0}
-  #   disk:
-  #     - {device: /dev/sdc, asmlabel: crs01}
-  #     - {device: /dev/sdd, asmlabel: crs02}
-  #     - {device: /dev/sde, asmlabel: crs03}
-  # - diskgroup: data
-  #    properties:
-  #      - {redundancy: external, ausize: 4}
-  #    attributes:
-  #      - {name: compatible.rdbms, value: 11.2.0.4.0}
-  #      - {name: compatible.asm, value: 12.1.0.2.0}
-  #    disk:
-  #      - {device: /dev/sdf, asmlabel: data01}
-  #  - diskgroup: fra
-  #    properties:
-  #      - {redundancy: external, ausize: 4}
-  #    attributes:
-  #      - {name: compatible.rdbms, value: 11.2.0.4.0}
-  #      - {name: compatible.asm, value: 12.1.0.2.0}
-  #    disk:
-  #      - {device: /dev/sdg, asmlabel: fra01}
+# asm_diskgroups:
+#  - diskgroup: crs
+#    properties:
+#      - {redundancy: normal, ausize: 1}
+#    attributes:
+#      - {name: 'compatible.rdbms', value: 11.2.0.4.0}
+#      - {name: 'compatible.asm', value: 12.1.0.2.0}
+#   disk:
+#     - {device: /dev/sdc, asmlabel: crs01}
+#     - {device: /dev/sdd, asmlabel: crs02}
+#     - {device: /dev/sde, asmlabel: crs03}
+# - diskgroup: data
+#    properties:
+#      - {redundancy: external, ausize: 4}
+#    attributes:
+#      - {name: compatible.rdbms, value: 11.2.0.4.0}
+#      - {name: compatible.asm, value: 12.1.0.2.0}
+#    disk:
+#      - {device: /dev/sdf, asmlabel: data01}
+#  - diskgroup: fra
+#    properties:
+#      - {redundancy: external, ausize: 4}
+#    attributes:
+#      - {name: compatible.rdbms, value: 11.2.0.4.0}
+#      - {name: compatible.asm, value: 12.1.0.2.0}
+#    disk:
+#      - {device: /dev/sdg, asmlabel: fra01}
 
-  #oradnfs:
-  #  - server: nfsserver
-  #    ips:
-  #      - local: dbserver
-  #        path: nfsserver
-  #    exports:
-  #      - export: /nfs/oradata
-  #        mount: /u02/oradata2
-  #      - export: /nfs/oradata2
-  #        mount: /u02/oradata
+# oradnfs:
+#  - server: nfsserver
+#    ips:
+#      - local: dbserver
+#        path: nfsserver
+#    exports:
+#      - export: /nfs/oradata
+#        mount: /u02/oradata2
+#      - export: /nfs/oradata2
+#        mount: /u02/oradata
