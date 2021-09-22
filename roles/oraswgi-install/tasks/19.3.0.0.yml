@@ -9,6 +9,7 @@
     creates: "{{ oracle_home_gi }}/root.sh"
   become: true
   become_user: "{{ grid_install_user }}"
+  run_once: "{{ configure_cluster }}"
   tags:
     - oragridswunpack
   when:
@@ -21,14 +22,13 @@
   stat: path={{ oracle_home_gi }}/gridSetup.sh
   register: stat_gridsetup_result
   run_once: "{{ configure_cluster }}"
-  # when: master_node
 
 - name: install-home-gi | State of GridSetup.sh
   assert:
     that: "stat_gridsetup_result.stat.exists == True"
     msg: "Cannot find {{ oracle_home_gi }}/gridSetup.sh }}"
   run_once: "{{ configure_cluster }}"
-  # when: master_node
+
 # unarchive didn't worked in some environments. => using unzip directly
 # Overwrite existing files from OPatch due to Note 2321749.1
 # - name: install-home-gi | Distribute latest opatch
