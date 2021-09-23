@@ -10,6 +10,7 @@
     creates: "{{ oracle_home_gi }}/root.sh"
   become: true
   become_user: "{{ grid_install_user }}"
+  run_once: "{{ configure_cluster }}"
   tags:
     - oragridswunpack
   when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and oracle_sw_copy and oracle_sw_unpack
@@ -31,7 +32,6 @@
   stat: path={{ oracle_home_gi }}/gridSetup.sh
   register: stat_gridsetup_result
   run_once: "{{ configure_cluster }}"
-  # when: master_node
 
 - name: install-home-gi | State of GridSetup.sh
   assert:

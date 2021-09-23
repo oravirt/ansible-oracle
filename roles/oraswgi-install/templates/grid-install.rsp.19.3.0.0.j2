@@ -257,25 +257,24 @@ oracle.install.crs.config.sites=
 # hostnameprefix:lowerbound-upperbound:hostnamesuffix:vipsuffix:role of node
 #
 #-------------------------------------------------------------------------------
-{%  if oracle_gi_cluster_type|upper  == "STANDARD"  or oracle_gi_cluster_type|upper == 'STANDALONE' %}
-
-{%  if ansible_domain  == ""  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}:HUB{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
-  {% else  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}.{{ ansible_domain }}:HUB{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
-{% endif %}
-
-{% elif oracle_gi_cluster_type|upper == 'FLEX'  %}
-
-{%  if ansible_domain  == ""  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
- {% else  %}
-oracle.install.crs.config.clusterNodes={% if configure_cluster %}{% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}.{{ ansible_domain }}:HUB{%- if not loop.last -%} , {%- endif -%}{%- endfor %}{% for host in groups[hostgroup_leaf] -%},{{host}}.{{ ansible_domain }}::LEAF {%- if not loop.last -%}  {%- endif -%} {%- endfor %}{% else %}{% endif %}
-
- {% endif %}
-
-{% endif %}
-
+oracle.install.crs.config.clusterNodes=
+{%- if configure_cluster -%}
+  {%- for host in groups[hostgroup] -%} {{ hostvars[host].ansible_fqdn }}:
+    {%- if hostvars[host].oracle_node_vip is defined -%}
+      {{ hostvars[host].oracle_node_vip }}
+    {%- else -%}
+      {{ hostvars[host].ansible_hostname }}{{ oracle_vip }}
+      {%- if hostvars[host].ansible_domain | length > 0 -%}
+        .{{ hostvars[host].ansible_domain }}
+      {%- endif -%}
+    {%- endif -%}
+    {% if oracle_gi_cluster_type | upper == 'FLEX' -%}
+      :HUB
+    {%- endif -%}
+    {%- if not loop.last -%},
+    {%- endif -%} 
+  {%- endfor %}
+{%- endif %}
 
 #-------------------------------------------------------------------------------
 # The value should be a comma separated strings where each string is as shown below
@@ -311,7 +310,7 @@ oracle.install.crs.config.networkInterfaceList=
 # This option is only applicable when CRS_CONFIG is chosen as install option,
 # and STANDALONE is chosen as cluster configuration.
 #------------------------------------------------------------------------------
-oracle.install.crs.configureGIMR=true
+oracle.install.crs.configureGIMR={{ oracle_gi_mgmt_repo | default('false') }}
 
 #------------------------------------------------------------------------------
 # Create a separate ASM DiskGroup to store GIMR data.

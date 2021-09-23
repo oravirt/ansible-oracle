@@ -6,6 +6,7 @@
   # noqa command-instead-of-shell risky-shell-pipe
   tags:
     - checkifgiinstall
+    - responsefilegi
   changed_when: false
   register: checkgiinstall
 
@@ -70,6 +71,7 @@
 
 - name: include_tasks "{{ oracle_install_version_gi }}.yml"
   include_tasks: "{{ oracle_install_version_gi }}.yml"
+  tags: always
 
 - name: install-home-gi | Check if stuff is running
   shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
