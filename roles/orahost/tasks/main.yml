@@ -291,7 +291,26 @@
   with_subelements:
     - "{{ host_fs_layout }}"
     - filesystem
-  when: configure_host_disks
+  when:
+    - configure_host_disks
+    - item.1.fstype is defined
+    - item.1.fstype != 'swap'
+  tags: hostfs
+
+- name: filesytem | add swap to fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^/dev/{{ item.0.vgname }}/{{ item.1.lvname }} '
+    line: "/dev/{{ item.0.vgname }}/{{ item.1.lvname }} swap swap defaults 0 0"
+  with_subelements:
+    - "{{ host_fs_layout }}"
+    - filesystem
+  when:
+    - configure_host_disks
+    - item.1.fstype is defined
+    - item.1.fstype == 'swap'
+  notify:
+    - swapon
   tags: hostfs
 
 - name: filesystem | Change permission on directories
