@@ -2,11 +2,9 @@
 ---
 
 
- - name: Delete Database(s)
-   hosts: "{{ hostgroup }}"
-   #user: ansible
-   become: yes
-   become_user: oracle
-   roles:
-      - oradb-delete
-
+- name: Delete Database(s)
+  hosts: "{{ hostgroup | default('all') }}"
+  become: true
+  become_user: oracle
+  roles:
+    - oradb-delete
