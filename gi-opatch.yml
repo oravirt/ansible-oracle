@@ -1,6 +1,7 @@
- - name: Apply patches to GI
-   hosts: "{{ hostgroup }}"
-   become: yes
-   serial: 1
-   roles:
-      - {role: oraswgi-manage-patches }
+---
+- name: Apply patches to GI
+  hosts: "{{ hostgroup | default('all') }}"
+  become: true
+  serial: 1
+  roles:
+    - {role: oraswgi-manage-patches}
