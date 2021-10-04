@@ -1,12 +1,19 @@
 ---
 - name: install-home-db | Configure oracle-rdbms auto-startup service (systemd.d)
-  template: src=oracle-rdbms-service.j2 dest=/etc/systemd/system/oracle-rdbms.service owner=root mode=0644
+  template:
+    src=oracle-rdbms-service.j2
+    dest=/etc/systemd/system/oracle-rdbms.service
+    owner=root
+    mode=0644
   become: true
+  become_user: root
+  notify:
+    - systemd register and reload
   with_items: "{{ db_homes_installed }}"
-  when: autostartup_service and hostinitdaemon == "systemd" and item.state|lower == 'present'
-  tags: autostartup_service
-
-- name: install-home-db | Register oracle-rdbms service (system.d)
-  systemd: name=oracle-rdbms daemon_reload=yes enabled=yes
-  when: autostartup_service and hostinitdaemon == "systemd"
-  tags: autostartup_service
+  when:
+    - autostartup_service
+    - hostinitdaemon == "systemd"
+    - item.state|lower == 'present'
+  tags:
+    - autostartup_service
+    - seclimit    # Update template when ulimits have been chagned as well.

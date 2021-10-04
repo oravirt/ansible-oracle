@@ -9,10 +9,21 @@ After=network.target
 
 [Service]
 Type=forking
+RemainAfterExit=yes
 Restart=no
 ExecStart=/usr/local/bin/manage_oracle_rdbms_procs.sh -a start
 ExecStop=/usr/local/bin/manage_oracle_rdbms_procs.sh -a stop
 User={{ oracle_user }}
+
+Slice=oracle_database.slice
+MemoryAccounting=yes
+
+LimitRSS=infinity
+{% for item in oracle_seclimits %}
+  {%- if ulimit_systemd_mapping[item.name] is defined %}
+{{ ulimit_systemd_mapping[item.name].name }}={{ (item.value | int * ulimit_systemd_mapping[item.name].sysctlfactor | default(1)) }}
+{% endif %}
+{%- endfor %}
 
 [Install]
 WantedBy=multi-user.target

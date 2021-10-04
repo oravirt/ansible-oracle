@@ -1,0 +1,11 @@
+---
+
+oracle_seclimits:
+  - {name: 'soft nproc', value: 16384}
+  - {name: 'hard nproc', value: 16384}
+  - {name: 'soft nofile', value: 4096}
+  - {name: 'hard nofile', value: 65536}
+  - {name: 'soft stack', value: 10240}
+  - {name: 'hard stack', value: 32768}
+  - {name: 'soft memlock', value: "{{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }}"}
+  - {name: 'hard memlock', value: "{{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }}"}
