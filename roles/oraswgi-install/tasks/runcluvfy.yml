@@ -1,0 +1,27 @@
+---
+- block:
+    - name: install-home-gi | Execute runcluvfy.sh
+      command:
+        argv:
+          - "{{ oracle_home_gi }}/runcluvfy.sh"
+          - comp
+          - sys
+          - -p
+          - crs
+      # noqa no-changed-when
+      register: cmdruncluvfy
+      failed_when: cmdruncluvfy.rc == -1
+      become: true
+      become_user: "{{ grid_install_user }}"
+
+    - debug: var=cmdruncluvfy.stdout_lines  # noqa unnamed-task
+      when: cmdruncluvfy.stdout_lines is defined
+
+    - name: install-home-gi | runcluvfy.sh failed
+      fail:
+        msg: "runcluvfy.sh failed - aborting Playbook"
+      when:
+        - cmdruncluvfy.rc != 0
+        - not gi_ignoreprereq | bool
+
+  tags: runcluvfy

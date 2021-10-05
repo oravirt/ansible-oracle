@@ -44,6 +44,10 @@
   file: name={{ oracle_home_gi }}  mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
   when: configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
 
+- include_tasks: runcluvfy.yml
+  # noqa unnamed-task
+  tags: always
+
 - name: install-home-gi | Setup response file for install (GI)
   template:
     src=grid-install.rsp.{{ oracle_install_version_gi }}.j2
