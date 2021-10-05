@@ -374,6 +374,13 @@
   tags: tphnuma
   # when: ansible_os_family == 'RedHat'
 
+- name: Network | Configure NOZEROCONF
+  lineinfile:
+    path: /etc/sysconfig/network
+    regexp: "^NOZEROCONF="
+    line: "NOZEROCONF=yes"
+  when: netnozeroconf | default(true) | bool
+  tags: nozeroconf
 
 - name: Network | Setup ip-address for RAC Interconnect
   template: src=ifcfg-eth1.j2 dest=/etc/sysconfig/network-scripts/ifcfg-{{ oracle_gi_nic_priv }} owner=root mode=0644
