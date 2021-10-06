@@ -5,8 +5,7 @@
   shell: cat "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" |grep -w {{ oracle_home_gi  }} |awk  '{print $3}' | cut -f2 -d'"'
   # noqa command-instead-of-shell risky-shell-pipe
   tags:
-    - checkifgiinstall
-    - responsefilegi
+    - always
   changed_when: false
   register: checkgiinstall
 
@@ -17,7 +16,9 @@
 - name: install-home-gi | set fact for patch_before_rootsh
   set_fact:
     patch_before_rootsh: false
-  when: olrloc.stat.exists and patch_before_rootsh
+  when:
+    - olrloc.stat.exists
+    - patch_before_rootsh
 
 - name: install-home-gi | Mount nfs share with installation media
   mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=mounted
@@ -67,7 +68,10 @@
   become_user: "{{ grid_install_user }}"
   tags:
     - oragridsw
-  when: oracle_home_gi not in checkgiinstall.stdout and is_sw_source_local and oracle_install_version_gi == item.version and oracle_sw_copy
+  when:
+    - oracle_home_gi not in checkgiinstall.stdout
+    - is_sw_source_local and oracle_install_version_gi == item.version
+    - oracle_sw_copy
 
 - name: include_tasks "{{ oracle_install_version_gi }}.yml"
   include_tasks: "{{ oracle_install_version_gi }}.yml"
@@ -115,7 +119,9 @@
 - name: include_role oraswgi-manage-patches
   include_role:
     name: oraswgi-manage-patches
-  when: not patch_before_rootsh and apply_patches_gi
+  when:
+    - not patch_before_rootsh
+    - apply_patches_gi
 
 - name: install-home-gi | Check opatch lsinventory (GI)
   shell: "{{ oracle_home_gi }}/OPatch/opatch lspatches"
