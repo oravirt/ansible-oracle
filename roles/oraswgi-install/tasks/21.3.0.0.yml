@@ -63,8 +63,8 @@
   when: oracle_home_gi not in checkgiinstall.stdout and item.diskgroup == oracle_asm_init_dg
 
 - name: install-home-gi | Install Grid Infrastructure
-  shell: "{{ oracle_home_gi }}/gridSetup.sh -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -silent"
-  # noqa command-instead-of-shell
+  shell: "{{ oracle_home_gi }}/gridSetup.sh -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -silent {{ giignoreprereqparam }}"
+  # noqa command-instead-of-shell yaml
   become: true
   become_user: "{{ grid_install_user }}"
   run_once: "{{ configure_cluster }}"
