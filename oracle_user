@@ -110,6 +110,9 @@ oracle_user: hostname=localhost service_name=orcl user=system password=manager s
 
 '''
 
+import hashlib
+from binascii import unhexlify
+
 try:
 	import cx_Oracle
 except ImportError:
@@ -160,7 +163,7 @@ def create_user(module, cursor, schema, schema_password, schema_password_hash, d
 
 	if authentication_type == 'password':
 		if (schema_password_hash):
-			sql = 'create user %s identified by values \"%s\" ' % (schema, schema_password_hash)
+			sql = 'create user %s identified by values \'%s\' ' % (schema, schema_password_hash)
 		else:
 			sql = 'create user %s identified by \"%s\" '% (schema, schema_password)
 	elif authentication_type == 'global':
@@ -205,7 +208,7 @@ def create_user(module, cursor, schema, schema_password, schema_password_hash, d
 
 # Get the current password hash for the user
 def get_user_password_hash(module, cursor, schema):
-	sql = 'select password from sys.user$ where name = upper(\'%s\')' % schema
+	sql = 'select spare4 from sys.user$ where name = upper(\'%s\')' % schema
 	try:
 			cursor.execute(sql)
 			pwhashresult = cursor.fetchone()[0]
@@ -216,17 +219,39 @@ def get_user_password_hash(module, cursor, schema):
 
 	return pwhashresult
 
+# Check plaintext password against retrieved hash
+# currently works with S: hashes only, returns true otherwise
+def password_matches_hash(password,password_hash):
+	# S: style hash
+	if ('S:' in password_hash):
+		for ch in password_hash.split('S:')[1][:60].upper():
+			if((ch < '0' or ch > '9') and (ch < 'A' or ch > 'F')):
+				return False # not a valid hex string character found, should not happen
+		hash=password_hash.split('S:')[1][:40]
+		salt=password_hash.split('S:')[1][40:60]
+		sha1 = hashlib.sha1()
+		sha1.update(password.encode('utf-8'))
+		sha1.update(unhexlify(salt))
+		return hash.upper() == sha1.hexdigest().upper()
+	
+	# no supported hashes found
+	return False
+
 # Modify the user/schema
 def modify_user(module, cursor, schema, schema_password, schema_password_hash, default_tablespace, default_temp_tablespace, update_password, profile, authentication_type, state, container_data):
 
 	sql_get_curr_def = 'select lower(account_status)'
 	sql = 'alter user %s' % schema
+	pw_change_needed = False
 
 	if update_password == 'always':
 		if authentication_type == 'password':
-			if schema_password_hash:
+			old_pw_hash = get_user_password_hash(module, cursor, schema)
+			if (schema_password_hash and (old_pw_hash != schema_password_hash)):
+				pw_change_needed = True
 				sql += ' identified by values \'%s\'' % (schema_password_hash)
-			elif schema_password:
+			elif schema_password and not password_matches_hash(schema_password,old_pw_hash):
+				pw_change_needed = True
 				sql += ' identified by %s ' % (schema_password)
 		elif authentication_type == 'external':
 			sql += ' identified externally '
@@ -283,47 +308,21 @@ def modify_user(module, cursor, schema, schema_password, schema_password_hash, d
 
 	sql_get_curr_def += ' from dba_users where username = upper(\'%s\')' % schema
 
-	if update_password == 'always':
-		old_pw_hash = get_user_password_hash(module, cursor, schema)
-
 	wanted_list = [x.lower() for x in wanted_list]
 	curr_defaults = execute_sql_get(module, cursor, sql_get_curr_def)
 	curr_defaults = [list(t) for t in curr_defaults]
 
-	if (schema_password_hash):
-		if update_password == 'always':
-			# if (wanted_list in curr_defaults) and (old_pw_hash == schema_password_hash):
-			# 	# Everything is kosher, exit changed=False
-			# 	module.exit_json(msg='The schema (%s) is in the intented state' % (schema), changed=False)
-			# else:
-			# 	# Make the change and exit changed=True
-				execute_sql(module, cursor, sql)
-				module.exit_json(msg='Successfully altered the user (%s)' % (schema), changed=True)
-		else:
-			if (wanted_list in curr_defaults):
-				module.exit_json(msg='The schema (%s) is in the intented state' % (schema), changed=False)
-			else:
-				# Make the change and exit changed=Truecontainer = module.params["container"]
-				execute_sql(module, cursor, sql)
-				module.exit_json(msg='Successfully altered the user (%s)' % (schema), changed=True)
-	else:
-		if (wanted_list in curr_defaults):
-			if update_password == 'always':
-				## DISABLING THE PRE/POST-CHECK
-				# change everything and compare hash pre/post. If same => exit change=False else exit change=True
-				execute_sql(module, cursor, sql)
-				# new_pw_hash = get_user_password_hash(module, cursor, schema)
-				# if new_pw_hash == old_pw_hash:
-				# 	module.exit_json(msg='The schema (%s) is in the intented state' % (schema), changed=False)
-				# else:
-				module.exit_json(msg='Successfully altered the user (%s)' % (schema), changed=True)
-			else:
-				 module.exit_json(msg='The schema (%s) is in the intented state' % (schema), changed=False)
-		else:
-			# do the complete change -> exit with change=True
-			# module.exit_json(msg=sql)
+	if (wanted_list in curr_defaults):
+		if (update_password == 'always' and pw_change_needed):
 			execute_sql(module, cursor, sql)
-			module.exit_json(msg='Successfully altered the user (%s, %s)' % (schema, sql), changed=True)
+			module.exit_json(msg='Successfully altered the user password (%s)' % (schema), changed=True)
+		else:
+			module.exit_json(msg='The schema (%s) is in the intented state' % (schema), changed=False)
+	else:
+		# do the complete change -> exit with change=True
+		# module.exit_json(msg=sql)
+		execute_sql(module, cursor, sql)
+		module.exit_json(msg='Successfully altered the user (%s, %s)' % (schema, sql), changed=True)
 
 	return True
 
