@@ -1,6 +1,5 @@
 ---
 
-# master_node: true
 cluster_master: "{{play_hosts[0]}}"
 role_separation: false
 hostgroup: "{{ group_names[0] }}"
@@ -18,6 +17,11 @@ dba_group: dba                          # dba
 asmoper_group: asmoper
 asmdba_group: asmdba                    # osdba
 asmadmin_group: asmadmin                # osasm
+
+# do not ignore failed runcluvfy.sh
+gi_ignoreprereq: false
+
+giignoreprereqparam: "{% if gi_ignoreprereq | bool %}-ignorePrereq{% endif %}"
 
 www_download_bin: curl                              # curl (shell module) or get_url module
 oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
@@ -83,9 +87,11 @@ oracle_scan_port: 1521                                           # Listener port
 oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }}
 
 oracle_asm_init_dg: crs
-oracle_asm_disk_string: "{% if device_persistence == 'asmlib' %}{% elif device_persistence == 'udev' %}/dev/oracle/{% else %}{% endif %}"
 device_persistence: asmlib
-cvuqdisk_rpm: "{% if oracle_install_version_gi > '12.1.0.2' %}cvuqdisk-1.0.10-1.rpm{% else %}cvuqdisk-1.0.9-1.rpm{% endif %} "
+oracle_asm_disk_string: ORCL:*
+cvuqdisk_rpm: "{%- if oracle_install_version_gi > '12.1.0.2' -%}cvuqdisk-1.0.10-1.rpm
+               {%- else -%}cvuqdisk-1.0.9-1.rpm
+               {%- endif -%}"
 
 oracle_cluster_name: "{{ hostgroup }}"      # Name of the cluster when setting up Clustered Grid Infrastructure
 oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
@@ -107,8 +113,9 @@ oracle_gi_gns_subdomain: a.b.c
 oracle_gi_gns_vip: gnsvip.a.b.c
 
 
-opatcharchive: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/{% for opatchfile in oracle_opatch_patch if opatchfile['version']==oracle_install_version_gi %}{{ opatchfile['filename'] }}{% endfor %}"
-# noqa yaml
+opatcharchive: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/
+                {%- for opatchfile in oracle_opatch_patch if opatchfile['version']==oracle_install_version_gi -%}{{ opatchfile['filename'] }}
+                {%- endfor -%}"
 
 oracle_gi_image: "{%- if oracle_sw_copy %}{{ oracle_stage }}
                 {%- else %}{{ oracle_stage_remote }}

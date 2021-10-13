@@ -1,0 +1,81 @@
+---
+- block:
+
+    - debug: msg="install-home-gi | Sttart Execute runcluvfy.sh for Grid-Infrastructure"  # noqa unnamed-task
+      run_once: true
+      when:
+        - configure_cluster
+
+    - name: install-home-gi | Execute runcluvfy.sh for Grid-Infrastructure
+      command:
+        argv:
+          - "{{ oracle_home_gi }}/runcluvfy.sh"
+          - stage
+          - -pre
+          - crsinst
+          - -responseFile
+          - "{{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }}"
+      register: cmdruncluvfygi
+      failed_when: cmdruncluvfygi.rc == -1
+      changed_when: cmdruncluvfygi.rc == 0
+      become: true
+      become_user: "{{ grid_install_user }}"
+      run_once: true
+      when:
+        - configure_cluster
+
+    - debug: var=cmdruncluvfygi.stdout_lines  # noqa unnamed-task
+      when: cmdruncluvfygi.stdout_lines is defined
+
+    - name: install-home-gi | runcluvfy.sh failed
+      fail:
+        msg: "runcluvfy.sh failed - aborting Playbook rc={{ cmdruncluvfygi.rc }}"
+      when:
+        - cmdruncluvfygi.rc is defined
+        - cmdruncluvfygi.rc != 0
+        - not gi_ignoreprereq | bool
+
+    - name: install-home-gi | Execute runcluvfy.sh for Oracle Restart
+      command:
+        argv:
+          - "{{ oracle_home_gi }}/runcluvfy.sh"
+          - comp
+          - sys
+          - -p
+          - crs
+          - -orainv
+          - oinstall
+      register: cmdruncluvfy
+      failed_when: cmdruncluvfy.rc == -1
+      changed_when: cmdruncluvfy.rc == 0
+      become: true
+      become_user: "{{ grid_install_user }}"
+      when:
+        - not configure_cluster
+
+    - debug: var=cmdruncluvfy.stdout_lines  # noqa unnamed-task
+      when: cmdruncluvfy.stdout_lines is defined
+
+    - name: install-home-gi | runcluvfy.sh failed
+      fail:
+        msg: "runcluvfy.sh failed - aborting Playbook rc={{ cmdruncluvfy.rc }}"
+      when:
+        - cmdruncluvfy.rc is defined
+        - cmdruncluvfy.rc != 0
+        - not gi_ignoreprereq | bool
+
+    # Oracle GI/Restart: Configuration will fail when hostname points to localhost ip!
+    - name: Check for hostname with localhost ip in hosts
+      lineinfile:
+        name: /etc/hosts
+        regexp: "127.0.[0-1].1 .*{{ ansible_hostname }}.*"
+        state: absent
+      check_mode: true
+      failed_when: etchosts.changed
+      register: etchosts
+
+  # need to run it once on cluster
+  # => unzip was executed on 1st node only.
+  # => hopefully the setup is the same on all nodes...
+  run_once: "{{ configure_cluster }}"
+  tags: runcluvfy
