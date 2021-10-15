@@ -252,7 +252,7 @@ def modify_user(module, cursor, schema, schema_password, schema_password_hash, d
 				sql += ' identified by values \'%s\'' % (schema_password_hash)
 			elif schema_password and not password_matches_hash(schema_password,old_pw_hash):
 				pw_change_needed = True
-				sql += ' identified by %s ' % (schema_password)
+				sql += ' identified by \"%s\" ' % (schema_password)
 		elif authentication_type == 'external':
 			sql += ' identified externally '
 			sql_get_curr_def += ' ,lower(authentication_type)'
