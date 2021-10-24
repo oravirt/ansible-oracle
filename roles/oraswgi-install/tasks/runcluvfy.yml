@@ -6,6 +6,19 @@
       when:
         - configure_cluster
 
+    # GI < 19.11 + OL8 is not supported by Oracle!
+    # ansible-oracle supports no preinstall patching at the moment
+    # runcluvfy.sh is stuck during execution.
+    # => Golden-Image with 19.11+ is mandatory for installation
+    # => We do NOT look into the archive
+    - name: assert that OL8 is using Golden-Image during unzip
+      assert:
+        that: oracle_install_image_gi is defined
+      when:
+        - ansible_os_family == 'RedHat'
+        - ansible_distribution_major_version | int == 8
+        - oracle_install_version_gi == "19.3.0.0"
+
     - name: install-home-gi | Execute runcluvfy.sh for Grid-Infrastructure
       command:
         argv:
