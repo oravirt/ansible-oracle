@@ -60,6 +60,8 @@
   when: dbh.state|lower == 'present'
   tags: create_db,dotprofile_db
 
+# dbca_copy_template is for special situations, when using DBCA-templates
+# without executing a template task before.
 - name: manage-db | Copy custom dbca Templates for Database to ORACLE_HOME/assistants/dbca/templates
   template:
     src={{ dbh.dbca_templatename }}
@@ -67,7 +69,11 @@
     owner={{ oracle_user }}
     group={{ oracle_group }}
     mode=0640
-  when: dbh.state|lower == 'present' and dbh.dbca_templatename is defined and dbh.dbca_templatename not in('New_Database.dbt','General_Purpose.dbc')
+  when:
+    - dbh.state|lower == 'present'
+    - dbh.dbca_templatename is defined
+    - dbh.dbca_copy_template | default(true)
+    - dbh.dbca_templatename not in('New_Database.dbt','General_Purpose.dbc')
   tags:
     - customdbcatemplate
     - dbcatemplate
