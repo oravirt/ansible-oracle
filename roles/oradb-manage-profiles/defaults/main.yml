@@ -9,9 +9,9 @@ db_password_cdb: "{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_
                   {%- endif %}"
 # noqa yaml
 
-db_password_pdb: "{% if dbpasswords is defined and dbpasswords[item.0.cdb] is defined and dbpasswords[item.0.cdb][db_user] is defined%}{{dbpasswords[item.0.cdb][db_user] }}
+db_password_pdb: "{% if dbpasswords is defined and dbpasswords[item.0.cdb] is defined and dbpasswords[item.0.cdb][db_user] is defined %}{{ dbpasswords[item.0.cdb][db_user] }}
                   {%- else %}{{ default_dbpass }}
-                  {%- endif%}"
+                  {%- endif %}"
 # noqa yaml
 
 db_service_name: "{% if item.0 is defined %}
@@ -25,7 +25,7 @@ listener_port_template: "{% if item.0.listener_port is defined %}{{ item.0.liste
 listener_port: 1521
 
 user_cdb_password: "{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name] is defined and dbpasswords[item.0.oracle_db_name][item.1.schema] is defined %}{{ dbpasswords[item.0.oracle_db_name][item.1.schema] }}
-                    {%- else %}{{ default_dbpass}}
+                    {%- else %}{{ default_dbpass }}
                     {%- endif%}"
 # noqa yaml
 
@@ -38,10 +38,10 @@ oracle_env:
   ORACLE_HOME: "{{ oracle_home_db }}"
   LD_LIBRARY_PATH: "{{ oracle_home_db }}/lib"
 
-attr_name: "{% if item.1.attributes is defined %}{{item.1.attributes |default (omit) | map(attribute='name') | list }}
+attr_name: "{% if item.1.attributes is defined %}{{ item.1.attributes | default (omit) | map(attribute='name') | list }}
             {%- else %}None
             {%- endif %}"
-attr_value: "{% if item.1.attributes is defined %}{{item.1.attributes |default (omit) | map(attribute='value') | list }}{% else %}None{%endif%}"
+attr_value: "{% if item.1.attributes is defined %}{{ item.1.attributes | default (omit) | map(attribute='value') | list }}{% else %}None{% endif %}"
 
 
 # This is an example of how the profile configuration should look like

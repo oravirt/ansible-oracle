@@ -9,7 +9,7 @@ oracle_group: oinstall                          # Primary group for oracle_user.
 oracle_dba_group: dba                          # Primary group for oracle_user.
 grid_dba_group: asmdba                          # Primary group for oracle_user.
 
-oracle_home_db: "{% if item.0 is defined %}{% if item.0.oracle_home is defined %}{{ item.0.oracle_home}}{% else %}{{ oracle_base }}/{{ item.0.oracle_version_db }}/{{ item.0.home }}{% endif %}{% else %}{% if item.oracle_home is defined %}{{ item.oracle_home }}{% else %}{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}{% endif %}{% endif %}"
+oracle_home_db: "{% if item.0 is defined %}{% if item.0.oracle_home is defined %}{{ item.0.oracle_home }}{% else %}{{ oracle_base }}/{{ item.0.oracle_version_db }}/{{ item.0.home }}{% endif %}{% else %}{% if item.oracle_home is defined %}{{ item.oracle_home }}{% else %}{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}{% endif %}{% endif %}"
 # noqa yaml
 
 oracle_stage: /u01/stage
@@ -22,10 +22,10 @@ oracle_reco_dir_fs: /u01/fra/                                   # If storage_typ
 oracle_dbf_dir_asm: '+DATA'                                        # If storage_type=ASM this is where the database is placed.
 oracle_reco_dir_asm: '+FRA'                                        # If storage_type=ASM this is where the fast recovery area is placed
 
-datafile_dest: "{% if item.0.storage_type|upper == 'FS' %}{{ oracle_dbf_dir_fs }}{% elif item.0.storage_type|upper == 'ASM' %}{{ oracle_dbf_dir_asm }}{% else %}{% endif %}"
+datafile_dest: "{% if item.0.storage_type | upper == 'FS' %}{{ oracle_dbf_dir_fs }}{% elif item.0.storage_type | upper == 'ASM' %}{{ oracle_dbf_dir_asm }}{% else %}{% endif %}"
 # noqa yaml
 
-recoveryfile_dest: "{% if item.0.storage_type|upper == 'FS' %}{{ oracle_reco_dir_fs }}{% elif item.0.storage_type|upper == 'ASM' %}{{ oracle_reco_dir_asm }}{% else %}{% endif %}"
+recoveryfile_dest: "{% if item.0.storage_type | upper == 'FS' %}{{ oracle_reco_dir_fs }}{% elif item.0.storage_type | upper == 'ASM' %}{{ oracle_reco_dir_asm }}{% else %}{% endif %}"
 # noqa yaml
 
 configure_cluster: false
@@ -63,7 +63,7 @@ asmmonitorpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% 
 # noqa yaml
 
 # DB
-default_dbpass: "{% if item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd}}{% else %}Oracle123{% endif%}"   # The check for the old passwords are there for  backwards compatibility and only temporary, will be removed
+default_dbpass: "{% if item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd }}{% else %}Oracle123{% endif %}"   # The check for the old passwords are there for  backwards compatibility and only temporary, will be removed
 # noqa yaml
 
 dbpasswords:
@@ -89,7 +89,7 @@ shell_aliases:
 
 dbca_templatename: General_Purpose.dbc
 
-dbca_initParams: "{% if '12.2' in item.0.oracle_version_db %} -initParams db_name={{item.0.oracle_db_name}}{% if item.0.oracle_db_unique_name is defined %},db_unique_name={{item.0.oracle_db_unique_name}}{% endif %}{% endif %}"
+dbca_initParams: "{% if '12.2' in item.0.oracle_version_db %} -initParams db_name={{ item.0.oracle_db_name }}{% if item.0.oracle_db_unique_name is defined %},db_unique_name={{ item.0.oracle_db_unique_name }}{% endif %}{% endif %}"
 # noqa yaml
 
 # This is an example layout of a database installation

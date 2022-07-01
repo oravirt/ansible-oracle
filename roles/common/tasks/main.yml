@@ -52,8 +52,15 @@
 
 # Update public-yum.repo only on old versions of OL7
 - name: Get newest repo-file for OL (public-yum)
-  get_url: dest={{ repo_dir }}/{{ ol_repo_file }}  url=http://public-yum.oracle.com/{{ ol_repo_file }} backup=yes
-  when: not olyumconfigfile.stat.exists | default(false) and configure_public_yum_repo and ansible_distribution == 'OracleLinux'
+  get_url:
+    dest: "{{ repo_dir }}/{{ ol_repo_file }}"
+    url: "http://public-yum.oracle.com/{{ ol_repo_file }}"
+    backup: true
+    mode: 0644
+  when:
+    - not olyumconfigfile.stat.exists | default(false)
+    - configure_public_yum_repo
+    - ansible_distribution == 'OracleLinux'
   tags:
     - olrepo
 

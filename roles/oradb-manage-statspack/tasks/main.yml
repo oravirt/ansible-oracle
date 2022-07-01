@@ -137,7 +137,7 @@
         ORACLE_SID: "{{ oracle_db_instance_name }}"
         pdb_name: "{{ pdb.0.pdb_name }}"
       loop:
-        - "{{ oracle_pdbs |flatten(levels=1) }}"
+        - "{{ oracle_pdbs | flatten(levels=1) }}"
       loop_control:
         loop_var: pdb
         label: "{{ pdb.0.cdb | default('') }} {{ pdb.0.pdb_name | default('') }} {{ oracle_db_instance_name | default('') }}"
@@ -179,7 +179,7 @@
         snaplevel: "{{ pdb.statspack.snaplevel | default(7) }}"
         pdb_name: "{{ pdb.0.pdb_name }}"
       loop:
-        - "{{ oracle_pdbs |flatten(levels=1) }}"
+        - "{{ oracle_pdbs | flatten(levels=1) }}"
       loop_control:
         loop_var: pdb
         label: "{{ pdb.0.cdb | default('') }} {{ pdb.0.pdb_name | default('') }} {{ oracle_db_instance_name | default('') }}"
@@ -225,7 +225,7 @@
   environment:
     ORACLE_HOME: "{{ oracle_home_db }}"
   loop:
-    - "{{ oracle_pdbs |flatten(levels=1) }}"
+    - "{{ oracle_pdbs | flatten(levels=1) }}"
   loop_control:
     loop_var: pdb
     label: "{{ pdb.0.cdb | default('') }} {{ pdb.0.pdb_name | default('') }}"
@@ -257,7 +257,7 @@
   environment:
     ORACLE_HOME: "{{ oracle_home_db }}"
   loop:
-    - "{{ oracle_pdbs |flatten(levels=1) }}"
+    - "{{ oracle_pdbs | flatten(levels=1) }}"
   loop_control:
     loop_var: pdb
     label: "{{ pdb.0.cdb | default('') }} {{ pdb.0.pdb_name | default('') }}"

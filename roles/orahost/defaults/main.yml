@@ -30,13 +30,13 @@ grid_users:
     othergroups: "asmadmin,asmdba,asmoper,dba"
     passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0"
 
-firewall_service: "{% if ansible_distribution_major_version|int==6%}iptables{%elif ansible_distribution_major_version|int==7 %}firewalld{% else %}0{% endif %}"
+firewall_service: "{% if ansible_distribution_major_version | int==6%}iptables{%elif ansible_distribution_major_version | int==7 %}firewalld{% else %}0{% endif %}"
 role_separation: false
 oracle_user: oracle                        # User that will own the Oracle Installations.
 grid_user: grid
-grid_install_user: "{% if role_separation %}{{grid_user }}{% else %}{{ oracle_user }}{% endif %}"
+grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
 configure_oracle_sudo: true
-etc_hosts_ip: "{% if 'virtualbox' in ansible_virtualization_type %}{{ansible_all_ipv4_addresses[1]}}{% else %}{{ansible_default_ipv4.address}}{%endif%}"
+etc_hosts_ip: "{% if 'virtualbox' in ansible_virtualization_type %}{{ ansible_all_ipv4_addresses[1] }}{% else %}{{ ansible_default_ipv4.address }}{% endif %}"
 oracle_inventory_loc: /u01/app/oraInventory
 
 oracle_user_home: "/home/{{ oracle_user }}"  # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
@@ -66,11 +66,11 @@ extrarepos_enabled: "{%- if ansible_distribution == 'OracleLinux' -%}
 extrarepos_disabled:
 
 # Install oracleasm-support from RPM-Repo on OracleLinux
-asmlib_rpm: "{%- if ansible_distribution_major_version|int == 6 %}
+asmlib_rpm: "{%- if ansible_distribution_major_version | int == 6 %}
                {{ asmlib_rpm_el6 }}
-             {%- elif ansible_distribution_major_version|int ==7 %}
+             {%- elif ansible_distribution_major_version | int ==7 %}
                {{ asmlib_rpm_el7 }}
-             {%- elif ansible_distribution_major_version|int ==8 %}
+             {%- elif ansible_distribution_major_version | int ==8 %}
                {{ asmlib_rpm_el8 }}
              {%- else %}
                None
@@ -79,12 +79,12 @@ asmlib_rpm: "{%- if ansible_distribution_major_version|int == 6 %}
 asmlibsupport_rpm: "{%- if ansible_distribution == 'OracleLinux' -%}
                       oracleasm-support
                     {%- else -%}
-                      {%- if ansible_distribution_major_version|int == 6 -%}
-                        {{asmlibsupport_rpm_el6}}
-                      {%- elif ansible_distribution_major_version|int == 7 -%}
-                        {{asmlibsupport_rpm_el7}}
-                      {%- elif ansible_distribution_major_version|int == 8 -%}
-                        {{asmlibsupport_rpm_el8}}
+                      {%- if ansible_distribution_major_version | int == 6 -%}
+                        {{ asmlibsupport_rpm_el6 }}
+                      {%- elif ansible_distribution_major_version | int == 7 -%}
+                        {{ asmlibsupport_rpm_el7 }}
+                      {%- elif ansible_distribution_major_version | int == 8 -%}
+                        {{ asmlibsupport_rpm_el8 }}
                       {%- else -%}
                         oracleasm-support
                       {%- endif -%}
@@ -135,11 +135,11 @@ configure_hugepages: true
 configure_hugepages_by: percentage          # percentage/memory
 percent_hugepages: 50                       # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages
 size_in_gb_hugepages: 1                     # The amount of RAM in GB to dedicate to hugepages
-nr_hugepages_percent: "{{((((percent_hugepages/100) * ansible_memtotal_mb)/2)+2)|round|int }}"
-nr_hugepages_memory: "{{ (((size_in_gb_hugepages*1024)/2)+2)|round|int }}"
+nr_hugepages_percent: "{{ (((( percent_hugepages / 100 ) * ansible_memtotal_mb ) / 2 ) + 2 ) | round | int }}"
+nr_hugepages_memory: "{{ ((( size_in_gb_hugepages * 1024 ) /2 ) +2 ) | round | int }}"
 nr_hugepages: "{% if configure_hugepages %}
-                 {%- if configure_hugepages_by|lower == 'percentage' %}{{ nr_hugepages_percent }}
-                 {%- elif configure_hugepages_by|lower == 'memory' %}{{ nr_hugepages_memory }}
+                 {%- if configure_hugepages_by | lower == 'percentage' %}{{ nr_hugepages_percent }}
+                 {%- elif configure_hugepages_by | lower == 'memory' %}{{ nr_hugepages_memory }}
                  {%- endif %}
                  {%- else %}0
                {%- endif %}"
@@ -152,7 +152,7 @@ host_fs_layout:
     disk:
       - {device: /dev/sdb, pvname: /dev/sdb1}
 
-host_fs_layout_vgdisks: "{%- for disk in item.disk -%} {{disk.pvname}} {%- if not loop.last -%},{%- endif -%}{% endfor %}"
+host_fs_layout_vgdisks: "{%- for disk in item.disk -%} {{ disk.pvname }} {%- if not loop.last -%},{%- endif -%}{% endfor %}"
 
 # asm_diskgroups:
 #  - diskgroup: crs
