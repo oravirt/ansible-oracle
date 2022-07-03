@@ -5,16 +5,16 @@ oracle_user: oracle
 configure_cluster: false
 oracle_base: /u01/app/oracle
 
-default_dbpass: "{% if item.0 is defined and item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd}}{% else %}Oracle123{% endif %}"
+default_dbpass: "{% if item.0 is defined and item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd }}{% else %}Oracle123{% endif %}"
 db_user: system
 db_password_cdb: "{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name] is defined and dbpasswords[item.0.oracle_db_name][db_user] is defined%}{{ dbpasswords[item.0.oracle_db_name][db_user] }}
                   {%- else %}{{ default_dbpass }}
                   {%- endif %}"
 # noqa yaml
 
-db_password_pdb: "{% if dbpasswords is defined and dbpasswords[item.0.cdb] is defined and dbpasswords[item.0.cdb][db_user] is defined%}{{dbpasswords[item.0.cdb][db_user] }}
+db_password_pdb: "{% if dbpasswords is defined and dbpasswords[item.0.cdb] is defined and dbpasswords[item.0.cdb][db_user] is defined %}{{ dbpasswords[item.0.cdb][db_user] }}
                   {%- else %}{{ default_dbpass }}
-                  {%- endif%}"
+                  {%- endif %}"
 # noqa yaml
 
 db_service_name: "{% if item.0 is defined %}

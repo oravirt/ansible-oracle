@@ -1,6 +1,6 @@
 ---
 
-cluster_master: "{{play_hosts[0]}}"
+cluster_master: "{{ play_hosts[0] }}"
 role_separation: false
 hostgroup: "{{ group_names[0] }}"
 hostgroup_hub: "{{ hostgroup }}-hub"
@@ -45,7 +45,7 @@ oracle_directories:
   - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
   - {name: "{{ oracle_rsp_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
   - {name: "{{ oracle_base }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_inventory_loc}}", owner: "{{ grid_install_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_inventory_loc }}", owner: "{{ grid_install_user }}", group: "{{ oracle_group }}", mode: 775}
   - {name: "{{ oracle_base }}/cfgtoollogs", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
   - {name: "{{ oracle_base }}/admin", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
   - {name: "{{ oracle_base }}/audit", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
@@ -76,7 +76,7 @@ asmmonitorpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% 
 # DB
 
 # The check for the old passwords are there for  backwards compatibility and only temporary, will be removed
-default_dbpass: "{% if item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd}}{% else %}Oracle123{% endif %}"
+default_dbpass: "{% if item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd }}{% else %}Oracle123{% endif %}"
 
 # oracle_password: Oracle123                                       # Password used for all Grid Infrastructure related resources (e.g ASM)
 oracle_scan: your.scan.address                                   # Scan address for Clustered Grid Infrastructure

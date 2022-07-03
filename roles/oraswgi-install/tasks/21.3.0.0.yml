@@ -42,7 +42,7 @@
   when: configure_cluster
   tags: cvuqdisk
 
-- block:  # when: configure_cluster
+- block:  # noqa unnamed-task when: configure_cluster
 
     # synchronize didn't work on all environments...
     # => fetch to ansible controller
@@ -105,6 +105,7 @@
 
     - name: install-home-gi | Install Grid Infrastructure
       command:
+        # noqa no-changed-when
         argv:
           - "{{ oracle_home_gi }}/gridSetup.sh"
           - -responseFile
@@ -134,6 +135,7 @@
 - block:  # when: oracle_home_gi not in checkgiinstall.stdout
     - name: install-home-gi | Run oraInstroot script after installation
       command: "{{ oracle_inventory_loc }}/orainstRoot.sh"
+      # noqa no-changed-when
       become: true
       tags:
         - runroot
@@ -143,6 +145,7 @@
 
     - name: install-home-gi | Run root script after installation (Master Node)
       command: "{{ oracle_home_gi }}/root.sh"
+      # noqa no-changed-when
       become: true
       run_once: "{{ configure_cluster }}"
       register: rootmaster

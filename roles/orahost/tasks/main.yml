@@ -14,8 +14,8 @@
   yum:
     name: "{{ oracle_packages }}"
     state: installed
-    enablerepo: "{{ extrarepos_enabled |default (omit, True) }}"
-    disablerepo: "{{ extrarepos_disabled |default (omit, True) }}"
+    enablerepo: "{{ extrarepos_enabled | default (omit, True) }}"
+    disablerepo: "{{ extrarepos_disabled | default (omit, True) }}"
   when:
     - install_os_packages
     - ansible_os_family == 'RedHat'
@@ -31,8 +31,8 @@
   yum:
     name: "{{ oracle_asm_packages }}"
     state: installed
-    enablerepo: "{{ extrarepos_enabled |default (omit, True) }}"
-    disablerepo: "{{ extrarepos_disabled |default (omit, True) }}"
+    enablerepo: "{{ extrarepos_enabled | default (omit, True ) }}"
+    disablerepo: "{{ extrarepos_disabled | default (omit, True ) }}"
   when:
     - install_os_packages | bool
     - ansible_os_family == 'RedHat'
@@ -71,7 +71,7 @@
   register: disable_selinux_runtime
   tags: selinux
 
-- block:
+- block:  # noqa unnamed-task
     - name: Set Timezone
       timezone:
         name: "{{ os_timezone }}"
@@ -341,9 +341,10 @@
 # Work Arroud:
 # => Flush File Cache
 # => retry a sysctl -p
-- block:
+- block:  # noqa unnamed-task
     - name: Flush Buffer Cache when hugepages have been changed
       command: echo 2 > /proc/sys/vm/drop_caches
+      # noqa no-changed-when
       tags: sysctl,hugepages
 
     - name: Try sysctl again

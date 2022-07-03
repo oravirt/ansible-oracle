@@ -9,7 +9,7 @@ nfs_server_sw: nfsserver
 nfs_server_sw_path: /path/to/orasw
 oracle_sw_copy: "{% if install_from_nfs %}false{% else %}true{% endif %}"
 oracle_sw_unpack: "{% if install_from_nfs %}false{% else %}true{% endif %}"
-oracle_db_responsefile: "{{ dbh.home}}_{{ ansible_hostname }}.rsp"
+oracle_db_responsefile: "{{ dbh.home }}_{{ ansible_hostname }}.rsp"
 oracle_stage: /u01/stage
 oracle_stage_remote: "{{ oracle_stage }}"
 oracle_stage_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
@@ -36,7 +36,7 @@ oracle_sw_extract_path: "{%- if '18' in db_version -%}
 #                  {%- endif %}"
 
 
-oracle_profile_name: ".profile_{{dbh.home}}"
+oracle_profile_name: ".profile_{{ dbh.home }}"
 
 # "{%- if item is defined -%}
 #                          {%- if item.oracle_home is defined -%}
@@ -87,8 +87,8 @@ oracle_EE_options: "{%- if   db_homes_config[dbh.home]['version'] in ('18.3.0.0'
                     {%- elif db_homes_config[dbh.home]['version'] in ('19.3.0.0') %}{{ oracle_EE_options_193 }}
                     {%- elif db_homes_config[dbh.home]['version'] in ('21.3.0.0') %}{{ oracle_EE_options_213 }}
                     {%- elif db_homes_config[dbh.home]['version'] in ('12.2.0.1') %}{{ oracle_EE_options_122 }}
-                    {%- elif db_homes_config[dbh.home]['version'] in ('12.1.0.1', '12.1.0.2') %}{{oracle_EE_options_121}}
-                    {%- elif db_homes_config[dbh.home]['version'] == '11.2.0.4' %}{{oracle_EE_options_112}}
+                    {%- elif db_homes_config[dbh.home]['version'] in ('12.1.0.1', '12.1.0.2') %}{{ oracle_EE_options_121 }}
+                    {%- elif db_homes_config[dbh.home]['version'] == '11.2.0.4' %}{{ oracle_EE_options_112 }}
                     {%- endif %}"
 
 # disable all options who requires extra licences

@@ -5,9 +5,9 @@ oracle_base: /u01/app/oracle
 oracle_user: oracle
 
 db_user: sys
-db_password_cdb: "{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name] is defined and dbpasswords[item.0.oracle_db_name][db_user] is defined %}{{ dbpasswords[item.0.oracle_db_name][db_user]}}
+db_password_cdb: "{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name] is defined and dbpasswords[item.0.oracle_db_name][db_user] is defined %}{{ dbpasswords[item.0.oracle_db_name][db_user] }}
                   {%- else %}{{ default_dbpass }}
-                  {%- endif%}"
+                  {%- endif %}"
 # noqa yaml
 db_password_pdb: "{% if dbpasswords is defined and dbpasswords[item.0.cdb] is defined and dbpasswords[item.0.cdb][db_user] is defined %}{{ dbpasswords[item.0.cdb][db_user] }}
                   {%- else %}{{ default_dbpass }}

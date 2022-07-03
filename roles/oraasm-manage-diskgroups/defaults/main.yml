@@ -15,15 +15,15 @@ oracle_env:
 oracle_asm_disk_string: ORCL:*
 
 oracle_asm_disk_prefix: "
-    {%- if device_persistence |lower == 'asmlib' -%}
+    {%- if device_persistence | lower == 'asmlib' -%}
       {%- if oracle_asm_disk_string.endswith('*') %}{{ oracle_asm_disk_string[:-1] }}
       {%- else -%}{{ oracle_asm_disk_string }}
       {%- endif -%}
-    {%- elif device_persistence |lower == 'udev' -%}{{ oracle_asm_disk_string }}
+    {%- elif device_persistence | lower == 'udev' -%}{{ oracle_asm_disk_string }}
     {%- else -%}
     {%- endif -%}"
 
-asmdevice_list: "{% if device_persistence |lower == 'asmlib' %}
+asmdevice_list: "{% if device_persistence | lower == 'asmlib' %}
                    {%- for disk in item.disk -%}{{ oracle_asm_disk_prefix }}{{ disk.asmlabel | upper }}
                      {%- if not loop.last -%},{%- endif -%}
                    {%- endfor %}
@@ -33,4 +33,4 @@ asmdevice_list: "{% if device_persistence |lower == 'asmlib' %}
                    {%- endfor %}
                  {%- endif %}"
 attr_name: "{% if item.attributes is defined %}{{ item.attributes | default (omit) | map(attribute='name') | list }}{% else %}None{%endif%}"
-attr_value: "{% if item.attributes is defined %}{{ item.attributes |default (omit) | map(attribute='value') | list }}{% else %}None{%endif%}"
+attr_value: "{% if item.attributes is defined %}{{ item.attributes | default (omit) | map(attribute='value') | list }}{% else %}None{%endif%}"
