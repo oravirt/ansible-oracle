@@ -53,7 +53,7 @@
 - name: manage-db | add dotprofile
   template:
     src: dotprofile-db.j2
-    dest: "/home/{{ oracle_user }}/.profile_{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_name) }}"
+    dest: "{{ oracle_user_home }}/.profile_{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_name) }}"
     owner: "{{ oracle_user }}"
     group: "{{ oracle_group }}"
     mode: 0660
@@ -163,7 +163,7 @@
 
 - name: manage-db | remove dotprofile
   file:
-    path: "/home/{{ oracle_user }}/.profile_{{ dbh.oracle_db_name }}"
+    path: "{{ oracle_user_home }}/.profile_{{ dbh.oracle_db_name }}"
     state: absent
   when: dbh.state|lower == 'absent'
   tags: create_cdb,dotprofile_db
