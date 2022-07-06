@@ -10,14 +10,14 @@
     password={{ db_password_cdb }}
     mode="{{ db_mode }}"
     schema={{ item.1.schema }}
-    schema_password={{ user_cdb_password }}
-    schema_password_hash={{ user_cdb_password_hash | default(omit) }}
+    schema_password={{ item.1.password_is_hash | default(false) | ternary(omit,user_cdb_password) }}
+    schema_password_hash={{ item.1.password_is_hash | default(false) | ternary(user_cdb_password,omit) }}
     profile={{ item.1.profile | default (omit) }}
     state={{ item.1.state }}
     default_tablespace={{ item.1.default_tablespace | default (omit) }}
     default_temp_tablespace={{ item.1.default_temp_tablespace | default (omit) }}
     container={{ item.1.container | default(omit) }}
-    update_password={{ item.1.update_password | default('on_create') }}
+    update_password={{ item.1.update_password | default(omit) }}
     authentication_type={{ item.1.authentication_type | default(omit) }}
     grants={{ item.1.grants | default (omit) }}
   with_subelements:
@@ -45,13 +45,13 @@
     password={{ db_password_pdb }}
     mode="{{ db_mode }}"
     schema={{ item.1.schema }}
-    schema_password={{ user_pdb_password }}
-    schema_password_hash={{ user_pdb_password_hash | default(omit) }}
+    schema_password={{ item.1.password_is_hash | default(false) | ternary(omit,user_pdb_password) }}
+    schema_password_hash={{ item.1.password_is_hash | default(false) | ternary(user_pdb_password,omit) }}
     profile={{ item.1.profile | default (omit) }}
     state={{ item.1.state }}
     default_tablespace={{ item.1.default_tablespace | default (omit) }}
     default_temp_tablespace={{ item.1.default_temp_tablespace | default (omit) }}
-    update_password={{ item.1.update_password | default('on_create') }}
+    update_password={{ item.1.update_password | default(omit) }}
     authentication_type={{ item.1.authentication_type | default(omit) }}
     grants={{ item.1.grants | default (omit) }}
   with_subelements:
