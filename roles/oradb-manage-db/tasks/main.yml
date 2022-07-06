@@ -58,6 +58,7 @@
     - "{{ oracle_databases }}"
   loop_control:
     loop_var: dbh
+    label: " oracle_db_name={{ dbh.oracle_db_name | default('') }}"
   when: oracle_databases is defined
   tags: create_db,dbca,customdbcatemplate,dotprofile_db
 
