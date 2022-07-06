@@ -49,17 +49,6 @@
   run_once: "{{ configure_cluster }}"
   when: dbh.state|lower == 'present'
 
-
-- name: manage-db | add dotprofile
-  template:
-    src: dotprofile-db.j2
-    dest: "{{ oracle_user_home }}/.profile_{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_name) }}"
-    owner: "{{ oracle_user }}"
-    group: "{{ oracle_group }}"
-    mode: 0660
-  when: dbh.state|lower == 'present'
-  tags: create_db,dotprofile_db
-
 # dbca_copy_template is for special situations, when using DBCA-templates
 # without executing a template task before.
 - name: manage-db | Copy custom dbca Templates for Database to ORACLE_HOME/assistants/dbca/templates
@@ -167,3 +156,7 @@
     state: absent
   when: dbh.state|lower == 'absent'
   tags: create_cdb,dotprofile_db
+
+- include_tasks: ocenv.yml
+  tags:
+    - always
