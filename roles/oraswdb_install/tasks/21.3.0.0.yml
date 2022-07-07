@@ -1,0 +1,20 @@
+---
+- name: install_home_db | Install Oracle Database Server
+  ansible.builtin.shell: "{{ oracle_home_db }}/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -silent -waitforcompletion"
+  # noqa command-instead-of-shell
+  become: true
+  become_user: "{{ oracle_user }}"
+  run_once: "{{ configure_cluster }}"
+  when: oracle_home_db not in existing_dbhome.stdout_lines
+  tags:
+    - oradbinstall
+  register: oradbinstall
+  failed_when: oradbinstall.rc not in [0,6]
+
+- ansible.builtin.debug: var=oradbinstall.stdout_lines
+  # noqa unnamed-task ignore-errors
+  run_once: "{{ configure_cluster }}"
+  when: oracle_home_db not in existing_dbhome.stdout_lines and oradbinstall.changed
+  tags:
+    - oradbinstall
+  ignore_errors: true

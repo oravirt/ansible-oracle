@@ -1,0 +1,31 @@
+---
+- name: db_opatch | check if GI is installed
+  ansible.builtin.stat: path=/etc/oracle/olr.loc
+  register: olrloc
+
+- name: install_home_db | Mount nfs share with installation media
+  ansible.builtin.mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=mounted
+  when: install_from_nfs
+  tags:
+    - nfsmountdb
+
+- name: db_opatch | Create patch-base directory (version specific)
+  ansible.builtin.file:
+    dest={{ oracle_patch_stage }}/{{ db_version }}
+    mode=775
+    owner={{ oracle_user }}
+    group={{ oracle_group }}
+    state=directory
+  with_items:
+    - "{{ db_homes_installed }}"
+  tags:
+    - directories
+  when: apply_patches_db and item.apply_patches |default (false)
+
+- ansible.builtin.include_tasks: db-home-patch.yml
+  with_items:
+    - "{{ db_homes_installed }}"
+  loop_control:
+    loop_var: dbh
+  when: db_homes_installed is defined and dbh.state == 'present' and dbh.apply_patches |default (False) and apply_patches_db
+  tags: autopatch

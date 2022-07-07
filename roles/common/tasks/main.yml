@@ -1,36 +1,20 @@
 # Common playbook - sets up the host generic stuff
 ---
 
-#  - name: Add {{ default_user }} user
-#    user: name={{ default_user }} state=present password={{ default_user_password }}
-#    tags:
-#     - user
-
-#  - name: Add {{ default_user }} to sudoers
-#    template: src=sudoers.j2 dest=/etc/sudoers.d/{{ default_user }} owner=root mode=0644
-#    tags:
-#     - sudoadd
-
-#  - name: Set up authorized_keys for {{ default_user }}
-#    authorized_key: user={{ default_user }} key="{{ item }}"
-#    with_file:
-#     - "~/.ssh/authorized_keys"
-#    tags:
-#     - keys
 - name: Check for correct Ansible Version (>= 2.8)
-  assert:
+  ansible.builtin.assert:
     that:
       - "ansible_version.full is version('2.8', '>=')"
 
 - name: Install EPEL Repo
   block:
     - name: Install GPG Key for EPEL
-      rpm_key:
+      ansible.builtin.rpm_key:
         state: present
         key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_distribution_major_version  }}
 
     - name: Add EPEL Repo
-      yum:
+      ansible.builtin.yum:
         name: "{{ epel_rpm }}"
         state: installed
 
@@ -43,7 +27,7 @@
 # Do not use the old public-yum.repo on OL7 after January 2019 anymore
 # Check for /usr/bin/ol_yum_configure.sh in newer systems
 - name: Check for ol_yum_configure.sh
-  stat:
+  ansible.builtin.stat:
     path: /usr/bin/ol_yum_configure.sh
   register: olyumconfigfile
   when: configure_public_yum_repo and ansible_distribution == 'OracleLinux'
@@ -52,7 +36,7 @@
 
 # Update public-yum.repo only on old versions of OL7
 - name: Get newest repo-file for OL (public-yum)
-  get_url:
+  ansible.builtin.get_url:
     dest: "{{ repo_dir }}/{{ ol_repo_file }}"
     url: "http://public-yum.oracle.com/{{ ol_repo_file }}"
     backup: true
@@ -65,22 +49,22 @@
     - olrepo
 
 - name: Install common packages OL/RHEL
-  yum: name={{ common_packages }} state=installed
+  ansible.builtin.yum: name={{ common_packages }} state=installed
   when: install_os_packages and ansible_os_family == 'RedHat'
   tags:
     - commonpackages
 
 - name: Install common packages SLES12
-  zypper: name={{ common_packages_sles }} state=installed
+  ansible.builtin.zypper: name={{ common_packages_sles }} state=installed
   when: install_os_packages and ansible_os_family == 'Suse'
   tags:
     - commonpackages
 
 - name: Start and enable ntp or chrony
-  service: name={{ ntp_type }}d  state=started  enabled=yes
+  ansible.builtin.service: name={{ ntp_type }}d  state=started  enabled=yes
   when: configure_ntp
 
 - name: Add motd
-  template: src=motd.j2 dest=/etc/motd mode=0644
+  ansible.builtin.template: src=motd.j2 dest=/etc/motd mode=0644
   tags: motd
   when: configure_motd

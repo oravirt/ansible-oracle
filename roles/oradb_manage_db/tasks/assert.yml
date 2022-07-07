@@ -1,0 +1,17 @@
+---
+# check for minimum configured atrributes in oracle_databases
+- name: assert oracle_databases
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - dbh.oracle_db_name is defined
+      - dbh.home in db_homes_config
+      - dbh.storage_type is defined
+      - db_version != ""
+      - dbh.oracle_db_type is defined
+  with_items: "{{ oracle_databases }}"
+  register: assert1
+  loop_control:
+    loop_var: dbh
+    label: "{{ dbh.oracle_db_name | default('') }}"
+  tags: dbh_assert

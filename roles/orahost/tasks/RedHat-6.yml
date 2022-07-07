@@ -1,13 +1,13 @@
 ---
 
 - name: Count number of kernel lines that needs to be changed (numa=off transparent_hugepage=never)
-  shell: cat /etc/grub.conf | grep title |wc -l
+  ansible.builtin.shell: cat /etc/grub.conf | grep title |wc -l
   # noqa risky-shell-pipe no-changed-when
   register: count
   tags: thpnuma
 
 - name: Disable Transparent Hugepages (in grub.conf)
-  lineinfile: dest=/boot/grub/grub.conf
+  ansible.builtin.lineinfile: dest=/boot/grub/grub.conf
             backup=True
             backrefs=True
             state=present
@@ -17,7 +17,7 @@
   tags: thpnuma
 
 - name: Disable Numa (in grub.conf)
-  lineinfile: dest=/boot/grub/grub.conf
+  ansible.builtin.lineinfile: dest=/boot/grub/grub.conf
             backup=True
             backrefs=True
             state=present
@@ -28,20 +28,20 @@
   when: disable_numa_boot
 
 - name: Disable Transparent Hugepages (runtime)
-  shell: if test -f {{ item.path }}; then {{ item.disable }} {{ item.path }}; fi;
+  ansible.builtin.shell: if test -f {{ item.path }}; then {{ item.disable }} {{ item.path }}; fi;
   # noqa no-changed-when
   with_items:
       - "{{ transparent_hugepage_disable }}"
   tags: tphnuma
 
 - name: Disable Transparent Hugepages (permanently)
-  lineinfile: dest={{ item.rclocal }} line="{{ item.disable }} {{ item.path }}" state=present
+  ansible.builtin.lineinfile: dest={{ item.rclocal }} line="{{ item.disable }} {{ item.path }}" state=present
   with_items:
       - "{{ transparent_hugepage_disable }}"
   tags: tphnuma
 
 - name: Fix permissions on /etc/rc.d/rc.local
-  file: path={{ item.rclocal }} mode=755
+  ansible.builtin.file: path={{ item.rclocal }} mode=755
   with_items:
       - "{{ transparent_hugepage_disable }}"
   tags: tphnuma

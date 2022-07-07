@@ -7,10 +7,11 @@
 
 Pre-requisites:
 
-- Ansible >= 2.4
+- Ansible >= 2.9
 - Oracle Linux (or any RHEL-based Linux System) >= 6.4
-- Oracle Database/Grid Infrastructure 18.3.0.0, 12.2.0.1, 12.1.0.1, 12.1.0.2, 11.2.0.4, 11.2.0.3
+- Oracle Database/Grid Infrastructure 21.3.0.0, 19.3.0.0, 18.3.0.0, 12.2.0.1, 12.1.0.1, 12.1.0.2
 - For example configurations, look in:
+
 ```
   SI/FS:   group_vars/vbox-si-fs.  - vagrant config: http://github.com/oravirt/vagrant-vbox-si-fs
   SI/ASM:  group_vars/vbox-si-asm  - vagrant config: http://github.com/oravirt/vagrant-vbox-si-asm
@@ -26,10 +27,11 @@ By default, installs a single instance 18.3.0.0 database on a filesystem.
    - `LINUX.X64_180000_db_home.zip`
 
 3. Create an Ansible inventory file
-   ```
+
+```
    [myhostgroup]
     dbhost
-   ```
+```
 
 4. Run the playbook:
 

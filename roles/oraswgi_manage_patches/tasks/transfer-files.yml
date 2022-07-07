@@ -1,0 +1,60 @@
+---
+- name: gi_opatch | Copy oracle GI patch (opatchauto) to server (www)
+  ansible.builtin.get_url:
+    url={{ oracle_sw_source_www }}/{{ item[0].filename }}
+    dest={{ oracle_stage }}
+    mode=0775
+  with_nested:
+    - "{{ oracle_sw_patches }}"
+    - "{{ gi_patches[oracle_install_version_gi]['opatchauto'] }}"
+  when:
+    - apply_patches_gi
+    - item[1].patchid == item[0].patchid
+    - item[1].state == 'present'
+    - oracle_sw_copy
+    - not is_sw_source_local
+  become: true
+  become_user: "{{ grid_install_user }}"
+  tags:
+    - oragridpatchget
+
+- name: gi_opatch | Copy oracle GI patch (opatchauto) to server (local)
+  ansible.builtin.copy:
+    src={{ oracle_sw_source_local }}/{{ item[0].filename }}
+    dest={{ oracle_stage }}
+    mode=0775
+    force=no
+  with_nested:
+    - "{{ oracle_sw_patches }}"
+    - "{{ gi_patches[oracle_install_version_gi]['opatchauto'] }}"
+  when: apply_patches_gi and item[1].patchid == item[0].patchid and item[1].state == 'present' and oracle_sw_copy and is_sw_source_local
+  become: true
+  become_user: "{{ grid_install_user }}"
+  tags:
+    - oragridpatchpush
+
+- name: gi_opatch | Copy oracle opatch to server (www)
+  ansible.builtin.get_url:
+    url={{ oracle_sw_source_www }}/{{ item.filename }}
+    dest={{ oracle_stage }}
+    mode=775
+    force=yes
+  with_items: "{{ oracle_opatch_patch }}"
+  when: apply_patches_gi and item.version == oracle_install_version_gi and oracle_sw_copy and not is_sw_source_local
+  become: true
+  become_user: "{{ grid_install_user }}"
+  tags:
+    - oragridopatchget
+
+- name: gi_opatch | Copy oracle opatch to server (local)
+  ansible.builtin.copy:
+    src={{ oracle_sw_source_local }}/{{ item.filename }}
+    dest={{ oracle_stage }}
+    mode=0775
+    force=yes
+  with_items: "{{ oracle_opatch_patch }}"
+  when: apply_patches_gi and item.version == oracle_install_version_gi and oracle_sw_copy and is_sw_source_local
+  become: true
+  become_user: "{{ grid_install_user }}"
+  tags:
+    - oragridpatchpush
