@@ -17,9 +17,12 @@
         mode: '0644'
 
     - name: manage_db | add ocenv to .bashrc
-      ansible.builtin.lineinfile:
+      ansible.builtin.blockinfile:
         path: "{{ oracle_user_home }}/.bashrc"
-        line: ". {{ dbenvdir }}/ocenv"
+        marker: "# {mark} ocenv ANSIBLE MANAGED BLOCK"
+        block: |
+          echo "execute ocenv to source Oracle Environment"
+          alias ocenv='. "{{ dbenvdir }}/ocenv"'
         create: true
         owner: "{{ oracle_user }}"
         group: "{{ oracle_group }}"
