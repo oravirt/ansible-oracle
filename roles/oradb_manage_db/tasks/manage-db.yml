@@ -12,6 +12,10 @@
                           {{ oracle_base }}/{{ db_homes_config[dbh.home]['version'] }}/{{ db_homes_config[dbh.home]['home'] }}
                     {%- endif -%}"
 
+- include_tasks: ocenv.yml
+  tags:
+    - always
+
 - ansible.builtin.debug: msg="Maintaining DB - {{ dbh.oracle_db_name }}, ORACLE_HOME - {{ oracle_home_db }}"  # noqa unnamed-task
   run_once: "{{ configure_cluster }}"
   when: dbh.state|lower == 'present'
@@ -110,7 +114,3 @@
     state: absent
   when: dbh.state|lower == 'absent'
   tags: create_cdb,dotprofile_db
-
-- include_tasks: ocenv.yml
-  tags:
-    - always
