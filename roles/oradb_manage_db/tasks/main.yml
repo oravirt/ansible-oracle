@@ -18,6 +18,7 @@
   with_items: "{{ oracle_databases }}"
   loop_control:
     loop_var: dbh
+    label: "create_listener {{ create_listener | default('') }}  oracle_home {{ dbh.home | default('') }}"
   tags: set_fact
 
 - include_tasks: sqlnet.yml
