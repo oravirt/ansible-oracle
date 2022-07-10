@@ -51,6 +51,7 @@
         - statspackcmd.rc != 0
         - '"ORA-01920:" not in statspackcmd.stdout'  # ORA-01920: user name 'PERFSTAT' conflicts with another user
       when:
+        - dbh.state | upper == 'PRESENT'
         - dbh.statspack is defined
         - dbh.statspack.state | default('present') == 'present'
 
@@ -88,6 +89,7 @@
     - "{{ oracle_databases }}"
   when:
     - oracle_databases is defined
+    - dbh.state | upper == 'PRESENT'
     - dbh.statspack is defined
     - dbh.statspack.state | default('present') == 'present'
   become_user: "{{ oracle_user }}"
@@ -119,6 +121,7 @@
     - "{{ oracle_databases }}"
   when:
     - oracle_databases is defined
+    - dbh.state | upper == 'PRESENT'
     - dbh.statspack is defined
     - dbh.statspack.state | default('present') == 'present'
   become_user: "{{ oracle_user }}"
@@ -191,6 +194,7 @@
         - '"ORA-01920:" not in statspackcmd.stdout'  # ORA-01920: user name 'PERFSTAT' conflicts with another user
       when:
         - oracle_pdbs is defined
+        - pdb.0.state | default('present') == 'present'
         - pdb.0.statspack is defined
         - pdb.0.statspack.state | default('present') == 'present'
 
@@ -233,6 +237,7 @@
     - oracle_pdbs is defined
     - pdb.0.cdb is defined
     - pdb.0.pdb_name is defined
+    - pdb.0.state | default('present') == 'present'
     - pdb.0.statspack is defined
     - pdb.0.statspack.state | default('present') == 'present'
   become_user: "{{ oracle_user }}"
@@ -265,6 +270,7 @@
     - oracle_pdbs is defined
     - pdb.0.cdb is defined
     - pdb.0.pdb_name is defined
+    - pdb.0.state | default('present') == 'present'
     - pdb.0.statspack is defined
     - pdb.0.statspack.state | default('present') == 'present'
   become: true
