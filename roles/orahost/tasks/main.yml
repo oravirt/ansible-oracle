@@ -107,7 +107,10 @@
 #    when: configure_etc_hosts and ansible_default_ipv4.address is defined
 
 - name: User | Add group(s)
-  ansible.builtin.group: name={{ item.group }} gid={{ item.gid }} state=present
+  ansible.builtin.group:
+    name: "{{ item.group }}"
+    gid: "{{ item.gid | default(omit) }}"
+    state: present
   with_items: "{{ oracle_groups }}"
   tags:
     - group
@@ -117,12 +120,12 @@
     name: "{{ item.username }}"
     group: "{{ item.primgroup }}"
     groups: "{{ item.othergroups }}"
-    uid: "{{ item.uid }}"
+    uid: "{{ item.uid | default(omit) }}"
     home: "{{ item.home | default(omit) }}"
     generate_ssh_key: true
     append: true
     state: present
-    password: "{{ item.passwd }}"
+    password: "{{ item.passwd | default(omit) }}"
   with_items: "{{ oracle_users }}"
   tags:
     - user
@@ -132,12 +135,12 @@
     name: "{{ item.username }}"
     group: "{{ item.primgroup }}"
     groups: "{{ item.othergroups }}"
-    uid: "{{ item.uid }}"
+    uid: "{{ item.uid | default(omit) }}"
     home: "{{ item.home | default(omit) }}"
     generate_ssh_key: true
     append: true
     state: present
-    password: "{{ item.passwd }}"
+    password: "{{ item.passwd | default(omit) }}"
   when: role_separation
   with_items: "{{ grid_users }}"
   tags:
