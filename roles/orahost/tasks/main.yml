@@ -264,7 +264,9 @@
   with_subelements:
     - "{{ host_fs_layout }}"
     - disk
-  when: configure_host_disks and item.1.device != item.1.pvname
+    - flags:
+      skip_missing: true
+  when: configure_host_disks and item.1 is defined and item.1.device != item.1.pvname
   tags: hostfs
 
 - name: filesystem | Create vg
