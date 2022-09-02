@@ -5,42 +5,42 @@
   hosts: aws-si-asm
   connection: local
   user: ec2-user
-  become: yes
+  become: true
   roles:
-     - common
-     - orahost
-     - orahost-storage
+    - common
+    - orahost
+    - orahost-storage
 
 - name: Oracle Grid Infrastructure installation & ASM Configuration
   hosts: aws-si-asm
   connection: local
   user: ec2-user
-  become: yes
+  become: true
   roles:
-     - oraswgi-install
-     - oraasm-createdg
+    - oraswgi-install
+    - oraasm-createdg
 
 - name: Database Server Installation & Database Creation
   hosts: aws-si-asm
   connection: local
   user: ec2-user
-  become: yes
+  become: true
   roles:
-      - oraswdb-install
-      - oradb-manage-db
+    - oraswdb-install
+    - oradb-manage-db
 
 - name: Install cx_oracle
   hosts: aws-si-asm
   connection: local
   user: ec2-user
-  become: yes
+  become: true
   roles:
-     - cxoracle
+    - cxoracle
 
 - name: Configure Logrotate
   hosts: aws-si-asm
   connection: local
   user: ec2-user
-  become: yes
+  become: true
   roles:
-     - orahost-logrotate
+    - orahost-logrotate

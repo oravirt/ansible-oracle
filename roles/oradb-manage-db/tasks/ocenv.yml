@@ -1,0 +1,28 @@
+---
+- block:  # noqa unnamed-task
+    - name: manage-db | create directory dbenv
+      file:
+        dest: "{{ dbenvdir }}"
+        state: directory
+        owner: "{{ oracle_user }}"
+        group: "{{ oracle_group }}"
+        mode: '0755'
+
+    - name: manage-db | copy ocenv
+      copy:
+        src: ocenv
+        dest: "{{ dbenvdir }}"
+        owner: "{{ oracle_user }}"
+        group: "{{ oracle_group }}"
+        mode: '0644'
+
+    - name: manage-db | add ocenv to .bashrc
+      ansible.builtin.lineinfile:
+        path: "{{ oracle_user_home }}/.bashrc"
+        line: ". {{ dbenvdir }}/ocenv"
+        create: true
+        owner: "{{ oracle_user }}"
+        group: "{{ oracle_group }}"
+        mode: 0644
+
+  tags: create_db,dotprofile_db

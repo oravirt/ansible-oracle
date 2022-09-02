@@ -1,288 +1,302 @@
 ---
-  #master_node: true
-  os_family_supported: "{% if ansible_os_family == 'Suse' %}Suse{% else %}RedHat{% endif %}"
-  os_min_supported_version: "{% if ansible_os_family == 'Suse' %}12.1{% else %}6.4{% endif %}"
+# master_node: true
+os_family_supported: "{% if ansible_os_family == 'Suse' %}Suse{% else %}RedHat{% endif %}"
+os_min_supported_version: "{% if ansible_os_family == 'Suse' %}12.1{% else %}6.4{% endif %}"
 
 # Users & groups
 
-  oracle_groups:
-    - { group: asmdba, gid: 54318 }
-    - { group: asmoper, gid: 54319 }
-    - { group: asmadmin, gid: 54320 }
-    - { group: oinstall, gid: 54321 }
-    - { group: dba, gid: 54322 }
-    - { group: backupdba, gid: 54323 }
-    - { group: oper, gid: 54324 }
-    - { group: dgdba, gid: 54325 }
-    - { group: kmdba, gid: 54326 }
+oracle_groups:
+  - {group: asmdba, gid: 54318}
+  - {group: asmoper, gid: 54319}
+  - {group: asmadmin, gid: 54320}
+  - {group: oinstall, gid: 54321}
+  - {group: dba, gid: 54322}
+  - {group: backupdba, gid: 54323}
+  - {group: oper, gid: 54324}
+  - {group: dgdba, gid: 54325}
+  - {group: kmdba, gid: 54326}
 
+oracle_users:         # Passwd :Oracle123
+  - username: oracle
+    uid: 54321
+    primgroup: oinstall
+    othergroups: "dba,asmadmin,asmdba,asmoper,backupdba,dgdba,kmdba,oper"
+    passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0"
 
+grid_users:
+  - username: grid
+    uid: 54320
+    primgroup: oinstall
+    othergroups: "asmadmin,asmdba,asmoper,dba"
+    passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0"
 
-  oracle_users:         # Passwd :Oracle123
-   - { username: oracle, uid: 54321, primgroup: oinstall, othergroups: "dba,asmadmin,asmdba,backupdba,dgdba,kmdba,oper", passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0" }
-  grid_users:
-   - { username: grid, uid: 54320, primgroup: oinstall, othergroups: "asmadmin,asmdba,asmoper,dba", passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0" }
+firewall_service: "{% if ansible_distribution_major_version | int==6%}iptables{%elif ansible_distribution_major_version | int==7 %}firewalld{% else %}0{% endif %}"
+role_separation: false
+oracle_user: oracle                        # User that will own the Oracle Installations.
+grid_user: grid
+grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
+configure_oracle_sudo: true
+etc_hosts_ip: "{% if 'virtualbox' in ansible_virtualization_type %}{{ ansible_all_ipv4_addresses[1] }}{% else %}{{ ansible_default_ipv4.address }}{% endif %}"
+oracle_inventory_loc: /u01/app/oraInventory
 
-  firewall_service: "{% if ansible_distribution_major_version|int==6%}iptables{%elif ansible_distribution_major_version|int==7 %}firewalld{% else %}0{% endif %}"
-  role_separation: false
-  oracle_user: oracle                        # User that will own the Oracle Installations.
-  grid_user: grid
-  grid_install_user: "{% if role_separation %}{{grid_user }}{% else %}{{ oracle_user }}{% endif %}"
-  configure_oracle_sudo: true
-  etc_hosts_ip: "{% if 'virtualbox' in ansible_virtualization_type %}{{ansible_all_ipv4_addresses[1]}}{% else %}{{ansible_default_ipv4.address}}{%endif%}"
-  oracle_inventory_loc: /u01/app/oraInventory
+oracle_user_home: "/home/{{ oracle_user }}"  # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+grid_user_home: "/home/{{ grid_install_user }}"  # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
+oracle_group: oinstall                          # Primary group for oracle_user.
+oper_group: oper
+dba_group: dba
+asmoper_group: asmoper
+asmdba_group: asmdba
+asmadmin_group: asmadmin
 
-  oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-  grid_user_home: "/home/{{ grid_install_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-  oracle_group: oinstall                          # Primary group for oracle_user.
-  oper_group: oper
-  dba_group: dba
-  asmoper_group: asmoper
-  asmdba_group: asmdba
-  asmadmin_group: asmadmin
-  old_ssh_config: True                # Temporary solution, will be removed. Possible to switch between old way of setting up passwordless ssh and new (role: orahost-ssh)
-  ssh_keys:
-   - /tmp/id_rsa
-   - /tmp/id_rsa.pub
-   - /tmp/authorized_keys
-  keyfile: /tmp/known_hosts
+# Temporary solution, will be removed.
+# Possible to switch between old way of setting up passwordless ssh and new (role: orahost-ssh)
+old_ssh_config: true
 
-  # Extra repositories that should be enabled
-  extrarepos_enabled: "{%- if ansible_distribution == 'OracleLinux' -%}
+ssh_keys:
+  - /tmp/id_rsa
+  - /tmp/id_rsa.pub
+  - /tmp/authorized_keys
+keyfile: /tmp/known_hosts
+
+# Extra repositories that should be enabled
+extrarepos_enabled: "{%- if ansible_distribution == 'OracleLinux' -%}
                           ol{{ ansible_distribution_major_version }}_addons
-                       {%- else -%}
-                       {%- endif %}"
-  extrarepos_disabled:
+                     {%- else -%}
+                     {%- endif %}"
+extrarepos_disabled:
 
-  # Install oracleasm-support from RPM-Repo on OracleLinux
-  asmlib_rpm:  "{%- if ansible_distribution_major_version|int == 6 %}
-                  {{ asmlib_rpm_el6 }}
-                {%- elif ansible_distribution_major_version|int ==7 %}
-                  {{ asmlib_rpm_el7 }}
-                {%- elif ansible_distribution_major_version|int ==8 %}
-                  {{ asmlib_rpm_el8 }}
-                {%- else %}
-                  None
-                {%- endif %}"
+# Install oracleasm-support from RPM-Repo on OracleLinux
+asmlib_rpm: "{%- if ansible_distribution_major_version | int == 6 %}
+               {{ asmlib_rpm_el6 }}
+             {%- elif ansible_distribution_major_version | int ==7 %}
+               {{ asmlib_rpm_el7 }}
+             {%- elif ansible_distribution_major_version | int ==8 %}
+               {{ asmlib_rpm_el8 }}
+             {%- else %}
+               None
+             {%- endif %}"
 
-  asmlibsupport_rpm: "{%- if ansible_distribution == 'OracleLinux' -%}
-                        oracleasm-support
+asmlibsupport_rpm: "{%- if ansible_distribution == 'OracleLinux' -%}
+                      oracleasm-support
+                    {%- else -%}
+                      {%- if ansible_distribution_major_version | int == 6 -%}
+                        {{ asmlibsupport_rpm_el6 }}
+                      {%- elif ansible_distribution_major_version | int == 7 -%}
+                        {{ asmlibsupport_rpm_el7 }}
+                      {%- elif ansible_distribution_major_version | int == 8 -%}
+                        {{ asmlibsupport_rpm_el8 }}
                       {%- else -%}
-                        {%- if ansible_distribution_major_version|int == 6 -%}
-                          {{asmlibsupport_rpm_el6}}
-                        {%- elif ansible_distribution_major_version|int == 7 -%}
-                          {{asmlibsupport_rpm_el7}}
-                        {%- elif ansible_distribution_major_version|int == 8 -%}
-                          {{asmlibsupport_rpm_el8}}
-                        {%- else -%}
-                          oracleasm-support
-                        {%- endif -%}
-                      {%- endif -%}"
+                        oracleasm-support
+                      {%- endif -%}
+                    {%- endif -%}"
 
-  asmlib_rpm_el6: "http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.4-1.el6.x86_64.rpm"
-  asmlib_rpm_el7: "http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.12-1.el7.x86_64.rpm"
-  asmlib_rpm_el8: "https://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.17-1.el8.x86_64.rpm"
-  asmlib_rpm_sles: "http://oss.oracle.com/projects/oracleasm-support/dist/files/RPMS/sles12/amd64/2.1.8/oracleasm-support-2.1.8-1.SLE12.x86_64.rpm"
-  asmlibsupport_rpm_el6: "http://oss.oracle.com/projects/oracleasm-support/dist/files/RPMS/rhel6/amd64/2.1.8/oracleasm-support-2.1.8-1.el6.x86_64.rpm"
-  asmlibsupport_rpm_el7: "https://yum.oracle.com/repo/OracleLinux/OL7/latest/x86_64/getPackage/oracleasm-support-2.1.11-2.el7.x86_64.rpm"
-  asmlibsupport_rpm_el8: "https://yum.oracle.com/repo/OracleLinux/OL8/latest/x86_64/getPackage/oracleasm-support-2.1.11-2.el8.x86_64.rpm"
+asmlib_rpm_el6: "http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.4-1.el6.x86_64.rpm"
+asmlib_rpm_el7: "http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.12-1.el7.x86_64.rpm"
+asmlib_rpm_el8: "https://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.17-1.el8.x86_64.rpm"
+asmlib_rpm_sles: "http://oss.oracle.com/projects/oracleasm-support/dist/files/RPMS/sles12/amd64/2.1.8/oracleasm-support-2.1.8-1.SLE12.x86_64.rpm"
+asmlibsupport_rpm_el6: "http://oss.oracle.com/projects/oracleasm-support/dist/files/RPMS/rhel6/amd64/2.1.8/oracleasm-support-2.1.8-1.el6.x86_64.rpm"
+asmlibsupport_rpm_el7: "https://yum.oracle.com/repo/OracleLinux/OL7/latest/x86_64/getPackage/oracleasm-support-2.1.11-2.el7.x86_64.rpm"
+asmlibsupport_rpm_el8: "https://yum.oracle.com/repo/OracleLinux/OL8/latest/x86_64/getPackage/oracleasm-support-2.1.11-2.el8.x86_64.rpm"
 
-  #ol6_repo_file: public-yum-ol6.repo
-  repo_dir: /etc/yum.repos.d/
+# ol6_repo_file: public-yum-ol6.repo
+repo_dir: /etc/yum.repos.d/
 
-  disable_numa_boot: true                    # (true/false) Sets numa=off in grub.conf
-  configure_interconnect: false               # (true/false) Should the Interconnect network be configured by Ansible (setup IP-address. IP-address configurable by variable oracle_ic_net). Only applicable to RAC-installs
-  oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }} # Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
-  configure_ssh: false                        # (true/false). Should passwordless ssh be configured between clusternodes. Only applicable to RAC-installs
-  configure_host_disks: false                 # (true/false). Should the specified directories be on their on devices -> (true), or do they live in the root-filesystem (/) -> (false).
-                                             # mountpoints are described in host_fs_layout
-  configure_etc_hosts: false
-  configure_cluster: false
-  oracle_stage: /u01/stage
-  oracle_rsp_stage: "{{ oracle_stage }}/rsp"
-  device_persistence: asmlib
-  install_os_packages: true
-  disable_selinux: true
-  disable_firewall: true
+disable_numa_boot: true                    # (true/false) Sets numa=off in grub.conf
 
-  transparent_hugepage_disable:
-             - {disable: "echo never >", path: /sys/kernel/mm/transparent_hugepage/enabled, rclocal: /etc/rc.d/rc.local}
-             - {disable: "echo never >", path: /sys/kernel/mm/transparent_hugepage/defrag, rclocal: /etc/rc.d/rc.local}
+# (true/false) Should the Interconnect network be configured
+# by Ansible (setup IP-address. IP-address configurable by variable oracle_ic_net).
+configure_interconnect: false
 
-  configure_hugepages: true
-  configure_hugepages_by: percentage          # percentage/memory
-  percent_hugepages: 50                       # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages
-  size_in_gb_hugepages: 1                     # The amount of RAM in GB to dedicate to hugepages
-  nr_hugepages_percent: "{{((((percent_hugepages/100) * ansible_memtotal_mb)/2)+2)|round|int }}"
-  nr_hugepages_memory: "{{ (((size_in_gb_hugepages*1024)/2)+2)|round|int }}"
-  nr_hugepages: "{% if configure_hugepages %}{% if configure_hugepages_by|lower == 'percentage'%}{{ nr_hugepages_percent }}{%elif configure_hugepages_by|lower == 'memory' %}{{ nr_hugepages_memory }}{% endif %}{% else %}0{% endif %}"
+# Picks the last octet from the public ip to use for
+# cluster-interconnect ip (e.g 3.3.3.51)
+oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }}
 
-  host_fs_layout:
-   - vgname: vgora
-     state: present
-     filesystem:
-       - {mntp: /u01, lvname: lvora, lvsize: 100%FREE, fstype: ext4}
-     disk:
-       - {device: /dev/sdb, pvname: /dev/sdb1}
+configure_ssh: false                        # (true/false). Should passwordless ssh be configured between clusternodes. Only applicable to RAC-installs
 
-  host_fs_layout_vgdisks: "{%- for disk in item.disk -%} {{disk.pvname}} {%- if not loop.last -%},{%- endif -%}{% endfor %}"
+# (true/false). Should the specified directories be on their
+# devices -> (true), or do they live in the root-filesystem (/) -> (false).
+# mountpoints are described in host_fs_layout
+configure_host_disks: false
 
-  #asm_diskgroups:
-  #  - diskgroup: crs
-  #    properties:
-  #      - {redundancy: normal, ausize: 4}
-  #    attributes:
-  #      - {name: 'compatible.rdbms', value: 11.2.0.4.0}
-  #      - {name: 'compatible.asm', value: 12.1.0.2.0}
-  #    disk:
-  #      - {device: /dev/sdc, asmlabel: crs01}
-  #      - {device: /dev/sdd, asmlabel: crs02}
-  #      - {device: /dev/sde, asmlabel: crs03}
-  #  - diskgroup: data
-  #    properties:
-  #      - {redundancy: external, ausize: 4}
-  #    attributes:
-  #      - {name: compatible.rdbms, value: 11.2.0.4.0}
-  #      - {name: compatible.asm, value: 12.1.0.2.0}
-  #    disk:
-  #      - {device: /dev/sdf, asmlabel: data01}
-  #  - diskgroup: fra
-  #    properties:
-  #     - {redundancy: external, ausize: 4}
-  #   attributes:
-  #      - {name: compatible.rdbms, value: 11.2.0.4.0}
-  #      - {name: compatible.asm, value: 12.1.0.2.0}
-  #    disk:
-  #      - {device: /dev/sdg, asmlabel: fra01}
+configure_etc_hosts: false
+configure_cluster: false
+oracle_stage: /u01/stage
+oracle_rsp_stage: "{{ oracle_stage }}/rsp"
+device_persistence: asmlib
+install_os_packages: true
+disable_selinux: true
+disable_firewall: true
 
+transparent_hugepage_disable:
+  - {disable: "echo never >", path: /sys/kernel/mm/transparent_hugepage/enabled, rclocal: /etc/rc.d/rc.local}
+  - {disable: "echo never >", path: /sys/kernel/mm/transparent_hugepage/defrag, rclocal: /etc/rc.d/rc.local}
 
+configure_hugepages: true
+configure_hugepages_by: percentage          # percentage/memory
+percent_hugepages: 50                       # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages
+size_in_gb_hugepages: 1                     # The amount of RAM in GB to dedicate to hugepages
+nr_hugepages_percent: "{{ (((( percent_hugepages / 100 ) * ansible_memtotal_mb ) / 2 ) + 2 ) | round | int }}"
+nr_hugepages_memory: "{{ ((( size_in_gb_hugepages * 1024 ) /2 ) +2 ) | round | int }}"
+nr_hugepages: "{% if configure_hugepages %}
+                 {%- if configure_hugepages_by | lower == 'percentage' %}{{ nr_hugepages_percent }}
+                 {%- elif configure_hugepages_by | lower == 'memory' %}{{ nr_hugepages_memory }}
+                 {%- endif %}
+                 {%- else %}0
+               {%- endif %}"
 
-  oracle_packages:
-      - bind-utils
-      - nfs-utils
-      - util-linux-ng
-      - xorg-x11-utils
-      - xorg-x11-xauth
-      - binutils
-      - compat-libstdc++-33
-      - compat-libstdc++-33.i686
-      - unixODBC-devel
-      - unixODBC-devel.i686
-      - gcc
-      - gcc-c++
-      - glibc
-      - glibc.i686
-      - glibc-devel
-      - glibc-devel.i686
-      - libaio
-      - libaio-devel
-      - libaio.i686
-      - libaio-devel.i686
-      - libgcc
-      - libgcc.i686
-      - libstdc++
-      - libstdc++-devel
-      - libstdc++.i686
-      - libstdc++-devel.i686
-      - libXext
-      - libXext.i686
-      - zlib-devel
-      - zlib-devel.i686
-      - make
-      - sysstat
-      - openssh-clients
-      - compat-libcap1
-      - xorg-x11-xauth
-      - xorg-x11-xinit
-      - libXtst
-      - xdpyinfo
-      - xterm
-      - xsetroot
-      - libXp
-      - libXt
-      - libXau
-      - libXau.i686
-      - libXi
-      - libXi.i686
-      - libX11
-      - libX11.i686
-      - smartmontools
-      - elfutils-libelf-devel.i686
-      - elfutils-libelf-devel
-      - cpp
-      - lsof
+host_fs_layout:
+  - vgname: vgora
+    state: present
+    filesystem:
+      - {mntp: /u01, lvname: lvora, lvsize: 100%FREE, fstype: ext4}
+    disk:
+      - {device: /dev/sdb, pvname: /dev/sdb1}
 
-  oracle_packages_sles:
-      - ksh
-      - binutils
-      - gcc
-      - gcc48
-      - glibc
-      - glibc-32bit
-      - glibc-devel
-      - glibc-devel-32bit
-      - mksh
-      - libaio1
-      - libaio-devel
-      - libcap1
-      - libstdc++48-devel
-      - libstdc++48-devel
-      - libstdc++6
-      - libstdc++6-32bit
-      - libstdc++-devel
-      - libstdc++-devel-32bit
-      - libgcc_s1
-      - libgcc_s1-32bit
-      - lsof
-      - make
-      - sysstat
-      - xorg-x11-driver-video
-      - xorg-x11-server
-      - xorg-x11-essentials
-      - xorg-x11-Xvnc
-      - xorg-x11-fonts-core
-      - xorg-x11
-      - xorg-x11-server-extra
-      - xorg-x11-libs
-      - xorg-x11-fonts
+host_fs_layout_vgdisks: "{%- for disk in item.disk -%} {{ disk.pvname }} {%- if not loop.last -%},{%- endif -%}{% endfor %}"
 
-  oracle_asm_packages:
-      - "{{ asmlib_rpm }}"
-      - "{{ asmlibsupport_rpm }}"
-      - kmod-oracleasm
-
-  oracle_asm_packages_sles:
-      - oracleasm-kmp-default
-      - oracleasm-kmp-xen
-      - "{{ asmlib_rpm_sles }}"
+# asm_diskgroups:
+#  - diskgroup: crs
+#    properties:
+#      - {redundancy: normal, ausize: 4}
+#    attributes:
+#      - {name: 'compatible.rdbms', value: 11.2.0.4.0}
+#      - {name: 'compatible.asm', value: 12.1.0.2.0}
+#    disk:
+#      - {device: /dev/sdc, asmlabel: crs01}
+#      - {device: /dev/sdd, asmlabel: crs02}
+#      - {device: /dev/sde, asmlabel: crs03}
+#  - diskgroup: data
+#    properties:
+#      - {redundancy: external, ausize: 4}
+#    attributes:
+#      - {name: compatible.rdbms, value: 11.2.0.4.0}
+#      - {name: compatible.asm, value: 12.1.0.2.0}
+#    disk:
+#      - {device: /dev/sdf, asmlabel: data01}
+#  - diskgroup: fra
+#    properties:
+#     - {redundancy: external, ausize: 4}
+#   attributes:
+#      - {name: compatible.rdbms, value: 11.2.0.4.0}
+#      - {name: compatible.asm, value: 12.1.0.2.0}
+#    disk:
+#      - {device: /dev/sdg, asmlabel: fra01}
 
 
+oracle_packages:
+  - bind-utils
+  - nfs-utils
+  - util-linux-ng
+  - xorg-x11-utils
+  - xorg-x11-xauth
+  - binutils
+  - compat-libstdc++-33
+  - compat-libstdc++-33.i686
+  - unixODBC-devel
+  - unixODBC-devel.i686
+  - gcc
+  - gcc-c++
+  - glibc
+  - glibc.i686
+  - glibc-devel
+  - glibc-devel.i686
+  - libaio
+  - libaio-devel
+  - libaio.i686
+  - libaio-devel.i686
+  - libgcc
+  - libgcc.i686
+  - libstdc++
+  - libstdc++-devel
+  - libstdc++.i686
+  - libstdc++-devel.i686
+  - libXext
+  - libXext.i686
+  - zlib-devel
+  - zlib-devel.i686
+  - make
+  - sysstat
+  - openssh-clients
+  - compat-libcap1
+  - xorg-x11-xauth
+  - xorg-x11-xinit
+  - libXtst
+  - xdpyinfo
+  - xterm
+  - xsetroot
+  - libXp
+  - libXt
+  - libXau
+  - libXau.i686
+  - libXi
+  - libXi.i686
+  - libX11
+  - libX11.i686
+  - smartmontools
+  - elfutils-libelf-devel.i686
+  - elfutils-libelf-devel
+  - cpp
+  - lsof
 
-  oracle_sysctl:
-      - { name: kernel.shmall, value: 4294967296 }
-      - { name: kernel.shmmax, value: 68719476736 }
-      - { name: kernel.shmmni, value: 4096 }
-      - { name: kernel.sem, value: "250 32000 100 128" }
-      - { name: fs.file-max, value: 6815744 }
-      - { name: fs.aio-max-nr, value: 3145728 }
-      - { name: net.ipv4.ip_local_port_range, value: "9000 65500" }
-      - { name: net.core.rmem_default, value: 262144 }
-      - { name: net.core.rmem_max, value: 4194304 }
-      - { name: net.core.wmem_default, value: 262144 }
-      - { name: net.core.wmem_max, value: 1048576 }
-      - { name: kernel.panic_on_oops, value: 1 }
-      - { name: vm.min_free_kbytes, value: 524288 }
+oracle_packages_sles:
+  - ksh
+  - binutils
+  - gcc
+  - gcc48
+  - glibc
+  - glibc-32bit
+  - glibc-devel
+  - glibc-devel-32bit
+  - mksh
+  - libaio1
+  - libaio-devel
+  - libcap1
+  - libstdc++48-devel
+  - libstdc++48-devel
+  - libstdc++6
+  - libstdc++6-32bit
+  - libstdc++-devel
+  - libstdc++-devel-32bit
+  - libgcc_s1
+  - libgcc_s1-32bit
+  - lsof
+  - make
+  - sysstat
+  - xorg-x11-driver-video
+  - xorg-x11-server
+  - xorg-x11-essentials
+  - xorg-x11-Xvnc
+  - xorg-x11-fonts-core
+  - xorg-x11
+  - xorg-x11-server-extra
+  - xorg-x11-libs
+  - xorg-x11-fonts
 
-  oracle_hugepages:
-      - { name: vm.nr_hugepages, value: "{{ nr_hugepages }}" }
+oracle_asm_packages:
+  - "{{ asmlib_rpm }}"
+  - "{{ asmlibsupport_rpm }}"
+  - kmod-oracleasm
+
+oracle_asm_packages_sles:
+  - oracleasm-kmp-default
+  - oracleasm-kmp-xen
+  - "{{ asmlib_rpm_sles }}"
 
 
-  oracle_seclimits:
-      - { name: 'soft nproc', value: 16384 }
-      - { name: 'hard nproc', value: 16384 }
-      - { name: 'soft nofile', value: 4096 }
-      - { name: 'hard nofile', value: 65536 }
-      - { name: 'soft stack', value: 10240 }
-      - { name: 'hard stack', value: 32768 }
-      - { name: 'soft memlock', value: "{{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }}" }
-      - { name: 'hard memlock', value: "{{ ((0.9 * ansible_memtotal_mb)*1024)|round|int }}" }
+oracle_sysctl:
+  - {name: kernel.shmall, value: 4294967296}
+  - {name: kernel.shmmax, value: 68719476736}
+  - {name: kernel.shmmni, value: 4096}
+  - {name: kernel.sem, value: "250 32000 100 128"}
+  - {name: fs.file-max, value: 6815744}
+  - {name: fs.aio-max-nr, value: 3145728}
+  - {name: net.ipv4.ip_local_port_range, value: "9000 65500"}
+  - {name: net.core.rmem_default, value: 262144}
+  - {name: net.core.rmem_max, value: 4194304}
+  - {name: net.core.wmem_default, value: 262144}
+  - {name: net.core.wmem_max, value: 1048576}
+  - {name: kernel.panic_on_oops, value: 1}
+  - {name: vm.min_free_kbytes, value: 524288}
+
+oracle_hugepages:
+  - {name: vm.nr_hugepages, value: "{{ nr_hugepages }}"}

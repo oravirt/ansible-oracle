@@ -1,57 +1,57 @@
 ---
-  hostgroup: orarac-flex
-  role_separation: true
-  device_persistence: udev
+hostgroup: orarac-flex
+role_separation: true
+device_persistence: udev
 #  install_from_nfs: false
 
-  configure_interconnect: true               
-  configure_ssh: true                       
-  configure_host_disks: true               
-                                          
-  configure_cluster: true
-  
+configure_interconnect: true               
+configure_ssh: true                       
+configure_host_disks: true               
+                                        
+configure_cluster: true
+
 ################ Grid Infrastructure specifics ################
-  oracle_install_option_gi: CRS_CONFIG  
-  oracle_install_version_gi: 12.1.0.2
-  oracle_gi_cluster_type: flex
-  oracle_gi_gns_subdomain: gns.discworld.net
-  oracle_gi_gns_vip: orarac-dc2-gns.gns.discworld.net
+oracle_install_option_gi: CRS_CONFIG  
+oracle_install_version_gi: 12.1.0.2
+oracle_gi_cluster_type: flex
+oracle_gi_gns_subdomain: gns.discworld.net
+oracle_gi_gns_vip: orarac-dc2-gns.gns.discworld.net
 
-  oracle_password: Oracle123
-  oracle_scan: orarac-scan-dc2.discworld.net
-  oracle_vip: -vip
-  oracle_scan_port: 1521
-  oracle_asm_init_dg: crs           
+oracle_password: Oracle123
+oracle_scan: orarac-scan-dc2.discworld.net
+oracle_vip: -vip
+oracle_scan_port: 1521
+oracle_asm_init_dg: crs           
 
 
- 
-  oracle_sw_image_db:
-       - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2 }
-       - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2 }
+
+oracle_sw_image_db:
+      - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2 }
+      - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2 }
 #       - { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1 }
 #       - { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1 }
 #       - { filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4 }      
 #       - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4 } 
 
-  oracle_databases:                                               # Dictionary describing the databases to be installed
-        - home: rachome1                                                   # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
-          oracle_version_db: 12.1.0.2                         # Oracle versiono
-          oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
-          oracle_db_name: racdba                                 # Database name
-          oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
-          oracle_db_type: RAC                                   # Type of database (RAC,RACONENODE,SI)
-          is_container: "false"                                # (true/false) Is the database a container database
-          pdb_prefix: pdb
-          num_pdbs: 1
-          is_racone: "false"                                   # (true/false) Is the database a RAC ONE NODE Database
-          storage_type: ASM                                     # Database storage to be used. ASM or FS. 
-          service_name: racdb_serv                               # Inital service to be created (not in use yet)
-          oracle_init_params: "open_cursors=300,processes=500" # Specific parameters to be set during installation. Comma-separated list
-          oracle_db_mem_percent: 25                            # Amount of RAM to be used for SGA
-          oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
-          redolog_size_in_mb: 100
-          delete_db: false 
-        
+oracle_databases:                                               # Dictionary describing the databases to be installed
+  - home: rachome1                                                   # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
+    oracle_version_db: 12.1.0.2                         # Oracle versiono
+    oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+    oracle_db_name: racdba                                 # Database name
+    oracle_db_passwd: Oracle123                          # Passwords (sys/system/dbsnm etc)
+    oracle_db_type: RAC                                   # Type of database (RAC,RACONENODE,SI)
+    is_container: "false"                                # (true/false) Is the database a container database
+    pdb_prefix: pdb
+    num_pdbs: 1
+    is_racone: "false"                                   # (true/false) Is the database a RAC ONE NODE Database
+    storage_type: ASM                                     # Database storage to be used. ASM or FS. 
+    service_name: racdb_serv                               # Inital service to be created (not in use yet)
+    oracle_init_params: "open_cursors=300,processes=500" # Specific parameters to be set during installation. Comma-separated list
+    oracle_db_mem_percent: 25                            # Amount of RAM to be used for SGA
+    oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+    redolog_size_in_mb: 100
+    delete_db: false 
+  
 #        - home: rachome1                                                   # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
 #          oracle_version_db: 12.1.0.2                         # Oracle versiono
 #          oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
@@ -70,27 +70,26 @@
 #          redolog_size_in_mb: 100
 #          delete_db: true
 
-                                                                                                                                                                                                                                           
-  oracle_dbf_dir_asm: "DATA"                                                                                                                                                                                                               
-  oracle_reco_dir_asm: "FRA"                                                                                                                                                                                                               
-                                                                                                                                                                                                                                           
-  host_fs_layout:                                                                                                                                                                                                                          
-      u01:                                                                                                                                                                                                                                 
-        {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora, fstype: xfs}
+                                                                                                                                                                                                                                          
+oracle_dbf_dir_asm: "DATA"                                                                                                                                                                                                               
+oracle_reco_dir_asm: "FRA"                                                                                                                                                                                                               
+                                                                                                                                                                                                                                          
+host_fs_layout:                                                                                                                                                                                                                          
+  u01:                                                                                                                                                                                                                                 
+    {mntp: /u01, device: /dev/sdb, vgname: vgora, pvname: /dev/sdb1, lvname: lvora, fstype: xfs}
 
-  asm_diskgroups:  
-     - crs
-     - data
-     - fra
+asm_diskgroups:  
+  - crs
+  - data
+  - fra
 
-  asm_storage_layout:   
-   crs:
-     - {device: /dev/sdc, asmlabel: crs01}
-   data:
-     - {device: /dev/sdd, asmlabel: data01}
-     - {device: /dev/sde, asmlabel: data02}
-   fra:
-     - {device: /dev/sdf, asmlabel: fra01}
-     - {device: /dev/sdg, asmlabel: fra02}
-     - {device: /dev/sdh, asmlabel: fra03}
-
+asm_storage_layout:   
+  crs:
+    - {device: /dev/sdc, asmlabel: crs01}
+  data:
+    - {device: /dev/sdd, asmlabel: data01}
+    - {device: /dev/sde, asmlabel: data02}
+  fra:
+    - {device: /dev/sdf, asmlabel: fra01}
+    - {device: /dev/sdg, asmlabel: fra02}
+    - {device: /dev/sdh, asmlabel: fra03}

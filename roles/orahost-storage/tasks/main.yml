@@ -1,62 +1,65 @@
+---
 # Partition & ASM-Label Shared disks
 
-  - name: ASM-storage | partition devices
-    shell: parted {{ item.1.device }} "mklabel gpt mkpart primary 1 -1"
-    args:
-       creates: "{{ item.1.device}}{{partition_suffix}}"
-    with_subelements:
-        - "{{asm_diskgroups}}"
-        - disk
-    run_once: "{{ configure_cluster}}"
-    when: partition_devices and asm_diskgroups is defined
-    tags: asmstorage,partition
+- name: ASM-storage | partition devices
+  shell: parted {{ item.1.device }} "mklabel gpt mkpart primary 1 -1"
+  # noqa command-instead-of-shell
+  args:
+    creates: "{{ item.1.device }}{{ partition_suffix }}"
+  with_subelements:
+    - "{{ asm_diskgroups }}"
+    - disk
+  run_once: "{{ configure_cluster }}"
+  when: partition_devices and asm_diskgroups is defined
+  tags: asmstorage,partition
 
-  - include: dm-multipath-kpartx.yml
-    when: multipath == 'dm-multipath' and partition_devices and asm_diskgroups is defined
+- include: dm-multipath-kpartx.yml
+  when: multipath == 'dm-multipath' and partition_devices and asm_diskgroups is defined
 
-  - include: "{{ device_persistence }}.yml"
+- include: "{{ device_persistence }}.yml"
 
-  - name: dNFS-storage | Prepare mountpoints
-    file:
-      path: "{{ item.1.mount }}"
-      state: "directory"
-      owner: "root"
-      group: "root"
-    with_subelements:
-        - "{{ oradnfs }}"
-        - exports
-    when: oradnfs is defined
+- name: dNFS-storage | Prepare mountpoints
+  file:
+    path: "{{ item.1.mount }}"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: 0755
+  with_subelements:
+    - "{{ oradnfs }}"
+    - exports
+  when: oradnfs is defined
 
-  - name: dNFS-storage | Configure /etc/fstab and mount
-    mount:
-      src: "{{ item.0.server }}:{{ item.1.export }}"
-      path: "{{ item.1.mount }}"
-      fstype: "nfs"
-      opts: "{{ dnfstaboptions }}"
-      state: mounted
-    with_subelements:
-        - "{{ oradnfs }}"
-        - exports
-    when: oradnfs is defined
+- name: dNFS-storage | Configure /etc/fstab and mount
+  mount:
+    src: "{{ item.0.server }}:{{ item.1.export }}"
+    path: "{{ item.1.mount }}"
+    fstype: "nfs"
+    opts: "{{ dnfstaboptions }}"
+    state: mounted
+  with_subelements:
+    - "{{ oradnfs }}"
+    - exports
+  when: oradnfs is defined
 
-  - name: dNFS-storage | Change permission on directories
-    file: path={{ item.1.mount }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=775
-    with_subelements:
-        - "{{ oradnfs }}"
-        - exports
-    when: oradnfs is defined
+- name: dNFS-storage | Change permission on directories
+  file: path={{ item.1.mount }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=0775
+  with_subelements:
+    - "{{ oradnfs }}"
+    - exports
+  when: oradnfs is defined
 
-  - name: dNFS-storage | Create /etc/oranfstab for dNFS
-    blockinfile:
-      path: /etc/oranfstab
-      state: present
-      create: True
-      owner: root
-      group: root
-      mode: 0644
-      insertafter: "EOF"
-      marker: "# {mark} Ansible managed for NFS-Server: {{ item.server }}"
-      block: "{{ lookup('template', 'oranfstab.j2') }}"
-    with_items:
-        - "{{ oradnfs }}"
-    when: oradnfs is defined
+- name: dNFS-storage | Create /etc/oranfstab for dNFS
+  blockinfile:
+    path: /etc/oranfstab
+    state: present
+    create: true
+    owner: root
+    group: root
+    mode: 0644
+    insertafter: "EOF"
+    marker: "# {mark} Ansible managed for NFS-Server: {{ item.server }}"
+    block: "{{ lookup('template', 'oranfstab.j2') }}"
+  with_items:
+    - "{{ oradnfs }}"
+  when: oradnfs is defined

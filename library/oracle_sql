@@ -74,6 +74,7 @@ EXAMPLES = '''
     script: /u01/scripts/create-tables-and-insert-default-values.sql
 '''
 import os
+import re
 from ansible.module_utils.basic import AnsibleModule
 
 try:
@@ -228,8 +229,11 @@ def main():
             else:
                 sqldelim = ';'
             
+            # fixed problems with quoted sqldelim using
+            # https://stackoverflow.com/questions/2785755/how-to-split-but-ignore-separators-in-quoted-strings-in-python
+            PATTERN = re.compile(r'''((?:[^''' + sqldelim + r'''"']|"[^"]*"|'[^']*')+)''')
             sqlfile = sqlfile.strip(sqldelim)
-            sql = sqlfile.split(sqldelim)
+            sql = PATTERN.split(sqlfile)[1::2]
             
             for q in sql:
                 execute_sql(module, cursor, conn, q)

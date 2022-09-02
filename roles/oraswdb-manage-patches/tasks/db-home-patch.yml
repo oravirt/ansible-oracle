@@ -1,11 +1,13 @@
-- set_fact:
-       oracle_home_db: "{%- if db_homes_config[dbh.home]['oracle_home'] is defined  -%}
-                            {{db_homes_config[dbh.home]['oracle_home']}}
-                        {%- else -%}
-                             {{oracle_base}}/{{db_homes_config[dbh.home]['version']}}/{{db_homes_config[dbh.home]['home']}}
-                        {%- endif -%}"
+---
+- set_fact:  # noqa unnamed-task
+    oracle_home_db: "{%- if db_homes_config[dbh.home]['oracle_home'] is defined  -%}
+                        {{ db_homes_config[dbh.home]['oracle_home'] }}
+                    {%- else -%}
+                          {{ oracle_base }}/{{ db_homes_config[dbh.home]['version'] }}/{{ db_homes_config[dbh.home]['home'] }}
+                    {%- endif -%}"
 
-- debug: msg="Managing patches for {{ oracle_home_db}}"
+- debug: msg="Managing patches for {{ oracle_home_db }}"
+  # noqa unnamed-task
   when: apply_patches_db
 
 - include: transfer-files.yml
@@ -19,67 +21,69 @@
 
 - name: db-opatch | Configure ocm.rsp (1)
   template:
-       src=ocmrsp.expect.j2
-       dest={{ oracle_patch_stage }}/{{ db_version }}/ocmrsp.expect
-       mode=0777
-       force=yes
+    src=ocmrsp.expect.j2
+    dest={{ oracle_patch_stage }}/{{ db_version }}/ocmrsp.expect
+    mode=0777
+    force=yes
   when: apply_patches_db and current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
-  become: yes
+  become: true
   become_user: "{{ oracle_user }}"
   tags:
     - ocmconfig
 
 - name: db-opatch | Configure ocm.rsp (2)
   shell: "{{ oracle_patch_stage }}/{{ db_version }}/ocmrsp.expect"
+  # noqa command-instead-of-shell
   when: apply_patches_db and current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
-  become: yes
+  become: true
   become_user: "{{ oracle_user }}"
-  changed_when: False
+  changed_when: false
   tags:
     - ocmconfig
 
 - name: db-opatch | Remove unwanted patches from DB
   oracle_opatch:
-      oracle_home={{ oracle_home_db }}
-      patch_base={{ oracle_patch_install }}/{{ db_version}}/{{ item.path | default (item.patchid)}}/
-      patch_id={{item.patchid}}
-      patch_version={{ item.patchversion |default(omit)}}
-      opatchauto=False
-      conflict_check=True
-      stop_processes={{item.stop_processes |default(False)}}
-      ocm_response_file={{ ocm_response_file | default(omit)}}
-      output=verbose
-      state={{ item.state}}
+    oracle_home={{ oracle_home_db }}
+    patch_base={{ oracle_patch_install }}/{{ db_version }}/{{ item.path | default (item.patchid) }}/
+    patch_id={{ item.patchid }}
+    patch_version={{ item.patchversion | default(omit) }}
+    exclude_upi={{ item.excludeUPI | default(omit) }}
+    opatchauto=False
+    conflict_check=True
+    stop_processes={{ item.stop_processes | default(False) }}
+    ocm_response_file={{ ocm_response_file | default(omit) }}
+    output=verbose
+    state={{ item.state }}
   with_items:
-      - "{{db_homes_config[dbh.home]['opatch']}}"
-  become: yes
+    - "{{ db_homes_config[dbh.home]['opatch'] }}"
+  become: true
   become_user: "{{ oracle_user }}"
   tags:
     - apply_patch_db
   when:
-    - apply_patches_db|bool
+    - apply_patches_db | bool
     - db_homes_config[dbh.home]['opatch'] is defined
     - item.state == "absent"
   register: psuapplym
 
 - name: db-opatch | Manage opatchauto patches for DB (non-gi)
   oracle_opatch:
-      oracle_home={{ oracle_home_db }}
-      patch_base={{ oracle_patch_install }}/{{ db_version}}/{{ item.0.path | default (item.0.patchid)}}/{{ item.1}}
-      patch_id={{item.1}}
-      patch_version={{ item.1.patchversion |default(omit)}}
-      opatchauto=False
-      conflict_check=True
-      ocm_response_file={{ ocm_response_file | default(omit)}}
-      output=verbose
-      state={{ item.0.state }}
+    oracle_home={{ oracle_home_db }}
+    patch_base={{ oracle_patch_install }}/{{ db_version }}/{{ item.0.path | default (item.0.patchid) }}/{{ item.1 }}
+    patch_id={{ item.1 }}
+    patch_version={{ item.1.patchversion | default(omit) }}
+    opatchauto=False
+    conflict_check=True
+    ocm_response_file={{ ocm_response_file | default(omit) }}
+    output=verbose
+    state={{ item.0.state }}
   with_subelements:
-      - "{{db_homes_config[dbh.home]['opatchauto']}}"
-      - subpatches
-      - flags:
-        skip_missing: True
-  #run_once: "{{ configure_cluster}}"
-  become: yes
+    - "{{ db_homes_config[dbh.home]['opatchauto'] }}"
+    - subpatches
+    - flags:
+      skip_missing: true
+  # run_once: "{{ configure_cluster}}"
+  become: true
   become_user: "{{ oracle_user }}"
   tags:
     - apply_patch_db
@@ -88,19 +92,19 @@
 
 - name: db-opatch | Manage opatchauto patches for DB (gi)
   oracle_opatch:
-      oracle_home={{ oracle_home_db }}
-      patch_base={{ oracle_patch_install }}/{{ db_version}}/{{ item.path | default (item.patchid)}}/
-      patch_id={{item.patchid}}
-      patch_version={{ item.patchversion |default(omit)}}
-      opatchauto=True
-      conflict_check=True
-      ocm_response_file={{ ocm_response_file | default(omit)}}
-      output=verbose
-      state={{ item.state}}
+    oracle_home={{ oracle_home_db }}
+    patch_base={{ oracle_patch_install }}/{{ db_version }}/{{ item.path | default (item.patchid) }}/
+    patch_id={{ item.patchid }}
+    patch_version={{ item.patchversion | default(omit) }}
+    opatchauto=True
+    conflict_check=True
+    ocm_response_file={{ ocm_response_file | default(omit) }}
+    output=verbose
+    state={{ item.state }}
   with_items:
-      - "{{db_homes_config[dbh.home]['opatchauto']}}"
-  #run_once: "{{ configure_cluster}}"
-  become: yes
+    - "{{ db_homes_config[dbh.home]['opatchauto'] }}"
+  # run_once: "{{ configure_cluster}}"
+  become: true
   tags:
     - apply_patch_db
   when: apply_patches_db and db_homes_config[dbh.home]['opatchauto'] is defined and olrloc.stat.exists
@@ -108,20 +112,21 @@
 
 - name: db-opatch | Manage patches for DB
   oracle_opatch:
-      oracle_home={{ oracle_home_db }}
-      patch_base={{ oracle_patch_install }}/{{ db_version}}/{{ item.path | default (item.patchid)}}/
-      patch_id={{item.patchid}}
-      patch_version={{ item.patchversion |default(omit)}}
-      opatchauto=False
-      conflict_check=True
-      stop_processes={{item.stop_processes |default(False)}}
-      ocm_response_file={{ ocm_response_file | default(omit)}}
-      output=verbose
-      state={{ item.state}}
+    oracle_home={{ oracle_home_db }}
+    patch_base={{ oracle_patch_install }}/{{ db_version }}/{{ item.path | default (item.patchid) }}/
+    patch_id={{ item.patchid }}
+    patch_version={{ item.patchversion | default(omit) }}
+    exclude_upi={{ item.excludeUPI | default(omit) }}
+    opatchauto=False
+    conflict_check=True
+    stop_processes={{ item.stop_processes | default(False) }}
+    ocm_response_file={{ ocm_response_file | default(omit) }}
+    output=verbose
+    state={{ item.state }}
   with_items:
-      - "{{db_homes_config[dbh.home]['opatch']}}"
-  #run_once: "{{ configure_cluster}}"
-  become: yes
+    - "{{ db_homes_config[dbh.home]['opatch'] }}"
+  # run_once: "{{ configure_cluster }}"
+  become: true
   become_user: "{{ oracle_user }}"
   tags:
     - apply_patch_db
@@ -129,10 +134,11 @@
   register: psuapplym
 
 - name: db-opatch | Check patches
-  shell: "{{ oracle_home_db}}/OPatch/opatch lspatches -oh {{ oracle_home_db}}"
-  become: yes
+  shell: "{{ oracle_home_db }}/OPatch/opatch lspatches -oh {{ oracle_home_db }}"
+  # noqa command-instead-of-shell
+  become: true
   become_user: "{{ oracle_user }}"
-  changed_when: False
+  changed_when: false
   register: dbhome_patches
 
 - name: db-opatch | Check patches
