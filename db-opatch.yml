@@ -1,12 +1,13 @@
+---
 - name: Apply binary patches
-  hosts: "{{ hostgroup }}"
-  become: yes
+  hosts: "{{ hostgroup | default('all') }}"
+  become: true
   serial: 1
   roles:
-     - {role: oraswdb-manage-patches }
+    - {role: oraswdb-manage-patches}
 
 - name: Run datapatch
-  hosts: "{{ hostgroup }}"
-  become: yes
+  hosts: "{{ hostgroup | default('all') }}"
+  become: true
   roles:
-     - {role: oradb-datapatch }
+    - {role: oradb-datapatch}

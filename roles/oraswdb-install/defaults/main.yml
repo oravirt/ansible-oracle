@@ -1,172 +1,175 @@
-  #master_node: true
+---
 
-  oracle_user: oracle                        # User that will own the Oracle Installations.
-  grid_user: grid
-  grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
-  oracle_user_home: "/home/{{ oracle_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-  grid_user_home: "/home/{{ grid_install_user }}" # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-  oracle_group: oinstall                          # Primary group for oracle_user.
-  oper_group: oper
-  dba_group: dba                          # Primary group for oracle_user.
-  asmoper_group: asmoper
-  asmdba_group: asmdba                          # Primary group for oracle_user.
-  asmadmin_group: asmadmin                          # Primary group for oracle_user.
+hostgroup: "{{ group_names[0] }}"
+hostgroup_hub: "{{ hostgroup }}-hub"
+hostgroup_leaf: "{{ hostgroup }}-leaf"
 
-  hostgroup: "{{ group_names[0] }}"
-  hostgroup_hub: "{{ hostgroup }}-hub"
-  hostgroup_leaf: "{{ hostgroup }}-leaf"
-
-  install_from_nfs: false
-  nfs_server_sw: nfsserver
-  nfs_server_sw_path: /path/to/orasw
-  oracle_sw_copy: "{% if install_from_nfs %}false{% else %}true{% endif %}"
-  oracle_sw_unpack: "{% if install_from_nfs %}false{% else %}true{% endif %}"
-  oracle_db_responsefile: "{{ dbh.home}}_{{ ansible_hostname }}.rsp"
-  oracle_stage: /u01/stage
-  oracle_stage_remote: "{{ oracle_stage }}"
-  oracle_stage_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
-  oracle_rsp_stage: "{{ oracle_stage }}/rsp"
-  oracle_inventory_loc: /u01/app/oraInventory
-  oracle_base: /u01/app/oracle
-  oracle_sw_extract_path: "{%- if '18' in db_version -%}
-                              {{ oracle_home_db }}
-                           {%- else -%}
-                               {{ oracle_stage }}/{{ item[0].version }}
-                           {%- endif -%}"
-  # oracle_home_db: "{% if dbh is defined %}
-  #                    {%- if dbh.oracle_home is defined %}{{ dbh.oracle_home }}
-  #                    {%- else %}{{ oracle_base}}/{{ dbh.oracle_version_db }}/{{ dbh.home }}
-  #                    {%- endif %}
-  #                  {%- elif item.0 is defined %}
-  #                    {%- if item.0.oracle_home is defined %}{{ item.0.oracle_home}}
-  #                    {%- else %}{{ oracle_base }}/{{ item.0.oracle_version_db }}/{{ item.0.home }}
-  #                    {%- endif %}
-  #                  {%- elif item is defined %}
-  #                    {%- if item.oracle_home is defined %}{{ item.oracle_home}}
-  #                    {%- else %}{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}
-  #                    {%- endif %}
-  #                  {%- endif %}"
+install_from_nfs: false
+nfs_server_sw: nfsserver
+nfs_server_sw_path: /path/to/orasw
+oracle_sw_copy: "{% if install_from_nfs %}false{% else %}true{% endif %}"
+oracle_sw_unpack: "{% if install_from_nfs %}false{% else %}true{% endif %}"
+oracle_db_responsefile: "{{ dbh.home }}_{{ ansible_hostname }}.rsp"
+oracle_stage: /u01/stage
+oracle_stage_remote: "{{ oracle_stage }}"
+oracle_stage_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
+oracle_rsp_stage: "{{ oracle_stage }}/rsp"
+oracle_inventory_loc: /u01/app/oraInventory
+oracle_base: /u01/app/oracle
+oracle_sw_extract_path: "{%- if '18' in db_version -%}
+                            {{ oracle_home_db }}
+                          {%- else -%}
+                              {{ oracle_stage }}/{{ item[0].version }}
+                          {%- endif -%}"
+# oracle_home_db: "{% if dbh is defined %}
+#                    {%- if dbh.oracle_home is defined %}{{ dbh.oracle_home }}
+#                    {%- else %}{{ oracle_base}}/{{ dbh.oracle_version_db }}/{{ dbh.home }}
+#                    {%- endif %}
+#                  {%- elif item.0 is defined %}
+#                    {%- if item.0.oracle_home is defined %}{{ item.0.oracle_home}}
+#                    {%- else %}{{ oracle_base }}/{{ item.0.oracle_version_db }}/{{ item.0.home }}
+#                    {%- endif %}
+#                  {%- elif item is defined %}
+#                    {%- if item.oracle_home is defined %}{{ item.oracle_home}}
+#                    {%- else %}{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}
+#                    {%- endif %}
+#                  {%- endif %}"
 
 
-  oracle_profile_name: ".profile_{{dbh.home}}"
+oracle_profile_name: ".profile_{{ dbh.home }}"
 
-  # "{%- if item is defined -%}
-  #                          {%- if item.oracle_home is defined -%}
-  #                             .profile_{{ item.oracle_home |basename}}_{{ item.oracle_version_db}}
-  #                          {%- elif item.home is defined -%}
-  #                             .profile_{{ item.home }}_{{item.oracle_version_db}}
-  #                          {%- elif item.oracle_home is defined -%}
-  #                             .profile_{{item.oracle_home |basename}}_{{item.oracle_version_db}}
-  #                          {%- endif- %}
-  #                       {% else %}
-  #                          {%- if dbh.oracle_home is defined -%}
-  #                             .profile_{{ dbh.oracle_home |basename}}_{{ dbh.oracle_version_db}}
-  #                          {%- elif dbh.home is defined -%}
-  #                             .profile_{{ dbh.home }}_{{dbh.oracle_version_db}}
-  #                          {%- else -%}
-  #                             .profile_{{dbh.home}}_{{dbh.oracle_db_name}}
-  #                          {%- endif -%}
-  #                       {%- endif -%}"    # Name of profile-file. Sets up the environment for that ORACLE_HOME
-  oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
-  www_download_bin: curl                              # curl (shell module) or get_url module
-  oracle_sw_source_www: ""                            #http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
-  oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
-  is_sw_source_local: true
-  configure_cluster: false
-  autostartup_service: false # automatic startup/stop databases service
-  hostinitdaemon: "{% if    ansible_os_family == 'RedHat' and ansible_distribution_major_version | int >= 7   %}systemd
-                   {%- elif ansible_os_family == 'Suse'   and ansible_distribution_major_version | int >= 12 %}systemd
-                   {%- else %}{% if ansible_service_mgr is defined %}{{ ansible_service_mgr }}{% else %}init{% endif %}{% endif %}"
+# "{%- if item is defined -%}
+#                          {%- if item.oracle_home is defined -%}
+#                             .profile_{{ item.oracle_home |basename}}_{{ item.oracle_version_db}}
+#                          {%- elif item.home is defined -%}
+#                             .profile_{{ item.home }}_{{item.oracle_version_db}}
+#                          {%- elif item.oracle_home is defined -%}
+#                             .profile_{{item.oracle_home |basename}}_{{item.oracle_version_db}}
+#                          {%- endif- %}
+#                       {% else %}
+#                          {%- if dbh.oracle_home is defined -%}
+#                             .profile_{{ dbh.oracle_home |basename}}_{{ dbh.oracle_version_db}}
+#                          {%- elif dbh.home is defined -%}
+#                             .profile_{{ dbh.home }}_{{dbh.oracle_version_db}}
+#                          {%- else -%}
+#                             .profile_{{dbh.home}}_{{dbh.oracle_db_name}}
+#                          {%- endif -%}
+#                       {%- endif -%}"    # Name of profile-file. Sets up the environment for that ORACLE_HOME
+oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
+www_download_bin: curl                              # curl (shell module) or get_url module
 
-  forcechopt: false
-  # choptcheck is a dummy for 'creates' during chopt-task to force an execution
-  choptcheck: "{% if forcechopt | bool %}dochopt{% endif %}"
+# address to all software if using the get_url module when putting software on the host(s)
+oracle_sw_source_www: ""
 
-  disable_EE_options: True
-  oracle_EE_options: "{%- if   db_homes_config[dbh.home]['version'] in ('18.3.0.0') %}{{ oracle_EE_options_183 }}
-                      {%- elif db_homes_config[dbh.home]['version'] in ('19.3.0.0') %}{{ oracle_EE_options_193 }}
-                      {%- elif db_homes_config[dbh.home]['version'] in ('21.3.0.0') %}{{ oracle_EE_options_213 }}
-                      {%- elif db_homes_config[dbh.home]['version'] in ('12.2.0.1') %}{{ oracle_EE_options_122 }}
-                      {%- elif db_homes_config[dbh.home]['version'] in ('12.1.0.1', '12.1.0.2') %}{{oracle_EE_options_121}}
-                      {%- elif db_homes_config[dbh.home]['version'] == '11.2.0.4' %}{{oracle_EE_options_112}}
-                      {%- endif %}"
+oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
+is_sw_source_local: true
+configure_cluster: false
+autostartup_service: false  # automatic startup/stop databases service
+hostinitdaemon: "{% if    ansible_os_family == 'RedHat' and ansible_distribution_major_version | int >= 7   %}systemd
+                  {%- elif ansible_os_family == 'Suse'   and ansible_distribution_major_version | int >= 12 %}systemd
+                  {%- else %}{% if ansible_service_mgr is defined %}{{ ansible_service_mgr }}{% else %}init{% endif %}{% endif %}"
 
-  # disable all options who requires extra licences
-  oracle_EE_options_112:
-    - {option: dm           , state: false }
-    - {option: dv           , state: false }
-    - {option: lbac         , state: false }
-    - {option: olap         , state: false }
-    - {option: partitioning , state: false }
-    - {option: rat          , state: false }
+forcechopt: false
+# choptcheck is a dummy for 'creates' during chopt-task to force an execution
+choptcheck: "{% if forcechopt | bool %}dochopt{% endif %}"
 
-  oracle_EE_options_121:
-    - {option: dm           , state: false }
-    - {option: olap         , state: false }
-    - {option: partitioning , state: false }
-    - {option: rat          , state: false }
+# ulimit and systemd has diferent definitions for the unit.
+# sysctlfactor as a factor on top of the value from ulimit.
+ulimit_systemd_mapping:
+  'hard nproc': {name: LimitNPROC}
+  'hard nofile': {name: LimitNOFILE}
+  'hard stack': {name: LimitSTACK, sysctlfactor: 1024}
+  'hard memlock': {name: LimitMEMLOCK, sysctlfactor: 1024}
 
-  oracle_EE_options_122:
-    - {option: oaa          , state: false }
-    - {option: olap         , state: false }
-    - {option: partitioning , state: false }
-    - {option: rat          , state: false }
+disable_EE_options: true
 
-  oracle_EE_options_183:
-    - {option: oaa          , state: false }
-    - {option: olap         , state: false }
-    - {option: partitioning , state: false }
-    - {option: rat          , state: false }
+oracle_EE_options: "{%- if   db_homes_config[dbh.home]['version'] in ('18.3.0.0') %}{{ oracle_EE_options_183 }}
+                    {%- elif db_homes_config[dbh.home]['version'] in ('19.3.0.0') %}{{ oracle_EE_options_193 }}
+                    {%- elif db_homes_config[dbh.home]['version'] in ('21.3.0.0') %}{{ oracle_EE_options_213 }}
+                    {%- elif db_homes_config[dbh.home]['version'] in ('12.2.0.1') %}{{ oracle_EE_options_122 }}
+                    {%- elif db_homes_config[dbh.home]['version'] in ('12.1.0.1', '12.1.0.2') %}{{ oracle_EE_options_121 }}
+                    {%- elif db_homes_config[dbh.home]['version'] == '11.2.0.4' %}{{ oracle_EE_options_112 }}
+                    {%- endif %}"
 
-  oracle_EE_options_193:
-    - {option: oaa          , state: false }
-    - {option: olap         , state: false }
-    - {option: partitioning , state: false }
-    - {option: rat          , state: false }
+# disable all options who requires extra licences
+oracle_EE_options_112:
+  - {option: dm, state: false}
+  - {option: dv, state: false}
+  - {option: lbac, state: false}
+  - {option: olap, state: false}
+  - {option: partitioning, state: false}
+  - {option: rat, state: false}
 
-  oracle_EE_options_213:
-    - {option: oaa          , state: false }
-    - {option: olap         , state: false }
-    - {option: partitioning , state: false }
-    - {option: rat          , state: false }
+oracle_EE_options_121:
+  - {option: dm, state: false}
+  - {option: olap, state: false}
+  - {option: partitioning, state: false}
+  - {option: rat, state: false}
 
-  oracle_directories:
-          - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_rsp_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_base }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_base }}/cfgtoollogs", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_base }}/admin", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_base }}/audit", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_base }}/cfgtoollogs/dbca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_base }}/cfgtoollogs/sqlpatch", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_base }}/cfgtoollogs/netca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
-          - {name: "{{ oracle_user_home }}/.Scripts", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775 }
+oracle_EE_options_122:
+  - {option: oaa, state: false}
+  - {option: olap, state: false}
+  - {option: partitioning, state: false}
+  - {option: rat, state: false}
 
-  glogin_default_nocdb:
-        - "set sqlprompt \"_user @ _connect_identifier:>\""
-        - "set time on"
-  glogin_default_cdb:
-        - "define gname=idle"
-        - "column global_name new_value gname"
-        - "set heading off"
-        - "set termout off"
-        - "col global_name noprint"
-        - "select upper(sys_context ('userenv', 'instance_name') || ':' || sys_context('userenv', 'con_name')) global_name from dual;"
-        - "set sqlprompt '_user @ &gname:>'"
-        - "set heading on"
-        - "set termout on"
-        - "set time on"
+oracle_EE_options_183:
+  - {option: oaa, state: false}
+  - {option: olap, state: false}
+  - {option: partitioning, state: false}
+  - {option: rat, state: false}
 
-  oracle_sw_image_db:
-       - { filename: LINUX.X64_213000_db_home.zip, version: 21.3.0.0, creates: 'install/.img.bin' }
-       - { filename: LINUX.X64_193000_db_home.zip, version: 19.3.0.0, creates: 'install/.img.bin' }
-       - { filename: LINUX.X64_180000_db_home.zip, version: 18.3.0.0, creates: 'install/.img.bin' }
-       - { filename: linuxx64_12201_database.zip, version: 12.2.0.1, creates: 'database/runInstaller' }
-       - { filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2, creates: 'database/stage/sizes/oracle.server.Custom.sizes.properties' }
-       - { filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2, creates: 'database/install/.oui' }
-       - { filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1, creates: 'database/runInstaller' }
-       - { filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1, creates: 'database/runInstaller' }
-       - { filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4, creates: 'database/install/resource/cons_zh_TW.nls' }
-       - { filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4, creates: 'database/stage/Components/oracle.db/11.2.0.4.0/1/DataFiles/filegroup18.jar' }
-       - { filename: p10404530_112030_Linux-x86-64_1of7.zip, version: 11.2.0.3, creates: 'database/readme.html'}
-       - { filename: p10404530_112030_Linux-x86-64_2of7.zip, version: 11.2.0.3, creates: 'database/stage/Components/oracle.sysman.console.db/11.2.0.3.0/1/DataFiles/filegroup2.jar' }
+oracle_EE_options_193:
+  - {option: oaa, state: false}
+  - {option: olap, state: false}
+  - {option: partitioning, state: false}
+  - {option: rat, state: false}
+
+oracle_EE_options_213:
+  - {option: oaa, state: false}
+  - {option: olap, state: false}
+  - {option: partitioning, state: false}
+  - {option: rat, state: false}
+
+oracle_directories:
+  - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_rsp_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/admin", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/audit", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs/dbca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs/sqlpatch", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs/netca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_user_home }}/.Scripts", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+
+glogin_default_nocdb:
+  - "set sqlprompt \"_user @ _connect_identifier:>\""
+  - "set time on"
+
+glogin_default_cdb:
+  - "define gname=idle"
+  - "column global_name new_value gname"
+  - "set heading off"
+  - "set termout off"
+  - "col global_name noprint"
+  - "select upper(sys_context ('userenv', 'instance_name') || ':' || sys_context('userenv', 'con_name')) global_name from dual;"
+  - "set sqlprompt '_user @ &gname:>'"
+  - "set heading on"
+  - "set termout on"
+  - "set time on"
+
+oracle_sw_image_db:
+  - {filename: LINUX.X64_213000_db_home.zip, version: 21.3.0.0, creates: 'install/.img.bin'}
+  - {filename: LINUX.X64_193000_db_home.zip, version: 19.3.0.0, creates: 'install/.img.bin'}
+  - {filename: LINUX.X64_180000_db_home.zip, version: 18.3.0.0, creates: 'install/.img.bin'}
+  - {filename: linuxx64_12201_database.zip, version: 12.2.0.1, creates: 'database/runInstaller'}
+  - {filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2, creates: 'database/stage/sizes/oracle.server.Custom.sizes.properties'}
+  - {filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2, creates: 'database/install/.oui'}
+  - {filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1, creates: 'database/runInstaller'}
+  - {filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1, creates: 'database/runInstaller'}
+  - {filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4, creates: 'database/install/resource/cons_zh_TW.nls'}
+  - {filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4, creates: 'database/stage/Components/oracle.db/11.2.0.4.0/1/DataFiles/filegroup18.jar'}
+  - {filename: p10404530_112030_Linux-x86-64_1of7.zip, version: 11.2.0.3, creates: 'database/readme.html'}
+  - filename: p10404530_112030_Linux-x86-64_2of7.zip
+    version: 11.2.0.3
+    creates: 'database/stage/Components/oracle.sysman.console.db/11.2.0.3.0/1/DataFiles/filegroup2.jar'

@@ -1,0 +1,274 @@
+---
+- block:
+    - name: oradb-manage-statspack | Drop Statspack Schema
+      script: spdrop.sh
+      environment:
+        ORACLE_HOME: "{{ oracle_home_db }}"
+        ORACLE_SID: "{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_unique_name | default(dbh.oracle_db_name)) }}"
+      with_items: "{{ oracle_databases }}"
+      loop_control:
+        loop_var: dbh
+        label: "{{ dbh.oracle_db_name }}"
+      register: statspackdropcmd
+      become: true
+      become_user: "{{ oracle_user }}"
+      when:
+        - dbh.statspack is defined
+        - dbh.statspack.state | default('present') == 'absent'
+
+    - debug: msg="{{ item.stdout_lines }}"  # noqa unnamed-task
+      with_items:
+        - "{{ statspackdropcmd.results }}"
+      loop_control:
+        label: ""
+      when:
+        - statspackdropcmd is defined
+        - item.stdout_lines is defined
+
+  tags:
+    - spdrop
+    - spcdb
+
+- block:
+    - name: oradb-manage-statspack | Create Statspack Schema (existing user is ignored)
+      script: spcreate.sh
+      environment:
+        ORACLE_HOME: "{{ oracle_home_db }}"
+        ORACLE_SID: "{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_unique_name | default(dbh.oracle_db_name)) }}"
+        perfstat_password: "{{ db_password_cdb }}"
+        temporary_tablespace: "{{ dbh.statspack.tablespace_temp | default('temp') }}"
+        default_tablespace: "{{ dbh.statspack.tablespace | default('sysaux') }}"
+        purgedates: "{{ dbh.statspack.purgedays | default(35) }}"
+        snaplevel: "{{ dbh.statspack.snaplevel | default(7) }}"
+      with_items: "{{ oracle_databases }}"
+      loop_control:
+        loop_var: dbh
+        label: "{{ dbh.oracle_db_name }}"
+      register: statspackcmd
+      become: true
+      become_user: "{{ oracle_user }}"
+      failed_when:
+        - statspackcmd.rc != 0
+        - '"ORA-01920:" not in statspackcmd.stdout'  # ORA-01920: user name 'PERFSTAT' conflicts with another user
+      when:
+        - dbh.statspack is defined
+        - dbh.statspack.state | default('present') == 'present'
+
+    - debug: msg="{{ item.stdout_lines }}"  # noqa unnamed-task
+      with_items:
+        - "{{ statspackcmd.results }}"
+      loop_control:
+        label: ""
+      when:
+        - statspackcmd is defined
+        - item.stdout_lines is defined
+  tags:
+    - spcreate
+    - spcdb
+
+- name: oradb-manage-statspack | Create/Modify Purge Job
+  oracle_job:
+    hostname: "{{ ansible_hostname }}"
+    service_name: "{{ db_service_name }}"
+    port: "{{ dbh.listener_port | default(listener_port | default(1521)) }}"
+    user: "{{ db_user }}"
+    password: "{{ db_password_cdb }}"
+    job_name: "PERFSTAT.PURGE"
+    comments: "Statspack Purge-Job"
+    job_type: "plsql_block"
+    job_action: "PERFSTAT.STATSPACK.PURGE({{ dbh.statspack.purgedays | default(purgedays) }});"
+    logging_level: "runs"
+    repeat_interval: "{{ dbh.statspack.purgeinterval | default(purgeinterval) }}"
+    state: "present"
+
+  environment:
+    ORACLE_HOME: "{{ oracle_home_db }}"
+    ORACLE_SID: "{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_unique_name | default(dbh.oracle_db_name)) }}"
+  with_items:
+    - "{{ oracle_databases }}"
+  when:
+    - oracle_databases is defined
+    - dbh.statspack is defined
+    - dbh.statspack.state | default('present') == 'present'
+  become_user: "{{ oracle_user }}"
+  loop_control:
+    loop_var: dbh
+    label: "{{ dbh.oracle_db_name }}"
+  tags:
+    - spjob
+    - spcdb
+
+- name: oradb-manage-statspack | Create/Modify Snapshot Job
+  oracle_job:
+    hostname: "{{ ansible_hostname }}"
+    service_name: "{{ db_service_name }}"
+    port: "{{ dbh.listener_port | default(listener_port | default(1521)) }}"
+    user: "{{ db_user }}"
+    password: "{{ db_password_cdb }}"
+    job_name: "PERFSTAT.SNAPSHOT"
+    comments: "Statspack Snapshot-Job"
+    job_type: "plsql_block"
+    job_action: "PERFSTAT.STATSPACK.SNAP(i_snap_level => {{ dbh.statspack.snaplevel | default(snaplevel) }});"
+    logging_level: "runs"
+    repeat_interval: "{{ dbh.statspack.snapinterval | default(snapinterval) }}"
+    state: "present"
+  environment:
+    ORACLE_HOME: "{{ oracle_home_db }}"
+    ORACLE_SID: "{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_unique_name | default(dbh.oracle_db_name)) }}"
+  with_items:
+    - "{{ oracle_databases }}"
+  when:
+    - oracle_databases is defined
+    - dbh.statspack is defined
+    - dbh.statspack.state | default('present') == 'present'
+  become_user: "{{ oracle_user }}"
+  loop_control:
+    loop_var: dbh
+    label: "{{ dbh.oracle_db_name }}"
+  tags:
+    - spjob
+    - spcdb
+
+- block:
+    - name: oradb-manage-statspack | Drop Statspack Schema (PDB)
+      script: spdrop.sh
+      environment:
+        ORACLE_HOME: "{{ oracle_home_db }}"
+        ORACLE_SID: "{{ oracle_db_instance_name }}"
+        pdb_name: "{{ pdb.0.pdb_name }}"
+      loop:
+        - "{{ oracle_pdbs | flatten(levels=1) }}"
+      loop_control:
+        loop_var: pdb
+        label: "{{ pdb.0.cdb | default('') }} {{ pdb.0.pdb_name | default('') }} {{ oracle_db_instance_name | default('') }}"
+      register: statspackdropcmd
+      become: true
+      become_user: "{{ oracle_user }}"
+      failed_when:
+        - statspackdropcmd.rc != 0
+        - '"ORA-01920:" not in statspackdropcmd.stdout'  # ORA-01920: user name 'PERFSTAT' conflicts with another user
+      when:
+        - oracle_pdbs is defined
+        - pdb.0.statspack is defined
+        - pdb.0.statspack.state | default('present') == 'absent'
+
+    - debug: msg="{{ item.stdout_lines }}"  # noqa unnamed-task
+      with_items:
+        - "{{ statspackdropcmd.results }}"
+      loop_control:
+        label: ""
+      when:
+        - statspackdropcmd is defined
+        - item.stdout_lines is defined
+  become: true
+  become_user: "{{ oracle_user }}"
+  tags:
+    - spdrop
+    - sppdb
+
+- block:
+    - name: oradb-manage-statspack | Create Statspack Schema in PDBs (existing user is ignored)
+      script: spcreate.sh
+      environment:
+        ORACLE_HOME: "{{ oracle_home_db }}"
+        ORACLE_SID: "{{ oracle_db_instance_name }}"
+        perfstat_password: perfstat
+        temporary_tablespace: "{{ pdb.statspack.tablespace_temp | default('temp') }}"
+        default_tablespace: "{{ pdb.statspack.tablespace | default('sysaux') }}"
+        purgedates: "{{ pdb.statspack.purgedays | default(35) }}"
+        snaplevel: "{{ pdb.statspack.snaplevel | default(7) }}"
+        pdb_name: "{{ pdb.0.pdb_name }}"
+      loop:
+        - "{{ oracle_pdbs | flatten(levels=1) }}"
+      loop_control:
+        loop_var: pdb
+        label: "{{ pdb.0.cdb | default('') }} {{ pdb.0.pdb_name | default('') }} {{ oracle_db_instance_name | default('') }}"
+      register: statspackcmd
+      become: true
+      become_user: "{{ oracle_user }}"
+      failed_when:
+        - statspackcmd.rc != 0
+        - '"ORA-01920:" not in statspackcmd.stdout'  # ORA-01920: user name 'PERFSTAT' conflicts with another user
+      when:
+        - oracle_pdbs is defined
+        - pdb.0.statspack is defined
+        - pdb.0.statspack.state | default('present') == 'present'
+
+    - debug: msg="{{ item.stdout_lines }}"  # noqa unnamed-task
+      with_items:
+        - "{{ statspackcmd.results }}"
+      loop_control:
+        label: ""
+      when:
+        - statspackcmd is defined
+        - item.stdout_lines is defined
+  become: true
+  become_user: "{{ oracle_user }}"
+  tags:
+    - spcreate
+    - sppdb
+
+- name: oradb-manage-statspack | Create/Modify Purge Job (PDB)
+  oracle_job:
+    hostname: "{{ ansible_hostname }}"
+    service_name: "{{ pdb.0.pdb_name }}"
+    port: "{{ pdb.listener_port | default(listener_port | default(1521)) }}"
+    user: "{{ db_user }}"
+    password: "{{ db_password_pdb }}"
+    job_name: "PERFSTAT.PURGE"
+    comments: "Statspack Purge-Job"
+    job_type: "plsql_block"
+    job_action: "PERFSTAT.STATSPACK.PURGE({{ pdb.statspack.purgedays | default(purgedays) }});"
+    logging_level: "runs"
+    repeat_interval: "{{ pdb.0.statspack.purgeinterval | default(purgeinterval) }}"
+    state: "present"
+  environment:
+    ORACLE_HOME: "{{ oracle_home_db }}"
+  loop:
+    - "{{ oracle_pdbs | flatten(levels=1) }}"
+  loop_control:
+    loop_var: pdb
+    label: "{{ pdb.0.cdb | default('') }} {{ pdb.0.pdb_name | default('') }}"
+  when:
+    - oracle_pdbs is defined
+    - pdb.0.cdb is defined
+    - pdb.0.pdb_name is defined
+    - pdb.0.statspack is defined
+    - pdb.0.statspack.state | default('present') == 'present'
+  become_user: "{{ oracle_user }}"
+  tags:
+    - spjob
+    - sppdb
+
+- name: oradb-manage-statspack | Create/Modify Snapshot Job (PDB)
+  oracle_job:
+    hostname: "{{ ansible_hostname }}"
+    service_name: "{{ pdb.0.pdb_name }}"
+    port: "{{ pdb.listener_port | default(listener_port | default(1521)) }}"
+    user: "{{ db_user }}"
+    password: "{{ db_password_pdb }}"
+    job_name: "PERFSTAT.SNAPSHOT"
+    comments: "Statspack Snapshot-Job"
+    job_type: "plsql_block"
+    job_action: "PERFSTAT.STATSPACK.SNAP(i_snap_level => {{ pdb.0.statspack.snaplevel | default(snaplevel) }});"
+    logging_level: "runs"
+    repeat_interval: "{{ pdb.0.statspack.snapinterval | default(snapinterval) }}"
+    state: "present"
+  environment:
+    ORACLE_HOME: "{{ oracle_home_db }}"
+  loop:
+    - "{{ oracle_pdbs | flatten(levels=1) }}"
+  loop_control:
+    loop_var: pdb
+    label: "{{ pdb.0.cdb | default('') }} {{ pdb.0.pdb_name | default('') }}"
+  when:
+    - oracle_pdbs is defined
+    - pdb.0.cdb is defined
+    - pdb.0.pdb_name is defined
+    - pdb.0.statspack is defined
+    - pdb.0.statspack.state | default('present') == 'present'
+  become: true
+  become_user: "{{ oracle_user }}"
+  tags:
+    - spjob
+    - sppdb

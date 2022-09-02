@@ -181,9 +181,9 @@ def ensure_profile_state(cursor, module, msg, name, state, attribute_name, attri
             current_attributes = get_current_attributes (cursor, module, msg, name, attribute_names_)
 
             # Convert to dict and compare current with wanted
-            if cmp(dict(current_attributes),dict(wanted_attributes)) is not 0:
-                for i in wanted_attributes:
-                    total_sql.append("alter profile %s limit %s %s " % (name, i[0], i[1]))
+            if dict(current_attributes) != dict(wanted_attributes):
+                for i, v in zip(attribute_name,attribute_value):
+                    total_sql.append("alter profile %s limit %s %s " % (name, i, v))
 
     # module.exit_json(msg=total_sql, changed=True)
     if len(total_sql) > 0:

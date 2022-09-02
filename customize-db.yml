@@ -1,6 +1,7 @@
+---
 - name: Customize database
-  hosts: "{{ hostgroup }}"
-  sudo: yes
+  hosts: "{{ hostgroup | default('all') }}"
+  become: true
   roles:
     - oradb-manage-pdb
     - oradb-manage-tablespace

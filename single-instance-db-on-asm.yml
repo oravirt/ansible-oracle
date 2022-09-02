@@ -1,34 +1,34 @@
 ---
 
 
- - name: Host configuration
-   hosts: "{{ hostgroup }}"
-   become: yes
-   roles:
-      - common
-      - orahost
-      - orahost-storage
+- name: Host configuration
+  hosts: "{{ hostgroup }}"
+  become: true
+  roles:
+    - common
+    - orahost
+    - orahost-storage
 
- - name: Oracle Grid Infrastructure installation & ASM Configuration
-   hosts: "{{ hostgroup }}"
-   become: yes
-   roles:
-      - oraswgi-install
-      - oraasm-createdg
+- name: Oracle Grid Infrastructure installation & ASM Configuration
+  hosts: "{{ hostgroup }}"
+  become: true
+  roles:
+    - oraswgi-install
+    - oraasm-createdg
 
- - name: Database Server Installation & Database Creation
-   hosts: "{{ hostgroup }}"
-   become: yes
-   roles:
-      - oraswdb-install
-      - oradb-manage-db
+- name: Database Server Installation & Database Creation
+  hosts: "{{ hostgroup | default('all') }}"
+  become: true
+  roles:
+    - oraswdb-install
+    - oradb-manage-db
 
- - name: Tweaks
-   become: yes
-   hosts: "{{ hostgroup }}"
-   roles:
-      - cxoracle
-      - orahost-logrotate
+- name: Tweaks
+  become: true
+  hosts: "{{ hostgroup | default('all') }}"
+  roles:
+    - cxoracle
+    - orahost-logrotate
 
 # - name: Database configuration (tablespaces, parameters etc)
 #   hosts: "{{ hostgroup }}"

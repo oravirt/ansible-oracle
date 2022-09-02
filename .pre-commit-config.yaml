@@ -1,0 +1,26 @@
+---
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.0.1
+    hooks:
+      # needs some cleanup in project before enabling
+      # - id: trailing-whitespace
+      # - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-symlinks
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: forbid-new-submodules
+
+  - repo: https://github.com/ansible-community/ansible-lint.git
+    rev: v5.2.0
+    hooks:
+      - id: ansible-lint
+        entry: ansible-lint --force-color -p
+        files: \.(yaml|yml)$
+        pass_filenames: false
+        always_run: true
+        verbose: true
