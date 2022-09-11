@@ -31,7 +31,7 @@
 ################################################################################
 
 ## Version of this script. Simply uses the date in YYYY-MM-DD format
-GV_OCENV_VERSION="2022-03-28"
+GV_OCENV_VERSION="2022-08-10"
 
 ###############################################################################
 ## Environment support homogenization
@@ -1402,8 +1402,26 @@ rotate_file() {
 }
 
 bkup_api_list_jobs () {
-  local P_LINE_COUNT="${1}"
-  local P_BACKUP_TYPE="${2}"
+  local P_LINE_COUNT P_BACKUP_TYPE
+  local re='^[0-9]+$'
+  if [[ -n "${1}" ]]
+  then
+    if [[ "${1}" =~ $re ]]
+    then
+      P_LINE_COUNT="${1}"
+    else
+      P_BACKUP_TYPE="${1}"
+    fi
+  fi
+  if [[ -n "${2}" ]]
+  then
+    if [[ "${2}" =~ $re ]]
+    then
+      P_LINE_COUNT="${2}"
+    else
+      P_BACKUP_TYPE="${2}"
+    fi
+  fi
   local LV_LINE_FILTER
   if [[ -z "${GV_DB_UNIQUE_NAME}" ]]
   then
@@ -1715,10 +1733,21 @@ set_ora_home_env() {
   export PATH=${ORACLE_HOME}/bin:${ORACLE_HOME}/OPatch:${ORIGINAL_PATH_PRE_ENVLOAD}
   unset GV_PDB_LIST
 }
+fill_pdb_details_list () {
+  unset GV_PDB_LIST_DETAILS
+
+  if [[ "${GV_IS_CDB}" == "YES" ]]
+  then
+    while read -r LV_PDB_ELEM
+    do
+      GV_PDB_LIST_DETAILS[${#GV_PDB_LIST_DETAILS[@]}]="${LV_PDB_ELEM}"
+    done <<< "$(exec_sql_data "SELECT name ||'|'|| open_mode ||'|'|| restricted ||'|'|| TO_CHAR(open_time, 'YYYY-MM-DD HH24:MI:SS') ||'|'|| DECODE(local_undo, 1, 'YES', 'NO') FROM v\$pdbs WHERE name <> 'PDB\$SEED' ORDER BY name")"
+  fi
+}
 list_pdbs() {
   if [[ "${GV_IS_CDB}" == "YES" ]]
   then
-    exec_sql_data "SELECT name FROM v\$pdbs WHERE name <> 'PDB\$SEED'"
+    exec_sql_data "SELECT name FROM v\$pdbs WHERE name <> 'PDB\$SEED' ORDER BY name"
   fi
 }
 list_user_sessions() {
@@ -1851,6 +1880,16 @@ SELECT 'x' FROM dual"
     eval "$(echo "${LV_ENV_VAR_CMDS}" | grep '^export')"
   fi
 }
+print_pdb_listing() {
+  unset GV_PDB_LIST
+  printf "   %-15s %-10s %-10s %-19s %-10s\n" "PDB NAME" "STATUS" "RESTRICTED" "OPEN TIME" "LOCAL UNDO"
+  printf "   %-15s %-10s %-10s %-19s %-10s\n" "---------------" "----------" "----------" "-------------------" "----------"
+  for LV_PDB_DETAIL in "${GV_PDB_LIST_DETAILS[@]}"
+  do
+    GV_PDB_LIST[${#GV_PDB_LIST[@]}]=$(echo "${LV_PDB_DETAIL}" | cut -d"|" -f1)
+    echo "${LV_PDB_DETAIL}" | awk -F"|" '{printf("   %-15s %-10s %-10s %-19s %-10s\n", $1, $2, $3, $4, $5)}'
+  done
+}
 unalias sta 2>/dev/null
 sta() {
   get_sid_info
@@ -1878,13 +1917,10 @@ sta() {
       if [[ "${GV_IS_CDB}" == "YES" ]]
       then
         echo "PDBs"
-        LV_PDB_STRING=$(list_pdbs)
-        unset GV_PDB_LIST
-        for LV_PDB in ${LV_PDB_STRING}
-        do
-          GV_PDB_LIST[${#GV_PDB_LIST[@]}]="${LV_PDB}"
-        done
-        echo "${GV_PDB_LIST[@]}" | awk '{printf("   %s\n", $0)}'
+
+        fill_pdb_details_list
+
+        print_pdb_listing
       fi
     fi
   fi
@@ -1957,7 +1993,10 @@ list_homes() {
   local LV_ORA_INSTLOC_LIST
   while read -r LV_ORA_INSTLOC_ELEM
   do
-    LV_ORA_INSTLOC_LIST[${#LV_ORA_INSTLOC_LIST[@]}]="${LV_ORA_INSTLOC_ELEM}"
+    if [[ -n "${LV_ORA_INSTLOC_ELEM}" ]]
+    then
+      LV_ORA_INSTLOC_LIST[${#LV_ORA_INSTLOC_LIST[@]}]="${LV_ORA_INSTLOC_ELEM}"
+    fi
   done <<< "$( ( awk -F: '/^[^#]*:[^#]+:/{printf("%s/oraInst.loc\n", $2)}' /etc/oratab 2>/dev/null; awk -F: '/[^[:space:]]/{printf("%s/oraInst.loc\n", $1)}' /etc/oragchomelist 2>/dev/null; awk -F= '/crs_home/{printf("%s/oraInst.loc\n", $2)}' /etc/oracle/olr.loc 2>/dev/null; ls -1 /etc/oraInst.loc 2>/dev/null) | sort -u)"
   if [[ "${#LV_ORA_INSTLOC_LIST[@]}" -gt 0 ]]
   then
