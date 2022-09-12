@@ -162,9 +162,11 @@
     # do not start root.sh on all nodes in parallel
     # => sleep
     - name: install_home_gi | Run root script after installation (Other Nodes)
-      ansible.builtin.script: |
-        /usr/bin/sleep {{ item.0 * 60 }}
+      ansible.builtin.shell: |
+        sleep {{ item.0 * 60 }}
         {{ oracle_home_gi }}/root.sh
+      args:
+        executable: /usr/bin/bash
       become: true
       with_indexed_items: "{{ groups[hostgroup] }}"
       tags:
