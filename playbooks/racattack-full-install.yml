@@ -1,0 +1,27 @@
+---
+- name: Host configuration
+  hosts: racattack-all
+  user: root
+  roles:
+    # - common
+    - orahost
+
+- name: Storage Configuration
+  hosts: racattack-hub
+  user: root
+  roles:
+    - orahost_storage
+
+- name: Oracle Grid Infrastructure installation
+  hosts: racattack
+  user: root
+  roles:
+    - oraswgi_install
+
+- name: ASM Configuration, Database Server Installation & Database Creation
+  hosts: racattack-hub
+  user: root
+  roles:
+    - oraasm_createdg
+    - oraswdb_install
+    - oradb_create
