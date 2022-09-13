@@ -147,16 +147,27 @@
     - user
 
 - name: User | Add Oracle user to sudoers
-  ansible.builtin.template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0600
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: "/etc/sudoers.d/{{ item.username }}"
+    owner: root
+    mode: 0440
   with_items: "{{ oracle_users }}"
-  when: configure_oracle_sudo
+  when:
+    - configure_oracle_sudo
   tags:
     - sudoadd
 
 - name: User | Add Grid user to sudoers
-  ansible.builtin.template: src=sudoers.j2 dest=/etc/sudoers.d/{{ item.username }} owner=root mode=0600
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: "/etc/sudoers.d/{{ item.username }}"
+    owner: root
+    mode: 0440
   with_items: "{{ grid_users }}"
-  when: role_separation and configure_oracle_sudo
+  when:
+    - role_separation
+    - configure_oracle_sudo
   tags:
     - sudoadd
 
