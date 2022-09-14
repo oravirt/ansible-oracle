@@ -268,8 +268,8 @@
 
 # create partition only when device != pvname
 - name: filesystem | Create partition and pv
-  ansible.builtin.shell: parted -a optimal -s {{ item.1.device }} "mklabel gpt mkpart primary 1 -1"
-  # noqa command-instead-of-shell
+  ansible.builtin.command: parted --script -a optimal -s {{ item.1.device }} "mklabel gpt mkpart primary 1 -1"
+  # noqa
   args:
     creates: "{{ item.1.pvname }}"
   with_subelements:
@@ -277,7 +277,10 @@
     - disk
     - flags:
       skip_missing: true
-  when: configure_host_disks and item.1 is defined and item.1.device != item.1.pvname
+  when:
+    - configure_host_disks
+    - item.1 is defined
+    - item.1.device != item.1.pvname
   tags: hostfs
 
 - name: filesystem | Create vg
