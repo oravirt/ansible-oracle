@@ -2,15 +2,17 @@
 # Partition & ASM-Label Shared disks
 
 - name: ASM-storage | partition devices
-  ansible.builtin.shell: parted {{ item.1.device }} "mklabel gpt mkpart primary 1 -1"
-  # noqa command-instead-of-shell
+  ansible.builtin.command: parted --script {{ item.1.device }} "mklabel gpt mkpart primary 1 -1"
+  # noqa
   args:
     creates: "{{ item.1.device }}{{ partition_suffix }}"
   with_subelements:
     - "{{ asm_diskgroups }}"
     - disk
   run_once: "{{ configure_cluster }}"
-  when: partition_devices and asm_diskgroups is defined
+  when:
+    - partition_devices
+    - asm_diskgroups is defined
   tags: asmstorage,partition
 
 - ansible.builtin.include: dm-multipath-kpartx.yml
