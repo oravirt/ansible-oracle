@@ -1,0 +1,11 @@
+---
+- name: Oracle Grid Infrastructure / Restart installation & ASM Configuration
+  hosts: "{{ hostgroup | default('all') }}"
+  become: true
+  any_errors_fatal: true
+  collections:
+    - opitzconsulting.ansible_oracle
+  roles:
+    - oraswgi_install
+    - oraswgi_manage_patches
+    - oraasm_manage_diskgroups

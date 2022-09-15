@@ -1,0 +1,30 @@
+version: '3.3'
+services:
+  ansible:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        ansible_version: 5.8.0
+    #     ansible_version: 2.9.26
+    # container_name: ansible-oracle-2.9.26
+    # image: ansible:2.9.26
+    container_name: ansible-oracle-2.12.6
+    image: ansible:2.12.6
+    hostname: ansible-oracle
+    mem_limit: 1000m
+    privileged: true
+    working_dir: /git/ansible-oracle
+    volumes:
+      # binding for workdir
+      - type: bind
+        source: ${GIT_SOURCE_FOLDER-./../..}
+        target: /git
+      - ${SSH_AUTH_SOCK}:/ssh-agent:ro
+      - ansible_galaxy:/ansible/galaxy:rw
+    environment:
+      - "PS1=$$(hostname):$$(pwd) $$ "
+      - SSH_AUTH_SOCK=/ssh-agent
+      - ANSIBLE_COLLECTIONS_PATHS=/ansible/galaxy
+volumes:
+  ansible_galaxy:

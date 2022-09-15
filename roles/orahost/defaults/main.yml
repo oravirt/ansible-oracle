@@ -132,7 +132,7 @@ transparent_hugepage_disable:
   - {disable: "echo never >", path: /sys/kernel/mm/transparent_hugepage/defrag, rclocal: /etc/rc.d/rc.local}
 
 configure_hugepages: true
-configure_hugepages_by: percentage          # percentage/memory
+configure_hugepages_by: memory              # percentage/memory
 percent_hugepages: 50                       # Percentage (0-100) of total RAM to dedicate to hugepages, Configures vm.nr_hugepages
 size_in_gb_hugepages: 1                     # The amount of RAM in GB to dedicate to hugepages
 nr_hugepages_percent: "{{ (((( percent_hugepages / 100 ) * ansible_memtotal_mb ) / 2 ) + 2 ) | round | int }}"
@@ -148,7 +148,8 @@ host_fs_layout:
   - vgname: vgora
     state: present
     filesystem:
-      - {mntp: /u01, lvname: lvora, lvsize: 100%FREE, fstype: ext4}
+      - {mntp: /u01, lvname: lvorabase, lvsize: 25G, fstype: xfs}
+      - {mntp: /u02, lvname: lvoradata, lvsize: 25G, fstype: xfs, fsopts: "-m reflink=1 -m crc=1"}
     disk:
       - {device: /dev/sdb, pvname: /dev/sdb1}
 

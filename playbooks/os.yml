@@ -1,0 +1,21 @@
+---
+
+- name: Host configuration
+  hosts: "{{ hostgroup | default('all') }}"
+  become: true
+  any_errors_fatal: true
+  collections:
+    - opitzconsulting.ansible_oracle
+  roles:
+    - common
+    - orahost
+    - orahost_storage
+    - name: orahost_ssh
+      when: configure_cluster | default(false)
+    - cxoracle
+    - orahost_logrotate
+
+  post_tasks:
+    - name: Restart autofs
+      service: name=autofs enabled=yes state=restarted
+      tags: autofs
