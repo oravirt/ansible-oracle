@@ -1,0 +1,49 @@
+---
+# This Playbook is used in Cloud Environments after the
+# deployment of the VM.
+# Use it as the 1st playbook for deployment of ansible-oracle
+#
+- name: yum update and reboot
+  hosts: "{{ hostgroup | default('all') }}"
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Wait 300 seconds for Connection
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+
+    - name: yum update yum packages 1st
+      ansible.builtin.package:
+        # noqa package-latest
+        name: "yum*"
+        state: latest
+      register: yumyumstate
+
+    - ansible.builtin.debug: msg="{{ yumyumstate.results }}"
+      # noqa unnamed-task
+
+    - name: Kernel Update with later Reboot
+      ansible.builtin.package:
+        # noqa package-latest
+        name: "kernel-uek"
+        state: latest
+      register: kernelstate
+
+    - ansible.builtin.debug: msg="{{ kernelstate.results }}"
+      # noqa unnamed-task
+
+    - name: yum update
+      ansible.builtin.package:
+        # noqa package-latest
+        name: "*"
+        state: latest
+      register: updatestate
+
+    - ansible.builtin.debug: msg="{{ kernelstate.results }}"
+      # noqa unnamed-task
+
+    - name: reboot due to Kernel Update
+      # noqa no-handler
+      ansible.builtin.reboot:
+        reboot_timeout: 180
+      when: kernelstate.changed

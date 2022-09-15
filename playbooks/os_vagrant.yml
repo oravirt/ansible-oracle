@@ -1,0 +1,28 @@
+---
+
+- name: Host configuration for Vagrant
+  hosts: "{{ hostgroup | default('all') }}"
+  become: true
+  become_user: root
+  any_errors_fatal: true
+  tasks:
+    - name: set new hostname
+      hostname:
+        name: "{{ inventory_hostname }}"
+
+    - name: Remove /etc/hosts
+      file:
+        path: /etc/hosts
+        state: absent
+
+    - name: Update /etc/hosts
+      blockinfile:
+        path: /etc/hosts
+        mode: 0644
+        create: true
+        backup: false
+        block: |
+          127.0.0.1 localhost
+          {% for item in play_hosts %}
+          {{ hostvars[item]['ansible_eth1']['ipv4']['address'] }}  {{ hostvars[item]['ansible_fqdn'] }} {{ hostvars[item]['ansible_hostname'] }}
+          {% endfor %}
