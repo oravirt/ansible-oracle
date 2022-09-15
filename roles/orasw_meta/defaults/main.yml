@@ -12,6 +12,14 @@ asmdba_group: asmdba                              # Primary group for oracle_use
 asmadmin_group: asmadmin                          # Primary group for oracle_user.
 
 db_homes_config:
+  21300-base:
+    home: db1-base
+    version: 21.3.0.0
+    edition: EE
+  19300-base:
+    home: db1-base
+    version: 19.3.0.0
+    edition: EE
   18300-base:
     home: db1-base
     version: 18.3.0.0
@@ -36,7 +44,7 @@ db_homes_config:
 
 
 db_homes_installed:
-  - home: 18300-base
+  - home: 19300-base
     apply_patches: false
     state: present
   - home: 12201-base
@@ -166,7 +174,6 @@ oracle_opatch_patch:
     version: 11.2.0.3
 
 
-default_dbpass: Oracle123
 oracle_base: /u01/app/oracle
 oracle_home_db: "{%- if dbh is defined -%}
                     {%- if db_homes_config[dbh.home]['oracle_home'] is defined  -%}
@@ -233,3 +240,93 @@ oracle_db_instance_name: "{%- if pdb.0.cdb is defined -%}
 oracle_home_gi: "{% if configure_cluster %}{{ oracle_home_gi_cl }}{% else %}{{ oracle_home_gi_so }}{% endif %}"
 oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid"  # ORACLE_HOME for Grid Infrastructure (Clustered)
 oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid"  # ORACLE_HOME for Grid Infrastructure (Stand Alone)
+
+
+# This is an example layout of a database installation
+oracle_databases:                                        # Dictionary describing the databases to be installed
+  - home: 19300-base                                     # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
+    oracle_db_name: orcl                                 # Database name
+    oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
+    is_container: true                                   # (true/false) Is the database a container database
+    storage_type: FS                                     # Database storage to be used. ASM or FS.
+    oracle_db_mem_totalmb: 1024                          # Amount of RAM to be used for SGA + PGA
+    oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+    redolog_size: 100M
+    redolog_groups: 3
+    archivelog: false
+    flashback: false
+    force_logging: false
+    listener_name: LISTENER
+    state: present                                       # present | absent
+    statspack:
+      purgedays: 14
+      snaplevel: 5
+      state: present
+    tablespaces:
+      - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+      - {name: sysaux, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+      - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
+      - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
+      - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+    init_parameters:
+      - {name: audit_trail, value: 'NONE', scope: spfile, state: present}
+      - {name: control_management_pack_access, value: 'NONE', scope: both, state: present}
+      - {name: control_file_record_keep_time, value: '30', scope: both, state: present}
+      - {name: db_files, value: '200', scope: spfile, state: present}
+      - {name: deferred_segment_creation, value: 'false', scope: both, state: present}
+      - {name: filesystemio_options, value: 'setall', scope: spfile, state: present}
+      - {name: job_queue_processes, value: '10', scope: both, state: present}
+      # Disable forcing hugepages on really small systems
+      #  - {name: use_large_pages ,value: 'ONLY', scope: spfile, state: present}
+      - {name: log_archive_dest_1, value: 'location=USE_DB_RECOVERY_FILE_DEST', scope: both, state: present}
+      - {name: log_buffer, value: '64M', scope: spfile, state: present}
+      - {name: pga_aggregate_target, value: '200M', scope: both, state: present, dbca: false}
+      - {name: sga_target, value: '1800M', scope: spfile, state: present, dbca: false}
+      - {name: recyclebin, value: 'off', scope: spfile, state: present}
+      - {name: streams_pool_size, value: '152M', scope: spfile, state: present}
+      - {name: "_cursor_obsolete_threshold", value: '1024', scope: spfile, state: present}
+      - {name: max_pdbs, value: '3', scope: both, state: present}
+      - {name: clonedb, value: 'true', scope: spfile, state: present, dbca: false}
+      - {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
+      - {name: db_create_online_log_dest_1, value: '/u02/oradata', scope: both, state: present}
+      - {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
+    profiles:
+      - name: DEFAULT
+        state: present
+        attributes:
+          - {name: password_life_time, value: unlimited}
+    users:
+      - schema: dbsnmp
+        state: unlocked
+        update_password: always
+
+oracle_pdbs:
+  - home: 19300-base
+    listener_port: 1521
+    cdb: orcl
+    pdb_name: ORCLPDB
+    state: present
+    statspack:
+      purgedays: 14
+      snaplevel: 7
+      state: present
+    tablespaces:
+      - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+      - {name: sysaux, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+      - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
+      - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
+      - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+
+# DB
+default_dbpass: "{% if item is defined and item.oracle_db_passwd is defined %}{{ item.oracle_db_passwd }}
+                 {%- elif dbh is defined and dbh.oracle_db_passwd is defined %}{{ dbh.oracle_db_passwd }}
+                 {%- else %}Oracle123
+                 {%- endif %}"
+dbpasswords:
+  orcl:
+    sys: Oracle_456
+    system: Oracle_456
+    dbsnmp: Oracle_456
+    pdbadmin: Oracle_456
+
+## END-OF-PASSWORDS

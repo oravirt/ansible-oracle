@@ -88,34 +88,8 @@ sysasmpassword: "{% if oracle_password is defined %}{{ oracle_password }}
 asmmonitorpassword: "{% if oracle_password is defined %}{{ oracle_password }}
                      {%- else %}Oracle123
                      {%- endif %}"  # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
-# DB
-# default_dbpass: Oracle123
-default_dbpass: "{% if item is defined and item.oracle_db_passwd is defined %}{{ item.oracle_db_passwd }}
-                 {%- elif dbh is defined and dbh.oracle_db_passwd is defined %}{{ dbh.oracle_db_passwd }}
-                 {%- else %}Oracle123
-                 {%- endif %}"
-dbpasswords:
-  orcl:
-    sys: Oracle_456
-    system: Oracle_456
-    dbsnmp: Oracle_456
-    pdbadmin: Oracle_456
-
-## END-OF-PASSWORDS
 
 dbca_templatename: General_Purpose.dbc
-# dbca_initparams: "{% if '12.2' in dbh.oracle_version_db %} -initParams db_name={{dbh.oracle_db_name}}
-#                     {%- if dbh.oracle_db_unique_name is defined %},db_unique_name={{dbh.oracle_db_unique_name}}
-#                     {%- endif %}
-#                   {%- endif %}"
-# dbca_initparams_extras: "{% if '12.2' in dbh.oracle_version_db and dbh.storage_type|upper == 'FS' and dbh.init_parameters is defined %}
-#                            {%- for a in  dbh.init_parameters %}
-#                              {%- if loop.first -%},
-#                              {%- endif %}{{ a.name }}={{ a.value}}
-#                              {%- if not loop.last -%},
-#                              {%- endif %}
-#                            {% endfor %}
-#                          {% endif %}"
 dbca_sys_pass: "{% if dbpasswords[dbh.oracle_db_name] is defined %}
                   {%- if dbpasswords[dbh.oracle_db_name]['sys'] is defined %}{{ dbpasswords[dbh.oracle_db_name]['sys'] }}
                   {%- else %}{{ default_dbpass }}
@@ -128,7 +102,7 @@ dbca_system_pass: "{% if dbpasswords[dbh.oracle_db_name] is defined %}
                      {%- endif %}
                     {%- else %}{{ default_dbpass }}
                     {%- endif %}"
-# dbca_redolog: "{% if dbh.redolog_size_in_mb is defined %} -redoLogFileSize {{ dbh.redolog_size_in_mb }}{% endif %}"
+
 init_params_list: "{%- if dbh.init_parameters is defined  -%}
                       {%- for p in  dbh.init_parameters -%}
                         {%- if p.dbca | default(True) -%}
@@ -154,37 +128,3 @@ shell_aliases:
   - "lsnrstop='lsnrctl stop $LSNRNAME'"
   - "lsnrstatus='lsnrctl status $LSNRNAME'"
   - "lsnrservice='lsnrctl services $LSNRNAME'"
-
-# db_homes_config:
-#   12201-base:
-#     home: db1
-#     version: 12.2.0.1
-#     edition: EE
-#   12102-base:
-#     home: db1
-#     version: 12.1.0.2
-#     edition: EE
-#   11204-base:
-#     home: db1
-#     version: 11.2.0.4
-#     edition: EE
-
-
-# This is an example layout of a database installation
-oracle_databases:                                        # Dictionary describing the databases to be installed
-  - home: 18300-base                                     # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
-    oracle_db_name: orcl                                 # Database name
-    oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
-    is_container: false                                  # (true/false) Is the database a container database
-    pdb_prefix: pdb
-    num_pdbs: 1
-    storage_type: FS                                     # Database storage to be used. ASM or FS.
-    oracle_db_mem_totalmb: 1024                          # Amount of RAM to be used for SGA + PGA
-    oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
-    redolog_size: 100M
-    redolog_groups: 3
-    archivelog: false
-    flashback: false
-    force_logging: false
-    listener_name: LISTENER
-    state: present                                        # present | absent
