@@ -1,0 +1,11 @@
+---
+# Do not mount installation media during boot!
+- name: orasw_meta | Mount nfs share with installation media
+  ansible.builtin.mount:
+    src: "{{ nfs_server_sw }}:{{ nfs_server_sw_path }}"
+    name: "{{ oracle_stage_remote }}"
+    fstype: nfs
+    state: mounted
+  when: install_from_nfs
+  tags:
+    - nfsmountdb
