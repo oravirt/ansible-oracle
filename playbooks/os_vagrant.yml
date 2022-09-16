@@ -7,16 +7,16 @@
   any_errors_fatal: true
   tasks:
     - name: set new hostname
-      hostname:
+      ansible.builtin.hostname:
         name: "{{ inventory_hostname }}"
 
     - name: Remove /etc/hosts
-      file:
+      ansible.builtin.file:
         path: /etc/hosts
         state: absent
 
     - name: Update /etc/hosts
-      blockinfile:
+      ansible.builtin.blockinfile:
         path: /etc/hosts
         mode: 0644
         create: true
