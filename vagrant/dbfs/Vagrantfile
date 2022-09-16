@@ -1,0 +1,95 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# PLEASE START 1st with following command to create additional disks!
+#
+# VAGRANT_EXPERIMENTAL=disks vagrant up
+
+Vagrant.configure("2") do |config|
+
+  lanip = "192.168.56.161"
+  vm_name = "dbfs161-192-168-56-161"
+
+  puts " "
+  puts " Single Instance Database in Filesystem"
+  puts " "
+  puts " Hostname: #{vm_name}"
+  puts " IP:       #{lanip}"
+  puts " Logins:"
+  puts "           vagrant / vagrant"
+  puts "           root    / vagrant"
+  puts " "
+  puts " Please do the 1st start with following command to create the additional disks!"
+  puts " VAGRANT_EXPERIMENTAL=disks vagrant up"
+  puts " "
+
+  # Please define the folder to the extracted archives from Oracle
+  #
+  config.vm.synced_folder ENV['VAGRANT_ANSIBLE_ORACLE_SW'], "/sw/oracle", disabled: false, mount_options: ["ro"]
+
+  config.vm.disk :disk, size: "150GB", name: "#{vm_name}_oracle"
+
+  # config.disksize.size = '50GB'
+  config.vm.box =  "Rendanic/oraclelinux-7.x"
+
+  config.vm.box_check_update = false
+
+  config.vm.network :private_network, ip: lanip
+
+  # config.vm.network "public_network"
+  config.ssh.insert_key = true
+  config.ssh.username = "vagrant"
+  config.ssh.password = "vagrant"
+
+  config.vm.hostname = "#{vm_name}.nio.io"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = vm_name
+    vb.gui = false
+    vb.memory = "4096"
+    vb.cpus = 2
+    # vb.customize ["modifyvm", :id, "--groups", "/ansible-oracle"]
+
+  end
+
+  config.vm.provision "shell", inline: <<-SHELL
+
+    if [ ! -b /dev/sdb ]; then
+      echo "Please start the Box with following command once to create the addional disks!"
+      echo "VAGRANT_EXPERIMENTAL=disks vagrant up"
+      exit 1
+    fi
+
+    # copy public key to vagrant user
+    ssh_public_key=/vagrant/id_rsa.pub
+    if test -f "$ssh_public_key" ; then
+      echo "Check if public key $ssh_public_key is valid."
+      if ssh-keygen -l -f "$ssh_public_key" ; then
+        echo "Add public key to /home/vagrant/.ssh/authorized_keys"
+        cat "$ssh_public_key" >> /home/vagrant/.ssh/authorized_keys
+      fi
+    fi
+
+    sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+    systemctl restart sshd.service
+
+    set -e
+    # configure local Nexus-Server when running
+    # 
+    os_release=$(grep '^VERSION_ID' /etc/os-release | awk -F'=' ' gsub(/"/,"") { print $2}' | cut -b1)
+    if curl -f -s -q -m 3 http://192.168.56.12:8081/repository/ol${os_release}os-yum-group/ > /dev/null ; then
+      echo "Local Nexus3 Server for yum proxy found!"
+
+      yum-config-manager --disable '*' > /dev/null
+      yum-config-manager -q --nogpgcheck --add-repo http://192.168.56.12:8081/repository/ol${os_release}os-yum-group
+      yum-config-manager -q --add-repo http://192.168.56.12:8081/repository/rhel${os_release}_epel-yum-proxy
+      sed -i 's/^gpgcheck=1/gpgcheck=0/g' /etc/yum.conf
+      echo "timeout=900" >> /etc/yum.conf
+    fi
+
+    yum install -y gcc make perl kernel-uek-devel
+    yum update -y
+    /sbin/rcvboxadd quicksetup all
+
+  SHELL
+end
