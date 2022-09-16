@@ -15,22 +15,22 @@
     - name: yum update yum packages 1st
       ansible.builtin.package:
         # noqa package-latest
-        name: "yum*"
+        name: yum*
         state: latest
       register: yumyumstate
 
     - ansible.builtin.debug: msg="{{ yumyumstate.results }}"
-      # noqa unnamed-task
+    # noqa unnamed-task
 
     - name: Kernel Update with later Reboot
       ansible.builtin.package:
         # noqa package-latest
-        name: "kernel-uek"
+        name: kernel-uek
         state: latest
       register: kernelstate
 
     - ansible.builtin.debug: msg="{{ kernelstate.results }}"
-      # noqa unnamed-task
+    # noqa unnamed-task
 
     - name: yum update
       ansible.builtin.package:
@@ -40,7 +40,7 @@
       register: updatestate
 
     - ansible.builtin.debug: msg="{{ kernelstate.results }}"
-      # noqa unnamed-task
+    # noqa unnamed-task
 
     - name: reboot due to Kernel Update
       # noqa no-handler
