@@ -1,0 +1,13 @@
+---
+# Try to umount and ignore_errors
+- name: orasw_meta | Umount nfs share with installation media
+  ansible.builtin.mount:
+    src: "{{ nfs_server_sw }}:{{ nfs_server_sw_path }}"
+    name: "{{ oracle_stage_remote }}"
+    fstype: nfs
+    state: absent
+  # noqa ignore-errors
+  ignore_errors: true
+  when: install_from_nfs
+  tags:
+    - nfsumountdb

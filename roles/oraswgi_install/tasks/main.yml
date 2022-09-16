@@ -20,10 +20,11 @@
     - patch_before_rootsh
 
 - name: install_home_gi | Mount nfs share with installation media
-  ansible.builtin.mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=mounted
+  ansible.builtin.include_role:
+    name: orasw_meta
+    tasks_from: mount_stage_remote
   tags:
-    - nfsmountgi
-  when: install_from_nfs
+    - nfsmountdb
 
 - name: install_home_gi | Add new dotprofile (GI)
   ansible.builtin.template:
@@ -156,6 +157,8 @@
     - olsnodes
 
 - name: install_home_gi | Unmount nfs share with installation media
-  ansible.builtin.mount: src="{{ nfs_server_sw }}:{{ nfs_server_sw_path }}" name={{ oracle_stage_remote }} fstype=nfs state=absent
-  when: install_from_nfs
-  tags: nfsunmountgi
+  ansible.builtin.include_role:
+    name: orasw_meta
+    tasks_from: umount_stage_remote
+  tags:
+    - nfsumountdb
