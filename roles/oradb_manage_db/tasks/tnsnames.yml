@@ -1,5 +1,5 @@
 ---
-- ansible.builtin.debug: msg="ORACLE_HOME {{ listener_home }}"  # noqa unnamed-task
+- ansible.builtin.debug: msg="ORACLE_BASE_HOME {{ listener_home_config }}"  # noqa unnamed-task
   tags: tnsnames
 
 - name: tnsnames.ora | create IFILE entry in tnsnames.ora
@@ -7,7 +7,7 @@
     line: "IFILE={{ listener_home }}/network/admin/tnsnames_ansible.ora"
     regexp: "^IFILE=/"
     insertbefore: BOF
-    path: "{{ listener_home }}/network/admin/tnsnames.ora"
+    path: "{{ listener_home_config }}/network/admin/tnsnames.ora"
     backup: true
     create: true
     group: "{{ oracle_group }}"
@@ -18,7 +18,7 @@
 
 - name: tnsnames.ora | create custom configuration in tnsnames_ansible.ora
   ansible.builtin.blockinfile:
-    path: "{{ listener_home }}/network/admin/tnsnames_ansible.ora"
+    path: "{{ listener_home_config }}/network/admin/tnsnames_ansible.ora"
     backup: true
     create: true
     group: "{{ oracle_group }}"
