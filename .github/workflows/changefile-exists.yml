@@ -1,0 +1,33 @@
+name: antsibull changelog files
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - 'pr*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Test changed-files
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get changelog files
+        id: changelog-files
+        uses: tj-actions/changed-files@v31
+        with:
+          files: |
+            changelogs/**
+      - name: List all changed files
+        run: |
+          for file in ${{ steps.changelog-files.outputs.all_changed_files }}; do
+            echo "antsibull changelog file found: $file"
+            exit 0
+          done
+          echo "antsibull changelog files missing!"
+          exit 1
