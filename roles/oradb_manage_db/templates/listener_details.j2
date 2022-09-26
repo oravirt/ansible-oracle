@@ -30,10 +30,10 @@
 {%- endif %}
 
 {# config_sid_list is used as a helper. jinja2 doesn't allow the exposing of variables from inside a loop to outside before version 2.10! #}
-{%- set config_sid_list = 0 %}
+{%- set config_sid_list = namespace(created = False) %}
 {# The following loop is executed only once for the header 'SID_LIST_... #}
-{%- for testsid in oracle_databases if testsid.listener_name is defined and testsid.listener_name == lsnrinst.listener_name and config_sid_list == 0 %}
-  {%- set config_sid_list =  1 %}
+{%- for testsid in oracle_databases if testsid.listener_name is defined and testsid.listener_name == lsnrinst.listener_name and not config_sid_list.created%}
+  {%- set config_sid_list.created =  True -%}
 
 SID_LIST_{{ lsnrinst.listener_name }} =
   (SID_LIST =
