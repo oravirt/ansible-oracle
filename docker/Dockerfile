@@ -1,6 +1,10 @@
 FROM docker.io/library/python:3.10-slim-buster
 
 ARG ansible_version
+ARG ansible_lint_version
+
+ENV ansible_version=5.8.0
+ENV ansible_lint_version=6.6.1
 
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
@@ -27,7 +31,7 @@ RUN apt-get update -y &&\
 
 RUN python3 -m pip install --upgrade pip
 
-RUN pip3 install ansible===${ansible_version} && \
+RUN pip3 install ansible===${ansible_version} ansible-lint===${ansible_lint_version} && \
     apt-get clean autoclean && \
     apt-get autoremove --yes && \
     rm -rf /var/lib/{apt,dpkg,cache,log}/ && \
