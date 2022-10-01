@@ -1,10 +1,10 @@
 ---
 - name: db_opatch | Extract opatchauto patch files to patch base
   ansible.builtin.unarchive:
-    src={{ oracle_stage }}/{{ item[0].filename }}
-    dest={{ oracle_patch_stage }}/{{ db_version }}
-    creates={{ oracle_patch_stage }}/{{ db_version }}/{{ item[0].creates | default (omit) }}
-    copy=no
+    src: "{{ oracle_stage }}/{{ item[0].filename }}"
+    dest: "{{ oracle_patch_stage }}/{{ db_version }}"
+    creates: "{{ oracle_patch_stage }}/{{ db_version }}/{{ item[0].creates | default(omit) }}"
+    copy: false
   become: true
   become_user: "{{ oracle_user }}"
   with_nested:
@@ -21,10 +21,10 @@
 
 - name: db_opatch | Extract opatchauto patch files to patch base (from remote location)
   ansible.builtin.unarchive:
-    src={{ oracle_stage_remote }}/{{ item[0].filename }}
-    dest={{ oracle_patch_stage }}/{{ db_version }}
-    creates={{ oracle_patch_stage }}/{{ db_version }}/{{ item[0].creates | default (omit) }}
-    copy=no
+    src: "{{ oracle_stage_remote }}/{{ item[0].filename }}"
+    dest: "{{ oracle_patch_stage }}/{{ db_version }}"
+    creates: "{{ oracle_patch_stage }}/{{ db_version }}/{{ item[0].creates | default(omit) }}"
+    copy: false
   become: true
   become_user: "{{ oracle_user }}"
   with_nested:
@@ -43,15 +43,15 @@
 
 - name: db_opatch | Extract one-off patch files to patch base
   ansible.builtin.unarchive:
-    src={{ oracle_stage }}/{{ item[0].filename }}
-    dest={{ oracle_patch_stage }}/{{ db_version }}
-    creates={{ oracle_patch_stage }}/{{ db_version }}/{{ item[0].creates | default (omit) }}
-    copy=no
+    src: "{{ oracle_stage }}/{{ item[0].filename }}"
+    dest: "{{ oracle_patch_stage }}/{{ db_version }}"
+    creates: "{{ oracle_patch_stage }}/{{ db_version }}/{{ item[0].creates | default(omit) }}"
+    copy: false
   become: true
   become_user: "{{ oracle_user }}"
   with_nested:
     - "{{ oracle_sw_patches }}"
-    - "{{  db_homes_config[dbh.home]['opatch'] }}"
+    - "{{ db_homes_config[dbh.home]['opatch'] }}"
   when:
     - apply_patches_db
     - item[1].patchid == item[0].patchid
@@ -64,10 +64,10 @@
 
 - name: db_opatch | Extract one-off patch files to patch base (from remote location)
   ansible.builtin.unarchive:
-    src={{ oracle_stage_remote }}/{{ item[0].filename }}
-    dest={{ oracle_patch_stage }}/{{ db_version }}
-    creates={{ oracle_patch_stage }}/{{ db_version }}/{{ item[0].creates | default (omit) }}
-    copy=no
+    src: "{{ oracle_stage_remote }}/{{ item[0].filename }}"
+    dest: "{{ oracle_patch_stage }}/{{ db_version }}"
+    creates: "{{ oracle_patch_stage }}/{{ db_version }}/{{ item[0].creates | default(omit) }}"
+    copy: false
   become: true
   become_user: "{{ oracle_user }}"
   with_nested:

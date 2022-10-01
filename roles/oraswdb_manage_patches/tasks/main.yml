@@ -21,7 +21,9 @@
     - "{{ db_homes_installed }}"
   tags:
     - directories
-  when: apply_patches_db and item.apply_patches |default (false)
+  when:
+    - apply_patches_db
+    - item.apply_patches | default(false)
 
 - ansible.builtin.include_tasks: db-home-patch.yml
   with_items:
