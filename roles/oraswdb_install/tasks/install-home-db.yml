@@ -42,7 +42,10 @@
   tags: responsefileswdb
 
 # unarchive Oracle RDBMS 12c+
-- block:  # noqa unnamed-task
+- name: install_home_db
+  when:
+    - db_homes_config[dbh.home]['version'] is version('12.2', '>=')
+  block:
     - name: install_home_db | Extract files
       ansible.builtin.unarchive:
         src={{ oracle_stage }}/{{ db_homes_config[dbh.home].imagename | default(item[0].filename) }}
@@ -82,8 +85,6 @@
         - oracle_home_db not in existing_dbhome.stdout_lines
       tags:
         - oradbswunpack
-  when:
-    - db_homes_config[dbh.home]['version'] is version('12.2', '>=')
 
 - ansible.builtin.include_tasks: "{{ db_version }}.yml"
 
