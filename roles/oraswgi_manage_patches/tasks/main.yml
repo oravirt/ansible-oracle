@@ -31,7 +31,7 @@
   when: apply_patches_gi
 
 - name: gi_opatch | Check current opatch version
-  oracle_opatch:
+  opitzconsulting.ansible_oracle.oracle_opatch:
     oracle_home={{ oracle_home_gi }}
     state=opatchversion
   register: current_opatch_version
@@ -60,7 +60,7 @@
     - ocmconfig
 
 - name: gi_opatch | Manage opatchauto patches for GI (after software only install)
-  oracle_opatch:
+  opitzconsulting.ansible_oracle.oracle_opatch:
     oracle_home={{ oracle_home_gi }}
     patch_base={{ oracle_patch_install }}/{{ oracle_install_version_gi }}/{{ item.0.path | default (item.0.patchid) }}/{{ item.1 }}
     patch_id={{ item.1 }}
@@ -88,17 +88,17 @@
   register: psuapplym
 
 - name: gi_opatch | Manage opatchauto patches for GI
-  oracle_opatch:
-    oracle_home={{ oracle_home_gi }}
-    patch_base={{ oracle_patch_install }}/{{ oracle_install_version_gi }}/{{ item.path | default (item.patchid) }}/
-    patch_id={{ item.patchid }}
-    patch_version={{ item.patchversion | default(omit) }}
-    opatchauto=True
-    rolling={{ item.rolling | default(True) }}
-    conflict_check=True
-    ocm_response_file={{ ocm_response_file | default(omit) }}
-    output=verbose
-    state={{ item.state }}
+  opitzconsulting.ansible_oracle.oracle_opatch:
+    oracle_home: "{{ oracle_home_gi }}"
+    patch_base: "{{ oracle_patch_install }}/{{ oracle_install_version_gi }}/{{ item.path | default(item.patchid) }}/"
+    patch_id: "{{ item.patchid }}"
+    patch_version: "{{ item.patchversion | default(omit) }}"
+    opatchauto: true
+    rolling: "{{ item.rolling | default(True) }}"
+    conflict_check: true
+    ocm_response_file: "{{ ocm_response_file | default(omit) }}"
+    output: verbose
+    state: "{{ item.state }}"
   with_items:
     - "{{ gi_patches[oracle_install_version_gi]['opatchauto'] }}"
   # run_once: "{{ configure_cluster }}"
@@ -114,16 +114,16 @@
   register: psuapplym
 
 - name: gi_opatch | Manage non opatchauto patches for GI
-  oracle_opatch:
-    oracle_home={{ oracle_home_gi }}
-    patch_base={{ oracle_patch_install }}/{{ oracle_install_version_gi }}/{{ item.path | default (item.patchid) }}/
-    patch_id={{ item.patchid }}
-    patch_version={{ item.patchversion | default(omit) }}
-    opatchauto=False
-    conflict_check=True
-    ocm_response_file={{ ocm_response_file | default(omit) }}
-    output=verbose
-    state={{ item.state }}
+  opitzconsulting.ansible_oracle.oracle_opatch:
+    oracle_home: "{{ oracle_home_gi }}"
+    patch_base: "{{ oracle_patch_install }}/{{ oracle_install_version_gi }}/{{ item.path | default(item.patchid) }}/"
+    patch_id: "{{ item.patchid }}"
+    patch_version: "{{ item.patchversion | default(omit) }}"
+    opatchauto: false
+    conflict_check: true
+    ocm_response_file: "{{ ocm_response_file | default(omit) }}"
+    output: verbose
+    state: "{{ item.state }}"
   with_items:
     - "{{ gi_patches[oracle_install_version_gi]['opatch'] }}"
   # run_once: "{{ configure_cluster }}"
