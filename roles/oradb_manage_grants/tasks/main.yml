@@ -1,20 +1,20 @@
 ---
 # tasks file for manage-db-users
 - name: Manage role grants (cdb)
-  oracle_grants:
-    role={{ item.1.name }}
-    state={{ item.1.state }}
-    grants={{ item.1.grants | default(omit) }}
-    grants_mode={{ item.1.grants_mode | default(omit) }}
-    object_privs={{ item.1.object_privs | default (omit) }}
-    directory_privs={{ item.1.directory_privs | default (omit) }}
-    hostname={{ ansible_hostname }}
-    port={{ listener_port_template }}
-    service_name={{ db_service_name }}
-    user={{ db_user }}
-    password={{ db_password_cdb }}
-    container={{ item.1.container | default(omit) }}
-    mode={{ db_mode }}
+  opitzconsulting.ansible_oracle.oracle_grants:
+    role: "{{ item.1.name }}"
+    state: "{{ item.1.state }}"
+    grants: "{{ item.1.grants | default(omit) }}"
+    grants_mode: "{{ item.1.grants_mode | default(omit) }}"
+    object_privs: "{{ item.1.object_privs | default(omit) }}"
+    directory_privs: "{{ item.1.directory_privs | default(omit) }}"
+    hostname: "{{ ansible_hostname }}"
+    port: "{{ listener_port_template }}"
+    service_name: "{{ db_service_name }}"
+    user: "{{ db_user }}"
+    password: "{{ db_password_cdb }}"
+    container: "{{ item.1.container | default(omit) }}"
+    mode: "{{ db_mode }}"
   with_subelements:
     - "{{ oracle_databases }}"
     - roles
@@ -33,26 +33,28 @@
   tags: users,grants
 
 - name: Manage role grants (pdb)
-  oracle_grants:
-    role={{ item.1.name }}
-    state={{ item.1.state }}
-    grants={{ item.1.grants | default(omit) }}
-    grants_mode={{ item.1.grants_mode | default(omit)  }}
-    object_privs={{ item.1.object_privs | default (omit) }}
-    directory_privs={{ item.1.directory_privs | default (omit) }}
-    hostname={{ ansible_hostname }}
-    port={{ listener_port_template }}
-    service_name={{ item.0.pdb_name }}
-    user={{ db_user }}
-    password={{ db_password_pdb }}
-    mode={{ db_mode }}
+  opitzconsulting.ansible_oracle.oracle_grants:
+    role: "{{ item.1.name }}"
+    state: "{{ item.1.state }}"
+    grants: "{{ item.1.grants | default(omit) }}"
+    grants_mode: "{{ item.1.grants_mode | default(omit)  }}"
+    object_privs: "{{ item.1.object_privs | default(omit) }}"
+    directory_privs: "{{ item.1.directory_privs | default(omit) }}"
+    hostname: "{{ ansible_hostname }}"
+    port: "{{ listener_port_template }}"
+    service_name: "{{ item.0.pdb_name }}"
+    user: "{{ db_user }}"
+    password: "{{ db_password_pdb }}"
+    mode: "{{ db_mode }}"
   with_subelements:
     - "{{ oracle_pdbs }}"
     - roles
     - flags:
       skip_missing: true
   environment: "{{ oracle_env }}"
-  when: oracle_pdbs is defined and item.0 is defined and item.0.state|lower == 'present' and (item.1.grants is defined or item.1.object_privs is defined)
+  when:
+    - oracle_pdbs is defined
+    - item.0 is defined and item.0.state|lower == 'present' and (item.1.grants is defined or item.1.object_privs is defined)
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   loop_control:
@@ -61,27 +63,30 @@
   tags: users,grants
 
 - name: Manage schema grants (cdb)
-  oracle_grants:
-    schema={{ item.1.schema }}
-    state={{ item.1.state }}
-    grants={{ item.1.grants | default(omit) }}
-    grants_mode={{ item.1.grants_mode | default(omit)  }}
-    object_privs={{ item.1.object_privs | default (omit) }}
-    directory_privs={{ item.1.directory_privs | default (omit) }}
-    hostname={{ ansible_hostname }}
-    port={{ listener_port_template }}
-    service_name={{ db_service_name }}
-    user={{ db_user }}
-    password={{ db_password_cdb }}
-    container={{ item.1.container | default(omit) }}
-    mode={{ db_mode }}
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ item.1.schema }}"
+    state: "{{ item.1.state }}"
+    grants: "{{ item.1.grants | default(omit) }}"
+    grants_mode: "{{ item.1.grants_mode | default(omit)  }}"
+    object_privs: "{{ item.1.object_privs | default(omit) }}"
+    directory_privs: "{{ item.1.directory_privs | default(omit) }}"
+    hostname: "{{ ansible_hostname }}"
+    port: "{{ listener_port_template }}"
+    service_name: "{{ db_service_name }}"
+    user: "{{ db_user }}"
+    password: "{{ db_password_cdb }}"
+    container: "{{ item.1.container | default(omit) }}"
+    mode: "{{ db_mode }}"
   with_subelements:
     - "{{ oracle_databases }}"
     - users
     - flags:
       skip_missing: true
   environment: "{{ oracle_env }}"
-  when: oracle_databases is defined and item.0.state|lower == 'present' and (item.1.grants is defined or item.1.object_privs is defined)
+  when:
+   - oracle_databases is defined
+   - item.0.state | lower == 'present'
+   - (item.1.grants is defined or item.1.object_privs is defined)
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   loop_control:
@@ -90,26 +95,30 @@
   tags: users,grants
 
 - name: Manage schema grants (pdb)
-  oracle_grants:
-    schema={{ item.1.schema }}
-    state={{ item.1.state }}
-    grants={{ item.1.grants | default (omit) }}
-    grants_mode={{ item.1.grants_mode | default(omit) }}
-    object_privs={{ item.1.object_privs | default (omit) }}
-    directory_privs={{ item.1.directory_privs | default (omit) }}
-    hostname={{ ansible_hostname }}
-    port={{ listener_port_template }}
-    service_name={{ item.0.pdb_name }}
-    user={{ db_user }}
-    password={{ db_password_pdb }}
-    mode={{ db_mode }}
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ item.1.schema }}"
+    state: "{{ item.1.state }}"
+    grants: "{{ item.1.grants | default(omit) }}"
+    grants_mode: "{{ item.1.grants_mode | default(omit) }}"
+    object_privs: "{{ item.1.object_privs | default(omit) }}"
+    directory_privs: "{{ item.1.directory_privs | default(omit) }}"
+    hostname: "{{ ansible_hostname }}"
+    port: "{{ listener_port_template }}"
+    service_name: "{{ item.0.pdb_name }}"
+    user: "{{ db_user }}"
+    password: "{{ db_password_pdb }}"
+    mode: "{{ db_mode }}"
   with_subelements:
     - "{{ oracle_pdbs }}"
     - users
     - flags:
       skip_missing: true
-  environment: "{{ oracle_env  }}"
-  when: oracle_pdbs is defined and item.0 is defined and item.0.state|lower == 'present' and (item.1.grants is defined or item.1.object_privs is defined)
+  environment: "{{ oracle_env }}"
+  when:
+    - oracle_pdbs is defined
+    - item.0 is defined
+    - and item.0.state | lower == 'present'
+    - and (item.1.grants is defined or item.1.object_privs is defined)
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   loop_control:
