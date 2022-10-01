@@ -1,5 +1,11 @@
 ---
-- block:
+- name: ""
+  # need to run it once on cluster
+  # => unzip was executed on 1st node only.
+  # => hopefully the setup is the same on all nodes...
+  run_once: "{{ configure_cluster }}"
+  tags: runcluvfy
+  block:
 
     - ansible.builtin.debug: msg="install_home_gi | Sttart Execute runcluvfy.sh for Grid-Infrastructure"  # noqa unnamed-task
       run_once: true
@@ -86,9 +92,3 @@
       check_mode: true
       failed_when: etchosts.changed
       register: etchosts
-
-  # need to run it once on cluster
-  # => unzip was executed on 1st node only.
-  # => hopefully the setup is the same on all nodes...
-  run_once: "{{ configure_cluster }}"
-  tags: runcluvfy

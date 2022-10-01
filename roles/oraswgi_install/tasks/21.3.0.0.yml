@@ -1,5 +1,10 @@
 ---
-- block:
+- name: install_home_gi
+  tags:
+    - oragridswunpack
+  when:
+    - oracle_home_gi not in checkgiinstall.stdout
+  block:
     - ansible.builtin.debug: msg="install_home_gi | Start Extract files to ORACLE_HOME (gi)"  # noqa unnamed-task
       run_once: "{{ configure_cluster }}"
 
@@ -7,7 +12,7 @@
       ansible.builtin.unarchive: src={{ oracle_gi_image }}  dest={{ oracle_home_gi }} copy=no
       with_items: "{{ oracle_sw_image_gi }}"
       loop_control:
-        label: "{{ oracle_gi_image | default ('') }}"
+        label: "{{ oracle_gi_image | default('') }}"
       args:
         creates: "{{ oracle_home_gi }}/root.sh"
       become: true
@@ -15,11 +20,6 @@
       run_once: "{{ configure_cluster }}"
       when:
         - oracle_install_version_gi == item.version
-
-  tags:
-    - oragridswunpack
-  when:
-    - oracle_home_gi not in checkgiinstall.stdout
 
 # Check for an existing GRID_HOME before reinstallation of OPatch
 - name: install_home_gi | Check for file GridSetup.sh
@@ -42,7 +42,12 @@
   when: configure_cluster
   tags: cvuqdisk
 
-- block:  # noqa unnamed-task when: configure_cluster
+- name: install_home_gi
+  when:
+    - configure_cluster
+    - hostvars[cluster_master]['statcvuqdisk']['stat']['exists']
+  tags: cvuqdisk
+  block:
 
     # synchronize didn't work on all environments...
     # => fetch to ansible controller
@@ -59,7 +64,7 @@
 
     - name: install_home_gi | copy cvuqdisk to cluster nodes
       ansible.builtin.copy:
-        src: "/tmp/{{ cluster_master  }}/{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}"
+        src: "/tmp/{{ cluster_master }}/{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}"
         dest: "{{ oracle_rsp_stage }}/{{ cvuqdisk_rpm }}"
         mode: 0644
       tags: cvuqdisk
@@ -70,11 +75,6 @@
         state: present
         disable_gpg_check: true
       tags: cvuqdisk
-
-  when:
-    - configure_cluster
-    - hostvars[cluster_master]['statcvuqdisk']['stat']['exists']
-  tags: cvuqdisk
 
 - name: install_home_gi | Setup response file for install (GI)
   ansible.builtin.template:
@@ -93,7 +93,9 @@
   when:
     - item.diskgroup == oracle_asm_init_dg
 
-- block:  # when: oracle_home_gi not in checkgiinstall.stdout
+- name: ""
+  when: oracle_home_gi not in checkgiinstall.stdout
+  block:  # when: oracle_home_gi not in checkgiinstall.stdout
 
     - include_tasks: runcluvfy.yml
       when:
@@ -119,20 +121,21 @@
       tags:
         - oragridinstall
       register: giinstall
-      failed_when: giinstall.rc not in [0,6]
+      failed_when: giinstall.rc not in [0, 6]
 
     - ansible.builtin.debug: var=giinstall.stdout_lines  # noqa unnamed-task
       run_once: "{{ configure_cluster }}"
       when: giinstall.stdout_lines is defined
-
-  when: oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | include role oraswgi_manage_patches
   ansible.builtin.include_role:
     name: oraswgi_manage_patches
   when: patch_before_rootsh and apply_patches_gi
 
-- block:  # when: oracle_home_gi not in checkgiinstall.stdout
+- name: ""
+  when:
+    - oracle_home_gi not in checkgiinstall.stdout
+  block:  # when: oracle_home_gi not in checkgiinstall.stdout
     - name: install_home_gi | Run oraInstroot script after installation
       ansible.builtin.command: "{{ oracle_inventory_loc }}/orainstRoot.sh"
       # noqa no-changed-when
@@ -191,6 +194,3 @@
         - run_configtoolallcommand
       ignore_errors: true
       register: configtool
-
-  when:
-    - oracle_home_gi not in checkgiinstall.stdout

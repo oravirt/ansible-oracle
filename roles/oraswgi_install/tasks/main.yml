@@ -1,7 +1,7 @@
 ---
 
 - name: install_home_gi | Check if GI is already installed
-  ansible.builtin.shell: cat "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" |grep -w {{ oracle_home_gi  }} |awk  '{print $3}' | cut -f2 -d'"'
+  ansible.builtin.shell: cat "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" | grep -w {{ oracle_home_gi }} |awk  '{print $3}' | cut -f2 -d'"'
   # noqa command-instead-of-shell risky-shell-pipe
   tags:
     - always
@@ -47,7 +47,7 @@
   ansible.builtin.file: dest={{ oracle_stage }}/{{ item.version }} mode=775 owner="{{ oracle_user }}" group={{ oracle_group }} state=directory
   become: true
   with_items: "{{ oracle_sw_image_gi }}"
-  when: oracle_install_version_gi  ==  item.version
+  when: oracle_install_version_gi == item.version
   tags:
     - directories
 
@@ -145,14 +145,14 @@
   # noqa command-instead-of-shell
   become: true
   become_user: "{{ grid_install_user }}"
-  when: oracle_gi_cluster_type |upper == 'FLEX' and '12' in oracle_install_version_gi
+  when: oracle_gi_cluster_type | upper == 'FLEX' and '12' in oracle_install_version_gi
   register: olsnodes
   tags:
     - olsnodes
 
 - name: install_home_gi | Check olsnodes (GI)
   ansible.builtin.debug: var=olsnodes.stdout_lines
-  when: oracle_gi_cluster_type|upper == 'FLEX' and '12' in oracle_install_version_gi
+  when: oracle_gi_cluster_type | upper == 'FLEX' and '12' in oracle_install_version_gi
   tags:
     - olsnodes
 

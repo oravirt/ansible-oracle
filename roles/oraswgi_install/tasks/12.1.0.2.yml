@@ -121,7 +121,7 @@
   run_once: "{{ configure_cluster }}"
   tags:
     - responsefileconfigtool
-  when: run_configtoolallcommand  and oracle_home_gi not in checkgiinstall.stdout
+  when: run_configtoolallcommand and oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Run configToolAllCommands
   ansible.builtin.shell: "{{ oracle_home_gi }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_rsp_stage }}/configtoolallcommands.rsp"

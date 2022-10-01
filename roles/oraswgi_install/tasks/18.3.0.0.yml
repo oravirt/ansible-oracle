@@ -103,7 +103,7 @@
     - oragridinstall
   when: oracle_home_gi not in checkgiinstall.stdout  # and oracle_sw_unpack
   register: giinstall
-  failed_when: giinstall.rc not in [0,6]
+  failed_when: giinstall.rc = not in [0, 6]
 
 - ansible.builtin.debug: var=giinstall.stdout_lines
   # noqa unnamed-task

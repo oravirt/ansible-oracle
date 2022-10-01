@@ -69,7 +69,7 @@ oracle_grid_responsefile: "grid-{{ oracle_cluster_name }}.rsp"   # Name of respo
 default_gipass: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif %}"
 
 # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
-sysasmpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif%}"
+sysasmpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif %}"
 
 # The check for the old passwords are there for backwards compatibility and only temporary, will be removed
 asmmonitorpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif %}"
@@ -89,8 +89,8 @@ oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }}
 oracle_asm_init_dg: crs
 device_persistence: asmlib
 oracle_asm_disk_string: ORCL:*
-cvuqdisk_rpm: "{%- if oracle_install_version_gi > '12.1.0.2' -%}cvuqdisk-1.0.10-1.rpm
-               {%- else -%}cvuqdisk-1.0.9-1.rpm
+cvuqdisk_rpm: "{%- if oracle_install_version_gi > '12.1.0.2' -%}cvuqdisk-1.0.10-1.rpm\
+               {%- else -%}cvuqdisk-1.0.9-1.rpm\
                {%- endif -%}"
 
 oracle_cluster_name: "{{ hostgroup }}"      # Name of the cluster when setting up Clustered Grid Infrastructure
@@ -117,11 +117,11 @@ opatcharchive: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/
                 {%- for opatchfile in oracle_opatch_patch if opatchfile['version']==oracle_install_version_gi -%}{{ opatchfile['filename'] }}
                 {%- endfor -%}"
 
-oracle_gi_image: "{%- if oracle_sw_copy %}{{ oracle_stage }}
-                {%- else %}{{ oracle_stage_remote }}
-                {%- endif %}
-                {%- if oracle_install_image_gi is defined %}/{{ oracle_install_image_gi }}
-                {%- else %}//{{ item.filename }}
+oracle_gi_image: "{%- if oracle_sw_copy %}{{ oracle_stage }}\
+                {%- else %}{{ oracle_stage_remote }}\
+                {%- endif %}\
+                {%- if oracle_install_image_gi is defined %}/{{ oracle_install_image_gi }}\
+                {%- else %}//{{ item.filename }}\
                 {%- endif %}"
 
 oracle_sw_image_gi:                                              # Files containing the installation media for Grid Infrastructure
