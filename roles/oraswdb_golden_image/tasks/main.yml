@@ -4,7 +4,12 @@
     that:
       - golden_image_dest is defined
 
-- block:  # noqa unnamed-task
+- name: Golden-Image
+  become: true
+  become_user: "{{ oracle_user }}"
+  when:
+    - db_homes_installed is defined
+  block:
 
     - name: Create destination directory for Golden-Image
       ansible.builtin.file:
@@ -37,8 +42,3 @@
       loop_control:
         label: ""
       when: createimage.results is defined
-
-  become: true
-  become_user: "{{ oracle_user }}"
-  when:
-    - db_homes_installed is defined

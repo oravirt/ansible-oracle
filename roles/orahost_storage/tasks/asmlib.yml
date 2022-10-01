@@ -1,5 +1,9 @@
 ---
-- block:  # noqa unnamed-task
+- name: Asmlib
+  when:
+    - device_persistence == 'asmlib'
+    - asm_diskgroups is defined
+  block:
     - name: ASM-storage | create asmlib labels
       ansible.builtin.shell: "{{ asmlib_binary }} createdisk {{ item.1.asmlabel }} {{ item.1.device }}{{ partition_suffix }}"
       # noqa command-instead-of-shell
@@ -29,7 +33,3 @@
     - name: ASMlib | List ASM disks
       ansible.builtin.debug: var=listdisks.stdout_lines
       tags: asmlibconfig,asmstorage
-
-  when:
-    - device_persistence == 'asmlib'
-    - asm_diskgroups is defined
