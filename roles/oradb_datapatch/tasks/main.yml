@@ -10,7 +10,7 @@
   when: listener_installed is defined and lsnrinst.state|lower == 'present'
 
 - name: oradb_datapatch | Start database
-  oracle_db:
+  opitzconsulting.ansible_oracle.oracle_db:
     oracle_home: "{{ oracle_db_home }}"
     db_name: "{{ item.oracle_db_name }}"
     db_unique_name: "{{ item.oracle_db_unique_name | default(omit) }}"
@@ -23,7 +23,7 @@
   tags: startdb
 
 - name: oradb_datapatch | Run datapatch
-  oracle_datapatch:
+  opitzconsulting.ansible_oracle.oracle_datapatch:
     oracle_home: "{{ oracle_db_home }}"
     db_name: "{{ item.oracle_db_name }}"
     db_unique_name: "{{ item.oracle_db_unique_name | default(omit) }}"
