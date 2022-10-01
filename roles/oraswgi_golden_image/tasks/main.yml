@@ -3,7 +3,12 @@
     that: golden_image_dest is defined
 
 # Creating Oracle Restart Golden-Image requires a running stack under 19c
-- block:
+- name: Golden-Image
+  become: true
+  become_user: "{{ oracle_user }}"
+  when:
+    - oracle_home_gi is defined
+  block:
     - name: Check for running Oracle Restart when installed
       ansible.builtin.command: "{{ oracle_home_gi }}/bin/crsctl status server"
       # noqa no-changed-when
@@ -25,8 +30,3 @@
 
     - ansible.builtin.debug: msg="{{ createimage.stdout_lines }}"  # noqa unnamed-task
       when: createimage.stdout_lines is defined
-
-  become: true
-  become_user: "{{ oracle_user }}"
-  when:
-    - oracle_home_gi is defined
