@@ -7,7 +7,9 @@
   loop_control:
     loop_var: lsnrinst
     label: "LISTENER: {{ lsnrinst.listener_name }} ORACLE_HOME: {{ listener_home }}"
-  when: listener_installed is defined and lsnrinst.state|lower == 'present'
+  when:
+    - listener_installed is defined
+    - lsnrinst.state | lower == 'present'
 
 - name: oradb_datapatch | Start database
   opitzconsulting.ansible_oracle.oracle_db:
