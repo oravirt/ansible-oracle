@@ -14,8 +14,8 @@
   ansible.builtin.yum:
     name: "{{ oracle_packages }}"
     state: installed
-    enablerepo: "{{ extrarepos_enabled | default (omit, True) }}"
-    disablerepo: "{{ extrarepos_disabled | default (omit, True) }}"
+    enablerepo: "{{ extrarepos_enabled | default(omit, True) }}"
+    disablerepo: "{{ extrarepos_disabled | default(omit, True) }}"
   when:
     - install_os_packages
     - ansible_os_family == 'RedHat'
@@ -31,8 +31,8 @@
   ansible.builtin.yum:
     name: "{{ oracle_asm_packages }}"
     state: installed
-    enablerepo: "{{ extrarepos_enabled | default (omit, True ) }}"
-    disablerepo: "{{ extrarepos_disabled | default (omit, True ) }}"
+    enablerepo: "{{ extrarepos_enabled | default(omit, True) }}"
+    disablerepo: "{{ extrarepos_disabled | default(omit, True) }}"
   when:
     - install_os_packages | bool
     - ansible_os_family == 'RedHat'
@@ -71,7 +71,9 @@
   register: disable_selinux_runtime
   tags: selinux
 
-- block:  # noqa unnamed-task
+- name: Timezone
+  when: os_timezone is defined
+  block:  # noqa unnamed-task
     - name: Set Timezone
       ansible.builtin.timezone:
         name: "{{ os_timezone }}"
@@ -87,8 +89,6 @@
         - timezoneresult is defined
         - timezoneresult.changed
       tags: timezone
-
-  when: os_timezone is defined
 
 - name: Check dns for host
   ansible.builtin.command: host {{ ansible_hostname }}
@@ -182,7 +182,13 @@
     - sshkeys
 
 - name: ssh-keys | Add ssh-keys & authorized_keys to oracle user
-  ansible.builtin.copy: src={{ item[1] }} dest={{ item[0].home | default(oracle_user_home | regex_replace('[^/]+$','') + item[0].username) }}/.ssh  owner={{ item[0].username }} group={{ item[0].primgroup }} force=yes mode=0600
+  ansible.builtin.copy:
+    src: "{{ item[1] }}"
+    dest: "{{ item[0].home | default(oracle_user_home | regex_replace('[^/]+$', '') + item[0].username) }}/.ssh"
+    owner: "{{ item[0].username }}"
+    group: "{{ item[0].primgroup }}"
+    force: true
+    mode: "0600"
   when: configure_ssh and configure_cluster and old_ssh_config
   with_nested:
     - "{{ oracle_users }}"
@@ -193,7 +199,7 @@
 - name: ssh-keys | Add ssh-keys & authorized_keys to grid user
   ansible.builtin.copy:
     src: "{{ item[1] }}"
-    dest: "{{ item[0].home | default(oracle_user_home | regex_replace('[^/]+$','') + item[0].username) }}/.ssh"
+    dest: "{{ item[0].home | default(oracle_user_home | regex_replace('[^/]+$', '') + item[0].username) }}/.ssh"
     owner: "{{ item[0].username }}"
     group: "{{ item[0].primgroup }}"
     force: true
@@ -206,7 +212,7 @@
     - sshkeys
 
 - name: ssh-keys | Add short name to known_hosts
-  local_action: shell ssh-keyscan -p {{ ansible_ssh_port|default(22) }} -H {{ ansible_hostname }} 2> /dev/null >> {{ keyfile }}  # noqa deprecated-local-action ignore-errors yaml
+  local_action: shell ssh-keyscan -p {{ ansible_ssh_port | default(22) }} -H {{ ansible_hostname }} 2> /dev/null >> {{ keyfile }}  # noqa deprecated-local-action ignore-errors
   # noqa fqcn-builtins
   ignore_errors: true
   become: false
@@ -215,7 +221,7 @@
     - sshkeys
 
 - name: ssh-keys | Add FQDN to known_hosts
-  local_action: shell ssh-keyscan -p {{ ansible_ssh_port|default(22) }} -H {{ ansible_fqdn }} 2> /dev/null >> {{ keyfile }}  # noqa yaml ignore-errors deprecated-local-action
+  local_action: shell ssh-keyscan -p {{ ansible_ssh_port | default(22) }} -H {{ ansible_fqdn }} 2> /dev/null >> {{ keyfile }}  # noqa yaml ignore-errors deprecated-local-action
   # noqa fqcn-builtins
   ignore_errors: true
   become: false
@@ -224,8 +230,7 @@
     - sshkeys
 
 - name: ssh-keys | Add IPv4 to known_hosts
-  local_action: shell ssh-keyscan -p {{ ansible_ssh_port|default(22) }} -H {{ ansible_default_ipv4.address  }} 2> /dev/null >> {{  keyfile }}  # noqa yaml ignore-errors deprecated-local-action
-  # noqa fqcn-builtins
+  ansible.builtin.local_action: shell ssh-keyscan -p {{ ansible_ssh_port | default(22) }} -H {{ ansible_default_ipv4.address }} 2> /dev/null >> {{ keyfile }}  # noqa ignore-errors deprecated-local-action
   ignore_errors: true
   become: false
   when: configure_ssh and configure_cluster and old_ssh_config
@@ -233,14 +238,24 @@
     - sshkeys
 
 - name: ssh-keys | Copy known_hosts to oracle user
-  ansible.builtin.copy: src={{ keyfile }} dest={{ item.home | default(oracle_user_home | regex_replace('[^/]+$','') + item.username) }}/.ssh/known_hosts owner={{ item.username }} group={{ item.primgroup }} mode=0644
+  ansible.builtin.copy:
+    src: "{{ keyfile }}"
+    dest: "{{ item.home | default(oracle_user_home | regex_replace('[^/]+$', '') + item.username) }}/.ssh/known_hosts"
+    owner: "{{ item.username }}"
+    group: "{{ item.primgroup }}"
+    mode: "0644"
   with_items: "{{ oracle_users }}"
   when: configure_ssh and configure_cluster and old_ssh_config
   tags:
     - sshkeys
 
 - name: ssh-keys | Copy known_hosts to grid user
-  ansible.builtin.copy: src={{ keyfile }} dest={{ item.home | default(oracle_user_home | regex_replace('[^/]+$','') + item.username) }}/.ssh/known_hosts owner={{ item.username }} group={{ item.primgroup }} mode=0644
+  ansible.builtin.copy:
+    src: "{{ keyfile }}"
+    dest: "{{ item.home | default(oracle_user_home | regex_replace('[^/]+$', '') + item.username) }}/.ssh/known_hosts"
+    owner: "{{ item.username }}"
+    group: "{{ item.primgroup }}"
+    mode: "0644"
   with_items: "{{ grid_users }}"
   when: configure_ssh and configure_cluster and role_separation and old_ssh_config
   tags:
@@ -372,7 +387,12 @@
 # Work Arroud:
 # => Flush File Cache
 # => retry a sysctl -p
-- block:  # noqa unnamed-task
+- name: Flush Buffer Cache
+  when:
+    - systclcmd is defined
+    - systclcmd.changed
+  tags: sysctl,hugepages
+  block:
     - name: Flush Buffer Cache when hugepages have been changed
       ansible.builtin.command: echo 2 > /proc/sys/vm/drop_caches
       # noqa no-changed-when
@@ -382,10 +402,6 @@
       ansible.builtin.sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes
       with_items: "{{ oracle_hugepages }}"
       tags: sysctl,hugepages
-  when:
-    - systclcmd is defined
-    - systclcmd.changed
-  tags: sysctl,hugepages
 
 - name: Oracle-recommended PAM config
   ansible.builtin.lineinfile: dest=/etc/pam.d/login state=present line="session required pam_limits.so"
@@ -442,14 +458,18 @@
 - name: Asmlib | Add configuration
   ansible.builtin.template: src=oracleasm.j2 dest=/etc/sysconfig/oracleasm-_dev_oracleasm mode=0644
   register: asmlibconfig
-  when: device_persistence|lower == 'asmlib' and asm_diskgroups is defined
+  when:
+    - device_persistence | lower == 'asmlib'
+    - asm_diskgroups is defined
   tags:
     - asmlibconfig
 
 - name: Asmlib | Add configuration (link)
   ansible.builtin.file: src=/etc/sysconfig/oracleasm-_dev_oracleasm dest=/etc/sysconfig/oracleasm state=link force=yes
   register: asmlibconfig
-  when: device_persistence|lower == 'asmlib' and asm_diskgroups is defined
+  when:
+    - device_persistence | lower == 'asmlib'
+    - asm_diskgroups is defined
   tags:
     - asmlibconfig
 
