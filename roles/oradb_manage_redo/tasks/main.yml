@@ -1,6 +1,6 @@
 ---
 - name: Manage redologs
-  oracle_redo:
+  opitzconsulting.ansible_oracle.oracle_redo:
     hostname={{ ansible_hostname }}
     service_name={{ db_service_name }}
     port={{ listener_port_template }}
@@ -13,7 +13,11 @@
   run_once: "{{ configure_cluster }}"
   with_items:
     - "{{ oracle_databases }}"
-  when: oracle_databases is defined and item.redolog_size is defined and item.redolog_groups is defined and item.state|lower == 'present'
+  when:
+    - oracle_databases is defined
+    - item.redolog_size is defined
+    - item.redolog_groups is defined
+    - item.state | lower == 'present'
   become_user: "{{ oracle_user }}"
   loop_control:
     label: "port: {{ listener_port_template }} service: {{ db_service_name }} groups: {{ item.redolog_groups }} size: {{ item.redolog_size }}"
