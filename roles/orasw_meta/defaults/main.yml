@@ -243,6 +243,56 @@ oracle_home_gi: "{% if configure_cluster %}{{ oracle_home_gi_cl }}{% else %}{{ o
 oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid"  # ORACLE_HOME for Grid Infrastructure (Clustered)
 oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid"  # ORACLE_HOME for Grid Infrastructure (Stand Alone)
 
+disable_ee_options: true
+
+# Do not change _oracle_ee_opiton_dict. It is only used for internal purposes.
+_oracle_ee_opiton_dict:
+  '11.2.0.4': "{{ oracle_ee_options_112 }}"
+  '12.1.0.1': "{{ oracle_ee_options_121 }}"
+  '12.1.0.2': "{{ oracle_ee_options_121 }}"
+  '12.2.0.1': "{{ oracle_ee_options_122 }}"
+  '18.3.0.0': "{{ oracle_ee_options_183 }}"
+  '19.3.0.0': "{{ oracle_ee_options_193 }}"
+  '21.3.0.0': "{{ oracle_ee_options_213 }}"
+
+# disable all options who requires extra licences
+oracle_ee_options_112:
+  - {option: dm, state: false}
+  - {option: dv, state: false}
+  - {option: lbac, state: false}
+  - {option: olap, state: false}
+  - {option: partitioning, state: false}
+  - {option: rat, state: false}
+
+oracle_ee_options_121:
+  - {option: dm, state: false}
+  - {option: olap, state: false}
+  - {option: partitioning, state: false}
+  - {option: rat, state: false}
+
+oracle_ee_options_122:
+  - {option: oaa, state: false}
+  - {option: olap, state: false}
+  - {option: partitioning, state: false}
+  - {option: rat, state: false}
+
+oracle_ee_options_183:
+  - {option: oaa, state: false}
+  - {option: olap, state: false}
+  - {option: partitioning, state: false}
+  - {option: rat, state: false}
+
+oracle_ee_options_193:
+  - {option: oaa, state: false}
+  - {option: olap, state: false}
+  - {option: partitioning, state: false}
+  - {option: rat, state: false}
+
+oracle_ee_options_213:
+  - {option: oaa, state: false}
+  - {option: olap, state: false}
+  - {option: partitioning, state: false}
+  - {option: rat, state: false}
 
 # This is an example layout of a database installation
 oracle_databases:                                        # Dictionary describing the databases to be installed
@@ -320,10 +370,11 @@ oracle_pdbs:
       - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
 
 # DB
-default_dbpass: "{% if item is defined and item.oracle_db_passwd is defined %}{{ item.oracle_db_passwd }}
-                 {%- elif dbh is defined and dbh.oracle_db_passwd is defined %}{{ dbh.oracle_db_passwd }}
-                 {%- else %}Oracle123
+default_dbpass: "{% if item is defined and item.oracle_db_passwd is defined %}{{ item.oracle_db_passwd }}\
+                 {%- elif dbh is defined and dbh.oracle_db_passwd is defined %}{{ dbh.oracle_db_passwd }}\
+                 {%- else %}Oracle123\
                  {%- endif %}"
+
 dbpasswords:
   orcl:
     sys: Oracle_456

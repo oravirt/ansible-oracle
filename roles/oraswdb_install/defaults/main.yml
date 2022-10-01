@@ -16,11 +16,12 @@ oracle_stage_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ or
 oracle_rsp_stage: "{{ oracle_stage }}/rsp"
 oracle_inventory_loc: /u01/app/oraInventory
 oracle_base: /u01/app/oracle
-oracle_sw_extract_path: "{%- if '18' in db_version -%}
-                            {{ oracle_home_db }}
-                          {%- else -%}
-                              {{ oracle_stage }}/{{ item[0].version }}
+oracle_sw_extract_path: "{%- if '18' in db_version -%}\
+                            {{ oracle_home_db }}\
+                          {%- else -%}\
+                              {{ oracle_stage }}/{{ item[0].version }}\
                           {%- endif -%}"
+
 # oracle_home_db: "{% if dbh is defined %}
 #                    {%- if dbh.oracle_home is defined %}{{ dbh.oracle_home }}
 #                    {%- else %}{{ oracle_base}}/{{ dbh.oracle_version_db }}/{{ dbh.home }}
@@ -65,9 +66,16 @@ oracle_sw_source_local: /tmp  # Path to all software if using the copy module wh
 is_sw_source_local: true
 configure_cluster: false
 autostartup_service: false  # automatic startup/stop databases service
-hostinitdaemon: "{% if    ansible_os_family == 'RedHat' and ansible_distribution_major_version | int >= 7   %}systemd
-                  {%- elif ansible_os_family == 'Suse'   and ansible_distribution_major_version | int >= 12 %}systemd
-                  {%- else %}{% if ansible_service_mgr is defined %}{{ ansible_service_mgr }}{% else %}init{% endif %}{% endif %}"
+
+# highest versions with initd - all other using systemd
+_hostinitdaemon_dict:
+  RedHat:
+    version_highest: 6
+  Suse:
+    version_highest: 11
+
+# {{ ansible_facts['distribution_version'] is version('12.04', '>=') }}
+hostinitdaemon: "{% if ansible_distribution_major_version is version(_hostinitdaemon_dict[ansible_os_family], <=) %}init{% else %}systemd{% endif %}"
 
 forcechopt: false
 # choptcheck is a dummy for 'creates' during chopt-task to force an execution
@@ -81,54 +89,7 @@ ulimit_systemd_mapping:
   'hard stack': {name: LimitSTACK, sysctlfactor: 1024}
   'hard memlock': {name: LimitMEMLOCK, sysctlfactor: 1024}
 
-disable_ee_options: true
-
-oracle_ee_options: "{%- if   db_homes_config[dbh.home]['version'] in ('18.3.0.0') %}{{ oracle_ee_options_183 }}
-                    {%- elif db_homes_config[dbh.home]['version'] in ('19.3.0.0') %}{{ oracle_ee_options_193 }}
-                    {%- elif db_homes_config[dbh.home]['version'] in ('21.3.0.0') %}{{ oracle_ee_options_213 }}
-                    {%- elif db_homes_config[dbh.home]['version'] in ('12.2.0.1') %}{{ oracle_ee_options_122 }}
-                    {%- elif db_homes_config[dbh.home]['version'] in ('12.1.0.1', '12.1.0.2') %}{{ oracle_ee_options_121 }}
-                    {%- elif db_homes_config[dbh.home]['version'] == '11.2.0.4' %}{{ oracle_ee_options_112 }}
-                    {%- endif %}"
-
-# disable all options who requires extra licences
-oracle_ee_options_112:
-  - {option: dm, state: false}
-  - {option: dv, state: false}
-  - {option: lbac, state: false}
-  - {option: olap, state: false}
-  - {option: partitioning, state: false}
-  - {option: rat, state: false}
-
-oracle_ee_options_121:
-  - {option: dm, state: false}
-  - {option: olap, state: false}
-  - {option: partitioning, state: false}
-  - {option: rat, state: false}
-
-oracle_ee_options_122:
-  - {option: oaa, state: false}
-  - {option: olap, state: false}
-  - {option: partitioning, state: false}
-  - {option: rat, state: false}
-
-oracle_ee_options_183:
-  - {option: oaa, state: false}
-  - {option: olap, state: false}
-  - {option: partitioning, state: false}
-  - {option: rat, state: false}
-
-oracle_ee_options_193:
-  - {option: oaa, state: false}
-  - {option: olap, state: false}
-  - {option: partitioning, state: false}
-  - {option: rat, state: false}
-
-oracle_ee_options_213:
-  - {option: oaa, state: false}
-  - {option: olap, state: false}
-  - {option: partitioning, state: false}
-  - {option: rat, state: false}
+oracle_ee_options: "{{ _oracle_ee_opiton_dict[db_homes_config[dbh.home]['version']] }}"
 
 oracle_directories:
   - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
