@@ -1,6 +1,6 @@
 ---
 - name: Create services (db/cdb)
-  oracle_services:
+  opitzconsulting.ansible_oracle.oracle_services:
     name={{ item.1.name }}
     database_name={{ item.0.oracle_db_name }}
     pi={{ item.1.pi | default(omit) }}
@@ -22,14 +22,14 @@
       skip_missing: true
   when:
     - oracle_databases is defined
-    - item.0.state|lower == 'present'
+    - item.0.state | lower == 'present'
     - item.1 is defined
-    - (item.1.state|upper == 'PRESENT' or item.1.state | upper == 'STARTED')
+    - (item.1.state | upper == 'PRESENT' or item.1.state | upper == 'STARTED')
   become_user: "{{ oracle_user }}"
   tags: create_service,services
 
 - name: Create services (pdb)
-  oracle_services:
+  opitzconsulting.ansible_oracle.oracle_services:
     name={{ item.1.name }}
     database_name={{ item.0.cdb }}
     pi={{ item.1.pi | default(omit) }}
@@ -58,7 +58,7 @@
   tags: create_service,services
 
 - name: Start services (db/cdb)
-  oracle_services:
+  opitzconsulting.ansible_oracle.oracle_services:
     name={{ item.1.name }}
     database_name={{ item.0.oracle_db_name }}
     pdb={{ item.0.pdb_name | default(omit) }}
@@ -75,12 +75,16 @@
     - services
     - flags:
       skip_missing: true
-  when: oracle_databases is defined and item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'STARTED'
+  when:
+    - oracle_databases is defined
+    - item.0.state | lower == 'present'
+    - item.1 is defined
+    - item.1.state | upper == 'STARTED'
   become_user: "{{ oracle_user }}"
   tags: start_service,services
 
 - name: Start services (pdbs)
-  oracle_services:
+  opitzconsulting.ansible_oracle.oracle_services:
     name={{ item.1.name }}
     database_name={{ item.0.cdb }}
     pdb={{ item.0.pdb_name | default(omit) }}
@@ -97,12 +101,15 @@
     - services
     - flags:
       skip_missing: true
-  when: oracle_pdbs is defined and item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'STARTED'
+  when:
+    - oracle_pdbs is defined
+    - item.0.state | lower == 'present'
+    - item.1 is defined and item.1.state | upper == 'STARTED'
   become_user: "{{ oracle_user }}"
   tags: start_service,services
 
 - name: Stop services (db/cdb)
-  oracle_services:
+  opitzconsulting.ansible_oracle.oracle_services:
     name={{ item.1.name }}
     database_name={{ item.0.oracle_db_name }}
     pdb={{ item.0.pdb_name | default(omit) }}
@@ -121,13 +128,13 @@
       skip_missing: true
   when:
     - oracle_databases is defined
-    - item.0.state|lower == 'present'
-    - item.1 is defined and item.1.state|upper == 'STOPPED' or item.1.state|upper == 'ABSENT'
+    - item.0.state | lower == 'present'
+    - item.1 is defined and item.1.state | upper == 'STOPPED' or item.1.state | upper == 'ABSENT'
   become_user: "{{ oracle_user }}"
   tags: start_service,services
 
 - name: Stop services (pdbs)
-  oracle_services:
+  opitzconsulting.ansible_oracle.oracle_services:
     name={{ item.1.name }}
     database_name={{ item.0.cdb }}
     pdb={{ item.0.pdb_name | default(omit) }}
@@ -144,12 +151,16 @@
     - services
     - flags:
       skip_missing: true
-  when: oracle_pdbs is defined and item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'STOPPED' or item.1.state|upper == 'ABSENT'
+  when:
+    - oracle_pdbs is defined
+    - item.0.state | lower == 'present'
+    - item.1 is defined
+    - item.1.state | upper == 'STOPPED' or item.1.state | upper == 'ABSENT'
   become_user: "{{ oracle_user }}"
   tags: start_service,services
 
 - name: Remove services (db/cdb)
-  oracle_services:
+  opitzconsulting.ansible_oracle.oracle_services:
     name={{ item.1.name }}
     database_name={{ item.0.oracle_db_name }}
     pdb={{ item.0.pdb_name | default(omit) }}
@@ -166,12 +177,16 @@
     - services
     - flags:
       skip_missing: true
-  when: oracle_databases is defined and item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'ABSENT'
+  when:
+    - oracle_databases is defined
+    - item.0.state | lower == 'present'
+    - item.1 is defined
+    - item.1.state | upper == 'ABSENT'
   become_user: "{{ oracle_user }}"
   tags: start_service,services
 
 - name: Remove services (pdbs)
-  oracle_services:
+  opitzconsulting.ansible_oracle.oracle_services:
     name={{ item.1.name }}
     database_name={{ item.0.cdb }}
     pdb={{ item.0.pdb_name | default(omit) }}
@@ -188,6 +203,10 @@
     - services
     - flags:
       skip_missing: true
-  when: oracle_pdbs is defined and item.0.state|lower == 'present' and item.1 is defined and item.1.state|upper == 'ABSENT'
+  when:
+    - oracle_pdbs is defined
+    - item.0.state | lower == 'present'
+    - item.1 is defined
+    - item.1.state | upper == 'ABSENT'
   become_user: "{{ oracle_user }}"
   tags: start_service,services

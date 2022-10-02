@@ -18,6 +18,15 @@
     - always
     - assert
 
+- name: install_home_db | assert hostinitdaemon
+  ansible.builtin.assert:
+    fail_msg: the init-Daemon could not be defined from defaults/main.yml
+    that:
+      - _hostinitdaemon_dict[ansible_os_family]['version_highest'] is defined
+  tags:
+    - always
+    - assert
+
 - name: install_home_db | Mount nfs share with installation media
   ansible.builtin.include_role:
     name: orasw_meta
@@ -41,19 +50,25 @@
   with_items:
     - "{{ db_homes_installed }}"
   run_once: "{{ configure_cluster }}"
-  when: db_homes_installed is defined  and item.state|lower == 'present'
+  when:
+    - db_homes_installed is defined
+    - item.state|lower == 'present'
   tags:
     - directoriesdb
 
 - name: install_home_db | Create ORACLE_HOME directory
   ansible.builtin.file: dest={{ oracle_home_db }} mode=0775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
   with_items: "{{ db_homes_installed }}"
-  when: db_homes_config[item.home] is defined and item.state|lower == 'present'
+  when:
+    - db_homes_config[item.home] is defined
+    - item.state|lower == 'present'
   tags:
     - directoriesdb
 
 - ansible.builtin.include_tasks: "{{ www_download_bin }}.yml"
-  when: not is_sw_source_local and oracle_sw_copy
+  when:
+    - not is_sw_source_local
+    - oracle_sw_copy
 
 - name: install_home_db | Transfer oracle installfiles to server (local)
   ansible.builtin.copy:
@@ -67,7 +82,11 @@
   become: true
   become_user: "{{ oracle_user }}"
   run_once: "{{ configure_cluster }}"
-  when: item[0].version == db_homes_config[item[1].home]['version'] and item[1].state|lower == 'present' and is_sw_source_local and oracle_sw_copy
+  when:
+    - item[0].version == db_homes_config[item[1].home]['version']
+    - item[1].state|lower == 'present'
+    - is_sw_source_local
+    - oracle_sw_copy
   tags:
     - oradbsw
 
@@ -76,7 +95,9 @@
     - "{{ db_homes_installed }}"
   loop_control:
     loop_var: dbh
-  when: db_homes_installed is defined and dbh.state|lower == 'present'
+  when:
+    - db_homes_installed is defined
+    - dbh.state | lower == 'present'
   tags: oradbinstall,dbchopt
 
 - name: install_home_db | Unmount nfs share with installation media

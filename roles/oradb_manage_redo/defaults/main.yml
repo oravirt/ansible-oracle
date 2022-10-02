@@ -4,19 +4,19 @@ oracle_base: /u01/app/oracle
 db_user: system
 db_mode: normal
 
-db_service_name: "{% if item is defined %}
-                    {%- if item.oracle_db_unique_name is defined %}{{ item.oracle_db_unique_name }}
-                    {%- elif item.oracle_db_instance_name is defined %}{{ item.oracle_db_instance_name }}
-                    {%- else %}{{ item.oracle_db_name }}
-                    {%- endif %}
+db_service_name: "{% if item is defined %}\
+                    {%- if item.oracle_db_unique_name is defined %}{{ item.oracle_db_unique_name }}\
+                    {%- elif item.oracle_db_instance_name is defined %}{{ item.oracle_db_instance_name }}\
+                    {%- else %}{{ item.oracle_db_name }}\
+                    {%- endif %}\
                   {%- endif %}"
 
 listener_port_template: "{% if item.listener_port is defined %}{{ item.listener_port }}{% else %}{{ listener_port }}{% endif %}"
 listener_port: 1521
 
-db_password_cdb: "{% if dbpasswords is defined and dbpasswords[item.oracle_db_name] is defined and dbpasswords[item.oracle_db_name][db_user] is defined %}{{ dbpasswords[item.oracle_db_name][db_user] }}
-                  {%- else %}{{ default_dbpass }}
-                  {%- endif%}"
+db_password_cdb: "{% if dbpasswords is defined and dbpasswords[item.oracle_db_name] is defined and dbpasswords[item.oracle_db_name][db_user] is defined %}{{ dbpasswords[item.oracle_db_name][db_user] }}\
+                  {%- else %}{{ default_dbpass }}\
+                  {%- endif %}"
 # noqa yaml
 
 oracle_env:

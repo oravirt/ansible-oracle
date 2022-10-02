@@ -11,7 +11,7 @@
   become_user: "{{ grid_install_user }}"
   tags:
     - oragridswunpack
-  when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi  == item.version and oracle_sw_copy and oracle_sw_unpack
+  when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and oracle_sw_copy and oracle_sw_unpack
 
 - name: install_home_gi | Extract files to stage-area (GI) (from remote location)
   ansible.builtin.unarchive:
@@ -119,7 +119,7 @@
   run_once: "{{ configure_cluster }}"
   tags:
     - responsefileconfigtool
-  when: run_configtoolallcommand  and oracle_home_gi not in checkgiinstall.stdout
+  when: run_configtoolallcommand and oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Run configToolAllCommands
   ansible.builtin.shell: "{{ oracle_home_gi }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_rsp_stage }}/configtoolallcommands.rsp"

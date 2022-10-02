@@ -7,22 +7,21 @@
       - "ansible_version.full is version('2.8', '>=')"
 
 - name: Install EPEL Repo
-  block:
-    - name: Install GPG Key for EPEL
-      ansible.builtin.rpm_key:
-        state: present
-        key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_distribution_major_version  }}
-
-    - name: Add EPEL Repo
-      ansible.builtin.yum:
-        name: "{{ epel_rpm }}"
-        state: installed
-
   when:
     - configure_epel_repo
     - ansible_os_family == 'RedHat'
   tags:
     - epelrepo
+  block:
+    - name: Install GPG Key for EPEL
+      ansible.builtin.rpm_key:
+        state: present
+        key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_distribution_major_version }}
+
+    - name: Add EPEL Repo
+      ansible.builtin.yum:
+        name: "{{ epel_rpm }}"
+        state: installed
 
 # Do not use the old public-yum.repo on OL7 after January 2019 anymore
 # Check for /usr/bin/ol_yum_configure.sh in newer systems

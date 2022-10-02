@@ -2,10 +2,10 @@
 
 - name: gi_opatch | Extract GI psu files to patch base
   ansible.builtin.unarchive:
-    src={{ oracle_stage }}/{{ item[0].filename }}
-    dest={{ oracle_patch_stage }}/{{ oracle_install_version_gi }}
-    creates={{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item[0].creates | default (omit) }}
-    copy=no
+    src: "{{ oracle_stage }}/{{ item[0].filename }}"
+    dest: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}"
+    creates: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item[0].creates | default(omit) }}"
+    copy: false
   become: true
   become_user: "{{ grid_install_user }}"
   with_nested:
@@ -23,10 +23,10 @@
 
 - name: gi_opatch | Extract GI psu files to patch base (from remote location)
   ansible.builtin.unarchive:
-    src={{ oracle_stage_remote }}/{{ item.0.filename }}
-    dest={{ oracle_patch_stage }}/{{ oracle_install_version_gi }}
-    creates={{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item[0].creates | default (omit) }}
-    copy=no
+    src: "{{ oracle_stage_remote }}/{{ item.0.filename }}"
+    dest: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}"
+    creates: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item[0].creates | default(omit) }}"
+    copy: false
   become: true
   become_user: "{{ grid_install_user }}"
   with_nested:

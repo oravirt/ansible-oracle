@@ -1,9 +1,9 @@
 ---
 - ansible.builtin.set_fact:  # noqa unnamed-task
-    oracle_home_db: "{%- if db_homes_config[dbh.home]['oracle_home'] is defined  -%}
-                        {{ db_homes_config[dbh.home]['oracle_home'] }}
-                    {%- else -%}
-                          {{ oracle_base }}/{{ db_homes_config[dbh.home]['version'] }}/{{ db_homes_config[dbh.home]['home'] }}
+    oracle_home_db: "{%- if db_homes_config[dbh.home]['oracle_home'] is defined -%}\
+                        {{ db_homes_config[dbh.home]['oracle_home'] }}\
+                    {%- else -%}\
+                          {{ oracle_base }}/{{ db_homes_config[dbh.home]['version'] }}/{{ db_homes_config[dbh.home]['home'] }}\
                     {%- endif -%}"
 
 - ansible.builtin.debug: msg="Managing patches for {{ oracle_home_db }}"
@@ -42,18 +42,18 @@
     - ocmconfig
 
 - name: db_opatch | Remove unwanted patches from DB
-  oracle_opatch:
-    oracle_home={{ oracle_home_db }}
-    patch_base={{ oracle_patch_install }}/{{ db_version }}/{{ item.path | default (item.patchid) }}/
-    patch_id={{ item.patchid }}
-    patch_version={{ item.patchversion | default(omit) }}
-    exclude_upi={{ item.excludeUPI | default(omit) }}
-    opatchauto=False
-    conflict_check=True
-    stop_processes={{ item.stop_processes | default(False) }}
-    ocm_response_file={{ ocm_response_file | default(omit) }}
-    output=verbose
-    state={{ item.state }}
+  opitzconsulting.ansible_oracle.oracle_opatch:
+    oracle_home: "{{ oracle_home_db }}"
+    patch_base: "{{ oracle_patch_install }}/{{ db_version }}/{{ item.path | default(item.patchid) }}/"
+    patch_id: "{{ item.patchid }}"
+    patch_version: "{{ item.patchversion | default(omit) }}"
+    exclude_upi: "{{ item.excludeUPI | default(omit) }}"
+    opatchauto: false
+    conflict_check: true
+    stop_processes: "{{ item.stop_processes | default(False) }}"
+    ocm_response_file: "{{ ocm_response_file | default(omit) }}"
+    output: verbose
+    state: "{{ item.state }}"
   with_items:
     - "{{ db_homes_config[dbh.home]['opatch'] }}"
   become: true
@@ -67,7 +67,7 @@
   register: psuapplym
 
 - name: db_opatch | Manage opatchauto patches for DB (non-gi)
-  oracle_opatch:
+  opitzconsulting.ansible_oracle.oracle_opatch:
     oracle_home={{ oracle_home_db }}
     patch_base={{ oracle_patch_install }}/{{ db_version }}/{{ item.0.path | default (item.0.patchid) }}/{{ item.1 }}
     patch_id={{ item.1 }}
@@ -91,16 +91,16 @@
   register: psuapplym
 
 - name: db_opatch | Manage opatchauto patches for DB (gi)
-  oracle_opatch:
-    oracle_home={{ oracle_home_db }}
-    patch_base={{ oracle_patch_install }}/{{ db_version }}/{{ item.path | default (item.patchid) }}/
-    patch_id={{ item.patchid }}
-    patch_version={{ item.patchversion | default(omit) }}
-    opatchauto=True
-    conflict_check=True
-    ocm_response_file={{ ocm_response_file | default(omit) }}
-    output=verbose
-    state={{ item.state }}
+  opitzconsulting.ansible_oracle.oracle_opatch:
+    oracle_home: "{{ oracle_home_db }}"
+    patch_base: "{{ oracle_patch_install }}/{{ db_version }}/{{ item.path | default(item.patchid) }}/"
+    patch_id: "{{ item.patchid }}"
+    patch_version: "{{ item.patchversion | default(omit) }}"
+    opatchauto: true
+    conflict_check: true
+    ocm_response_file: "{{ ocm_response_file | default(omit) }}"
+    output: verbose
+    state: "{{ item.state }}"
   with_items:
     - "{{ db_homes_config[dbh.home]['opatchauto'] }}"
   # run_once: "{{ configure_cluster}}"
@@ -111,18 +111,18 @@
   register: psuapplym
 
 - name: db_opatch | Manage patches for DB
-  oracle_opatch:
-    oracle_home={{ oracle_home_db }}
-    patch_base={{ oracle_patch_install }}/{{ db_version }}/{{ item.path | default (item.patchid) }}/
-    patch_id={{ item.patchid }}
-    patch_version={{ item.patchversion | default(omit) }}
-    exclude_upi={{ item.excludeUPI | default(omit) }}
-    opatchauto=False
-    conflict_check=True
-    stop_processes={{ item.stop_processes | default(False) }}
-    ocm_response_file={{ ocm_response_file | default(omit) }}
-    output=verbose
-    state={{ item.state }}
+  opitzconsulting.ansible_oracle.oracle_opatch:
+    oracle_home: "{{ oracle_home_db }}"
+    patch_base: "{{ oracle_patch_install }}/{{ db_version }}/{{ item.path | default(item.patchid) }}/"
+    patch_id: "{{ item.patchid }}"
+    patch_version: "{{ item.patchversion | default(omit) }}"
+    exclude_upi: "{{ item.excludeUPI | default(omit) }}"
+    opatchauto: false
+    conflict_check: true
+    stop_processes: "{{ item.stop_processes | default(False) }}"
+    ocm_response_file: "{{ ocm_response_file | default(omit) }}"
+    output: verbose
+    state: "{{ item.state }}"
   with_items:
     - "{{ db_homes_config[dbh.home]['opatch'] }}"
   # run_once: "{{ configure_cluster }}"

@@ -1,7 +1,7 @@
 ---
 # tasks file for manage-db-users
 - name: Manage roles (cdb)
-  oracle_role:
+  opitzconsulting.ansible_oracle.oracle_role:
     role={{ item.1.name }}
     state={{ item.1.state }}
     hostname={{ ansible_hostname }}
@@ -16,7 +16,10 @@
     - flags:
       skip_missing: true
   environment: "{{ oracle_env }}"
-  when: oracle_databases is defined and item.0.state|lower == 'present' and item.1 is defined
+  when:
+    - oracle_databases is defined
+    - item.0.state | lower == 'present'
+    - item.1 is defined
   loop_control:
     label: "port: {{ listener_port_template }}, service: {{ db_service_name }}, role: {{ item.1.name }}, state: {{ item.1.state }}"
   run_once: "{{ configure_cluster }}"
@@ -24,7 +27,7 @@
   tags: users,grants
 
 - name: Manage roles (pdb)
-  oracle_role:
+  opitzconsulting.ansible_oracle.oracle_role:
     role={{ item.1.name }}
     state={{ item.1.state }}
     hostname={{ ansible_hostname }}
@@ -39,7 +42,11 @@
     - flags:
       skip_missing: true
   environment: "{{ oracle_env }}"
-  when: oracle_pdbs is defined and item.0 is defined and item.0.state|lower == 'present' and item.1 is defined
+  when:
+    - oracle_pdbs is defined
+    - item.0 is defined
+    - item.0.state | lower == 'present'
+    - item.1 is defined
   loop_control:
     label: "port: {{ listener_port_template }}, service: {{ item.0.pdb_name }}, role: {{ item.1.name }}, state: {{ item.1.state }}"
   run_once: "{{ configure_cluster }}"

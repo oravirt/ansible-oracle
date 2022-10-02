@@ -3,18 +3,16 @@ configure_cluster: false
 oracle_base: /u01/app/oracle
 oracle_user: oracle
 db_user: sys
-db_password_cdb: "{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name] is defined and dbpasswords[item.0.oracle_db_name][db_user] is defined%}{{ dbpasswords[item.0.oracle_db_name][db_user] }}
-                  {%- else %}{{ default_dbpass }}
+db_password_cdb: "{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name] is defined and dbpasswords[item.0.oracle_db_name][db_user] is defined%}{{ dbpasswords[item.0.oracle_db_name][db_user] }}\
+                  {%- else %}{{ default_dbpass }}\
                   {%- endif %}"
-# noqa yaml
 
 db_mode: sysdba
 
 pdbadmin_user: pdbadmin
-pdbadmin_password: "{% if dbpasswords is defined and dbpasswords[item[1].cdb] is defined and dbpasswords[item[1].cdb][item[1].pdb_name] is defined and dbpasswords[item[1].cdb][item[1].pdb_name][pdbadmin_user] is defined%}{{ dbpasswords[item[1].cdb][item[1].pdb_name][pdbadmin_user] }}
-                    {%- else %}{{ default_dbpass }}
-                    {%- endif%}"
-# noqa yaml
+pdbadmin_password: "{% if dbpasswords is defined and dbpasswords[item[1].cdb] is defined and dbpasswords[item[1].cdb][item[1].pdb_name] is defined and dbpasswords[item[1].cdb][item[1].pdb_name][pdbadmin_user] is defined %}{{ dbpasswords[item[1].cdb][item[1].pdb_name][pdbadmin_user] }}\
+                    {%- else %}{{ default_dbpass }}\
+                    {%- endif %}"
 
 listener_port_template: "{% if item.0.listener_port is defined %}{{ item.0.listener_port }}{% else %}{{ listener_port }}{% endif %}"
 listener_port: 1521
