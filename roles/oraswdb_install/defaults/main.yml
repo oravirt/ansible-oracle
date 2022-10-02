@@ -75,7 +75,7 @@ _hostinitdaemon_dict:
     version_highest: 11
 
 # {{ ansible_facts['distribution_version'] is version('12.04', '>=') }}
-hostinitdaemon: "{% if ansible_distribution_major_version is version(_hostinitdaemon_dict[ansible_os_family], <=) %}init{% else %}systemd{% endif %}"
+hostinitdaemon: "{% if ansible_distribution_major_version is version(_hostinitdaemon_dict[ansible_os_family]['version_highest'], '<=') %}init{% else %}systemd{% endif %}"
 
 forcechopt: false
 # choptcheck is a dummy for 'creates' during chopt-task to force an execution

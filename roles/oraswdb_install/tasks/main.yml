@@ -18,6 +18,15 @@
     - always
     - assert
 
+- name: install_home_db | assert hostinitdaemon
+  ansible.builtin.assert:
+    fail_msg: the init-Daemon could not be defined from defaults/main.yml
+    that:
+      - _hostinitdaemon_dict[ansible_os_family]['version_highest'] is defined
+  tags:
+    - always
+    - assert
+
 - name: install_home_db | Mount nfs share with installation media
   ansible.builtin.include_role:
     name: orasw_meta
