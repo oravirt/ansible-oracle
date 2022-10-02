@@ -64,7 +64,7 @@ cd vagrant/dbfs
 VAGRANT_EXPERIMENTAL=disks vagrant up
 ----
 
-IMPORTANT: Copy `LINUX.X64_190000_db_home.zip` into `/tmp` on Vagrantbox
+IMPORTANT: Copy `LINUX.X64_193000_grid_home.zip` into `/vagrant` in same directory as the Vagrantfile.
 
 
 #### Start Playbook
@@ -75,6 +75,42 @@ The `playbook/os_vagrant.yml` fixes that.
 .execute playbook
 ----
 ansible-playbook -e hostgroup=all -i inventory/dbfs/hosts.yml playbooks/os_vagrant.yml playbooks/single-instance-fs.yml 
+----
+
+### Single Instance with Oracle Restart (HAS) in Vagrantbox
+
+
+#### Vagrantbox for Database Server
+
+Requirements::
+8500 MB RAM: +
+20 GB Diskspace:
+
+The Inventory from has expects a 2nd disk at `/dev/sdb`.
+See `host_fs_layout` as example.
+
+The Vagrantfile is in `vagrant/has` of `ansible-oracle`.
+
+IMPORTANT: The `VAGRANT_EXPERIMENTAL=disks` is very important.
+It adds the 2nd disk for LVM and 2 ASM-Disks to the VM during the startup.
+
+.Start Vagrantbox
+----
+cd vagrant/has
+VAGRANT_EXPERIMENTAL=disks vagrant up
+----
+
+IMPORTANT: Copy `LINUX.X64_193000_grid_home.zip` and `LINUX.X64_190000_db_home.zip` into `/vagrant` in same directory as the Vagrantfile.
+
+
+#### Start Playbook
+
+IMPORTANT: The used Vagrantbox does not configure the `/etc/hosts` for Oracle correctly.
+The `playbook/os_vagrant.yml` fixes that. +
+
+.execute playbook
+----
+ansible-playbook -e hostgroup=all -i inventory/has/hosts.yml playbooks/os_vagrant.yml playbooks/single-instance-asm.yml 
 ----
 
 = Roles

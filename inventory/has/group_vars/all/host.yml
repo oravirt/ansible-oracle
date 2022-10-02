@@ -1,0 +1,28 @@
+---
+configure_public_yum_repo: false
+configure_motd: false
+
+configure_hugepages_by: memory
+
+# disable hugepages on small systems
+# don't forget to enable use_large_pages in oracle parameter
+# size_in_gb_hugepages: 2
+size_in_gb_hugepages: 0
+
+
+configure_host_disks: true
+
+host_fs_layout:
+  - vgname: vgora
+    state: present
+    filesystem:
+      - {mntp: /u01, lvname: orabaselv, lvsize: 40G, fstype: xfs}
+      - {mntp: swap, lvname: swaplv, lvsize: 16g, fstype: swap}
+    disk:
+      - {device: /dev/sdb, pvname: /dev/sdb1}
+  - vgname: rootvg
+    state: present
+    filesystem:
+      - {mntp: /tmp, lvname: tmplv, lvsize: 1200m, fstype: ext4}
+    disk:
+      - {device: /dev/sda, pvname: /dev/sda2}
