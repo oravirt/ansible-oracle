@@ -66,6 +66,20 @@ listener_home: "{%- if lsnrinst is defined -%}\
                   {%- endif -%}\
                 {%- endif -%}"
 
+listener_home_config: "{%- if lsnrinst is defined -%}\
+                  {%- if db_homes_config[lsnrinst.home]['readonly_home'] | default(false) -%}{{ oracle_base }}/homes/{{ db_homes_config[lsnrinst.home]['oracle_home_name'] }}\
+                  {%- else -%}{{ listener_home }}\
+                  {%- endif -%}\
+                {%- elif tnsinst is defined -%}\
+                  {%- if db_homes_config[tnsinst.home]['readonly_home'] | default(false) -%}{{ oracle_base }}/homes/{{ db_homes_config[tnsinst.home]['oracle_home_name'] }}\
+                  {%- else -%}{{ listener_home }}\
+                  {%- endif -%}\
+                {%- elif sqlnetinst is defined -%}\
+                  {%- if db_homes_config[sqlnetinst.home]['readonly_home'] | default(false) -%}{{ oracle_base }}/homes/{{ db_homes_config[sqlnetinst.home]['oracle_home_name'] }}\
+                  {%- else -%}{{ listener_home }}\
+                  {%- endif -%}\
+                {%- endif -%}"
+
 oracle_env_lsnrctl:
   ORACLE_BASE: "{{ oracle_base }}"
   ORACLE_HOME: "{{ listener_home }}"

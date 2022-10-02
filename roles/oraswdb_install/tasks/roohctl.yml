@@ -1,0 +1,31 @@
+---
+# we need a known value for ORACLE_HOME_NAME for later usage in ansible-oracle
+- name: install_home_db | Check Inventory for enabled readonly home
+  ansible.builtin.assert:
+    fail_msg: Missing oracle_home_name key in db_homes_config for enabled readonly_home
+    that:
+      - db_homes_config[dbh.home]['oracle_home_name'] is defined
+  when:
+    - db_homes_config[dbh.home]['readonly_home'] | default(false)
+
+- name: install_home_db | Configure Read Only Oracle Home
+  ansible.builtin.command: "{{ oracle_home_db }}/bin/roohctl {% if db_homes_config[dbh.home]['readonly_home'] | default(false) %}-enable{% else %}-disable{% endif %}"
+  become: true
+  become_user: "{{ oracle_user }}"
+  run_once: "{{ configure_cluster }}"
+  when:
+    - oracle_home_db not in existing_dbhome.stdout_lines
+  tags:
+    - roohctl
+  register: roohctl
+  failed_when: roohctl.rc not in [0]
+
+- ansible.builtin.debug: var=roohctl.stdout_lines
+  # noqa unnamed-task ignore-errors
+  run_once: "{{ configure_cluster }}"
+  when:
+    - oracle_home_db not in existing_dbhome.stdout_lines
+    - roohctl.changed
+  tags:
+    - roohctl
+  ignore_errors: true
