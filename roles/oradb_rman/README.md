@@ -69,9 +69,17 @@ Cronjobs are only created when day, weekday, hour and minute are defined.
 
 * rman_retention_policy
 
-  This could be used to overwrite the global default of `rman_retention_policy`at database level.
+  This could be used to overwrite the global default of `rman_retention_policy` at database level.
 
-* 
+## Using RMAN Catalog
+
+It is possible to configure rman jobs to use RMAN Catalog. In order to achieve this, you need to specify following attributes
+at your `oracle_databases` database block:
+* `rman_tnsalias` - tnsnames alias for RMAN Catalog database (has to be a tnsnames alias present in database home)
+* `rman_user` - username for the catalog database
+* `rman_password` - [deprecated] password for the catalog database. Use `dbpasswords[rman_tnsalias][rman_user]` instead.
+* `rman_wallet` (optionally) - when set to true, this role will configure Oracle Wallet for RMAN not to include plaintext password in crontab file.
+
 ## Example
 
 The backup is configured in oracle_databases with rman_jobs:
@@ -80,7 +88,9 @@ The backup is configured in oracle_databases with rman_jobs:
   oracle_databases:
     - home: db_home1
       oracle_db_name: TEST
-
+      # rman_tnsalias: RCAT
+      # rman_user: rman
+      # rman_wallet: true
       rman_jobs:
          - name: parameter
          - name: archivelog
