@@ -23,7 +23,12 @@
   tags: os_packages, oscheck
 
 - name: Install packages required by Oracle on SLES
-  ansible.builtin.zypper: name={{ oracle_packages_sles }} state=installed
+  ansible.builtin.zypper:
+    name: "{{ oracle_packages_sles
+            | default(oracle_packages_sles_multi['v' + ansible_distribution_version])
+            | default(oracle_packages_sles_multi['v' + ansible_distribution_major_version])
+            | default(oracle_packages_sles_multi['fallback']) }}"
+    state: installed
   when: install_os_packages and ansible_os_family == 'Suse'
   tags: os_packages, oscheck
 
