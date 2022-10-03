@@ -96,3 +96,67 @@ releases:
     - 98-opatch.yaml
     - 99-collection.yaml
     release_date: '2022-09-13'
+  3.1.0:
+    changes:
+      bugfixes:
+      - 'ansible-lint: removed name[play] from execptions (#272)'
+      - fix for oracle_packages with SLES 15 and 15.3 (#282)
+      - fixed/fully implemented rman catalog support in oradb_rman (#278)
+      - fixes transparent huge pages handling for SLES 15.x (#282)
+      - 'github actions: ansible-lint: removed args due to deprecation warning (#270)'
+      - 'oradb_manage_db: Bugfix listener.ora for multiple Instances on 1 host (#275)'
+      - 'oradb_manage_db: add missing netca.rsp.19.3.0.0.j2 (#267)'
+      - 'oradb_manage_db: new defaults for role (#268)'
+      - 'orahost: new defaults for role (#268)'
+      - 'orahost_ssh: added block with configure_cluster check (#271)'
+      - 'orahost_storage: add --script to parted (#264)'
+      - 'orasw_meta: added tasks/mount_stage_remote.yml (#269)'
+      - 'orasw_meta: added tasks/umount_stage_remote.yml (#269)'
+      - 'orasw_meta: new defaults for role (#268)'
+      - 'requirements.yml: removed ansible-oracle due to loop in ansible-lint (#270)'
+      minor_changes:
+      - Development helper install_collection.sh (#279)
+      - READMEs rewritten (#268)
+      - Support of Read-Only ORACLE_HOMEs (#273)
+      - 'ansible-lint: Move to  v6.6.1 (#277)'
+      - 'ansible-lint: linting and github actions for playbooks and inventory (#270)'
+      - 'ansible-lint: removed disabled rules for v6.6.1 (#280)'
+      - 'github Actions: check antsibull changelog files (#276)'
+      - 'github actions: antsibull-changelog removed obsolete branches (#270)'
+      - 'inventory: New Inventory for has (#272)'
+      - 'inventory: replaced old example inventory (#268)'
+      - new playbooks for future inventory (#268)
+      - using ansible in docker container (#268)
+      - 'vagrant: Vagrantfile for dbfs & has (#272)'
+      release_summary: The switch to ansible-lint 0.6.1 introduced a lto of changes
+        in 3.1.0. Hopefully nothing brokes by that.
+      removed_features:
+      - desupported leftover racattackl-install.yml (#272)
+      security_fixes:
+      - 'orahost: fix permissions for sudoers (#263)'
+      - 'orahost: security: changed default for configure_oracle_sudo to false (#263)'
+    fragments:
+    - 263-sudo.yml
+    - 263-sudoers.yml
+    - 264-parted.yml
+    - 267-netca.yml
+    - 268-ansible-docker.yml
+    - 268-defaults.yml
+    - 268-documentation.yml
+    - 268-inventory.yml
+    - 268-playbooks.yml
+    - 269-nfs-stage.yml
+    - 270-ansible-lint.yml
+    - 271-ssh.yml
+    - 272-vagrant.yml
+    - 273-readonly-homes.yml
+    - 274-listener_details.yml
+    - 276-github-actions.yml
+    - 277-ansible-lint.yml
+    - 278-oradb_rman-catalog.yml
+    - 279-install_collection.yml
+    - 280-ansible-lint.yml
+    - 281-release31.yml
+    - 282-sles_hugepages.yml
+    - 282-sles_packages.yml
+    release_date: '2022-10-03'

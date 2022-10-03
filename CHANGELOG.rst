@@ -5,6 +5,61 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.1.0
+======
+
+Release Summary
+---------------
+
+The switch to ansible-lint 0.6.1 introduced a lto of changes in 3.1.0. Hopefully nothing brokes by that.
+
+Minor Changes
+-------------
+
+- Development helper install_collection.sh (#279)
+- READMEs rewritten (#268)
+- Support of Read-Only ORACLE_HOMEs (#273)
+- ansible-lint: Move to  v6.6.1 (#277)
+- ansible-lint: linting and github actions for playbooks and inventory (#270)
+- ansible-lint: removed disabled rules for v6.6.1 (#280)
+- github Actions: check antsibull changelog files (#276)
+- github actions: antsibull-changelog removed obsolete branches (#270)
+- inventory: New Inventory for has (#272)
+- inventory: replaced old example inventory (#268)
+- new playbooks for future inventory (#268)
+- using ansible in docker container (#268)
+- vagrant: Vagrantfile for dbfs & has (#272)
+
+Removed Features (previously deprecated)
+----------------------------------------
+
+- desupported leftover racattackl-install.yml (#272)
+
+Security Fixes
+--------------
+
+- orahost: fix permissions for sudoers (#263)
+- orahost: security: changed default for configure_oracle_sudo to false (#263)
+
+Bugfixes
+--------
+
+- ansible-lint: removed name[play] from execptions (#272)
+- fix for oracle_packages with SLES 15 and 15.3 (#282)
+- fixed/fully implemented rman catalog support in oradb_rman (#278)
+- fixes transparent huge pages handling for SLES 15.x (#282)
+- github actions: ansible-lint: removed args due to deprecation warning (#270)
+- oradb_manage_db: Bugfix listener.ora for multiple Instances on 1 host (#275)
+- oradb_manage_db: add missing netca.rsp.19.3.0.0.j2 (#267)
+- oradb_manage_db: new defaults for role (#268)
+- orahost: new defaults for role (#268)
+- orahost_ssh: added block with configure_cluster check (#271)
+- orahost_storage: add --script to parted (#264)
+- orasw_meta: added tasks/mount_stage_remote.yml (#269)
+- orasw_meta: added tasks/umount_stage_remote.yml (#269)
+- orasw_meta: new defaults for role (#268)
+- requirements.yml: removed ansible-oracle due to loop in ansible-lint (#270)
+
 v3.0.0
 ======
 
