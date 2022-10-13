@@ -67,6 +67,7 @@
   when: disable_selinux and ansible_os_family == 'RedHat'
   tags: selinux
   register: selinux
+  failed_when: selinux.msg | default('ok', True) is not search('(^ok$|libselinux-python|(SELinux state changed))')
 
 - name: Disable selinux (runtime)  # noqa command-instead-of-shell
   ansible.builtin.shell: setenforce 0
