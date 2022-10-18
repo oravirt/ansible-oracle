@@ -245,7 +245,7 @@ def run_sql(sql, username, password, pdb):
         if timeout > 0:
             t = Timer(timeout, kill_process)
             t.start()
-        [sout, serr] = sql_process.communicate(input = sql_cmd)
+        [sout, serr] = sql_process.communicate(input = sql_cmd.encode())
     except Exception as e:
         err_msg += 'Could not call sqlplus. %s. called: %s.' % (to_native(e), " ".join(sqlplus()))
         return "[ERR]"
@@ -256,13 +256,13 @@ def run_sql(sql, username, password, pdb):
         err_msg += "called: %s\nreturncode: %d\nresult: %s. stderr = %s." % (sql_cmd, sql_process.returncode, sout, serr)
         return "[ERR]"
     sqlerr_pat = re.compile("^(ORA|TNS|SP2)-[0-9]+", re.MULTILINE)
-    sqlplus_err = sqlerr_pat.search(sout)
+    sqlplus_err = sqlerr_pat.search(sout.decode())
     if sqlplus_err:
         err_msg += "[ERR] sqlplus: %s\nERR Code: %s.\n" % (sql_cmd, sqlplus_err.group())
         return "[ERR]\n%s\n" % sout.strip()
 
     changed = True
-    return sout.strip()
+    return sout.decode().strip()
 
 
 def check_creates_sql(sql, scope):
