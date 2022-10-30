@@ -1,24 +1,24 @@
 ---
 - name: gi_opatch | Check current opatch version
   opitzconsulting.ansible_oracle.oracle_opatch:
-    oracle_home={{ oracle_home_gi }}
-    state=opatchversion
+    oracle_home: "{{ oracle_home_gi }}"
+    state: opatchversion
   register: current_opatch_version
   tags: current_opatch_version
   when: gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined
 
-- ansible.builtin.debug: var=current_opatch_version.msg
-  # noqa name[missing]
+- ansible.builtin.debug:  # noqa name[missing]
+    var: current_opatch_version.msg
   tags: current_opatch_version
   when: gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined
 
 - name: gi_opatch | Extract OPatch to GI Home
   ansible.builtin.unarchive:
-    src={{ oracle_stage }}/{{ item.filename }}
-    dest={{ oracle_home_gi }}
-    copy=no
-    owner={{ grid_install_user }}
-    group={{ oracle_group }}
+    src: "{{ oracle_stage }}/{{ item.filename }}"
+    dest: "{{ oracle_home_gi }}"
+    copy: false
+    owner: "{{ grid_install_user }}"
+    group: "{{ oracle_group }}"
   become: true
   with_items: "{{ oracle_opatch_patch }}"
   when:
@@ -34,11 +34,11 @@
 
 - name: gi_opatch | Extract OPatch to GI Home (from remote location)
   ansible.builtin.unarchive:
-    src={{ oracle_stage_remote }}/{{ item.filename }}
-    dest={{ oracle_home_gi }}
-    copy=no
-    owner={{ grid_install_user }}
-    group={{ oracle_group }}
+    src: "{{ oracle_stage_remote }}/{{ item.filename }}"
+    dest: "{{ oracle_home_gi }}"
+    copy: false
+    owner: "{{ grid_install_user }}"
+    group: "{{ oracle_group }}"
   become: true
   with_items: "{{ oracle_opatch_patch }}"
   when:
@@ -54,8 +54,8 @@
 
 - name: gi_opatch | Check current opatch version
   opitzconsulting.ansible_oracle.oracle_opatch:
-    oracle_home={{ oracle_home_gi }}
-    state=opatchversion
+    oracle_home: "{{ oracle_home_gi }}"
+    state: opatchversion
   register: current_opatch_version
   tags: current_opatch_version
   when:
@@ -63,7 +63,7 @@
     - gi_patches[oracle_install_version_gi] is defined
     - gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined
 
-- ansible.builtin.debug: var=current_opatch_version.msg
-  # noqa name[missing] no-handler
+- ansible.builtin.debug:  # noqa name[missing] no-handler
+    var: current_opatch_version.msg
   tags: current_opatch_version
   when: current_opatch_version.changed
