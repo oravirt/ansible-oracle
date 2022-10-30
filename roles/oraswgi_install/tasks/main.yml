@@ -9,7 +9,8 @@
   register: checkgiinstall
 
 - name: install_home_gi | check if GI has been configured
-  ansible.builtin.stat: path=/etc/oracle/olr.loc
+  ansible.builtin.stat:
+    path: /etc/oracle/olr.loc
   register: olrloc
 
 - name: install_home_gi | set fact for patch_before_rootsh
@@ -28,23 +29,33 @@
 
 - name: install_home_gi | Add new dotprofile (GI)
   ansible.builtin.template:
-    src=dotprofile-gi.j2
-    dest={{ grid_user_home }}/{{ oracle_profile_name_gi }}
-    owner={{ grid_install_user }}
-    group={{ oracle_group }}
-    mode=0755
-    backup=yes
+    src: dotprofile-gi.j2
+    dest: "{{ grid_user_home }}/{{ oracle_profile_name_gi }}"
+    owner: "{{ grid_install_user }}"
+    group: "{{ oracle_group }}"
+    mode: "0755"
+    backup: true
   tags:
     - dotprofilegi
 
 - name: install_home_gi | Create common directories
-  ansible.builtin.file: dest={{ item.name }} mode={{ item.mode }} owner={{ item.owner }} group={{ item.group }} state=directory
+  ansible.builtin.file:
+    dest: "{{ item.name }}"
+    mode: "{{ item.mode }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    state: directory
   with_items: "{{ oracle_directories }}"
   tags:
     - directories
 
 - name: install_home_gi | Create stage directory (version specific)
-  ansible.builtin.file: dest={{ oracle_stage }}/{{ item.version }} mode=775 owner="{{ oracle_user }}" group={{ oracle_group }} state=directory
+  ansible.builtin.file:
+    dest: "{{ oracle_stage }}/{{ item.version }}"
+    mode: "0775"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    state: directory
   become: true
   with_items: "{{ oracle_sw_image_gi }}"
   when: oracle_install_version_gi == item.version
@@ -52,7 +63,12 @@
     - directories
 
 - name: install_home_gi | Create ORACLE_HOME directory (GI)
-  ansible.builtin.file: dest={{ oracle_home_gi }} owner="{{ grid_install_user }}" group={{ oracle_group }} state=directory mode=775
+  ansible.builtin.file:
+    dest: "{{ oracle_home_gi }}"
+    owner: "{{ grid_install_user }}"
+    group: "{{ oracle_group }}"
+    state: directory
+    mode: "0775"
   become: true
   tags:
     - directories
@@ -62,7 +78,11 @@
   when: not is_sw_source_local and oracle_sw_copy
 
 - name: install_home_gi | Copy oracle installfiles to server (GI) (local)
-  ansible.builtin.copy: src={{ oracle_sw_source_local }}/{{ item.filename }} dest={{ oracle_stage }} mode=775 force=no
+  ansible.builtin.copy:
+    src: "{{ oracle_sw_source_local }}/{{ item.filename }}"
+    dest: "{{ oracle_stage }}"
+    mode: "0775"
+    force: false
   with_items: "{{ oracle_sw_image_gi }}"
   become: true
   become_user: "{{ grid_install_user }}"
@@ -86,8 +106,8 @@
   run_once: "{{ configure_cluster }}"
   when: oracle_home_gi not in checkgiinstall.stdout
 
-- ansible.builtin.debug: var=crsctl.stdout_lines
-  # noqa name[missing]
+- ansible.builtin.debug:  # noqa name[missing]
+    var: crsctl.stdout_lines
   tags:
     - crsctl
   run_once: "{{ configure_cluster }}"
@@ -105,13 +125,19 @@
     - updatenodelist
 
 - name: install_home_gi | Add additional info to glogin.sql (1)
-  ansible.builtin.lineinfile: dest="{{ oracle_home_gi }}/sqlplus/admin/glogin.sql" line='set sqlprompt "_user @ _connect_identifier:>"' backup=yes
+  ansible.builtin.lineinfile:
+    dest: "{{ oracle_home_gi }}/sqlplus/admin/glogin.sql"
+    line: 'set sqlprompt "_user @ _connect_identifier:>"'
+    backup: true
   tags:
     - glogingi
   when: oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Add additional info to glogin.sql (2)
-  ansible.builtin.lineinfile: dest="{{ oracle_home_gi }}/sqlplus/admin/glogin.sql" line='set time on' backup=yes
+  ansible.builtin.lineinfile:
+    dest: "{{ oracle_home_gi }}/sqlplus/admin/glogin.sql"
+    line: 'set time on'
+    backup: true
   tags:
     - glogingi
   when: oracle_home_gi not in checkgiinstall.stdout
@@ -135,7 +161,8 @@
   when: oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Check opatch lsinventory (GI)
-  ansible.builtin.debug: var=opatchls.stdout_lines
+  ansible.builtin.debug:
+    var: opatchls.stdout_lines
   tags:
     - opatchls
   when: oracle_home_gi not in checkgiinstall.stdout
@@ -151,7 +178,8 @@
     - olsnodes
 
 - name: install_home_gi | Check olsnodes (GI)
-  ansible.builtin.debug: var=olsnodes.stdout_lines
+  ansible.builtin.debug:
+    var: olsnodes.stdout_lines
   when: oracle_gi_cluster_type | upper == 'FLEX' and '12' in oracle_install_version_gi
   tags:
     - olsnodes
