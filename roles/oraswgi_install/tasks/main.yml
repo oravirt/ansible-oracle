@@ -58,7 +58,7 @@
     - directories
   when: oracle_home_gi not in checkgiinstall.stdout
 
-- include_tasks: "{{ www_download_bin }}.yml"
+- ansible.builtin.include_tasks: "{{ www_download_bin }}.yml"
   when: not is_sw_source_local and oracle_sw_copy
 
 - name: install_home_gi | Copy oracle installfiles to server (GI) (local)
@@ -74,7 +74,7 @@
     - oracle_sw_copy
 
 - name: include_tasks "{{ oracle_install_version_gi }}.yml"
-  include_tasks: "{{ oracle_install_version_gi }}.yml"
+  ansible.builtin.include_tasks: "{{ oracle_install_version_gi }}.yml"
   tags: always
 
 - name: install_home_gi | Check if stuff is running
