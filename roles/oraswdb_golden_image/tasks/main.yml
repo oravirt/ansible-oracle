@@ -36,7 +36,8 @@
       register: createimage
 
     - name: test
-      ansible.builtin.debug: msg="{{ item.stdout_lines }}"
+      ansible.builtin.debug:
+        msg: "{{ item.stdout_lines }}"
       with_items:
         - "{{ createimage.results }}"
       loop_control:
