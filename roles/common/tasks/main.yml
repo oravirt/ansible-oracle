@@ -48,22 +48,32 @@
     - olrepo
 
 - name: Install common packages OL/RHEL
-  ansible.builtin.yum: name={{ common_packages }} state=installed
+  ansible.builtin.yum:
+    name: "{{ common_packages }}"
+    state: installed
   when: install_os_packages and ansible_os_family == 'RedHat'
   tags:
     - commonpackages
 
 - name: Install common packages SLES12
-  community.general.packaging.os.zypper: name={{ common_packages_sles }} state=installed
+  community.general.packaging.os.zypper:
+    name: "{{ common_packages_sles }}"
+    state: installed
   when: install_os_packages and ansible_os_family == 'Suse'
   tags:
     - commonpackages
 
 - name: Start and enable ntp or chrony
-  ansible.builtin.service: name={{ ntp_type }}d  state=started  enabled=yes
+  ansible.builtin.service:
+    name: "{{ ntp_type }}d"
+    state: started
+    enabled: true
   when: configure_ntp
 
 - name: Add motd
-  ansible.builtin.template: src=motd.j2 dest=/etc/motd mode=0644
+  ansible.builtin.template:
+    src: motd.j2
+    dest: /etc/motd
+    mode: 0644
   tags: motd
   when: configure_motd
