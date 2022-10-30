@@ -1,5 +1,5 @@
 ---
-- ansible.builtin.set_fact:  # noqa unnamed-task
+- ansible.builtin.set_fact:  # noqa name[missing]
     oracle_home_db: "{%- if db_homes_config[dbh.home]['oracle_home'] is defined -%}\
                         {{ db_homes_config[dbh.home]['oracle_home'] }}\
                     {%- else -%}\
@@ -7,7 +7,7 @@
                     {%- endif -%}"
 
 - ansible.builtin.debug: msg="Managing patches for {{ oracle_home_db }}"
-  # noqa unnamed-task
+  # noqa name[missing]
   when: apply_patches_db
 
 - ansible.builtin.include: transfer-files.yml

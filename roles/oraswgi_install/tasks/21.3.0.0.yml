@@ -5,7 +5,7 @@
   when:
     - oracle_home_gi not in checkgiinstall.stdout
   block:
-    - ansible.builtin.debug: msg="install_home_gi | Start Extract files to ORACLE_HOME (gi)"  # noqa unnamed-task
+    - ansible.builtin.debug: msg="install_home_gi | Start Extract files to ORACLE_HOME (gi)"  # noqa name[missing]
       run_once: "{{ configure_cluster }}"
 
     - name: install_home_gi | Extract files to ORACLE_HOME (gi)
@@ -102,7 +102,7 @@
         - force_runcluvfy | default(false) or oracle_home_gi not in checkgiinstall.stdout
       tags: always
 
-    - ansible.builtin.debug: msg="install_home_gi | Start Install Grid Infrastructure"  # noqa unnamed-task
+    - ansible.builtin.debug: msg="install_home_gi | Start Install Grid Infrastructure"  # noqa name[missing]
       run_once: true
 
     - name: install_home_gi | Install Grid Infrastructure
@@ -123,7 +123,7 @@
       register: giinstall
       failed_when: giinstall.rc not in [0, 6]
 
-    - ansible.builtin.debug: var=giinstall.stdout_lines  # noqa unnamed-task
+    - ansible.builtin.debug: var=giinstall.stdout_lines  # noqa name[missing]
       run_once: "{{ configure_cluster }}"
       when: giinstall.stdout_lines is defined
 
@@ -143,7 +143,7 @@
       tags:
         - runroot
 
-    - ansible.builtin.debug: msg="install_home_gi | Start Run root script after installation (Master Node)"  # noqa unnamed-task
+    - ansible.builtin.debug: msg="install_home_gi | Start Run root script after installation (Master Node)"  # noqa name[missing]
       run_once: true
 
     - name: install_home_gi | Run root script after installation (Master Node)
@@ -155,11 +155,11 @@
       tags:
         - runroot
 
-    - ansible.builtin.debug: var=rootmaster.stdout_lines  # noqa unnamed-task
+    - ansible.builtin.debug: var=rootmaster.stdout_lines  # noqa name[missing]
       run_once: "{{ configure_cluster }}"
       when: rootmaster.stdout_lines is defined
 
-    - ansible.builtin.debug: msg="install_home_gi | Start Run root script after installation (Other Nodes)"  # noqa unnamed-task
+    - ansible.builtin.debug: msg="install_home_gi | Start Run root script after installation (Other Nodes)"  # noqa name[missing]
       run_once: true
 
     # do not start root.sh on all nodes in parallel
@@ -180,7 +180,7 @@
         - inventory_hostname == item.1
       register: rootother
 
-    - ansible.builtin.debug: var=rootother.stdout_lines  # noqa unnamed-task
+    - ansible.builtin.debug: var=rootother.stdout_lines  # noqa name[missing]
       when: rootother.stdout_lines is defined
 
     - name: install_home_gi | Execute ConfigTools
