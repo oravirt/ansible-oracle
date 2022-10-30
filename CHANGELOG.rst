@@ -5,6 +5,16 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.2.0
+======
+
+Bugfixes
+--------
+
+- oracle_sqldba module: Use byte streams for sqlplus process communication.
+- oradb-manage-db: Make the deployment of ocenv configurable (#285)
+- oraswdb_install: Make it possible to install Oracle 19.3 on RedHat 8 (#284)
+
 v3.1.0
 ======
 
