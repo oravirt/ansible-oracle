@@ -1,10 +1,10 @@
 ---
 # tasks file for manage_db
-- include_tasks: assert.yml
+- ansible.builtin.include_tasks: assert.yml
   tags:
     always
 
-- include_tasks: tnsnames.yml
+- ansible.builtin.include_tasks: tnsnames.yml
   with_items:
     - "{{ tnsnames_installed }}"
   loop_control:
@@ -21,7 +21,7 @@
     label: "create_listener {{ create_listener | default('') }}  oracle_home {{ dbh.home | default('') }}"
   tags: set_fact
 
-- include_tasks: sqlnet.yml
+- ansible.builtin.include_tasks: sqlnet.yml
   with_items:
     - "{{ sqlnet_installed }}"
   loop_control:
@@ -29,7 +29,7 @@
   when: sqlnet_installed is defined
   tags: sqlnet2
 
-- include_tasks: listener_details.yml
+- ansible.builtin.include_tasks: listener_details.yml
   with_items:
     - "{{ listener_installed }}"
   loop_control:
@@ -37,7 +37,7 @@
   when: listener_installed is defined
   tags: listener2
 
-- include_tasks: listener.yml
+- ansible.builtin.include_tasks: listener.yml
   with_items:
     - "{{ oracle_databases }}"
   loop_control:
@@ -54,7 +54,7 @@
     mode: 0644
   tags: sql_script
 
-- include_tasks: manage-db.yml
+- ansible.builtin.include_tasks: manage-db.yml
   with_items:
     - "{{ oracle_databases }}"
   loop_control:
