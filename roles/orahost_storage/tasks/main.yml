@@ -15,10 +15,10 @@
     - asm_diskgroups is defined
   tags: asmstorage,partition
 
-- ansible.builtin.include: dm-multipath-kpartx.yml  # noqa name[missing]
+- include: dm-multipath-kpartx.yml  # noqa name[missing] fqcn[action-core]
   when: multipath == 'dm-multipath' and partition_devices and asm_diskgroups is defined
 
-- ansible.builtin.include: "{{ device_persistence }}.yml"  # noqa name[missing]
+- include: "{{ device_persistence }}.yml"  # noqa name[missing] fqcn[action-core]
 
 - name: dNFS-storage | Prepare mountpoints
   ansible.builtin.file:
