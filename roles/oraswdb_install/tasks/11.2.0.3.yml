@@ -1,10 +1,10 @@
 ---
 - name: install_home_db | Extract files to stage-area
   ansible.builtin.unarchive:
-    src={{ oracle_stage }}/{{ item[0].filename }}
-    dest={{ oracle_stage }}/{{ item[0].version }}
-    copy=no
-    creates="{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates }}"
+    src: "{{ oracle_stage }}/{{ item[0].filename }}"
+    dest: "{{ oracle_stage }}/{{ item[0].version }}"
+    copy: false
+    creates: "{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates }}"
   with_nested:
     - "{{ oracle_sw_image_db }}"
     - "{{ db_homes_installed }}"
@@ -50,8 +50,8 @@
     - oradbinstall
   register: oradbinstall
 
-- ansible.builtin.debug: var=oradbinstall.stdout_lines
-  # noqa name[missing] ignore-errors
+- ansible.builtin.debug:  # noqa name[missing] ignore-errors
+    var: oradbinstall.stdout_lines
   run_once: "{{ configure_cluster }}"
   when: oracle_home_db not in existing_dbhome.stdout_lines and oradbinstall.changed
   tags:

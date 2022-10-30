@@ -20,8 +20,8 @@
   register: roohctl
   failed_when: roohctl.rc not in [0]
 
-- ansible.builtin.debug: var=roohctl.stdout_lines
-  # noqa name[missing] ignore-errors
+- ansible.builtin.debug:  # noqa name[missing] ignore-errors
+    var: roohctl.stdout_lines
   run_once: "{{ configure_cluster }}"
   when:
     - oracle_home_db not in existing_dbhome.stdout_lines
