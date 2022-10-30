@@ -1,6 +1,9 @@
 ---
 - name: listener | Create responsefile for listener configuration
-  ansible.builtin.template: src=netca.rsp.{{ db_version }}.j2 dest={{ oracle_rsp_stage }}/{{ oracle_netca_rsp }} mode=0600
+  ansible.builtin.template:
+    src: "netca.rsp.{{ db_version }}.j2"
+    dest: "{{ oracle_rsp_stage }}/{{ oracle_netca_rsp }}"
+    mode: "0600"
   become: true
   become_user: "{{ oracle_user }}"
   when: create_listener
