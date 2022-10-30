@@ -128,7 +128,7 @@
     owner: "{{ oracle_user }}"
     mode: '0755'
   with_items:
-    - "{{ oracle_databases | selectattr('rman_tnsalias','defined') | map(attribute='oracle_db_name') }}"
+    - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | map(attribute='oracle_db_name') }}"
   tags:
     - tns
 
@@ -139,7 +139,7 @@
     owner: "{{ oracle_user }}"
     mode: '0644'
   with_items:
-    - "{{ oracle_databases | selectattr('rman_tnsalias','defined') | selectattr('rman_wallet','defined') }}"
+    - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_wallet', 'defined') }}"
   loop_control:
     label: "{{ item.oracle_db_name | default('') }}"
   when: item.rman_wallet
@@ -182,7 +182,7 @@
   environment:
     stdin: "{{ rman_wallet_password }}\n{{ rman_wallet_password }}"
   with_items:
-    - "{{ oracle_databases | selectattr('rman_tnsalias','defined') | selectattr('rman_wallet','defined') }}"
+    - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_wallet', 'defined') }}"
   loop_control:
     label: "{{ item.oracle_db_name | default('') }}"
   when: item.rman_wallet
@@ -198,7 +198,7 @@
   environment:
     stdin: "{{ rman_wallet_password }}"
   with_items:
-    - "{{ oracle_databases | selectattr('rman_tnsalias','defined') | selectattr('rman_wallet','defined') }}"
+    - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_wallet', 'defined') }}"
   when:
     - item.rman_wallet
     - not wallet_created.changed
@@ -220,7 +220,7 @@
     rman_user: "{{ item.rman_user }}"
     rman_password: "{{ dbpasswords[item.rman_tnsalias][item.rman_user] | default(item.rman_password) }}"
   with_items:
-    - "{{ oracle_databases | selectattr('rman_tnsalias','defined') | selectattr('rman_wallet','defined') }}"
+    - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_wallet', 'defined') }}"
   when:
     - item.rman_wallet
     - "wallet_created.changed or ((': ' + item.rman_tnsalias + ' ' + item.rman_user) not in (wallet_contents.results[loopidx].stdout | default('')))"
@@ -243,7 +243,7 @@
     rman_user: "{{ item.rman_user }}"
     rman_password: "{{ dbpasswords[item.rman_tnsalias][item.rman_user] | default(item.rman_password) }}"
   with_items:
-    - "{{ oracle_databases | selectattr('rman_tnsalias','defined') | selectattr('rman_wallet','defined') }}"
+    - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_wallet', 'defined') }}"
   when:
     - item.rman_wallet
     - not wallet_created.changed
