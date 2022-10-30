@@ -19,7 +19,8 @@
         state: latest
       register: yumyumstate
 
-    - ansible.builtin.debug: msg="{{ yumyumstate.results }}"
+    - ansible.builtin.debug:
+        msg: "{{ yumyumstate.results }}"
     # noqa name[missing]
 
     - name: Kernel Update with later Reboot
@@ -29,8 +30,9 @@
         state: latest
       register: kernelstate
 
-    - ansible.builtin.debug: msg="{{ kernelstate.results }}"
-    # noqa name[missing]
+    - ansible.builtin.debug:  # noqa name[missing]
+        msg: "{{ kernelstate.results }}"
+
 
     - name: yum update
       ansible.builtin.package:
@@ -39,8 +41,8 @@
         state: latest
       register: updatestate
 
-    - ansible.builtin.debug: msg="{{ kernelstate.results }}"
-    # noqa name[missing]
+    - ansible.builtin.debug:  # noqa name[missing]
+        msg: "{{ kernelstate.results }}"
 
     - name: reboot due to Kernel Update
       # noqa no-handler
