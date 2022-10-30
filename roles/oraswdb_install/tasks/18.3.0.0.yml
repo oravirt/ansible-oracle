@@ -12,8 +12,8 @@
   register: oradbinstall
   failed_when: oradbinstall.rc not in [0, 6]
 
-- ansible.builtin.debug: var=oradbinstall.stdout_lines
-  # noqa name[missing] ignore-errors
+- ansible.builtin.debug:  # noqa name[missing] ignore-errors
+    var: oradbinstall.stdout_lines
   run_once: "{{ configure_cluster }}"
   when:
     - oracle_home_db not in existing_dbhome.stdout_lines

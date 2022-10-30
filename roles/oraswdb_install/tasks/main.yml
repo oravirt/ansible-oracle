@@ -35,18 +35,34 @@
     - nfsmountdb
 
 - name: install_home_db | Add oraInst.loc
-  ansible.builtin.template: src=oraInst.loc.j2 dest=/etc/oraInst.loc owner={{ oracle_user }} group={{ oracle_group }} mode=644 backup=yes
+  ansible.builtin.template:
+    src: oraInst.loc.j2
+    dest: /etc/oraInst.loc
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: "0644"
+    backup: true
   tags:
     - orainst
 
 - name: install_home_db | Create common directories
-  ansible.builtin.file: dest={{ item.name }} mode={{ item.mode }} owner={{ item.owner }} group={{ item.group }} state=directory
+  ansible.builtin.file:
+    dest: "{{ item.name }}"
+    mode: "{{ item.mode }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    state: directory
   with_items: "{{ oracle_directories }}"
   tags:
     - directoriesdb
 
 - name: install_home_db | Create stage directory (version specific)
-  ansible.builtin.file: dest={{ oracle_stage }}/{{ db_version }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+  ansible.builtin.file:
+    dest: "{{ oracle_stage }}/{{ db_version }}"
+    mode: "0775"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    state: directory
   with_items:
     - "{{ db_homes_installed }}"
   run_once: "{{ configure_cluster }}"
@@ -57,7 +73,12 @@
     - directoriesdb
 
 - name: install_home_db | Create ORACLE_HOME directory
-  ansible.builtin.file: dest={{ oracle_home_db }} mode=0775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+  ansible.builtin.file:
+    dest: "{{ oracle_home_db }}"
+    mode: "0775"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    state: directory
   with_items: "{{ db_homes_installed }}"
   when:
     - db_homes_config[item.home] is defined
