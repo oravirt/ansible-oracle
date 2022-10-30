@@ -1,14 +1,14 @@
 ---
 - name: Manage redologs
   opitzconsulting.ansible_oracle.oracle_redo:
-    hostname={{ ansible_hostname }}
-    service_name={{ db_service_name }}
-    port={{ listener_port_template }}
-    user={{ db_user }}
-    password={{ db_password_cdb }}
-    mode={{ db_mode }}
-    size={{ item.redolog_size }}
-    groups={{ item.redolog_groups }}
+    hostname: "{{ ansible_hostname }}"
+    service_name: "{{ db_service_name }}"
+    port: "{{ listener_port_template }}"
+    user: "{{ db_user }}"
+    password: "{{ db_password_cdb }}"
+    mode: "{{ db_mode }}"
+    size: "{{ item.redolog_size }}"
+    groups: "{{ item.redolog_groups }}"
   environment: "{{ oracle_env }}"
   run_once: "{{ configure_cluster }}"
   with_items:
