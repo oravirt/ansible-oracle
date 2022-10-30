@@ -20,7 +20,7 @@
         - sshkeys
 
     - name: ssh-keys | Add keys for {{ oracle_user }}
-      ansible.builtin.authorized_key: user={{ oracle_user }} key="{{ item[1] }}"
+      ansible.posix.authorized_key: user={{ oracle_user }} key="{{ item[1] }}"
       delegate_to: "{{ item[0] }}"
       with_nested:
         - "{{ groups[hostgroup] }}"
@@ -30,7 +30,7 @@
       when: oracle_key is defined
 
     - name: ssh-keys | Add keys for {{ grid_user }}
-      ansible.builtin.authorized_key: user={{ grid_user }} key="{{ item[1] }}"
+      ansible.posix.authorized_key: user={{ grid_user }} key="{{ item[1] }}"
       delegate_to: "{{ item[0] }}"
       with_nested:
         - "{{ groups[hostgroup] }}"
