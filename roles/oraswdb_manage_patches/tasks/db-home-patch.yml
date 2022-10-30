@@ -6,25 +6,25 @@
                           {{ oracle_base }}/{{ db_homes_config[dbh.home]['version'] }}/{{ db_homes_config[dbh.home]['home'] }}\
                     {%- endif -%}"
 
-- ansible.builtin.debug: msg="Managing patches for {{ oracle_home_db }}"
-  # noqa name[missing]
+- ansible.builtin.debug:  # noqa name[missing]
+    msg: "Managing patches for {{ oracle_home_db }}"
   when: apply_patches_db
 
-- include: transfer-files.yml  # noqa name[missing] fqcn[action-core]
+- include: transfer-files.yml  # noqa name[missing] fqcn[action-core] deprecated-module
   when: oracle_sw_copy
 
-- include: unpack-files.yml  # noqa name[missing] fqcn[action-core]
+- include: unpack-files.yml  # noqa name[missing] fqcn[action-core] deprecated-module
   when: oracle_sw_unpack and apply_patches_db
 
-- include: opatch-upgrade.yml  # noqa name[missing] fqcn[action-core]
+- include: opatch-upgrade.yml  # noqa name[missing] fqcn[action-core] deprecated-module
   when: apply_patches_db
 
 - name: db_opatch | Configure ocm.rsp (1)
   ansible.builtin.template:
-    src=ocmrsp.expect.j2
-    dest={{ oracle_patch_stage }}/{{ db_version }}/ocmrsp.expect
-    mode=0777
-    force=yes
+    src: ocmrsp.expect.j2
+    dest: "={{ oracle_patch_stage }}/{{ db_version }}/ocmrsp.expect"
+    mode: "0777"
+    force: true
   when: apply_patches_db and current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
   become: true
   become_user: "{{ oracle_user }}"
@@ -68,15 +68,15 @@
 
 - name: db_opatch | Manage opatchauto patches for DB (non-gi)
   opitzconsulting.ansible_oracle.oracle_opatch:
-    oracle_home={{ oracle_home_db }}
-    patch_base={{ oracle_patch_install }}/{{ db_version }}/{{ item.0.path | default (item.0.patchid) }}/{{ item.1 }}
-    patch_id={{ item.1 }}
-    patch_version={{ item.1.patchversion | default(omit) }}
-    opatchauto=False
-    conflict_check=True
-    ocm_response_file={{ ocm_response_file | default(omit) }}
-    output=verbose
-    state={{ item.0.state }}
+    oracle_home: "{{ oracle_home_db }}"
+    patch_base: "{{ oracle_patch_install }}/{{ db_version }}/{{ item.0.path | default (item.0.patchid) }}/{{ item.1 }}"
+    patch_id: "{{ item.1 }}"
+    patch_version: "{{ item.1.patchversion | default(omit) }}"
+    opatchauto: false
+    conflict_check: true
+    ocm_response_file: "{{ ocm_response_file | default(omit) }}"
+    output: verbose
+    state: "{{ item.0.state }}"
   with_subelements:
     - "{{ db_homes_config[dbh.home]['opatchauto'] }}"
     - subpatches
@@ -142,4 +142,5 @@
   register: dbhome_patches
 
 - name: db_opatch | Check patches
-  ansible.builtin.debug: var=dbhome_patches.stdout_lines
+  ansible.builtin.debug:
+    var: dbhome_patches.stdout_lines

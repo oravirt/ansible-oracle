@@ -1,6 +1,7 @@
 ---
 - name: db_opatch | check if GI is installed
-  ansible.builtin.stat: path=/etc/oracle/olr.loc
+  ansible.builtin.stat:
+    path: /etc/oracle/olr.loc
   register: olrloc
 
 - name: db_opatch | Mount nfs share with installation media
@@ -12,11 +13,11 @@
 
 - name: db_opatch | Create patch-base directory (version specific)
   ansible.builtin.file:
-    dest={{ oracle_patch_stage }}/{{ db_version }}
-    mode=775
-    owner={{ oracle_user }}
-    group={{ oracle_group }}
-    state=directory
+    dest: "{{ oracle_patch_stage }}/{{ db_version }}"
+    mode: "0775"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    state: directory
   with_items:
     - "{{ db_homes_installed }}"
   tags:
