@@ -12,7 +12,12 @@
 
 
 - name: Create stage directory
-  ansible.builtin.file: dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} mode=775 owner={{ grid_install_user }} group={{ oracle_group }} state=directory
+  ansible.builtin.file:
+    dest: "{{ oracle_psu_stage }}/{{ oracle_install_version_gi }}"
+    mode: "0775"
+    owner: "{{ grid_install_user }}"
+    group: "{{ oracle_group }}"
+    state: directory
   # file: dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} mode=775 owner=grid group={{ oracle_group }} state=directory
   tags:
     - directoriespsu
@@ -40,7 +45,10 @@
 
 
 - name: Extract OPatch to stage-area
-  ansible.builtin.unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
+  ansible.builtin.unarchive:
+    src: "{{ oracle_stage }}/{{ item.filename }}"
+    dest: "{{ oracle_psu_stage }}/{{ oracle_install_version_gi }}"
+    copy: false
   become: true
   become_user: "{{ grid_install_user }}"
   with_items: "{{ oracle_opatch_patch }}"
@@ -49,7 +57,10 @@
     - oragridpatchunpack
 
 - name: Extract Opatch to stage-area (from remote location)
-  ansible.builtin.unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
+  ansible.builtin.unarchive:
+    src: "{{ oracle_stage_remote }}/{{ item.filename }}"
+    dest: "{{ oracle_psu_stage }}/{{ oracle_install_version_gi }}"
+    copy: false
   with_items: "{{ oracle_opatch_patch }}"
   become: true
   become_user: "{{ grid_install_user }}"
@@ -59,7 +70,10 @@
 
 
 - name: Extract GI psu files to stage-area
-  ansible.builtin.unarchive: src={{ oracle_stage }}/{{ item.0.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
+  ansible.builtin.unarchive:
+    src: "{{ oracle_stage }}/{{ item.0.filename }}"
+    dest: "{{ oracle_psu_stage }}/{{ oracle_install_version_gi }}"
+    copy: false
   become: true
   become_user: "{{ grid_install_user }}"
   with_together:
@@ -70,7 +84,10 @@
     - oragridpsuunpack
 
 - name: Extract GI psu files to stage-area (from remote location)
-  ansible.builtin.unarchive: src={{ oracle_stage_remote }}/{{ item.0.filename }}  dest={{ oracle_psu_stage }}/{{ oracle_install_version_gi }} copy=no
+  ansible.builtin.unarchive:
+    src: "{{ oracle_stage_remote }}/{{ item.0.filename }}"
+    dest: "{{ oracle_psu_stage }}/{{ oracle_install_version_gi }}"
+    copy: false
   become: true
   become_user: "{{ grid_install_user }}"
   with_together:
@@ -126,8 +143,8 @@
   when: oracle_psu_apply_gi and '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
   register: psuapplym
 
-- ansible.builtin.debug: var=psuapplym.stdout_lines
-  # noqa name[missing]
+- ansible.builtin.debug:  # noqa name[missing]
+    var: psuapplym.stdout_lines
   run_once: "{{ configure_cluster }}"
   when: oracle_psu_apply_gi
   tags:
@@ -142,8 +159,8 @@
   register: crsctl
   when: oracle_psu_apply_gi  # and not {{ item.1.stdout }} != 0
 
-- ansible.builtin.debug: var=crsctl.stdout_lines
-  # noqa name[missing]
+- ansible.builtin.debug:  # noqa name[missing]
+    var: crsctl.stdout_lines
   tags:
     - crsctl
   run_once: "{{ configure_cluster }}"
@@ -182,8 +199,8 @@
     - not item.1.stdout != 0
   register: psuapplyo
 
-- ansible.builtin.debug: var=psuapplyo.stdout_lines
-  # noqa name[missing]
+- ansible.builtin.debug:  # noqa name[missing]
+    var: psuapplyo.stdout_lines
   when: configure_cluster and inventory_hostname != cluster_master and oracle_psu_apply_gi and psuapplyo is defined
   tags:
     - psuapplyo
@@ -196,8 +213,8 @@
   register: crsctl
   when: oracle_psu_apply_gi
 
-- ansible.builtin.debug: var=crsctl.stdout_lines
-  # noqa name[missing]
+- ansible.builtin.debug:  # # noqa name[missing]
+    var: crsctl.stdout_lines
   tags:
     - crsctl-opatch
   when: oracle_psu_apply_gi
@@ -212,8 +229,8 @@
   tags:
     - opatchls
 
-- ansible.builtin.debug: var=opatchls.stdout_lines
-  # noqa name[missing]
+- ansible.builtin.debug:  # noqa name[missing]
+    var: opatchls.stdout_lines
   when: oracle_psu_apply_gi
   tags:
     - opatchls
