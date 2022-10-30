@@ -15,10 +15,10 @@
     - asm_diskgroups is defined
   tags: asmstorage,partition
 
-- include: dm-multipath-kpartx.yml  # noqa name[missing] fqcn[action-core]
+- include: dm-multipath-kpartx.yml  # noqa name[missing] fqcn[action-core] deprecated-module
   when: multipath == 'dm-multipath' and partition_devices and asm_diskgroups is defined
 
-- include: "{{ device_persistence }}.yml"  # noqa name[missing] fqcn[action-core]
+- include: "{{ device_persistence }}.yml"  # noqa name[missing] fqcn[action-core] deprecated-module
 
 - name: dNFS-storage | Prepare mountpoints
   ansible.builtin.file:
@@ -45,7 +45,12 @@
   when: oradnfs is defined
 
 - name: dNFS-storage | Change permission on directories
-  ansible.builtin.file: path={{ item.1.mount }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=0775
+  ansible.builtin.file:
+    path: "{{ item.1.mount }}"
+    state: directory
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0775
   with_subelements:
     - "{{ oradnfs }}"
     - exports
