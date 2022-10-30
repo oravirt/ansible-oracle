@@ -1,24 +1,24 @@
 ---
 - name: db_opatch | Check current opatch version
   opitzconsulting.ansible_oracle.oracle_opatch:
-    oracle_home={{ oracle_home_db }}
-    state=opatchversion
+    oracle_home: "{{ oracle_home_db }}"
+    state: opatchversion
   register: current_opatch_version
   tags: current_opatch_version
   when: db_homes_config[dbh.home]['opatch_minversion'] is defined
 
-- ansible.builtin.debug: var=current_opatch_version.msg
-  # noqa name[missing] no-handler
+- ansible.builtin.debug:  # noqa name[missing] no-handler
+    var: current_opatch_version.msg
   tags: current_opatch_version
   when: current_opatch_version.changed
 
 - name: db_opatch | Extract OPatch to DB Home
   ansible.builtin.unarchive:
-    src={{ oracle_stage }}/{{ item.filename }}
-    dest={{ oracle_home_db }}
-    copy=no
-    owner={{ oracle_user }}
-    group={{ oracle_group }}
+    src: "{{ oracle_stage }}/{{ item.filename }}"
+    dest: "{{ oracle_home_db }}"
+    copy: false
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
   become: true
   with_items: "{{ oracle_opatch_patch }}"
   when:
@@ -32,11 +32,11 @@
 
 - name: db_opatch | Extract OPatch to DB Home (from remote location)
   ansible.builtin.unarchive:
-    src={{ oracle_stage_remote }}/{{ item.filename }}
-    dest={{ oracle_home_db }}
-    copy=no
-    owner={{ oracle_user }}
-    group={{ oracle_group }}
+    src: "{{ oracle_stage_remote }}/{{ item.filename }}"
+    dest: "{{ oracle_home_db }}"
+    copy: false
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
   become: true
   with_items: "{{ oracle_opatch_patch }}"
   when:
@@ -50,13 +50,13 @@
 
 - name: db_opatch | Check current opatch version
   opitzconsulting.ansible_oracle.oracle_opatch:
-    oracle_home={{ oracle_home_db }}
-    state=opatchversion
+    oracle_home: "{{ oracle_home_db }}"
+    state: opatchversion
   register: current_opatch_version
   tags: current_opatch_version
   when: db_homes_config[dbh.home]['opatch_minversion'] is defined
 
-- ansible.builtin.debug: var=current_opatch_version.msg
-  # noqa name[missing] no-handler
+- ansible.builtin.debug:  # noqa name[missing] no-handler
+    var: current_opatch_version.msg
   tags: current_opatch_version
   when: current_opatch_version.changed
