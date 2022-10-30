@@ -1,8 +1,14 @@
 ---
 # tasks file for orahost-admin
 - name: Manage cron
-  ansible.builtin.cron: user={{ item.user }} name="{{ item.name }}" job="{{ item.job }}" hour={{ item.hour }} cron_file={{ item.cron_file }} state={{ item.state }}
+  ansible.builtin.cron:
+    user: "{{ item.user }}"
+    name: "{{ item.name }}"
+    job: "{{ item.job }}"
+    hour: "{{ item.hour }}"
+    cron_file: "{{ item.cron_file }}"
+    state: "{{ item.state }}"
   with_items:
-        - "{{ cron_config }}"
+    - "{{ cron_config }}"
   when: cron_config is defined
   tags: cron

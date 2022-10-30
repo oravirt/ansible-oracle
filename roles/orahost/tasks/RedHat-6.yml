@@ -7,22 +7,24 @@
   tags: thpnuma
 
 - name: Disable Transparent Hugepages (in grub.conf)
-  ansible.builtin.lineinfile: dest=/boot/grub/grub.conf
-            backup=True
-            backrefs=True
-            state=present
-            regexp='(^\s+kernel(\s+(?!transparent_hugepage=never)[\w=/\-\.]+)*)\s*$'
-            line='\1 transparent_hugepage=never'
+  ansible.builtin.lineinfile:
+    dest: /boot/grub/grub.conf
+    backup: true
+    backrefs: true
+    state: present
+    regexp: '(^\s+kernel(\s+(?!transparent_hugepage=never)[\w=/\-\.]+)*)\s*$'
+    line: '\1 transparent_hugepage=never'
   with_sequence: start=0 end={{ count.stdout }}
   tags: thpnuma
 
 - name: Disable Numa (in grub.conf)
-  ansible.builtin.lineinfile: dest=/boot/grub/grub.conf
-            backup=True
-            backrefs=True
-            state=present
-            regexp='(^\s+kernel(\s+(?!numa=off)[\w=/\-\.]+)*)\s*$'
-            line='\1 numa=off'
+  ansible.builtin.lineinfile:
+    dest: /boot/grub/grub.conf
+    backup: true
+    backrefs: true
+    state: present
+    regexp: '(^\s+kernel(\s+(?!numa=off)[\w=/\-\.]+)*)\s*$'
+    line: '\1 numa=off'
   with_sequence: start=0 end={{ count.stdout }}
   tags: thpnuma
   when: disable_numa_boot
@@ -31,17 +33,22 @@
   ansible.builtin.shell: if test -f {{ item.path }}; then {{ item.disable }} {{ item.path }}; fi;
   # noqa no-changed-when
   with_items:
-      - "{{ transparent_hugepage_disable }}"
+    - "{{ transparent_hugepage_disable }}"
   tags: tphnuma
 
 - name: Disable Transparent Hugepages (permanently)
-  ansible.builtin.lineinfile: dest={{ item.rclocal }} line="{{ item.disable }} {{ item.path }}" state=present
+  ansible.builtin.lineinfile:
+    dest: "{{ item.rclocal }}"
+    line: "{{ item.disable }} {{ item.path }}"
+    state: present
   with_items:
-      - "{{ transparent_hugepage_disable }}"
+    - "{{ transparent_hugepage_disable }}"
   tags: tphnuma
 
 - name: Fix permissions on /etc/rc.d/rc.local
-  ansible.builtin.file: path={{ item.rclocal }} mode=755
+  ansible.builtin.file:
+    path: "{{ item.rclocal }}"
+    mode: "0755"
   with_items:
-      - "{{ transparent_hugepage_disable }}"
+    - "{{ transparent_hugepage_disable }}"
   tags: tphnuma

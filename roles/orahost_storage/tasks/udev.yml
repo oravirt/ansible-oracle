@@ -1,17 +1,26 @@
 ---
 - name: udev | Create device to label mappings for udev
-  ansible.builtin.template: src=udev-label-device-mapping.txt.j2 dest={{ oracle_stage }}/udev/udev-{{ item.diskgroup }} mode=0644
+  ansible.builtin.template:
+    src: udev-label-device-mapping.txt.j2
+    dest: "{{ oracle_stage }}/udev/udev-{{ item.diskgroup }}"
+    mode: "0644"
   with_items: "{{ asm_diskgroups }}"
   when: device_persistence == 'udev' and asm_diskgroups is defined
   tags: udev
 
 - name: udev | Assemble into one mapfile
-  ansible.builtin.assemble: src={{ oracle_stage }}/udev dest={{ oracle_rsp_stage }}/udev-device-input.txt mode=0644
+  ansible.builtin.assemble:
+    src: "{{ oracle_stage }}/udev"
+    dest: "{{ oracle_rsp_stage }}/udev-device-input.txt"
+    mode: "0644"
   when: device_persistence == 'udev'
   tags: udev
 
 - name: udev | Create script to create rules
-  ansible.builtin.template: src=setup-udev.sh.j2 dest={{ oracle_rsp_stage }}/setup-udev-rules.sh mode=755
+  ansible.builtin.template:
+    src: setup-udev.sh.j2
+    dest: "{{ oracle_rsp_stage }}/setup-udev-rules.sh"
+    mode: "0755"
   when: device_persistence == 'udev'
   tags: udev
 
@@ -34,6 +43,7 @@
   register: lsdevice
 
 - name: udev | List device aliases
-  ansible.builtin.debug: var=lsdevice.stdout_lines
+  ansible.builtin.debug:
+    var: lsdevice.stdout_lines
   when: device_persistence == 'udev'
   tags: udev

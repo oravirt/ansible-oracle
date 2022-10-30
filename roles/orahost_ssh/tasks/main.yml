@@ -20,7 +20,9 @@
         - sshkeys
 
     - name: ssh-keys | Add keys for {{ oracle_user }}
-      ansible.posix.authorized_key: user={{ oracle_user }} key="{{ item[1] }}"
+      ansible.posix.authorized_key:
+        user: "{{ oracle_user }}"
+        key: "{{ item[1] }}"
       delegate_to: "{{ item[0] }}"
       with_nested:
         - "{{ groups[hostgroup] }}"
@@ -30,7 +32,9 @@
       when: oracle_key is defined
 
     - name: ssh-keys | Add keys for {{ grid_user }}
-      ansible.posix.authorized_key: user={{ grid_user }} key="{{ item[1] }}"
+      ansible.posix.authorized_key:
+        user: "{{ grid_user }}"
+        key: "{{ item[1] }}"
       delegate_to: "{{ item[0] }}"
       with_nested:
         - "{{ groups[hostgroup] }}"
@@ -52,7 +56,7 @@
       changed_when: false
       tags: sshkeys,known_hosts
 
-    - include: known-hosts.yml  # noqa name[missing] fqcn[action-core]
+    - include: known-hosts.yml  # noqa name[missing] fqcn[action-core] deprecated-module
       with_items:
         - "{{ oracle_user }}"
         - "{% if role_separation %}{{ grid_user }}{% else %}[]{% endif %}"

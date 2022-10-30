@@ -3,17 +3,22 @@
   ansible.builtin.shell: if test -f {{ item.path }}; then {{ item.disable }} {{ item.path }}; fi;
   # noqa no-changed-when
   with_items:
-      - "{{ transparent_hugepage_disable }}"
+    - "{{ transparent_hugepage_disable }}"
   tags: tphnuma
 
 - name: Disable Transparent Hugepages (permanently)
-  ansible.builtin.lineinfile: dest={{ item.rclocal }} line="{{ item.disable }} {{ item.path }}" state=present
+  ansible.builtin.lineinfile:
+    dest: "{{ item.rclocal }}"
+    line: "{{ item.disable }} {{ item.path }}"
+    state: present
   with_items:
-      - "{{ transparent_hugepage_disable }}"
+    - "{{ transparent_hugepage_disable }}"
   tags: tphnuma
 
 - name: Fix permissions on /etc/rc.d/rc.local
-  ansible.builtin.file: path={{ item.rclocal }} mode=755
+  ansible.builtin.file:
+    path: "{{ item.rclocal }}"
+    mode: "0755"
   with_items:
-      - "{{ transparent_hugepage_disable }}"
+    - "{{ transparent_hugepage_disable }}"
   tags: tphnuma

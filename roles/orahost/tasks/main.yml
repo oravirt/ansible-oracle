@@ -46,24 +46,32 @@
   tags: os_packages, oscheck
 
 - name: Install packages required by Oracle for ASMlib on SLES
-  community.general.packaging.os.zypper: name={{ oracle_asm_packages_sles }} state=installed
+  community.general.packaging.os.zypper:
+    name: "{{ oracle_asm_packages_sles }}"
+    state: installed
   when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'Suse' and asm_diskgroups is defined
   tags: os_packages, oscheck, asm1
 
 - name: Check if firewall is installed
-  ansible.builtin.yum: list={{ firewall_service }} disablerepo=*
+  ansible.builtin.yum:
+    list: "{{ firewall_service }}"
+    disablerepo: "*"
   when: disable_firewall and ansible_os_family == 'RedHat'
   tags: iptables,firewalld
   register: firewall
 
 - name: Disable firewall
-  ansible.builtin.service: name={{ firewall_service }} state=stopped enabled=no
+  ansible.builtin.service:
+    name: "{{ firewall_service }}"
+    state: stopped
+    enabled: false
   when: disable_firewall and ansible_os_family == 'RedHat' and firewall.results
   tags: iptables,firewalld
   register: iptables
 
 - name: Disable selinux (permanently)
-  ansible.posix.selinux: state=disabled
+  ansible.posix.selinux:
+    state: disabled
   when: disable_selinux and ansible_os_family == 'RedHat'
   tags: selinux
   register: selinux
@@ -103,7 +111,11 @@
   tags: etchosts
 
 - name: Add host to /etc/hosts if needed
-  ansible.builtin.lineinfile: dest=/etc/hosts regexp='.*{{ ansible_fqdn }}$' line="{{ etc_hosts_ip }} {{ ansible_hostname }} {{ ansible_fqdn }}" state=present
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    regexp: '.*{{ ansible_fqdn }}$'
+    line: "{{ etc_hosts_ip }} {{ ansible_hostname }} {{ ansible_fqdn }}"
+    state: present
   when: "ns.rc != 0 or configure_etc_hosts"
   tags: etchosts
 
@@ -281,7 +293,12 @@
     - sshkeys
 
 - name: filesystem | Create directories
-  ansible.builtin.file: path={{ item.1.mntp }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=0775
+  ansible.builtin.file:
+    path: "{{ item.1.mntp }}"
+    state: directory
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: "0775"
   with_subelements:
     - "{{ host_fs_layout }}"
     - filesystem
@@ -305,13 +322,22 @@
   tags: hostfs
 
 - name: filesystem | Create vg
-  community.general.system.lvg: vg={{ item.vgname }} pvs={{ host_fs_layout_vgdisks }} state={{ item.state }}
+  community.general.system.lvg:
+    vg: "{{ item.vgname }}"
+    pvs: "{{ host_fs_layout_vgdisks }}"
+    state: "{{ item.state }}"
   with_items: "{{ host_fs_layout }}"
   when: configure_host_disks
   tags: hostfs
 
 - name: filesystem | create lv
-  community.general.system.lvol: vg={{ item.0.vgname }} lv={{ item.1.lvname }} size={{ item.1.lvsize }} state=present shrink=no resizefs=yes
+  community.general.system.lvol:
+    vg: "{{ item.0.vgname }}"
+    lv: "{{ item.1.lvname }}"
+    size: "{{ item.1.lvsize }}"
+    state: present
+    shrink: false
+    resizefs: true
   with_subelements:
     - "{{ host_fs_layout }}"
     - filesystem
@@ -319,7 +345,10 @@
   tags: hostfs
 
 - name: filesystem | create fs
-  community.general.system.filesystem: fstype={{ item.1.fstype }} dev=/dev/{{ item.0.vgname }}/{{ item.1.lvname }} opts={{ item.1.fsopts | default(omit) }}
+  community.general.system.filesystem:
+    fstype: "{{ item.1.fstype }}"
+    dev: "/dev/{{ item.0.vgname }}/{{ item.1.lvname }}"
+    opts: "{{ item.1.fsopts | default(omit) }}"
   with_subelements:
     - "{{ host_fs_layout }}"
     - filesystem
@@ -373,16 +402,31 @@
   tags: hostfs
 
 - name: filesystem | Create directory for oraInventory
-  ansible.builtin.file: path={{ oracle_inventory_loc }} state=directory owner={{ oracle_user }} group={{ oracle_group }} mode=775
+  ansible.builtin.file:
+    path: "{{ oracle_inventory_loc }}"
+    state: directory
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: "0775"
   tags: hostfs
 
 - name: Oracle-recommended kernel settings
-  ansible.posix.sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes ignoreerrors=yes
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: true
+    ignoreerrors: true
   with_items: "{{ oracle_sysctl }}"
   tags: sysctl
 
 - name: Oracle hugepages
-  ansible.posix.sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes ignoreerrors=yes
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: true
+    ignoreerrors: true
   with_items: "{{ oracle_hugepages }}"
   register: systclcmd
   tags: sysctl,hugepages
@@ -405,26 +449,41 @@
       tags: sysctl,hugepages
 
     - name: Try sysctl again
-      ansible.posix.sysctl: name={{ item.name }} value="{{ item.value }}" state=present reload=yes
+      ansible.posix.sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: true
       with_items: "{{ oracle_hugepages }}"
       tags: sysctl,hugepages
 
 - name: Oracle-recommended PAM config
-  ansible.builtin.lineinfile: dest=/etc/pam.d/login state=present line="session required pam_limits.so"
+  ansible.builtin.lineinfile:
+    dest: /etc/pam.d/login
+    state: present
+    line: "session required pam_limits.so"
   tags: pamconfig
 
 - name: Oracle-recommended security limits
-  ansible.builtin.template: src=oracle-seclimits.conf.j2 dest=/etc/security/limits.d/99-oracle-limits.conf backup=yes mode=0644
+  ansible.builtin.template:
+    src: oracle-seclimits.conf.j2
+    dest: /etc/security/limits.d/99-oracle-limits.conf
+    backup: true
+    mode: "0644"
   when: ansible_os_family == 'RedHat'
   tags: seclimit
 
 - name: Oracle-recommended security limits on SLES
-  community.general.system.pam_limits: domain=oracle limit_type={{ item.name.split(' ')[0] }} limit_item={{ item.name.split(' ')[1] }} value={{ item.value }}
+  community.general.system.pam_limits:
+    domain: oracle
+    limit_type: "{{ item.name.split(' ')[0] }}"
+    limit_item: "{{ item.name.split(' ')[1] }}"
+    value: "{{ item.value }}"
   with_items: "{{ oracle_seclimits }}"
   when: ansible_os_family == 'Suse'
   tags: seclimit
 
-- include: "{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"  # noqa name[missing] fqcn[action-core]
+- include: "{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"  # noqa name[missing] fqcn[action-core] deprecated-module
   tags: tphnuma
   # when: ansible_os_family == 'RedHat'
 
@@ -437,32 +496,56 @@
   tags: nozeroconf
 
 - name: Network | Setup ip-address for RAC Interconnect
-  ansible.builtin.template: src=ifcfg-eth1.j2 dest=/etc/sysconfig/network-scripts/ifcfg-{{ oracle_gi_nic_priv }} owner=root mode=0644
+  ansible.builtin.template:
+    src: ifcfg-eth1.j2
+    dest: "/etc/sysconfig/network-scripts/ifcfg-{{ oracle_gi_nic_priv }}"
+    owner: root
+    mode: "0644"
   when: configure_interconnect and configure_cluster and ansible_os_family == 'RedHat'
   tags:
     - eth1
   register: ic
 
 - name: Network | Bring up eth1
-  ansible.builtin.service: name=network  state=restarted
+  ansible.builtin.service:
+    name: network
+    state: restarted
   when: configure_interconnect and configure_cluster and ic.changed and ansible_os_family == 'RedHat'
   tags:
     - eth1
 
 - name: Create stage directory
-  ansible.builtin.file: dest={{ oracle_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+  ansible.builtin.file:
+    dest: "{{ oracle_stage }}"
+    mode: "0775"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    state: directory
   tags: stagedir
 
 - name: Create rsp stage directory
-  ansible.builtin.file: dest={{ oracle_rsp_stage }} mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+  ansible.builtin.file:
+    dest: "{{ oracle_rsp_stage }}"
+    mode: "0775"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    state: directory
   tags: stagedir
 
 - name: udev | Create udev stage directory
-  ansible.builtin.file: dest={{ oracle_stage }}/udev mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+  ansible.builtin.file:
+    dest: "{{ oracle_stage }}/udev"
+    mode: "0775"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    state: directory
   when: device_persistence == 'udev'
 
 - name: Asmlib | Add configuration
-  ansible.builtin.template: src=oracleasm.j2 dest=/etc/sysconfig/oracleasm-_dev_oracleasm mode=0644
+  ansible.builtin.template:
+    src: oracleasm.j2
+    dest: /etc/sysconfig/oracleasm-_dev_oracleasm
+    mode: "0644"
   register: asmlibconfig
   when:
     - device_persistence | lower == 'asmlib'
@@ -471,7 +554,11 @@
     - asmlibconfig
 
 - name: Asmlib | Add configuration (link)
-  ansible.builtin.file: src=/etc/sysconfig/oracleasm-_dev_oracleasm dest=/etc/sysconfig/oracleasm state=link force=yes
+  ansible.builtin.file:
+    src: /etc/sysconfig/oracleasm-_dev_oracleasm
+    dest: /etc/sysconfig/oracleasm
+    state: link
+    force: true
   register: asmlibconfig
   when:
     - device_persistence | lower == 'asmlib'
@@ -480,13 +567,18 @@
     - asmlibconfig
 
 - name: Asmlib | Enable and start Oracle Asmlib
-  ansible.builtin.service: name=oracleasm  state=started  enabled=yes
+  ansible.builtin.service:
+    name: oracleasm
+    state: started
+    enabled: true
   when: device_persistence == 'asmlib' and asm_diskgroups is defined
   tags:
     - asmlibconfig
 
 - name: Asmlib | Restart Asmlib
-  ansible.builtin.service: name=oracleasm  state=restarted
+  ansible.builtin.service:
+    name: oracleasm
+    state: restarted
   when: asm_diskgroups is defined and device_persistence == 'asmlib' and asmlibconfig.changed
   tags:
     - asmlibconfig
