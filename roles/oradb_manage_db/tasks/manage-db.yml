@@ -1,6 +1,7 @@
 ---
 - name: manage_db | check if GI is present
-  ansible.builtin.stat: path=/etc/oracle/olr.loc
+  ansible.builtin.stat:
+    path: /etc/oracle/olr.loc
   register: olrloc
   tags: update_oratab
 
@@ -17,7 +18,8 @@
   tags:
     - always
 
-- ansible.builtin.debug: msg="Maintaining DB - {{ dbh.oracle_db_name }}, ORACLE_HOME - {{ oracle_home_db }}"  # noqa name[missing]
+- ansible.builtin.debug:
+    msg: "Maintaining DB - {{ dbh.oracle_db_name }}, ORACLE_HOME - {{ oracle_home_db }}"  # noqa name[missing]
   run_once: "{{ configure_cluster }}"
   when: dbh.state | lower == 'present'
 
@@ -73,40 +75,42 @@
 
 - name: manage_db | Customize oratab for autostart
   ansible.builtin.lineinfile:
-    dest=/etc/oratab
-    line="{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_name) }}:{{ oracle_home_db }}:Y"
-    state=present
+    dest: /etc/oratab
+    line: "{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_name) }}:{{ oracle_home_db }}:Y"
+    state: present
   when: autostartup_service and not olrloc.stat.exists and dbh.state == 'present'
   tags: update_oratab
 
 - name: manage_db | Customize oratab for autostart
   ansible.builtin.lineinfile:
-    dest=/etc/oratab
-    line="{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_name) }}:{{ oracle_home_db }}:N"
-    state=absent
+    dest: /etc/oratab
+    line: "{{ dbh.oracle_db_instance_name | default(dbh.oracle_db_name) }}:{{ oracle_home_db }}:N"
+    state: absent
   when: autostartup_service and not olrloc.stat.exists and dbh.state == 'present'
   become: true
   tags: update_oratab
 
-- ansible.builtin.debug: msg="Removing DB - {{ dbh.oracle_db_name }}, ORACLE_HOME - {{ oracle_home_db }}"  # noqa name[missing]
+- ansible.builtin.debug:
+    msg: "Removing DB - {{ dbh.oracle_db_name }}, ORACLE_HOME - {{ oracle_home_db }}"  # noqa name[missing]
   run_once: "{{ configure_cluster }}"
   when: dbh.state | lower == 'absent'
 
 - name: manage_db | remove database
   opitzconsulting.ansible_oracle.oracle_db:
-    oracle_home={{ oracle_home_db }}
-    port={{ listener_port_template }}
-    sys_password={{ dbca_sys_pass }}
-    db_name={{ dbh.oracle_db_name }}
-    output=verbose
-    state={{ dbh.state }}
+    oracle_home: "{{ oracle_home_db }}"
+    port: "{{ listener_port_template }}"
+    sys_password: "{{ dbca_sys_pass }}"
+    db_name: "{{ dbh.oracle_db_name }}"
+    output: verbose
+    state: "{{ dbh.state }}"
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   when: dbh.state | lower == 'absent'
   register: dbca_remove
   tags: remove_db,dbca
 
-- ansible.builtin.debug: var=dbca_remove.stdout_lines  # noqa name[missing] no-handler
+- ansible.builtin.debug:
+    var: dbca_remove.stdout_lines  # noqa name[missing] no-handler
   when: dbca_remove.changed
 
 - name: manage_db | remove dotprofile
