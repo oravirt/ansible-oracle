@@ -5,11 +5,15 @@
   when:
     - oracle_home_gi not in checkgiinstall.stdout
   block:
-    - ansible.builtin.debug: msg="install_home_gi | Start Extract files to ORACLE_HOME (gi)"  # noqa name[missing]
+    - ansible.builtin.debug:  # noqa name[missing]
+        msg: "install_home_gi | Start Extract files to ORACLE_HOME (gi)"
       run_once: "{{ configure_cluster }}"
 
     - name: install_home_gi | Extract files to ORACLE_HOME (gi)
-      ansible.builtin.unarchive: src={{ oracle_gi_image }}  dest={{ oracle_home_gi }} copy=no
+      ansible.builtin.unarchive:
+        src: "{{ oracle_gi_image }}"
+        dest: "{{ oracle_home_gi }}"
+        copy: false
       with_items: "{{ oracle_sw_image_gi }}"
       loop_control:
         label: "{{ oracle_gi_image | default('') }}"
@@ -24,7 +28,8 @@
 # Check for an existing GRID_HOME before reinstallation of OPatch
 - name: install_home_gi | Check for file GridSetup.sh
   no_log: true
-  ansible.builtin.stat: path={{ oracle_home_gi }}/gridSetup.sh
+  ansible.builtin.stat:
+    path: "{{ oracle_home_gi }}/gridSetup.sh"
   register: stat_gridsetup_result
   run_once: "{{ configure_cluster }}"
 
@@ -78,12 +83,12 @@
 
 - name: install_home_gi | Setup response file for install (GI)
   ansible.builtin.template:
-    src=grid-install.rsp.{{ oracle_install_version_gi }}.j2
-    dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }}
-    owner="{{ grid_install_user }}"
-    group={{ oracle_group }}
-    mode=0600
-    backup=yes
+    src: "grid-install.rsp.{{ oracle_install_version_gi }}.j2"
+    dest: "{{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }}"
+    owner: "{{ grid_install_user }}"
+    group: "{{ oracle_group }}"
+    mode: "0600"
+    backup: true
   with_items: "{{ asm_diskgroups }}"
   run_once: "{{ configure_cluster }}"
   loop_control:
@@ -102,7 +107,8 @@
         - force_runcluvfy | default(false) or oracle_home_gi not in checkgiinstall.stdout
       tags: always
 
-    - ansible.builtin.debug: msg="install_home_gi | Start Install Grid Infrastructure"  # noqa name[missing]
+    - ansible.builtin.debug:  # noqa name[missing]
+        msg: "install_home_gi | Start Install Grid Infrastructure"
       run_once: true
 
     - name: install_home_gi | Install Grid Infrastructure
@@ -123,7 +129,8 @@
       register: giinstall
       failed_when: giinstall.rc = not in [0, 6]
 
-    - ansible.builtin.debug: var=giinstall.stdout_lines  # noqa name[missing]
+    - ansible.builtin.debug:  # noqa name[missing]
+        var: giinstall.stdout_lines
       run_once: "{{ configure_cluster }}"
       when: giinstall.stdout_lines is defined
 
@@ -143,7 +150,8 @@
       tags:
         - runroot
 
-    - ansible.builtin.debug: msg="install_home_gi | Start Run root script after installation (Master Node)"  # noqa name[missing]
+    - ansible.builtin.debug:  # noqa name[missing]
+        msg: "install_home_gi | Start Run root script after installation (Master Node)"
       run_once: true
 
     - name: install_home_gi | Run root script after installation (Master Node)
@@ -155,11 +163,13 @@
       tags:
         - runroot
 
-    - ansible.builtin.debug: var=rootmaster.stdout_lines  # noqa name[missing]
+    - ansible.builtin.debug:  # noqa name[missing]
+        var: rootmaster.stdout_lines
       run_once: "{{ configure_cluster }}"
       when: rootmaster.stdout_lines is defined
 
-    - ansible.builtin.debug: msg="install_home_gi | Start Run root script after installation (Other Nodes)"  # noqa name[missing]
+    - ansible.builtin.debug:  # noqa name[missing]
+        msg: "install_home_gi | Start Run root script after installation (Other Nodes)"
       run_once: true
 
     # do not start root.sh on all nodes in parallel
@@ -180,7 +190,8 @@
         - inventory_hostname == item.1
       register: rootother
 
-    - ansible.builtin.debug: var=rootother.stdout_lines  # noqa name[missing]
+    - ansible.builtin.debug:  # noqa name[missing]
+        var: rootother.stdout_lines
       when: rootother.stdout_lines is defined
 
     - name: install_home_gi | Execute ConfigTools

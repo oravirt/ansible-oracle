@@ -1,10 +1,10 @@
 ---
 - name: install_home_gi | Copy oracle installfiles to server (GI) (web - get_url)
   ansible.builtin.get_url:
-    url={{ oracle_sw_source_www }}/{{ item.filename }}
-    dest={{ oracle_stage }}
-    mode=775
-    force=no
+    url: "{{ oracle_sw_source_www }}/{{ item.filename }}"
+    dest: "{{ oracle_stage }}"
+    mode: "0775"
+    force: false
   with_items: "{{ oracle_sw_image_gi }}"
   become: true
   become_user: "{{ grid_install_user }}"

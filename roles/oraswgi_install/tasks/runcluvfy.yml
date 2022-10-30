@@ -7,7 +7,8 @@
   tags: runcluvfy
   block:
 
-    - ansible.builtin.debug: msg="install_home_gi | Sttart Execute runcluvfy.sh for Grid-Infrastructure"  # noqa name[missing]
+    - ansible.builtin.debug:  # noqa name[missing]
+        msg: "install_home_gi | Sttart Execute runcluvfy.sh for Grid-Infrastructure"
       run_once: true
       when:
         - configure_cluster
@@ -43,7 +44,8 @@
       when:
         - configure_cluster
 
-    - ansible.builtin.debug: var=cmdruncluvfygi.stdout_lines  # noqa name[missing]
+    - ansible.builtin.debug:  # noqa name[missing]
+        var: cmdruncluvfygi.stdout_lines
       when: cmdruncluvfygi.stdout_lines is defined
 
     - name: install_home_gi | runcluvfy.sh failed
@@ -72,7 +74,8 @@
       when:
         - not configure_cluster
 
-    - ansible.builtin.debug: var=cmdruncluvfy.stdout_lines  # noqa name[missing]
+    - ansible.builtin.debug:  # noqa name[missing]
+        var: cmdruncluvfy.stdout_lines
       when: cmdruncluvfy.stdout_lines is defined
 
     - name: install_home_gi | runcluvfy.sh failed

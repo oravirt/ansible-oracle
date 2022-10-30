@@ -1,7 +1,10 @@
 ---
 
 - name: install_home_gi | Extract files to ORACLE_HOME (gi)
-  ansible.builtin.unarchive: src={{ oracle_stage }}/{{ item.filename }}  dest={{ oracle_home_gi }} copy=no
+  ansible.builtin.unarchive:
+    src: "{{ oracle_stage }}/{{ item.filename }}"
+    dest: "{{ oracle_home_gi }}"
+    copy: false
   with_items: "{{ oracle_sw_image_gi }}"
   args:
     creates: "{{ oracle_home_gi }}/root.sh"
@@ -13,7 +16,10 @@
   when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and oracle_sw_copy and oracle_sw_unpack
 
 - name: install_home_gi | Extract files to ORACLE_HOME (gi) (from remote location)
-  ansible.builtin.unarchive: src={{ oracle_stage_remote }}/{{ item.filename }}  dest={{ oracle_home_gi }} copy=no
+  ansible.builtin.unarchive:
+    src: "{{ oracle_stage_remote }}/{{ item.filename }}"
+    dest: "{{ oracle_home_gi }}"
+    copy: false
   with_items: "{{ oracle_sw_image_gi }}"
   args:
     creates: "{{ oracle_home_gi }}/root.sh"
@@ -27,7 +33,8 @@
 # Check for an existing GRID_HOME before reinstallation of OPatch
 - name: install_home_gi | Check for file GridSetup.sh
   no_log: true
-  ansible.builtin.stat: path={{ oracle_home_gi }}/gridSetup.sh
+  ansible.builtin.stat:
+    path: "{{ oracle_home_gi }}/gridSetup.sh"
   register: stat_gridsetup_result
   run_once: "{{ configure_cluster }}"
 
@@ -46,28 +53,37 @@
 #   when: oracle_sw_patches is defined and oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Install cvuqdisk rpm
-  ansible.builtin.yum: name="{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}" state=present
+  ansible.builtin.yum:
+    name: "{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}"
+    state: present
   # noqa ignore-errors
   when: configure_cluster
   tags: cvuqdisk
   ignore_errors: true
 
 - name: install_home_gi | Recreate ORACLE_HOME (gi) on other nodes
-  ansible.builtin.file: name={{ oracle_home_gi }} state=absent
+  ansible.builtin.file:
+    name: "{{ oracle_home_gi }}"
+    state: absent
   when: configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Recreate ORACLE_HOME (gi) on other nodes
-  ansible.builtin.file: name={{ oracle_home_gi }}  mode=775 owner={{ oracle_user }} group={{ oracle_group }} state=directory
+  ansible.builtin.file:
+    name: "{{ oracle_home_gi }}"
+    mode: "0775"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    state: directory
   when: configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Setup response file for install (GI)
   ansible.builtin.template:
-    src=grid-install.rsp.{{ oracle_install_version_gi }}.j2
-    dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }}
-    owner="{{ grid_install_user }}"
-    group={{ oracle_group }}
-    mode=0600
-    backup=yes
+    src: "grid-install.rsp.{{ oracle_install_version_gi }}.j2"
+    dest: "{{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }}"
+    owner: "{{ grid_install_user }}"
+    group: "{{ oracle_group }}"
+    mode: "0600"
+    backup: true
   with_items: "{{ asm_diskgroups }}"
   run_once: "{{ configure_cluster }}"
   tags:
@@ -105,8 +121,8 @@
   register: giinstall
   failed_when: giinstall.rc = not in [0, 6]
 
-- ansible.builtin.debug: var=giinstall.stdout_lines
-  # noqa name[missing]
+- ansible.builtin.debug:  # noqa name[missing]
+    var: giinstall.stdout_lines
   run_once: "{{ configure_cluster }}"
   when: oracle_home_gi not in checkgiinstall.stdout and giinstall.changed
 
@@ -133,8 +149,8 @@
   when: oracle_home_gi not in checkgiinstall.stdout
   register: rootmaster
 
-- ansible.builtin.debug: var=rootmaster.stdout_lines
-  # noqa name[missing]
+- ansible.builtin.debug:  # noqa name[missing]
+    var: rootmaster.stdout_lines
   run_once: "{{ configure_cluster }}"
   when: oracle_home_gi not in checkgiinstall.stdout
 
@@ -149,8 +165,8 @@
   when: configure_cluster and inventory_hostname != cluster_master and inventory_hostname == item.1 and oracle_home_gi not in checkgiinstall.stdout
   register: rootother
 
-- ansible.builtin.debug: var=rootother.stdout_lines
-  # noqa name[missing] ignore-errors
+- ansible.builtin.debug:  # noqa name[missing] ignore-errors
+    var: rootother.stdout_lines
   # when: not master_node and oracle_home_gi not in checkgiinstall.stdout
   when: configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
   ignore_errors: true

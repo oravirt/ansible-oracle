@@ -2,10 +2,10 @@
 
 - name: install_home_gi | Extract files to stage-area (GI)
   ansible.builtin.unarchive:
-    src={{ oracle_stage_remote }}/{{ item.filename }}
-    dest={{ oracle_stage }}/{{ item.version }}
-    copy=no
-    creates={{ oracle_stage }}/{{ item.version }}/{{ item.creates }}
+    src: "{ oracle_stage_remote }}/{{ item.filename }}"
+    dest: "{{ oracle_stage }}/{{ item.version }}"
+    copy: false
+    creates: "{{ oracle_stage }}/{{ item.version }}/{{ item.creates }}"
   with_items: "{{ oracle_sw_image_gi }}"
   become: true
   become_user: "{{ grid_install_user }}"
@@ -15,10 +15,10 @@
 
 - name: install_home_gi | Extract files to stage-area (GI) (from remote location)
   ansible.builtin.unarchive:
-    src={{ oracle_stage_remote }}/{{ item.filename }}
-    dest={{ oracle_stage }}/{{ item.version }}
-    copy=no
-    creates={{ oracle_stage }}/{{ item.version }}/{{ item.creates }}
+    src: "{{ oracle_stage_remote }}/{{ item.filename }}"
+    dest: "{{ oracle_stage }}/{{ item.version }}"
+    copy: false
+    creates: "{{ oracle_stage }}/{{ item.version }}/{{ item.creates }}"
   with_items: "{{ oracle_sw_image_gi }}"
   become: true
   become_user: "{{ grid_install_user }}"
@@ -27,7 +27,9 @@
   when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and not oracle_sw_copy and oracle_sw_unpack
 
 - name: install_home_gi | Install cvuqdisk rpm
-  ansible.builtin.yum: name="{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/grid/rpm/{{ cvuqdisk_rpm }}" state=present
+  ansible.builtin.yum:
+    name: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/grid/rpm/{{ cvuqdisk_rpm }}"
+    state: present
   # noqa ignore-errors
   when: configure_cluster
   tags: cvuqdisk
@@ -35,12 +37,12 @@
 
 - name: install_home_gi | Setup response file for install (GI)
   ansible.builtin.template:
-    src=grid-install.rsp.{{ oracle_install_version_gi }}.j2
-    dest={{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }}
-    owner="{{ grid_install_user }}"
-    group={{ oracle_group }}
-    mode=0600
-    backup=yes
+    src: "grid-install.rsp.{{ oracle_install_version_gi }}.j2"
+    dest: "{{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }}"
+    owner: "{{ grid_install_user }}"
+    group: "{{ oracle_group }}"
+    mode: "0600"
+    backup: true
   with_items: "{{ asm_diskgroups }}"
   run_once: "{{ configure_cluster }}"
   tags:
@@ -58,8 +60,8 @@
   when: oracle_home_gi not in checkgiinstall.stdout  # and oracle_sw_unpack
   register: giinstall
 
-- ansible.builtin.debug: var=giinstall.stdout_lines
-  # noqa name[missing]
+- ansible.builtin.debug:  # noqa name[missing]
+    var: giinstall.stdout_lines
   run_once: "{{ configure_cluster }}"
   when: oracle_home_gi not in checkgiinstall.stdout
 
@@ -68,8 +70,8 @@
     name: oraswgi_manage_patches
   when: patch_before_rootsh and apply_patches_gi
 
-- ansible.builtin.stat: path="{{ oracle_inventory_loc }}/orainstRoot.sh"
-  # noqa name[missing]
+- ansible.builtin.stat:  # noqa name[missing]
+    path: "{{ oracle_inventory_loc }}/orainstRoot.sh"
   register: orainstroot
 
 - name: install_home_gi | Run oraInstroot script after installation
@@ -90,8 +92,8 @@
   when: oracle_home_gi not in checkgiinstall.stdout
   register: rootmaster
 
-- ansible.builtin.debug: var=rootmaster.stdout_lines
-  # noqa name[missing]
+- ansible.builtin.debug:  # noqa name[missing]
+    var: rootmaster.stdout_lines
   run_once: "{{ configure_cluster }}"
   when: oracle_home_gi not in checkgiinstall.stdout
 
@@ -105,19 +107,19 @@
   when: configure_cluster and inventory_hostname != cluster_master and inventory_hostname == item.1 and oracle_home_gi not in checkgiinstall.stdout
   register: rootother
 
-- ansible.builtin.debug: var=rootother.stdout_lines
-  # noqa name[missing] ignore-errors
+- ansible.builtin.debug:  # noqa name[missing] ignore-errors
+    var: rootother.stdout_lines
   when: configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
   ignore_errors: true
 
 - name: install_home_gi | Setup response file for configToolAllCommands
   ansible.builtin.template:
-    src=configtoolallcommands.rsp.{{ oracle_install_version_gi }}.j2
-    dest={{ oracle_rsp_stage }}/configtoolallcommands.rsp
-    owner="{{ grid_install_user }}"
-    group={{ oracle_group }}
-    mode=0755
-    backup=yes
+    src: "configtoolallcommands.rsp.{{ oracle_install_version_gi }}.j2"
+    dest: "{{ oracle_rsp_stage }}/configtoolallcommands.rsp"
+    owner: "{{ grid_install_user }}"
+    group: "{{ oracle_group }}"
+    mode: "0755"
+    backup: true
   run_once: "{{ configure_cluster }}"
   tags:
     - responsefileconfigtool
