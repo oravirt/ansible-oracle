@@ -2,14 +2,14 @@
 # tasks file for manage-db-users
 - name: Manage roles (cdb)
   opitzconsulting.ansible_oracle.oracle_role:
-    role={{ item.1.name }}
-    state={{ item.1.state }}
-    hostname={{ ansible_hostname }}
-    port={{ listener_port_template }}
-    service_name={{ db_service_name }}
-    user={{ db_user }}
-    password={{ db_password_cdb }}
-    mode={{ db_mode }}
+    role: "{{ item.1.name }}"
+    state: "{{ item.1.state }}"
+    hostname: "{{ ansible_hostname }}"
+    port: "{{ listener_port_template }}"
+    service_name: "{{ db_service_name }}"
+    user: "{{ db_user }}"
+    password: "{{ db_password_cdb }}"
+    mode: "{{ db_mode }}"
   with_subelements:
     - "{{ oracle_databases }}"
     - roles
@@ -28,14 +28,14 @@
 
 - name: Manage roles (pdb)
   opitzconsulting.ansible_oracle.oracle_role:
-    role={{ item.1.name }}
-    state={{ item.1.state }}
-    hostname={{ ansible_hostname }}
-    port={{ listener_port_template }}
-    service_name={{ item.0.pdb_name }}
-    user={{ db_user }}
-    password={{ db_password_pdb }}
-    mode={{ db_mode }}
+    role: "{{ item.1.name }}"
+    state: "{{ item.1.state }}"
+    hostname: "{{ ansible_hostname }}"
+    port: "{{ listener_port_template }}"
+    service_name: "{{ item.0.pdb_name }}"
+    user: "{{ db_user }}"
+    password: "{{ db_password_pdb }}"
+    mode: "{{ db_mode }}"
   with_subelements:
     - "{{ oracle_pdbs }}"
     - roles
