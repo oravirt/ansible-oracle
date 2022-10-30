@@ -106,12 +106,12 @@
   failed_when: giinstall.rc = not in [0, 6]
 
 - ansible.builtin.debug: var=giinstall.stdout_lines
-  # noqa unnamed-task
+  # noqa name[missing]
   run_once: "{{ configure_cluster }}"
   when: oracle_home_gi not in checkgiinstall.stdout and giinstall.changed
 
 - ansible.builtin.include_role:
-    # noqa unnamed-task
+    # noqa name[missing]
     name: oraswgi_manage_patches
   when: patch_before_rootsh and apply_patches_gi
 
@@ -134,7 +134,7 @@
   register: rootmaster
 
 - ansible.builtin.debug: var=rootmaster.stdout_lines
-  # noqa unnamed-task
+  # noqa name[missing]
   run_once: "{{ configure_cluster }}"
   when: oracle_home_gi not in checkgiinstall.stdout
 
@@ -150,7 +150,7 @@
   register: rootother
 
 - ansible.builtin.debug: var=rootother.stdout_lines
-  # noqa unnamed-task ignore-errors
+  # noqa name[missing] ignore-errors
   # when: not master_node and oracle_home_gi not in checkgiinstall.stdout
   when: configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
   ignore_errors: true

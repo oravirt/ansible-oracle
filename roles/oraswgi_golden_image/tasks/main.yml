@@ -1,5 +1,5 @@
 ---
-- ansible.builtin.assert:  # noqa unnamed-task
+- ansible.builtin.assert:  # noqa name[missing]
     that: golden_image_dest is defined
 
 # Creating Oracle Restart Golden-Image requires a running stack under 19c
@@ -14,7 +14,7 @@
       # noqa no-changed-when
       register: crscheck
 
-    - ansible.builtin.debug: msg="{{ crscheck.stdout_lines }}"  # noqa unnamed-task
+    - ansible.builtin.debug: msg="{{ crscheck.stdout_lines }}"  # noqa name[missing]
       when: crscheck.stdout_lines is defined
 
     - name: Create destination directory for Golden-Image {{ golden_image_dest }}
@@ -28,5 +28,5 @@
       # noqa no-changed-when
       register: createimage
 
-    - ansible.builtin.debug: msg="{{ createimage.stdout_lines }}"  # noqa unnamed-task
+    - ansible.builtin.debug: msg="{{ createimage.stdout_lines }}"  # noqa name[missing]
       when: createimage.stdout_lines is defined

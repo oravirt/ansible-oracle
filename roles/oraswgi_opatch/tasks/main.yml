@@ -127,7 +127,7 @@
   register: psuapplym
 
 - ansible.builtin.debug: var=psuapplym.stdout_lines
-  # noqa unnamed-task
+  # noqa name[missing]
   run_once: "{{ configure_cluster }}"
   when: oracle_psu_apply_gi
   tags:
@@ -143,7 +143,7 @@
   when: oracle_psu_apply_gi  # and not {{ item.1.stdout }} != 0
 
 - ansible.builtin.debug: var=crsctl.stdout_lines
-  # noqa unnamed-task
+  # noqa name[missing]
   tags:
     - crsctl
   run_once: "{{ configure_cluster }}"
@@ -183,7 +183,7 @@
   register: psuapplyo
 
 - ansible.builtin.debug: var=psuapplyo.stdout_lines
-  # noqa unnamed-task
+  # noqa name[missing]
   when: configure_cluster and inventory_hostname != cluster_master and oracle_psu_apply_gi and psuapplyo is defined
   tags:
     - psuapplyo
@@ -197,7 +197,7 @@
   when: oracle_psu_apply_gi
 
 - ansible.builtin.debug: var=crsctl.stdout_lines
-  # noqa unnamed-task
+  # noqa name[missing]
   tags:
     - crsctl-opatch
   when: oracle_psu_apply_gi
@@ -213,7 +213,7 @@
     - opatchls
 
 - ansible.builtin.debug: var=opatchls.stdout_lines
-  # noqa unnamed-task
+  # noqa name[missing]
   when: oracle_psu_apply_gi
   tags:
     - opatchls

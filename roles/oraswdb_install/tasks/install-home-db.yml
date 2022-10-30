@@ -17,7 +17,7 @@
   tags: install_home,existing_dbhome,checkdbswinstall
 
 - ansible.builtin.debug: msg="Installing ORACLE_HOME - {{ oracle_home_db }}"
-  # noqa unnamed-task
+  # noqa name[missing]
   when: oracle_home_db not in existing_dbhome.stdout_lines
 
 - name: install_home_db | add dotprofile
@@ -154,7 +154,7 @@
     - opatchls
 
 - ansible.builtin.debug: var=opatchls.stdout_lines
-  # noqa ignore-errors unnamed-task
+  # noqa ignore-errors name[missing]
   run_once: "{{ configure_cluster }}"
   when: opatchls is defined
   tags:

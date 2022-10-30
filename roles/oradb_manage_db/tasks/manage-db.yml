@@ -17,7 +17,7 @@
   tags:
     - always
 
-- ansible.builtin.debug: msg="Maintaining DB - {{ dbh.oracle_db_name }}, ORACLE_HOME - {{ oracle_home_db }}"  # noqa unnamed-task
+- ansible.builtin.debug: msg="Maintaining DB - {{ dbh.oracle_db_name }}, ORACLE_HOME - {{ oracle_home_db }}"  # noqa name[missing]
   run_once: "{{ configure_cluster }}"
   when: dbh.state | lower == 'present'
 
@@ -88,7 +88,7 @@
   become: true
   tags: update_oratab
 
-- ansible.builtin.debug: msg="Removing DB - {{ dbh.oracle_db_name }}, ORACLE_HOME - {{ oracle_home_db }}"  # noqa unnamed-task
+- ansible.builtin.debug: msg="Removing DB - {{ dbh.oracle_db_name }}, ORACLE_HOME - {{ oracle_home_db }}"  # noqa name[missing]
   run_once: "{{ configure_cluster }}"
   when: dbh.state | lower == 'absent'
 
@@ -106,7 +106,7 @@
   register: dbca_remove
   tags: remove_db,dbca
 
-- ansible.builtin.debug: var=dbca_remove.stdout_lines  # noqa unnamed-task no-handler
+- ansible.builtin.debug: var=dbca_remove.stdout_lines  # noqa name[missing] no-handler
   when: dbca_remove.changed
 
 - name: manage_db | remove dotprofile
