@@ -3,24 +3,24 @@
 
 - name: Manage users (db/cdb)
   opitzconsulting.ansible_oracle.oracle_user:
-    hostname={{ ansible_hostname }}
-    port={{ listener_port_template }}
-    service_name={{ db_service_name }}
-    user={{ db_user }}
-    password={{ db_password_cdb }}
-    mode="{{ db_mode }}"
-    schema={{ item.1.schema }}
-    schema_password={{ item.1.password_is_hash | default(false) | ternary(omit,user_cdb_password) }}
-    schema_password_hash={{ item.1.password_is_hash | default(false) | ternary(user_cdb_password,omit) }}
-    profile={{ item.1.profile | default (omit) }}
-    state={{ item.1.state }}
-    default_tablespace={{ item.1.default_tablespace | default (omit) }}
-    default_temp_tablespace={{ item.1.default_temp_tablespace | default (omit) }}
-    container={{ item.1.container | default(omit) }}
-    container_data={{ item.1.container_data | default(omit) }}
-    update_password={{ item.1.update_password | default(omit) }}
-    authentication_type={{ item.1.authentication_type | default(omit) }}
-    grants={{ item.1.grants | default (omit) }}
+    hostname: "{{ ansible_hostname }}"
+    port: "{{ listener_port_template }}"
+    service_name: "{{ db_service_name }}"
+    user: "{{ db_user }}"
+    password: "{{ db_password_cdb }}"
+    mode: "{{ db_mode }}"
+    schema: "{{ item.1.schema }}"
+    schema_password: "{{ item.1.password_is_hash | default(false) | ternary(omit,user_cdb_password) }}"
+    schema_password_hash: "{{ item.1.password_is_hash | default(false) | ternary(user_cdb_password,omit) }}"
+    profile: "{{ item.1.profile | default (omit) }}"
+    state: "{{ item.1.state }}"
+    default_tablespace: "{{ item.1.default_tablespace | default (omit) }}"
+    default_temp_tablespace: "{{ item.1.default_temp_tablespace | default (omit) }}"
+    container: "{{ item.1.container | default(omit) }}"
+    container_data: "{{ item.1.container_data | default(omit) }}"
+    update_password: "{{ item.1.update_password | default(omit) }}"
+    authentication_type: "{{ item.1.authentication_type | default(omit) }}"
+    grants: "{{ item.1.grants | default (omit) }}"
   with_subelements:
     - "{{ oracle_databases }}"
     - users
@@ -39,22 +39,22 @@
 
 - name: Manage users (pdb)
   opitzconsulting.ansible_oracle.oracle_user:
-    hostname={{ ansible_hostname }}
-    port={{ listener_port_template }}
-    service_name={{ item.0.pdb_name }}
-    user={{ db_user }}
-    password={{ db_password_pdb }}
-    mode="{{ db_mode }}"
-    schema={{ item.1.schema }}
-    schema_password={{ item.1.password_is_hash | default(false) | ternary(omit,user_pdb_password) }}
-    schema_password_hash={{ item.1.password_is_hash | default(false) | ternary(user_pdb_password,omit) }}
-    profile={{ item.1.profile | default (omit) }}
-    state={{ item.1.state }}
-    default_tablespace={{ item.1.default_tablespace | default (omit) }}
-    default_temp_tablespace={{ item.1.default_temp_tablespace | default (omit) }}
-    update_password={{ item.1.update_password | default(omit) }}
-    authentication_type={{ item.1.authentication_type | default(omit) }}
-    grants={{ item.1.grants | default (omit) }}
+    hostname: "{{ ansible_hostname }}"
+    port: "{{ listener_port_template }}"
+    service_name: "{{ item.0.pdb_name }}"
+    user: "{{ db_user }}"
+    password: "{{ db_password_pdb }}"
+    mode: "{{ db_mode }}"
+    schema: "{{ item.1.schema }}"
+    schema_password: "{{ item.1.password_is_hash | default(false) | ternary(omit,user_pdb_password) }}"
+    schema_password_hash: "{{ item.1.password_is_hash | default(false) | ternary(user_pdb_password,omit) }}"
+    profile: "{{ item.1.profile | default (omit) }}"
+    state: "{{ item.1.state }}"
+    default_tablespace: "{{ item.1.default_tablespace | default (omit) }}"
+    default_temp_tablespace: "{{ item.1.default_temp_tablespace | default (omit) }}"
+    update_password: "{{ item.1.update_password | default(omit) }}"
+    authentication_type: "{{ item.1.authentication_type | default(omit) }}"
+    grants: "{{ item.1.grants | default (omit) }}"
   with_subelements:
     - "{{ oracle_pdbs }}"
     - users
