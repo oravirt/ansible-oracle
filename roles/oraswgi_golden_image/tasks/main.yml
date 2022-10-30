@@ -14,7 +14,8 @@
       # noqa no-changed-when
       register: crscheck
 
-    - ansible.builtin.debug: msg="{{ crscheck.stdout_lines }}"  # noqa name[missing]
+    - ansible.builtin.debug:  # noqa name[missing]
+        msg: "{{ crscheck.stdout_lines }}"
       when: crscheck.stdout_lines is defined
 
     - name: Create destination directory for Golden-Image {{ golden_image_dest }}
@@ -28,5 +29,6 @@
       # noqa no-changed-when
       register: createimage
 
-    - ansible.builtin.debug: msg="{{ createimage.stdout_lines }}"  # noqa name[missing]
+    - ansible.builtin.debug:  # noqa name[missing]
+        msg: "{{ createimage.stdout_lines }}"
       when: createimage.stdout_lines is defined
