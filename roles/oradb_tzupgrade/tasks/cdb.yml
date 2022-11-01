@@ -1,0 +1,84 @@
+---
+- name: oradb_tzupgrade | Perform timezone checks for CDB$ROOT and PDB$SEED first
+  oracle_sqldba:
+    catcon_pl: "{{ oracle_db_home }}/rdbms/admin/utltz_upg_check.sql"
+    creates_sql: "{{ tz_check_query }}"
+    oracle_home: "{{ oracle_db_home }}"
+    oracle_db_name: "{{ oracle_db_name }}"
+    scope: pdbs
+    pdb_list: "CDB$ROOT PDB$SEED"
+  become_user: "{{ oracle_user }}"
+
+- name: oradb_tzupgrade | Upgrade timezone for CDB$ROOT and PDB$SEED
+  oracle_sqldba:
+    catcon_pl: "{{ oracle_db_home }}/rdbms/admin/utltz_upg_apply.sql"
+    creates_sql: "{{ tz_check_query }}"
+    oracle_home: "{{ oracle_db_home }}"
+    oracle_db_name: "{{ oracle_db_name }}"
+    scope: pdbs
+    pdb_list: "CDB$ROOT PDB$SEED"
+  become_user: "{{ oracle_user }}"
+
+- name: oradb_tzupgrade | Get all open PDBs
+  oracle_sqldba:
+    sqlselect: "select listagg(name, ' ') within group (order by name) pdb_list from v$pdbs where open_mode in ('READ WRITE', 'MIGRATE')"
+    oracle_home: "{{ oracle_db_home }}"
+    oracle_db_name: "{{ oracle_db_name }}"
+  become_user: "{{ oracle_user }}"
+  register: pdbs_info
+
+- ansible.builtin.set_fact:  # noqa unnamed-task
+    candidate_pdbs: "{{ pdbs_info.state.ROW[0].PDB_LIST | default('') }}"
+
+- ansible.builtin.debug:  # noqa unnamed-task
+    msg: "Candidate PDBs: {{ candidate_pdbs }}"
+
+- block:  # noqa unnamed-task
+
+    - name: oradb_tzupgrade | Perform timezone checks for the candidate PDBs
+      oracle_sqldba:
+        catcon_pl: "{{ oracle_db_home }}/rdbms/admin/utltz_upg_check.sql"
+        creates_sql: "{{ tz_check_query }}"
+        oracle_home: "{{ oracle_db_home }}"
+        scope: pdbs
+        pdb_list: "{{ candidate_pdbs }}"
+        oracle_db_name: "{{ oracle_db_name }}"
+      become_user: "{{ oracle_user }}"
+
+    - name: oradb_tzupgrade | Upgrade timezone for the candidate PDBs
+      oracle_sqldba:
+        catcon_pl: "{{ oracle_db_home }}/rdbms/admin/utltz_upg_apply.sql"
+        creates_sql: "{{ tz_check_query }}"
+        oracle_home: "{{ oracle_db_home }}"
+        scope: pdbs
+        pdb_list: "{{ candidate_pdbs }}"
+        oracle_db_name: "{{ oracle_db_name }}"
+      become_user: "{{ oracle_user }}"
+
+  when: candidate_pdbs != ""
+
+- name: oradb_tzupgrade | Get post upgrade timezone status info
+  oracle_sqldba:
+    sql: |
+      set tab off
+      set head on
+      set pages 99
+      set lines 200
+      column current_tz format a20
+      column latest_tz format a20
+      column container format a20
+      column open_mode format a15
+      alter session set "_exclude_seed_cdb_view"=false;
+      select (select name from v$containers where con_id=t.con_id) container,
+             (select open_mode from v$containers where con_id = t.con_id) open_mode,
+             value$ current_tz,
+             to_char(dbms_dst.get_latest_timezone_version) latest_tz
+        from containers(SYS.PROPS$) t where NAME='DST_PRIMARY_TT_VERSION' order by 1;
+    oracle_home: "{{ oracle_db_home }}"
+    oracle_db_name: "{{ oracle_db_name }}"
+  become_user: "{{ oracle_user }}"
+  changed_when: false
+  register: post_status_info
+
+- ansible.builtin.debug:  # noqa unnamed-task
+    msg: "{{ post_status_info.msg | split('\n') }}"
