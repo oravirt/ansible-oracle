@@ -1,0 +1,9 @@
+---
+- ansible.builtin.include_tasks: tzpatch_db.yml
+  # noqa unnamed-task
+  vars:
+    oradb_entry: "{{ item }}"
+  with_items: "{{ oracle_databases }}"
+  when: item.state | lower == 'present'
+  loop_control:
+    label: "home: {{ item.home }} db_name: {{ item.oracle_db_name }}"

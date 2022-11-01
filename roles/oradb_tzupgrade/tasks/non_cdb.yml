@@ -1,0 +1,36 @@
+---
+- name: oradb_tzupgrade | Perform timezone checks for a non-CDB database
+  oracle_sqldba:
+    sql: "@?/rdbms/admin/utltz_upg_check.sql"
+    creates_sql: "{{ tz_check_query }}"
+    oracle_home: "{{ oracle_db_home }}"
+    oracle_db_name: "{{ oracle_db_name }}"
+  become_user: "{{ oracle_user }}"
+
+- name: oradb_tzupgrade | Apply the timezone upgrade for the non-CDB database
+  oracle_sqldba:
+    sql: "@?/rdbms/admin/utltz_upg_apply.sql"
+    creates_sql: "{{ tz_check_query }}"
+    oracle_home: "{{ oracle_db_home }}"
+    oracle_db_name: "{{ oracle_db_name }}"
+  become_user: "{{ oracle_user }}"
+
+- name: oradb_tzupgrade | Get post upgrade timezone status info
+  oracle_sqldba:
+    sql: |
+      set lines 200
+      set head on
+      set pages 99
+      set tab off
+      column current_tz format a20
+      column latest_tz format a20
+      SELECT property_value current_tz, to_char(dbms_dst.get_latest_timezone_version) latest_tz
+        FROM database_properties WHERE property_name LIKE 'DST_PRIMARY_TT_VERSION';
+    oracle_home: "{{ oracle_db_home }}"
+    oracle_db_name: "{{ oracle_db_name }}"
+  become_user: "{{ oracle_user }}"
+  changed_when: false
+  register: post_status_info
+
+- ansible.builtin.debug:  # noqa unnamed-task
+    msg: "{{ post_status_info.msg | split('\n') }}"

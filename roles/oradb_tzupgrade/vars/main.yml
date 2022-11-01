@@ -1,0 +1,10 @@
+---
+oracle_db_name: "{{ oradb_entry.oracle_db_instance_name | default(oradb_entry.oracle_db_unique_name | default(oradb_entry.oracle_db_name)) }}"
+oracle_db_home: "{%- if oradb_entry is defined -%}\
+                    {%- if db_homes_config[oradb_entry.home]['oracle_home'] is defined -%}\
+                         {{ db_homes_config[oradb_entry.home]['oracle_home'] }}\
+                    {%- else -%}\
+                         {{ oracle_base }}/{{ db_homes_config[oradb_entry.home]['version'] }}/{{ db_homes_config[oradb_entry.home]['home'] }}\
+                    {%- endif -%}\
+                 {%- endif -%}"
+tz_check_query: "SELECT decode(property_value, dbms_dst.get_latest_timezone_version, 1, 0) status FROM database_properties WHERE  property_name LIKE 'DST_PRIMARY_TT_VERSION'"
