@@ -25,7 +25,7 @@
 # without executing a template task before.
 - name: manage_db | Copy custom dbca Templates for Database to ORACLE_HOME/assistants/dbca/templates
   ansible.builtin.template:
-    src: "{{ dbh.dbca_templatename }}"
+    src: "{{ (dbh.dbca_templatepath | default(''), dbh.dbca_templatename) | path_join }}"
     dest: "{{ oracle_home_db }}/assistants/dbca/templates/{{ dbh.oracle_db_name }}_{{ dbh.dbca_templatename }}"
     owner: "{{ oracle_user }}"
     group: "{{ oracle_group }}"
