@@ -1,0 +1,49 @@
+@startuml
+!include <C4/C4_Component>
+!include <office/Servers/database_server>
+
+LAYOUT_TOP_DOWN()
+
+AddContainerTag("oradb", $legendText="Database")
+AddContainerTag("media", $legendText="Installation Media")
+AddContainerTag("software", $legendText="Tool")
+AddContainerTag("ansible", $legendText="Ansible")
+AddSystemTag("tools", $legendText="Tool")
+
+Person(admin, "Administrator")
+System_Boundary(host, "Host System", "PC/Notebook") {
+  Boundary(tools, "Tools") {
+    System_Ext(vscode, "Virtual Studio Code", "", $tags="software")
+    System(conemu, "ConEmu", "Using git+bash as CLI") {
+      Container(sshagent, "ssh-agent", "", $tags="software")
+      Container(ssh, "ssh", "ssh vagrant@192.168.56.161", $tags="software")
+      Container(vagrant, "Vagrant", "", $tags="software")
+      Container(git, "git", "git clone for Vagrantfile from ansible-oracle", $tags="software")
+
+      SetPropertyHeader("Windows Environment Variable","Description")
+      AddProperty("VAGRANT_ANSIBLE_ORACLE_SW", "Drive with directory on Host System")
+      Container(instmediahost, "Installation Media", "Environment Variable for vboxsf mount in VM", $tags="media")
+    }
+  }
+  Boundary(virtualbox, "VirtualBox") {
+    System(vmansible, "VM Ansible", "DNS: advanced-ansible-151-192-168-56-199.nip.io \n Oracle Linux 7\n2GB RAM, 1 Cores") {
+      Container(ansible, "Ansible-Container", "ansible-playbook single-instance-fs.yml")
+   }
+    System(dbfs, "VM Database-Server", "DNS: advanced-dbfs-151-192-168-56-161.nip.io \n Oracle Linux 7\n4GB RAM, 2 Cores") {
+      SetPropertyHeader("Parameter","Value")
+      AddProperty("ORACLE_BASE", "/u01/app/oracle")
+      AddProperty("ORACLE_HOME", "/u01/app/oracle/product/19/db1")
+      AddProperty("ORACLE_SID", "DB1")
+      AddProperty("db_create_file_dest", "/u02/oradata")
+      AddProperty("db_recovery_file_dest", "/u02/fra")
+      ContainerDb(rdbms, "Oracle RDBMS", "DB1", $tags="oradb")
+      Container(instmedia, "Installation Media from Environment Variable VAGRANT_ANSIBLE_ORACLE_SW mounted on /sw/oracle inside VM", "ORA 19c", $tags="media")
+   }
+  }
+}
+Rel_Down(admin, tools, "")
+Rel_Down(conemu, vmansible, "ssh with agent forwarding")
+Rel_Down(vmansible, dbfs, "ssh with key from Agent")
+
+SHOW_LEGEND()
+@enduml

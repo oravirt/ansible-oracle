@@ -1,0 +1,46 @@
+@startuml
+!include <C4/C4_Component>
+!include <office/Servers/database_server>
+
+LAYOUT_TOP_DOWN()
+
+AddContainerTag("oradb", $legendText="Database")
+AddContainerTag("media", $legendText="Installation Media")
+AddContainerTag("software", $legendText="Tool")
+AddContainerTag("ansible", $bgColor="DarkBlue", $legendText="Ansible")
+AddSystemTag("tools", $legendText="Tool")
+
+Person(admin, "Administrator")
+System_Boundary(host, "Host System", "PC/Notebook") {
+  Container(instmediahost, "Installation Media", "Placed in Vagrantfile Folder on Host System", $tags="media")
+
+  Boundary(tools, "Tools") {
+    System_Ext(vscode, "Visual Studio Code", "", $tags="software")
+    System(conemu, "ConEmu", "Using git+bash as CLI") {
+      Container(sshagent, "ssh-agent", "", $tags="software")
+      Container(ssh, "ssh", "ssh vagrant@192.168.56.161", $tags="software")
+      Container(vagrant, "Vagrant", "", $tags="software")
+      Container(git, "git", "git clone for Vagrantfile from ansible-oracle", $tags="software")
+    }
+  }
+  Boundary(virtualbox, "VirtualBox") {
+    System(dbfs, "VM Ansible + Database-Server", "DNS: beginner-dbfs-151-192-168-56-161.nip.io \n Oracle Linux 7\n4GB RAM, 2 Cores") {
+      Container(docker, "Docker Container") {
+        Container(ansible, "Ansible-Container", "ansible-playbook single-instance-fs.yml", $tags="ansible")
+      }
+      SetPropertyHeader("Parameter","Value")
+      AddProperty("ORACLE_BASE", "/u01/app/oracle")
+      AddProperty("ORACLE_HOME", "/u01/app/oracle/product/19/db1")
+      AddProperty("ORACLE_SID", "DB1")
+      AddProperty("db_create_file_dest", "/u02/oradata")
+      AddProperty("db_recovery_file_dest", "/u02/fra")      ContainerDb(rdbms, "Oracle RDBMS", "DB1", $tags="oradb")
+      Container(instmedia, "Installation Media from /vagrant mount", "", $tags="media")
+   }
+  }
+}
+Rel_Down(admin, tools, "")
+Rel_Down(ssh, dbfs, "ssh with agent forwarding")
+Rel_Up(instmediahost, instmedia, "mounted with vboxsf at /vagrant")
+
+SHOW_LEGEND()
+@enduml
