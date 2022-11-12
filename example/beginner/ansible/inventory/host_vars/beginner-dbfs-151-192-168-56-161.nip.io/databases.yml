@@ -1,0 +1,13 @@
+---
+# rmanautofs: yes
+# rmanautofsmount: /u01/rmanbackup
+rman_retention_policy: "RECOVERY WINDOW OF 14 DAYS"
+rman_channel_disk: "format '/u01/rmanbackup/%d/%d_%T_%U'"
+rman_controlfile_autobackup_disk: "'/u01/rmanbackup/%d/%d_%F'"
+rman_device_type_disk: 'PARALLELISM 1 BACKUP TYPE TO COMPRESSED BACKUPSET'
+
+oracle_databases:
+  - "{{ oracle_database_db1 }}"
+
+oracle_pdbs:
+  - "{{ oracle_pdb_db1_orclpdb }}"

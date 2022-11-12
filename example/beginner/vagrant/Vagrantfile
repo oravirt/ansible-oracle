@@ -1,0 +1,109 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# PLEASE START 1st with following command to create additional disks!
+#
+# VAGRANT_EXPERIMENTAL=disks vagrant up
+
+Vagrant.configure("2") do |config|
+
+  lanip = "192.168.56.161"
+  vm_name = "beginner-dbfs-151-192-168-56-161"
+
+  puts " "
+  puts " Single Instance Database in Filesystem"
+  puts " "
+  puts " Hostname: #{vm_name}"
+  puts " IP:       #{lanip}"
+  puts " Logins:"
+  puts "           vagrant / vagrant"
+  puts "           root    / vagrant"
+  puts " "
+  puts " Please do the 1st start with following command to create the additional disks!"
+  puts " VAGRANT_EXPERIMENTAL=disks vagrant up"
+  puts " "
+
+  # Please define the folder to the extracted archives from Oracle
+  #
+  config.vm.synced_folder ENV['VAGRANT_ANSIBLE_ORACLE_SW'], "/sw/oracle", disabled: false, mount_options: ["ro"]
+
+  config.vm.disk :disk, size: "150GB", name: "#{vm_name}_oracle"
+
+  config.vm.box =  "Rendanic/oraclelinux-7.x"
+  config.vm.box_check_update = false
+
+  config.vm.network :private_network, ip: lanip
+
+  # config.vm.network "public_network"
+  config.ssh.insert_key = true
+  config.ssh.username = "vagrant"
+  config.ssh.password = "vagrant"
+
+  config.vm.hostname = "#{vm_name}.nio.io"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = vm_name
+    vb.gui = false
+    vb.memory = "4096"
+    vb.cpus = 2
+    # vb.customize ["modifyvm", :id, "--groups", "/ansible-oracle"]
+
+  end
+
+  config.vm.provision "shell", inline: <<-SHELL
+
+    if [ ! -b /dev/sdb ]; then
+      echo "Please start the Box with following command once to create the addional disks!"
+      echo "VAGRANT_EXPERIMENTAL=disks vagrant up"
+      exit 1
+    fi
+
+    # copy public key to vagrant user
+    ssh_public_key=$(find /vagrant/*.pub -printf "%p")
+    if test -f "$ssh_public_key" ; then
+      echo "Check if public key $ssh_public_key is valid."
+      if ssh-keygen -l -f "$ssh_public_key" ; then
+        echo "Add public key to /home/vagrant/.ssh/authorized_keys"
+        cat "$ssh_public_key" >> /home/vagrant/.ssh/authorized_keys
+      fi
+    fi
+
+    sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+    systemctl restart sshd.service
+
+    # Install docker for Ansible-Container!
+    yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+    yum-config-manager --enable ol7_addons
+    yum install -y oraclelinux-developer-release-el7.x86_64
+    yum install -y docker-ce
+    usermod -G docker -a vagrant
+    systemctl start docker
+    systemctl enable docker
+
+    # Install docker-compose
+    wget -q https://github.com/docker/compose/releases/download/v2.12.2/docker-compose-linux-x86_64
+    mv docker-compose-linux-x86_64 /usr/local/bin/docker-compose
+    chmod 755 /usr/local/bin/docker-compose
+
+    # Clone ansible-oracle Repository
+    yum install -y git
+    mkdir /home/vagrant/git
+    cd /home/vagrant/git
+
+    # temporary Rendanic until PR is merged into master!
+    git clone --branch examples https://github.com/Rendanic/ansible-oracle.git
+    # git clone https://github.com/oravirt/ansible-oracle.git
+    chown -R vagrant /home/vagrant/git
+
+    # Build Ansible-Container
+    cd /home/vagrant/git/ansible-oracle/docker
+    eval $(ssh-agent)
+    /usr/local/bin/docker-compose build
+
+    # Update OS
+    yum install -y gcc make perl kernel-uek-devel bash-completion
+    yum update -y
+    /sbin/rcvboxadd quicksetup all
+
+  SHELL
+end
