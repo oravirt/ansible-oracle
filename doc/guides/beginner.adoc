@@ -1,0 +1,292 @@
+:toc:
+:toc-placement!:
+:toclevels: 4
+toc::[]
+
+:sectnums:
+:sectnumlevels: 4
+
+== Beginners Guide
+
+IMPORTANT: The setup of Vagrant, VirtualBox and SSH is not part of this documentation. +
+Please follow the link:../vagrant.adoc[documentation].
+
+=== Overview
+
+:puml: http://www.plantuml.com/plantuml/proxy?src=https://raw.githubusercontent.com/oravirt/ansible-oracle/master/doc
+
+image::{puml}/guides/beginner.puml[Architecturview]
+
+.Used defaults in this guide
+[options="header,footer"]
+|=======================
+|Value |Description
+|~/git/ansible-oracle |git Repository on Host System
+|~/git/ansible-oracle |git Repository in VM
+|~/.ssh/id_rsa |private Key on Host System
+|vagrant |SSH-User for Login and Ansible
+|~/git/ansible-oracle/example/beginner|Vagrantfile location
+
+|=======================
+
+=== Setup Host System
+
+IMPORTANT: All steps are executed on the Host System inside a `git+bash`.
+
+.clone git Repository
+----
+mkdir ~/git
+cd ~/git
+
+git clone https://github.com/oravirt/ansible-oracle.git
+----
+
+==== Download Oracle Installation media
+
+Download the link:https://download.oracle.com/otn/linux/oracle19c/190000/LINUX.X64_193000_db_home.zip[installation media for Oracle RDBMS 19c] for Linux x86_64.
+
+Place the ZIP archive into the directory of Vagrantfile.
+
+.copy archive
+----
+cd <Downloadlocation>
+
+cp LINUX.X64_193000_db_home.zip ~/git/ansible-oracle/example/beginner/vagrant
+----
+
+==== Configure SSH-Key
+
+IMPORTANT: Do not skip the preparation for Vagrant and SSH. +
+Please follow the link:../vagrant.adoc[documentation].
+
+.Copy Public key into Vagrantfile directory
+----
+cp ~/.ssh/id_rsa.pub ~/git/ansible-oracle/example/beginner/vagrant
+----
+
+.Start ssh-Agent (not needed when running from SSH-Setup)
+----
+eval $(ssh-agent)
+----
+
+.Import the generated key
+----
+ssh-add ~/.ssh/id_rsa
+----
+
+==== Start Vagrantbox
+
+IMPORTANT: The Deployment und provisioning of the VM takes some minutes. +
+It highly depends on the speed of the internet connection.
+
+IMPORTANT: The SSH public key is configured during the provisioning phase of the VM. +
+*Do not forget to copy the file before starting the box with `vagrant up`.*
+
+.vagrant up
+----
+cd ~/git/ansible-oracle/example/beginner/vagrant
+VAGRANT_EXPERIMENTAL=disks vagrant up
+----
+
+=== Working inside the VM
+
+==== Connect to VM
+
+IMPORTANT: All furter steps are done inside the VM. +
+The SSH-Setup from previous chapter must be completed before!
+
+.Connect into VM with SSH from `git+bash`
+----
+ssh -A vagrant@192.168.56.161
+----
+
+==== Note about Installation media
+
+The installation media is mounted with vboxsf from Vagrant into the VM at `/vagrant`. +
+You can check this.
+
+.check for Installation media
+----
+[vagrant@beginner-dbfs-151-192-168-56-161 ~]$ ls /vagrant/LINUX.X64_193000_db_home.zip
+
+/vagrant/LINUX.X64_193000_db_home.zip
+----
+
+==== Start Ansible-Container inside VM
+
+IMPORTANT: Check the prompt while starting the commands in shell or inside the Ansible-Container. +
+`ansible@ansible-oracle` is for working inside the container.
+
+.Start Ansible-Container
+----
+cd ~/git/ansible-oracle/docker
+docker-compose run --rm -w /git/ansible-oracle/example/beginner/ansible ansible bash
+----
+
+.Example
+[auote, output]
+----
+[vagrant@beginner-dbfs-151-192-168-56-161 docker]$ docker-compose run --rm -w /git/ansible-oracle/example/beginner/ansible ansible bash
+[+] Running 2/0
+ ⠿ Network docker_default          Created
+ ⠿ Volume "docker_ansible_galaxy"  Created
+
+ansible@ansible-oracle:/git/ansible-oracle/example/beginner/ansible$
+----
+
+
+IMPORTANT: The collection are installed once and stored on the docker volume.
+
+.Install Collections
+----
+ansible@ansible-oracle:/git/ansible-oracle/example/beginner/ansible$ ansible-galaxy collection install -r requirements.yml
+----
+
+.Example
+[auote, output]
+----
+ansible@ansible-oracle:/git/ansible-oracle/example/beginner/ansible$ ansible-galaxy collection install -r requirements.yml 
+Starting galaxy collection install process
+Process install dependency map
+Starting collection install process
+Downloading https://galaxy.ansible.com/download/devsec-hardening-8.2.0.tar.gz to /home/ansible/.ansible/tmp/ansible-local-25z8isd809/tmp25w_hn4o/devsec-hardening-8.2.0-0j9481f1
+Installing 'devsec.hardening:8.2.0' to '/ansible/galaxy/ansible_collections/devsec/hardening'
+Downloading https://galaxy.ansible.com/download/opitzconsulting-ansible_oracle-3.2.0.tar.gz to /home/ansible/.ansible/tmp/ansible-local-25z8isd809/tmp25w_hn4o/opitzconsulting-ansible_oracle-3.2.0-x3wo4c3b
+devsec.hardening:8.2.0 was installed successfully
+Installing 'opitzconsulting.ansible_oracle:3.2.0' to '/ansible/galaxy/ansible_collections/opitzconsulting/ansible_oracle'
+Downloading https://galaxy.ansible.com/download/ansible-posix-1.4.0.tar.gz to /home/ansible/.ansible/tmp/ansible-local-25z8isd809/tmp25w_hn4o/ansible-posix-1.4.0-1jub71c6
+opitzconsulting.ansible_oracle:3.2.0 was installed successfully
+Installing 'ansible.posix:1.4.0' to '/ansible/galaxy/ansible_collections/ansible/posix'
+Downloading https://galaxy.ansible.com/download/community-mysql-3.5.1.tar.gz to /home/ansible/.ansible/tmp/ansible-local-25z8isd809/tmp25w_hn4o/community-mysql-3.5.1-lkcnbkd5
+ansible.posix:1.4.0 was installed successfully
+Installing 'community.mysql:3.5.1' to '/ansible/galaxy/ansible_collections/community/mysql'
+Downloading https://galaxy.ansible.com/download/community-crypto-2.8.0.tar.gz to /home/ansible/.ansible/tmp/ansible-local-25z8isd809/tmp25w_hn4o/community-crypto-2.8.0-6sco_75m
+community.mysql:3.5.1 was installed successfully
+Installing 'community.crypto:2.8.0' to '/ansible/galaxy/ansible_collections/community/crypto'
+Downloading https://galaxy.ansible.com/download/community-general-5.8.0.tar.gz to /home/ansible/.ansible/tmp/ansible-local-25z8isd809/tmp25w_hn4o/community-general-5.8.0-up2j_3iq
+community.crypto:2.8.0 was installed successfully
+Installing 'community.general:5.8.0' to '/ansible/galaxy/ansible_collections/community/general'
+community.general:5.8.0 was installed successfully
+----
+
+==== Start Installation with Ansible
+
+IMPORTANT: Make sure to start the installation inside the Ansible Container. +
+The prompt shows the correct location.
+The execution takes ~60 minutes.
+
+.Start installation with Ansible
+----
+cd /git/ansible-oracle/example/beginner/ansible
+ansible-playbook -i inventory/ -e hostgroup=dbfs playbooks/single-instance-fs.yml
+----
+
+The Database creation has been completed. +
+See the follwoing chapter for details about how to work with the VM.
+
+
+=== How to work with installed database
+
+==== Login as vagrant
+
+.Login with SSH from `git+bash`
+----
+ssh -A vagrant@192.168.56.161
+----
+
+==== Sudo oracle
+
+.sudo oracle
+----
+[vagrant@beginner-dbfs-151-192-168-56-161 ~]$ sudo su - oracle
+----
+
+.Example
+[auote, output]
+----
+[vagrant@beginner-dbfs-151-192-168-56-161 ~]$ sudo su - oracle
+Last login: Sun Nov  6 11:16:54 UTC 2022 on pts/2
+execute ocenv to source Oracle Environment
+----
+
+==== Start ocenv
+
+.Initialize ocenv
+----
+[oracle@beginner-dbfs-151-192-168-56-161 ~]$ ocenv
+----
+
+.Example
+[auote, output]
+----
+[oracle@beginner-dbfs-151-192-168-56-161 ~]$ ocenv
+#####################################################################################
+## Version: 2022-08-10
+## get command overview by typing envhelp
+#####################################################################################
+home   oracle       OraHome_OraDB19Home1                       /u01/app/oracle/product/19/db1
+db     oracle       DB1              (up)                      /u01/app/oracle/product/19/db1
+lsnr   oracle       LISTENER                                   /u01/app/oracle/product/19/db1
+[oracle@beginner-dbfs-151-192-168-56-161] [] [~]
+----
+
+==== Switch to DB1
+
+.Set ORACLE_SID
+----
+[oracle@beginner-dbfs-151-192-168-56-161] [] [~]
+$ DB1
+----
+
+.Example
+[auote, output]
+----
+[oracle@beginner-dbfs-151-192-168-56-161] [] [~]
+$ DB1
+=================================
+INSTANCE NAME       : DB1
+INSTANCE STATUS     : OPEN (READ WRITE)
+INSTANCE START TIME : 2022-11-06 11:34:06
+DB NAME             : DB1
+DB UNIQUE NAME      : DB1
+DB ID               : 1713907024
+DB LOGGING MODE     : NOARCHIVELOG
+DB ROLE             : PRIMARY
+DB FORCE LOGGING    : YES
+DB FLASHBACK ON     : NO
+DB is CDB           : YES
+PDBs
+   PDB NAME        STATUS     RESTRICTED OPEN TIME           LOCAL UNDO
+   --------------- ---------- ---------- ------------------- ----------
+   ORCLPDB         READ WRITE NO         2022-11-06 11:34:28 YES
+=================================
+[oracle@beginner-dbfs-151-192-168-56-161] [DB1] [~]
+----
+
+==== Start SQLPlus
+
+.SQLPlus login
+----
+[oracle@beginner-dbfs-151-192-168-56-161] [DB1] [~]
+$ sql
+----
+
+.Example
+[auote, output]
+----
+[oracle@beginner-dbfs-151-192-168-56-161] [DB1] [~]
+$ sql
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Sun Nov 6 11:41:40 2022
+Version 19.3.0.0.0
+
+Copyright (c) 1982, 2019, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.3.0.0.0
+
+11:41:40 SYS@DB1
+SQL>
+----
