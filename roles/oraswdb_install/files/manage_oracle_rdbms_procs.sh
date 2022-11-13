@@ -91,8 +91,8 @@ setenv()
 
 function start_database() {
 
-    ORACLE_HOME=${1}
-    ORACLE_SID=${2}
+    export ORACLE_HOME=${1}
+    export ORACLE_SID=${2}
     ORA_STARTMODE=${3}
     echo "########################################"
     echo "ORACLE_HOME: "${ORACLE_HOME}
@@ -137,8 +137,8 @@ function start_database() {
 
 function stop_database() {
 
-    ORACLE_HOME=${1}
-    ORACLE_SID=${2}
+    export ORACLE_HOME=${1}
+    export ORACLE_SID=${2}
     ORA_STOPMODE=${3}
     echo "########################################"
     # check for pmon
@@ -157,7 +157,7 @@ function stop_database() {
 }
 
 function start_listener() {
-    ORACLE_HOME=${1}
+    export ORACLE_HOME=${1}
     LSNRNAME=${2}
     echo "checking Listener: "${LSNRNAME}" in ORACLE_HOME: "${ORACLE_HOME}
     ORACLE_BASE=$(${ORACLE_HOME}/bin/orabase)
@@ -170,7 +170,7 @@ function start_listener() {
 }
 
 function stop_listener() {
-    ORACLE_HOME=${1}
+    export ORACLE_HOME=${1}
     LSNRNAME=${2}
     echo "checking Listener: "${LSNRNAME}" in ORACLE_HOME: "${ORACLE_HOME}
     ORACLE_BASE=$(${ORACLE_HOME}/bin/orabase)
