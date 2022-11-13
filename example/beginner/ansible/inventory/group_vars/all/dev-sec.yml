@@ -7,6 +7,8 @@ os_security_kernel_enable_module_loading: true
 sysctl_overwrite:
   network_ipv6_enable: false
   fs.protected_regular: 0  # needed for opatchauto ...
+  # Needed for Docker on Ansible-host
+  net.ipv4.ip_forward: 1
 
 # ssh settings
 ssh_print_last_log: true
@@ -17,7 +19,3 @@ ssh_allow_tcp_forwarding: 'yes'
 ssh_max_auth_retries: 3
 
 ssh_allow_users: vagrant
-
-sysctl_overwrite:
-  # Needed for Docker on Ansible-host
-  net.ipv4.ip_forward: 1

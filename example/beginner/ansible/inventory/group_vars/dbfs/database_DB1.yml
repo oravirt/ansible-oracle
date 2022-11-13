@@ -46,8 +46,8 @@ oracle_database_db1:
     - {name: deferred_segment_creation, value: 'false', scope: both, state: present}
     - {name: filesystemio_options, value: 'setall', scope: spfile, state: present}
     - {name: job_queue_processes, value: '10', scope: both, state: present}
-  # Disable forcing hugepages on really small systems
-  #  - {name: use_large_pages ,value: 'ONLY', scope: spfile, state: present}
+    # Disable forcing hugepages on really small systems
+    #  - {name: use_large_pages ,value: 'ONLY', scope: spfile, state: present}
     - {name: log_archive_dest_1, value: 'location=USE_DB_RECOVERY_FILE_DEST', scope: both, state: present}
     - {name: log_buffer, value: '64M', scope: spfile, state: present}
     - {name: pga_aggregate_target, value: '200M', scope: both, state: present, dbca: false}
@@ -102,5 +102,5 @@ oracle_pdb_db1_orclpdb:
     - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
     - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
     - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
-  # init_parameters:
-  #      - {name: db_create_file_dest, value: '/u02/oradata/', scope: both, state: present}
+    # init_parameters:
+    #      - {name: db_create_file_dest, value: '/u02/oradata/', scope: both, state: present}
