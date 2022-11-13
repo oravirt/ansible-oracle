@@ -1,10 +1,10 @@
 ---
 - name: oradb_tzupgrade | Determine the database type
-  oracle_sqldba:
+  opitzconsulting.ansible_oracle.oracle_sqldba:
     sqlselect: "select decode(cdb, 'YES', 'cdb', 'non_cdb') dbtype from v$database"
     oracle_home: "{{ oracle_db_home }}"
     oracle_db_name: "{{ oracle_db_name }}"
   become_user: "{{ oracle_user }}"
   register: dbtype
 
-- ansible.builtin.include_tasks: "{{ dbtype.state.ROW[0].DBTYPE }}.yml"  # noqa unnamed-task
+- ansible.builtin.include_tasks: "{{ dbtype.state.ROW[0].DBTYPE }}.yml"  # noqa name[missing]
