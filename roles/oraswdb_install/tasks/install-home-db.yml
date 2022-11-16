@@ -22,12 +22,13 @@
 
 - name: install_home_db | add dotprofile
   ansible.builtin.template:
-    src: dotprofile-home.j2
+    src: "{{ oracle_profile_template }}"
     dest: "{{ oracle_user_home }}/{{ oracle_profile_name }}"
     owner: "{{ oracle_user }}"
     group: "{{ oracle_group }}"
     mode: 0660
   # when: oracle_home_db not in existing_dbhome.stdout_lines
+  when: configure_oracle_profile
   tags: create_db,dotprofile_db
 
 - name: install_home_db | Setup response file for install (DB)

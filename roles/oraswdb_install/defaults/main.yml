@@ -22,7 +22,9 @@ oracle_sw_extract_path: "{%- if '18' in db_version -%}\
                               {{ oracle_stage }}/{{ item[0].version }}\
                           {%- endif -%}"
 
+configure_oracle_profile: true
 oracle_profile_name: ".profile_{{ dbh.home }}"
+oracle_profile_template: dotprofile-home.j2
 
 oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
 www_download_bin: curl                              # curl (shell module) or get_url module
