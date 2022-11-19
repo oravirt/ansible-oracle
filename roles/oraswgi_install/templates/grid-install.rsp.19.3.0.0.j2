@@ -272,7 +272,7 @@ oracle.install.crs.config.clusterNodes=
       :HUB
     {%- endif -%}
     {%- if not loop.last -%},
-    {%- endif -%} 
+    {%- endif -%}
   {%- endfor %}
 {%- endif %}
 
@@ -454,6 +454,7 @@ oracle.install.asm.diskGroup.disksWithFailureGroupNames=
 #-------------------------------------------------------------------------------
 oracle.install.asm.diskGroup.disks={%- for disk in  item.disk %}
   {%- if device_persistence=='udev' -%}{{ disk.device }}
+  {%- elif device_persistence=='asmfd' -%}AFD:{{ disk.asmlabel | upper }}
   {%- else -%}
     {%- if oracle_asm_disk_string.endswith('*') %}{{ oracle_asm_disk_string[:-1] }}
     {%- else -%}{{ oracle_asm_disk_string }}
@@ -477,7 +478,8 @@ oracle.install.asm.diskGroup.quorumFailureGroupNames=
 #     oracle.install.asm.diskGroup.diskDiscoveryString=\\.\ORCLDISK*
 #
 #-------------------------------------------------------------------------------
-oracle.install.asm.diskGroup.diskDiscoveryString={{ oracle_asm_disk_string }}
+# todo: asm_diskstring includes the afd_diskstring which is wrong as well, but installation will not work, with afd_diskstring here...
+oracle.install.asm.diskGroup.diskDiscoveryString={% if device_persistence=='asmfd' %}{{ oracle_asmfd_disk_string }}{% else %}{{ oracle_asm_disk_string }}{% endif %}
 
 #-------------------------------------------------------------------------------
 # Password for ASMSNMP account
@@ -566,7 +568,8 @@ oracle.install.asm.gimrDG.quorumFailureGroupNames=
 # Applicable only for FLEX_ASM_STORAGE option
 # Specify 'true' if you want to configure AFD, else specify 'false'
 #-------------------------------------------------------------------------------
-oracle.install.asm.configureAFD=
+oracle.install.asm.configureAFD={% if device_persistence | default('udev') == 'asmfd' %}true{% endif %}
+
 #-------------------------------------------------------------------------------
 # Configure RHPS - Rapid Home Provisioning Service
 # Applicable only for DOMAIN cluster configuration

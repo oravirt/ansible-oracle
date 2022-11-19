@@ -13,6 +13,16 @@
     path: /etc/oracle/olr.loc
   register: olrloc
 
+- name: Assert inventory
+  when:
+    - not olrloc.stat.exists
+  block:
+    - name: assert oracle_asm_init_dg in asm_diskgroups
+      ansible.builtin.assert:
+        that:
+          - oracle_asm_init_dg is defined
+          - init_dg_exists
+
 - name: install_home_gi | set fact for patch_before_rootsh
   ansible.builtin.set_fact:
     patch_before_rootsh: false
@@ -95,6 +105,10 @@
 
 - name: include_tasks {{ oracle_install_version_gi }}
   ansible.builtin.include_tasks: "{{ oracle_install_version_gi }}.yml"
+  tags: always
+
+- name: include_tasks asmcmd_dsset.yml
+  ansible.builtin.include_tasks: asmcmd_dsset.yml
   tags: always
 
 - name: install_home_gi | Check if stuff is running

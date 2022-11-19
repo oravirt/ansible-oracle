@@ -41,6 +41,7 @@ oracle_base: /u01/app/oracle
 oracle_rsp_stage: "{{ oracle_stage }}/rsp"
 oracle_inventory_loc: /u01/app/oraInventory
 
+init_dg_exists: "{% for dg in asm_diskgroups if oracle_asm_init_dg == dg.diskgroup %}true{% endfor %}"
 oracle_directories:
   - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
   - {name: "{{ oracle_rsp_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}

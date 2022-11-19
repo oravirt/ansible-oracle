@@ -19,6 +19,8 @@
   when: multipath == 'dm-multipath' and partition_devices and asm_diskgroups is defined
 
 - include: "{{ device_persistence }}.yml"  # noqa name[missing] fqcn[action-core] deprecated-module
+  when:
+    - device_persistence in ('asmlib', 'udev')
 
 - name: dNFS-storage | Prepare mountpoints
   ansible.builtin.file:
