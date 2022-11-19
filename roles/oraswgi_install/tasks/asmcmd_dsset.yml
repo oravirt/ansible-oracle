@@ -1,0 +1,28 @@
+---
+# Setting the asm_diskstring after installation for ASMfd
+# => Installer sets wrong asm_diskstring ...
+- name: Set asmcmd dsset for ASMfd
+  when:
+    - device_persistence == "asmfd"
+  tags:
+    - dsset
+  block:
+    - name: Execute asmcmd dsset
+      ansible.builtin.command:  # noqa no-changed-when
+        argv:
+          - "{{ oracle_home_gi }}/bin/asmcmd"
+          - dsset
+          - "{{ oracle_asm_disk_string }}"
+      become: true
+      become_user: "{{ grid_install_user }}"
+      register: asmcmddsset
+      run_once: true
+      environment:
+        ORACLE_BASE: "{{ oracle_base }}"
+        ORACLE_HOME: "{{ oracle_home_gi }}"
+        ORACLE_SID: "+ASM{% if configure_cluster %}1{% endif %}"
+
+    - name: Output asmcmd dsset
+      ansible.builtin.debug:
+        msg: "{{ asmcmddsset.stdout_lines }}"
+      run_once: true

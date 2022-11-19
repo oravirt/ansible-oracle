@@ -1,0 +1,35 @@
+---
+- name: Label ASMFD Disk
+  tags:
+    - always
+  environment:
+    ORACLE_BASE: "/tmp"  # asmcmd is executed as root => Permission issues with ADR structure
+    ORACLE_HOME: "{{ oracle_home_gi }}"
+  block:
+
+    - name: Label ASMFD Disk Label {{ item.1.asmlabel | default('') }} Device {{ item.1.device | default('') }}
+      # noqa name[template]
+      ansible.builtin.command:
+        argv:
+          - "{{ oracle_home_gi }}/bin/asmcmd"
+          - afd_label
+          - "{{ item.1.asmlabel }}"
+          - "{{ item.1.device }}1"
+          # - "--init"
+      register: asmfdlabel
+      become: true
+      become_user: root
+      changed_when: "asmfdlabel.stdout_lines | length == 0"
+
+    - name: Output Label ASMFD Disk
+      ansible.builtin.debug:
+        msg: "{{ asmfdlabel.stdout_lines }}"
+
+  rescue:
+    - name: Output Label ASMFD Disk failed
+      ansible.builtin.debug:
+        msg: "{{ asmfdlabel.stdout_lines }}"
+
+    - name: Output Label ASMFD Disk failed
+      ansible.builtin.fail:
+        msg: "asmcmd afd_label failed"

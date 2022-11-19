@@ -41,7 +41,7 @@
 ###############################################################################
 
 #------------------------------------------------------------------------------
-# Do not change the following system generated value. 
+# Do not change the following system generated value.
 #------------------------------------------------------------------------------
 oracle.install.responseFileVersion=/oracle/install/rspfmt_crsinstall_response_schema_v21.0.0
 
@@ -54,7 +54,7 @@ oracle.install.responseFileVersion=/oracle/install/rspfmt_crsinstall_response_sc
 
 #-------------------------------------------------------------------------------
 # Specify the location which holds the inventory files.
-# This is an optional parameter if installing on  
+# This is an optional parameter if installing on
 # Windows based Operating System.
 #-------------------------------------------------------------------------------
 INVENTORY_LOCATION={{ oracle_inventory_loc }}
@@ -65,9 +65,9 @@ INVENTORY_LOCATION={{ oracle_inventory_loc }}
 #   - CRS_CONFIG  : To register home and configure Grid Infrastructure for cluster
 #   - HA_CONFIG   : To register home and configure Grid Infrastructure for stand alone server
 #   - UPGRADE     : To register home and upgrade clusterware software of earlier release
-#   - CRS_SWONLY  : To register Grid Infrastructure Software home (can be configured for cluster 
+#   - CRS_SWONLY  : To register Grid Infrastructure Software home (can be configured for cluster
 #                   or stand alone server later)
-#   - HA_SWONLY   : To register Grid Infrastructure Software home (can be configured for stand 
+#   - HA_SWONLY   : To register Grid Infrastructure Software home (can be configured for stand
 #                   alone server later. This is only supported on Windows.)
 #   - CRS_ADDNODE : To add more nodes to the cluster
 #   - CRS_DELETE_NODE : To delete nodes to the cluster
@@ -167,7 +167,7 @@ oracle.install.crs.config.configureAsExtendedCluster=false
 #-------------------------------------------------------------------------------
 # Specify a name for the Cluster you are creating.
 #
-# The maximum length allowed for clustername is 63 characters. The name can be 
+# The maximum length allowed for clustername is 63 characters. The name can be
 # any combination of lower and uppercase alphabets (A - Z), (0 - 9) and hyphens (-).
 #
 # Applicable only for STANDALONE and DOMAIN cluster configuration
@@ -202,7 +202,7 @@ oracle.install.crs.config.gpnp.gnsOption=CREATE_NEW_GNS
 oracle.install.crs.config.gpnp.gnsClientDataFile=
 
 #-------------------------------------------------------------------------------
-# Applicable only for STANDALONE and DOMAIN cluster configuration if you choose to 
+# Applicable only for STANDALONE and DOMAIN cluster configuration if you choose to
 # configure GNS for this cluster oracle.install.crs.config.gpnp.gnsOption=CREATE_NEW_GNS
 # Specify the GNS subdomain and an unused virtual hostname for GNS service
 #-------------------------------------------------------------------------------
@@ -228,7 +228,7 @@ oracle.install.crs.config.sites=
 # - 2 fields if configuring a Flex Cluster
 # - 2 fields if adding more nodes to the configured cluster, or
 # - 3 fields if configuring an Extended Cluster
-# 
+#
 # The fields should be ordered as follows:
 # 1. The first field should be the public node name.
 # 2. The second field should be the virtual host name
@@ -262,7 +262,7 @@ oracle.install.crs.config.clusterNodes=
       :HUB
     {%- endif -%}
     {%- if not loop.last -%},
-    {%- endif -%} 
+    {%- endif -%}
   {%- endfor %}
 {%- endif %}
 
@@ -317,10 +317,10 @@ oracle.install.crs.config.storageOption={{ oracle_asm_storage_option|upper }}
 {% endif %}
 
 #-------------------------------------------------------------------------------
-# These properties are applicable only if FILE_SYSTEM_STORAGE is chosen for 
+# These properties are applicable only if FILE_SYSTEM_STORAGE is chosen for
 # storing OCR and voting disk
 # Specify the location(s) for OCR and voting disks
-# Three(3) or one(1) location(s) should be specified for OCR and voting disk, 
+# Three(3) or one(1) location(s) should be specified for OCR and voting disk,
 # separated by commas.
 # Example:
 #     For Unix based Operating System:
@@ -351,7 +351,7 @@ oracle.install.crs.config.useIPMI=
 #-------------------------------------------------------------------------------
 # Applicable only if you choose to configure IPMI
 # i.e. oracle.install.crs.config.useIPMI=true
-# Specify the location of the ipmiutil binary 
+# Specify the location of the ipmiutil binary
 # Specify the username and password for using IPMI service
 #-------------------------------------------------------------------------------
 oracle.install.crs.config.ipmi.bmcBinpath=
@@ -380,7 +380,7 @@ oracle.install.asm.diskGroup.name={{ oracle_asm_init_dg }}
 
 #-------------------------------------------------------------------------------
 # Redundancy level to be used by ASM.
-# It can be one of the following  
+# It can be one of the following
 #   - NORMAL
 #   - HIGH
 #   - EXTERNAL
@@ -461,7 +461,8 @@ oracle.install.asm.diskGroup.quorumFailureGroupNames=
 #     oracle.install.asm.diskGroup.diskDiscoveryString=\\.\ORCLDISK*
 #
 #-------------------------------------------------------------------------------
-oracle.install.asm.diskGroup.diskDiscoveryString={{ oracle_asm_disk_string }}
+# todo: asm_diskstring includes the afd_diskstring which is wrong as well, but installation will not work, with afd_diskstring here...
+oracle.install.asm.diskGroup.diskDiscoveryString={% if device_persistence=='asmfd' %}{{ oracle_asmfd_disk_string }}{% else %}{{ oracle_asm_disk_string }}{% endif %}
 
 #-------------------------------------------------------------------------------
 # Password for ASMSNMP account
@@ -474,7 +475,8 @@ oracle.install.asm.monitorPassword={%if asmmonitorpassword is defined %}{{asmmon
 # Applicable only for FLEX_ASM_STORAGE option
 # Specify 'true' if you want to configure AFD, else specify 'false'
 #-------------------------------------------------------------------------------
-oracle.install.asm.configureAFD=
+oracle.install.asm.configureAFD={% if device_persistence | default('udev') == 'asmfd' %}true{% endif %}
+
 #-------------------------------------------------------------------------------
 # Configure RHPS - Rapid Home Provisioning Service
 # Applicable only for DOMAIN cluster configuration
@@ -501,9 +503,9 @@ oracle.install.crs.config.ignoreDownNodes=
 
 #------------------------------------------------------------------------------
 # Specify 'true' if you would like to configure Grid Infrastructure Management
-# Repository (GIMR), else specify 'false'. Applicable only if CRS_CONFIG is 
+# Repository (GIMR), else specify 'false'. Applicable only if CRS_CONFIG is
 # chosen as install option and STANDALONE is chosen as cluster configuration.
-# If you want to use or configure 
+# If you want to use or configure
 # Local GIMR : oracle.install.crs.configureGIMR=true and oracle.install.crs.configureRemoteGIMR=false
 # Remote GIMR : oracle.install.crs.configureGIMR=true, oracle.install.crs.configureRemoteGIMR=true
 # and oracle.install.crs.RemoteGIMRCredFile= path of the GIMR cred file
@@ -515,7 +517,7 @@ oracle.install.crs.RemoteGIMRCredFile=
 
 #------------------------------------------------------------------------------
 # Create a separate ASM DiskGroup to store GIMR data.
-# Specify 'true' if you would like to separate GIMR data with clusterware data, 
+# Specify 'true' if you would like to separate GIMR data with clusterware data,
 # else specify 'false'
 # Value should be 'true' for DOMAIN cluster configurations
 # Value can be true/false for STANDALONE cluster configurations.
@@ -524,7 +526,7 @@ oracle.install.asm.configureGIMRDataDG=
 
 #-------------------------------------------------------------------------------
 # GIMR Storage data ASM DiskGroup
-# Applicable only when 
+# Applicable only when
 # oracle.install.asm.configureGIMRDataDG=true
 # Example: oracle.install.asm.GIMRDG.name=MGMT
 #
@@ -533,7 +535,7 @@ oracle.install.asm.gimrDG.name=
 
 #-------------------------------------------------------------------------------
 # Redundancy level to be used by ASM.
-# It can be one of the following  
+# It can be one of the following
 #   - NORMAL
 #   - HIGH
 #   - EXTERNAL
@@ -667,7 +669,7 @@ oracle.install.crs.rootconfig.configMethod=
 oracle.install.crs.rootconfig.sudoPath=
 
 #--------------------------------------------------------------------------------------
-# Specify the name of the user who is in the sudoers list. 
+# Specify the name of the user who is in the sudoers list.
 # Applicable only when SUDO configuration method was chosen.
 # Note:For Grid Infrastructure for Standalone server installations,the sudo user name must be the username of the user performing the installation.
 #--------------------------------------------------------------------------------------
@@ -677,17 +679,17 @@ oracle.install.crs.rootconfig.sudoUserName=
 #
 # This should be a comma separated list of node:batch pairs.
 # During upgrade, you can sequence the automatic execution of root scripts
-# by pooling the nodes into batches. 
-# A maximum of three batches can be specified. 
+# by pooling the nodes into batches.
+# A maximum of three batches can be specified.
 # Installer will execute the root scripts on all the nodes in one batch before
 # proceeding to next batch.
 # Root script execution on the local node must be in Batch 1.
-# Examples: 
+# Examples:
 # 1. oracle.install.crs.config.batchinfo=Node1:1,Node2:2,Node3:2,Node4:3
 # 2. oracle.install.crs.config.batchinfo=Node1:1,Node2:2,Node3:2,Node4:2
 # 3. oracle.install.crs.config.batchinfo=Node1:1,Node2:1,Node3:2,Node4:3
 #
-# Applicable only for UPGRADE install option. 
+# Applicable only for UPGRADE install option.
 #--------------------------------------------------------------------------------------
 oracle.install.crs.config.batchinfo=
 #################################################################################
@@ -697,7 +699,7 @@ oracle.install.crs.config.batchinfo=
 #################################################################################
 
 #--------------------------------------------------------------------------------
-# Specify the node names to delete nodes from cluster. 
+# Specify the node names to delete nodes from cluster.
 # Delete node will be performed only for the remote nodes from the cluster.
 #--------------------------------------------------------------------------------
 oracle.install.crs.deleteNode.nodes=

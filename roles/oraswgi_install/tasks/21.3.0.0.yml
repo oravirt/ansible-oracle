@@ -44,13 +44,15 @@
     path: "{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}"
   register: statcvuqdisk
   run_once: true
-  when: configure_cluster
   tags: cvuqdisk
 
-- name: install_home_gi
+# Oracle Restart + ASMFD
+# => cvuqdisk is mandatory
+- name: When configure_cluster
   when:
-    - configure_cluster
-    - hostvars[cluster_master]['statcvuqdisk']['stat']['exists']
+    - (configure_cluster and hostvars[cluster_master]['statcvuqdisk']['stat']['exists'])
+      or
+      (not configure_cluster and device_persistence == 'asmfd')
   tags: cvuqdisk
   block:
 
@@ -106,6 +108,13 @@
       when:
         - force_runcluvfy | default(false) or oracle_home_gi not in checkgiinstall.stdout
       tags: always
+
+    - name: ASM Filter Driver
+      ansible.builtin.include_tasks: asmfd.yml
+      when:
+        - device_persistence == 'asmfd'
+      tags:
+        - asmfd
 
     - ansible.builtin.debug:  # noqa name[missing]
         msg: "install_home_gi | Start Install Grid Infrastructure"

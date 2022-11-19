@@ -1,0 +1,137 @@
+---
+- name: assert for ASMFD
+  ansible.builtin.assert:
+    that:
+      - oracle_asmfd_disk_string is defined
+  when:
+    - device_persistence == "asmfd"
+
+- name: Check for installed ASMlib
+  when:
+    - check_installed_asmlib | default(true)
+  block:
+    - name: Gather the package facts
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: assert that ASMlib is not installed
+      ansible.builtin.assert:
+        that:
+          - "'oracleasmlib' not in ansible_facts.packages"
+
+- name: Check ASMFD Support
+  tags:
+    - asmfd
+  environment:
+    ORACLE_BASE: "/tmp"  # asmcmd is executed as root => Permission issues with ADR structure
+    ORACLE_HOME: "{{ oracle_home_gi }}"
+  block:
+    - name: Check ASMFD Support
+      ansible.builtin.command:
+        argv:
+          - "{{ oracle_home_gi }}/bin/afddriverstate"
+          - supported
+      changed_when: "asmfdcheck.stdout == 'AFD-9200: Supported'"
+      failed_when: "asmfdcheck.stdout != 'AFD-9200: Supported'"
+      register: asmfdcheck
+
+    - name: Output Check ASMFD failed
+      ansible.builtin.debug:
+        msg: "{{ asmfdcheck.stdout_lines }}"
+
+  rescue:
+    - name: Check ASMFD failed
+      ansible.builtin.debug:
+        msg: "{{ asmfdcheck.stdout_lines }}"
+
+    - name: Check ASMFD failed
+      ansible.builtin.fail:
+        msg: "ASMFD not supported on Node"
+
+- name: Get Current State of ASMFD
+  ansible.builtin.command:
+    argv:
+      - "{{ oracle_home_gi }}/bin/afddriverstate"
+      - loaded
+  register: asmfdstate
+  changed_when: "'AFD-9206:' is in asmfdstate.stdout"
+  failed_when: asmfdstate.rc not in [0, 1]
+  tags:
+    - asmfd
+  environment:
+    ORACLE_BASE: "/tmp"  # asmcmd is executed as root => Permission issues with ADR structure
+    ORACLE_HOME: "{{ oracle_home_gi }}"
+
+- name: Install ASMFD Driver  # noqa no-handler
+  when: asmfdstate.changed
+  tags:
+    - asmfd
+  environment:
+    ORACLE_BASE: "/tmp"  # asmcmd is executed as root => Permission issues with ADR structure
+    ORACLE_HOME: "{{ oracle_home_gi }}"
+  block:
+    - name: Output Get Current State of ASMFD
+      ansible.builtin.debug:
+        var: asmfdstate.stdout_lines
+
+    # asmcmd afd_configure has no result after 1 execution
+    # => retry it for a 2nd time before failing
+    - name: Configure ASMFD with asmcmd  # noqa no-changed-when
+      ansible.builtin.command:
+        argv:
+          - "{{ oracle_home_gi }}/bin/asmcmd"
+          - afd_configure
+          - "-e"
+      become: true
+      become_user: root
+      register: asmfdconfigure
+      until: "asmfdconfigure.stdout_lines | length > 0"
+      retries: 2
+      delay: 1
+
+    - name: Output Configure ASMFD with asmcmd
+      ansible.builtin.debug:
+        msg: "{{ asmfdconfigure.stdout_lines }}"
+
+- name: Get current List of ASMFD Labels
+  environment:
+    ORACLE_BASE: "/tmp"  # asmcmd is executed as root => Permission issues with ADR structure
+    ORACLE_HOME: "{{ oracle_home_gi }}"
+  ansible.builtin.command:  # noqa no-changed-when
+    argv:
+      - "{{ oracle_home_gi }}/bin/asmcmd"
+      - afd_lslbl
+  become: true
+  register: asmfdlsdsk
+  tags:
+    - asmfd
+
+- name: List existing ASMFD Labels
+  ansible.builtin.debug:
+    var: asmfdlsdsk.stdout_lines
+  tags:
+    - asmfd
+
+- name: Label ASMFD Disks
+  tags:
+    - asmfd
+  when:
+    - item.1.asmlabel is defined
+    - asmfdlsdsk.stdout_lines is defined
+    - not asmfdlsdsk.stdout_lines | regex_search(item.1.asmlabel | upper)
+  ansible.builtin.include_tasks: asmfd_disks.yml
+  with_subelements:
+    - "{{ asm_diskgroups }}"
+    - disk
+  loop_control:
+    label: "Diskgroup {{ item.0.diskgroup | default('') }} Disk {{ item.1.asmlabel | default('') }}"
+
+# just for safety, when a root proces created the ADR in ORACLE_BASE
+- name: Fix ownership of ADR
+  ansible.builtin.file:
+    path: "{{ oracle_base }}/diag"
+    recurse: true
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    state: directory
+    mode: '0755'
