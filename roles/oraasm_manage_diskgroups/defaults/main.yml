@@ -27,6 +27,10 @@ asmdevice_list: "{% if device_persistence | lower == 'asmlib' %}\
                    {%- for disk in item.disk -%}{{ oracle_asm_disk_prefix }}{{ disk.asmlabel | upper }}\
                      {%- if not loop.last -%},{%- endif -%}\
                    {%- endfor %}\
+                 {%- elif device_persistence | lower == 'asmfd' %}\
+                   {%- for disk in item.disk -%}AFD:{{ disk.asmlabel | upper }}\
+                     {%- if not loop.last -%},{%- endif -%}\
+                   {%- endfor %}\
                  {%- elif device_persistence | lower == 'udev' %}\
                    {%- for disk in item.disk -%}{{ oracle_asm_disk_prefix }}{{ disk.asmlabel }}\
                      {%- if not loop.last -%},{%- endif -%}\
