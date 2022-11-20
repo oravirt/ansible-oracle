@@ -1,0 +1,19 @@
+@startuml
+!include <C4/C4_Component>
+
+System_Boundary(host, "Host System", "PC/Notebook") {
+  Component(chocolatey, "chocolatey", "", "")
+  System_Boundary(tools, "Tools") {
+    Component(gitbash, "git+bash", "git+bash for Windows")
+    Component(vagrant, "Vagrant", "Hashicorp Vagrant")
+    Component(virtualbox, "VirtualBox", "VirtualBox")
+    Component_Ext(vscode, "VSCode", "Visual Studio Code")
+    Component_Ext(conemu, "ConEmu", "ConEmu")
+  }
+}
+Rel_U(chocolatey, conemu, "optional")
+Rel_U(chocolatey, vscode, "optional")
+Rel_U(chocolatey, gitbash, "installs")
+Rel_U(chocolatey, vagrant, "installs")
+Rel_U(chocolatey, virtualbox, "installs")
+@enduml
