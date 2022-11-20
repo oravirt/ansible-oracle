@@ -5,6 +5,52 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.3.0
+======
+
+Release Summary
+---------------
+
+This Release introduce ASM Filter Driver Support for Oracle Grid-Infrastructure/Restart. It is experimental for the moment, because it requires more testing in the field.
+
+Minor Changes
+-------------
+
+- Documentation: Added feauturelist and missing picture (oravirt#299)
+- Replace include with include_tasks due to deprecation warning (oravirt#301)
+- Update ocenv to 2022-11-22 (oravirt#305)
+- added support to upgrade the timezone in the database using the oradb_tzupgrade role (oravirt#291)
+- ansible-lint: move to v6.8.2 (oravirt#290)
+- documentation: New Beginners Guide (oravirt#293)
+- experimental support for ASMFD (Filter Driver) (oravirt#297)
+- github-actions: Add development branch to Actions (oravirt#295)
+- oradb_manage_db: support for dbca custom scripts (oravirt#300)
+- pre-commit: move to v4.3.0 (oravirt#290)
+
+Deprecated Features
+-------------------
+
+- inventory structure will be moved to new examples directory (oravirt#293)
+- vagrant folder will be moved to examples (oravirt#293)
+
+Bugfixes
+--------
+
+- common, orahost, oraswdb_install: Make some of the j2 templates source configurable (oravirt#296)
+- fix oradb_manage_grants (oravirt#306)
+- oraasm_manage_diskgroups: Added support for ASMFD (oravirt#302)
+- oracle_datapatch: Fix password alias (oravirt#304)
+- oradb_manage_db: Add option to set the path of the dbca template (oravirt#292)
+- oraswdb_install: Fix oracle export environment variables (oravirt#294)
+- pre-commit: added some extra hooks (oravirt#291)
+
+Known Issues
+------------
+
+- Problem Instance <db_unique_name> is not running during DBCA in RAC (opitzconsulting#91)
+- removal of database not working when db_name <> db_instance_name (opitzconsulting#28)
+- wrong ORACLE_BASE in RAC with role sepepration (oravirt#259)
+
 v3.2.0
 ======
 
