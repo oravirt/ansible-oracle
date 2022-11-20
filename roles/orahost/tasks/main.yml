@@ -483,7 +483,8 @@
   when: ansible_os_family == 'Suse'
   tags: seclimit
 
-- include: "{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"  # noqa name[missing] fqcn[action-core] deprecated-module
+- name: Execute Distribution tasks
+  ansible.builtin.include_tasks:: "{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"
   tags: tphnuma
   # when: ansible_os_family == 'RedHat'
 
