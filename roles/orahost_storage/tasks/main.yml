@@ -15,10 +15,12 @@
     - asm_diskgroups is defined
   tags: asmstorage,partition
 
-- include: dm-multipath-kpartx.yml  # noqa name[missing] fqcn[action-core] deprecated-module
+- name: Partition disks for multipath
+  ansible.builtin.include_tasks:: dm-multipath-kpartx.yml
   when: multipath == 'dm-multipath' and partition_devices and asm_diskgroups is defined
 
-- include: "{{ device_persistence }}.yml"  # noqa name[missing] fqcn[action-core] deprecated-module
+- name: Configure disks for device persistency
+  ansible.builtin.include_tasks: "{{ device_persistence }}.yml"
   when:
     - device_persistence in ('asmlib', 'udev')
 

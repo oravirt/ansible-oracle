@@ -56,7 +56,8 @@
       changed_when: false
       tags: sshkeys,known_hosts
 
-    - include: known-hosts.yml  # noqa name[missing] fqcn[action-core] deprecated-module
+    - name: Deploy known_hosts
+      ansible.builtin.include_tasks:: known-hosts.yml
       with_items:
         - "{{ oracle_user }}"
         - "{% if role_separation %}{{ grid_user }}{% else %}[]{% endif %}"
