@@ -31,7 +31,7 @@
 ################################################################################
 
 ## Version of this script. Simply uses the date in YYYY-MM-DD format
-GV_OCENV_VERSION="2022-08-10"
+GV_OCENV_VERSION="2022-11-22"
 
 ###############################################################################
 ## Environment support homogenization
@@ -140,6 +140,7 @@ then
   export ORIGINAL_LD_LIBRARY_PATH_PRE_ENVLOAD="${LD_LIBRARY_PATH}"
 
   export GV_INITIAL_VARS_SAVED=TRUE
+  GV_ENV_SPECIFIC_VARS=()
 fi
 
 export NLS_LANG=AMERICAN_AMERICA.AL32UTF8
@@ -523,11 +524,15 @@ alias pmon='ps -ef | grep -w -E "ora_pmon_[a-zA-Z0-9]+"'
 [[ -n "$(which amon 2>/dev/null)" ]] && alias amon="\$(which amon) -l n"
 if [[ "${GV_OS_TYPE}" == "AIX" ]]
 then
-  export GV_PAGER=more
   alias psg='ps -ef | grep -v grep | grep '
 else
-  export GV_PAGER=less
   alias psg='ps aux | grep -v grep | grep --color=auto'
+fi
+if [[ -x "$(which less 2>/dev/null)" ]]
+then
+  export GV_PAGER=less
+else
+  export GV_PAGER=more
 fi
 alias via='${GV_PAGER} ${GV_INSTANCE_ALERT_LOG}'
 alias vio='${EDITOR} /etc/oratab'
@@ -611,9 +616,46 @@ clroraenv() {
   unset GV_INSTANCE_STATUS
   unset GV_IS_CDB
   unset GV_ORACLE_SID_LC
+  for LV_VAR_NAME in "${GV_ENV_SPECIFIC_VARS[@]}"
+  do
+    unset "${LV_VAR_NAME}"
+  done
+  GV_ENV_SPECIFIC_VARS=()
   unset ORACLE_BASE
   unset ORACLE_HOME
   unset ORACLE_SID
+  unset GV_PDB_LIST
+  unset TNS_ADMIN
+  export PATH="${ORIGINAL_PATH_PRE_ENVLOAD}"
+}
+add_env_specific_var() {
+  if [[ -n "${1}" ]]
+  then
+    GV_ENV_SPECIFIC_VARS[${#GV_ENV_SPECIFIC_VARS[@]}]="${1}"
+  fi
+}
+set_ora_home_env() {
+  if [[ -z "$1" ]]
+  then
+    echo "No ORACLE_HOME given as parameter." 1>&2
+    return 1
+  fi
+  export ORACLE_HOME="$1"
+  if [[ -x "${ORACLE_HOME}/bin/orabase" ]]
+  then
+    ORACLE_BASE="$("${ORACLE_HOME}/bin/orabase")"
+    export ORACLE_BASE
+  fi
+  case "$(uname -s)" in
+    "Linux")
+      export LD_LIBRARY_PATH=${ORACLE_HOME}/lib:${ORIGINAL_LD_LIBRARY_PATH_PRE_ENVLOAD}
+    ;;
+    "AIX")
+      export LIBPATH=${ORACLE_HOME}/lib:${ORIGINAL_LIBPATH_PRE_ENVLOAD}
+    ;;
+  esac
+  export PATH=${ORACLE_HOME}/bin:${ORACLE_HOME}/OPatch:${ORIGINAL_PATH_PRE_ENVLOAD}
+  unset GV_PDB_LIST
 }
 myoraenv_simple() {
   if [[ -z "${2}" ]]
@@ -625,6 +667,8 @@ myoraenv_simple() {
   unset GV_DB_UNIQUE_NAME          2>/dev/null
   unset GV_DB_UNIQUE_NAME_LC       2>/dev/null
   unset TNS_ADMIN                  2>/dev/null
+  ## ORACLE_UNQNAME is not set by this method, but often sourced from srvctl in OCI environments
+  unset ORACLE_UNQNAME             2>/dev/null
   if [[ -n "${3}" ]]
   then
     export TNS_ADMIN="${3}"
@@ -664,12 +708,31 @@ myoraenv() {
     return 1
   fi
   myoraenv_simple "${LV_ORACLE_SID}" "${LV_ORACLE_HOME}" "${LV_TNS_ADMIN}"
+  if [[ -n "${GV_GRID_HOME}" ]]
+  then
+    ## Read environment variables from GridInfrastructure ressource configuration
+    while read -r LV_VAR_ASSIGNMENT
+    do
+      ## Make sure, that the variable actually contains something that can plausibly be a variable assignment
+      if [[ "${LV_VAR_ASSIGNMENT}" =~ .+= ]]
+      then
+        local LV_VAR_NAME="${LV_VAR_ASSIGNMENT%=*}"
+        eval "export ${LV_VAR_ASSIGNMENT}"
+        add_env_specific_var "${LV_VAR_NAME}"
+      fi
+    done <<< "$("${LV_ORACLE_HOME}"/bin/srvctl getenv database -db "${LV_DB_UNIQUE_NAME}" | grep "=")"
+  fi
+
   if [[ -n "${LV_DB_NAME}" ]]
   then
     GV_DB_NAME="${LV_DB_NAME}"
   fi
   if [[ -n "${LV_DB_UNIQUE_NAME}" ]]
   then
+    if [[ -z "${ORACLE_UNQNAME}" ]]
+    then
+      export ORACLE_UNQNAME="${LV_DB_UNIQUE_NAME}"
+    fi
     GV_DB_UNIQUE_NAME="${LV_DB_UNIQUE_NAME}"
     GV_DB_UNIQUE_NAME_LC="$(echo "${GV_DB_UNIQUE_NAME}" | to_lower)"
   fi
@@ -1104,19 +1167,19 @@ llh() {
       }
       if ($1 != "total") {
         v_size = $5
-  v_unit = "B "
-  if ( v_size >= 1024 ) {
-    v_size = v_size / 1024
-    v_unit = "KB"
-    if ( v_size >= 1024 ) {
-      v_size = v_size / 1024
-      v_unit = "MB"
-      if ( v_size >= 1024 ) {
-        v_size = v_size / 1024
-        v_unit = "GB"
-      }
-    }
-  }
+        v_unit = "B "
+        if ( v_size >= 1024 ) {
+          v_size = v_size / 1024
+          v_unit = "KB"
+          if ( v_size >= 1024 ) {
+            v_size = v_size / 1024
+            v_unit = "MB"
+            if ( v_size >= 1024 ) {
+              v_size = v_size / 1024
+              v_unit = "GB"
+            }
+          }
+        }
         printf("%10s %4d %8s %-8s %7.2f %2s %3s %2s %5s %s\n", $1, $2, $3, $4, v_size, v_unit, $6, $7, $8, $9);
       }
     }'
@@ -1193,7 +1256,7 @@ edf() {
   local LV_THRESHOLD_CRIT=95
   local LV_THRESHOLD_WARN=85
 
-  if [[ "${GV_OS_TYPE}" == "AIX" ]]
+  if [[ "$(uname -s)" == "AIX" ]] && ! (which df 2>/dev/null| grep -q "/opt/freeware/")
   then
     local LV_DF="df -Pg"
   else
@@ -1710,29 +1773,6 @@ vilsnr(){
     ${GV_PAGER} "${LV_LSNR_LOG}"
   fi
 }
-set_ora_home_env() {
-  if [[ -z "$1" ]]
-  then
-    echo "No ORACLE_HOME given as parameter." 1>&2
-    return 1
-  fi
-  export ORACLE_HOME="$1"
-  if [[ -x "${ORACLE_HOME}/bin/orabase" ]]
-  then
-    ORACLE_BASE="$("${ORACLE_HOME}/bin/orabase")"
-    export ORACLE_BASE
-  fi
-  case "${GV_OS_TYPE}" in
-    "Linux")
-      export LD_LIBRARY_PATH=${ORACLE_HOME}/lib:${ORIGINAL_LD_LIBRARY_PATH_PRE_ENVLOAD}
-    ;;
-    "AIX")
-      export LIBPATH=${ORACLE_HOME}/lib:${ORIGINAL_LIBPATH_PRE_ENVLOAD}
-    ;;
-  esac
-  export PATH=${ORACLE_HOME}/bin:${ORACLE_HOME}/OPatch:${ORIGINAL_PATH_PRE_ENVLOAD}
-  unset GV_PDB_LIST
-}
 fill_pdb_details_list () {
   unset GV_PDB_LIST_DETAILS
 
@@ -2046,7 +2086,7 @@ list_homes() {
 }
 mystat() {
   local LV_TARGET="${1}"
-  if [[ "${GV_OS_TYPE}" == "AIX" ]]
+  if [[ "$(uname -s)" == "AIX" ]] && ! (which stat 2>/dev/null| grep -q "/opt/freeware/")
   then
     istat "${LV_TARGET}" | awk '/Owner/{split($2, v_a, "[()]"); print v_a[2]; }'
   else
