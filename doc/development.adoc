@@ -4,10 +4,69 @@ toc::[]
 :sectnums:
 :sectnumlevels: 4
 
-= Pull-Requests
+== How to develop in `ansible-oracle`?
+
+IMPORTANT: This is an example how most of the development in `ansible-oracle` is done. +
+A Pull-Request is only accepted, when `github-Actions` are valid.
+
+=== Prepare a development environment
+
+IMPORTANT: This chapter shows, how the development envionment could look like. +
+You need an Ansible-Controller with an Editor or IDE of your own choice.
 
 
-== Important Information
+
+=== Create Fork on github and contribute to the project
+
+link:https://docs.github.com/en/get-started/quickstart/contributing-to-projects[github] has a great documentation with details about creating a fork and branch to contribute to `ansible-oracle`.
+
+IMPORTANT: The `github-Actions` will automatically start, when the branchname starts with `pr` or in each Pull-Request. +
+Please use a branch with 'pr'--prefix, when `ansible-lint` should be checked for each commit.
+
+=== pre-commit
+
+IMPORTANT: link:https://pre-commit.com/[pre-commit] is a nice tool for git. +
+Each commit is locally checked against multiple rules, to prevent failures in github-Actions after pushing commits to github. +
+This tool is recommended but not mandatory for contributing to `ansible-oracle`.
+
+.Installation (cd into repository before)
+----
+pip install --user pre-commit
+pre-commit install
+----
+
+.run outside git
+----
+pre-commit run
+----
+
+=== Start Ansible-Container
+
+=== Start Playbook
+
+IMPORTANT: Don't forget to set the working branch in `requirements.yml`. +
+Remove/Disable `devsec.hardening` for faster installation of Ansible collection, when devsec should not be tested.
+
+
+.Edit requirements.yml
+----
+---
+collections:
+  # - name: devsec.hardening
+  #   version: 8.2.0
+  - name: https://github.com/Rendanic/ansible-oracle.git
+    type: git
+    version: devbranch
+----
+
+.Execute ansible-playbook
+----
+ansible-galaxy collection install --force -r requirements.yml && ansible-playbook -i inventory/hasfd -e hostgroup='all' playbooks/single-instance-asm.yml --limit '*19c*'
+----
+
+== Pull-Requests
+
+=== Important Information
 
 The ansible-oracle project introduced `antsibull-changelog` for managing the `CHANGELOG.rst` based on fragments in `changelogs/gragments`.
 
@@ -17,13 +76,67 @@ If multiple PRs are open, the upper rule makes sure that no duplicate files are 
 
 IMPORTANT: Each Pull-Requests needs a fragment from Release 3.0.0 onwards!
 
-== Working with antsibull-changelog
+<<<<<<< HEAD
+== Create new Releases in `ansible-oracle`
+
+IMPORTANT: This is only needed for creating new Releases in `ansible-oracle` - not for development!
+
+
+=======
+== Create new Releases in `ansible-oracle`
+
+IMPORTANT: This is only needed for creating new Releases in `ansible-oracle` - not for development!
+
+>>>>>>> 2226b8a9fe5dec919cdb916059f233c63b914fc9
+=== Install antsibull-changelog
+
+----
+cd ansible-oracle/docker
+docker-compose run --rm -w /git/ansible-oracle/example/beginner/ansible ansible bash
+
+pip3 install antsibull-changelog
+----
+
+=== Working with antsibull-changelog
 
 Changelogs for Collections: https://github.com/ansible-community/antsibull-changelog/blob/main/docs/changelogs.rst#releasing-a-new-version-of-a-collection
 
-== Creating new releases
+=== Creating new releases
 
 `antsibull-changelog release` reads `galaxy.yml` to get the release version automatically.
 The execution is aborted, when a release with the version is existing in `CHANGELOG.rst`.
 
 NOTE: The whole release process should be donw with a dedicated Pull-Request.
+
+----
+antsibull-changelog release
+----
+
+== Update Vagrantbox on vagrantcloud for examples
+
+IMPORTANT: This is only an example how to do it, when custom images should be used.
+
+=== Create new Box
+
+----
+git clone https://github.com/Rendanic/bento.git
+cd bento
+git checkout oc
+cd packer_templates/oraclelinux/
+./oc_oracle-7.x_vbox.sh oracle-7.9-x86_64.json
+----
+
+=== Upload new Version
+
+IMPORTANT: Change the boxname to an account with write priviledges.
+
+.Upload new version after build:
+----
+boxname="Rendanic/oraclelinux-7.x"
+vagrantversion=$(date +%y%m%d)
+
+vagrant cloud version create ${boxname} "$vagrantversion"
+vagrant cloud provider create ${boxname} virtualbox "$vagrantversion"
+vagrant cloud provider upload ${boxname} virtualbox "$vagrantversion" ../../builds/oracle-7.9.virtualbox.box
+vagrant cloud publish --release ${boxname} "$vagrantversion" virtualbox
+----

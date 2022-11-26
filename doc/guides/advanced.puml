@@ -19,10 +19,6 @@ System_Boundary(host, "Host System", "PC/Notebook") {
       Container(ssh, "ssh", "ssh vagrant@192.168.56.161", $tags="software")
       Container(vagrant, "Vagrant", "", $tags="software")
       Container(git, "git", "git clone for Vagrantfile from ansible-oracle", $tags="software")
-
-      SetPropertyHeader("Windows Environment Variable","Description")
-      AddProperty("VAGRANT_ANSIBLE_ORACLE_SW", "Drive with directory on Host System")
-      Container(instmediahost, "Installation Media", "Environment Variable for vboxsf mount in VM", $tags="media")
     }
   }
   Boundary(virtualbox, "VirtualBox") {
@@ -40,7 +36,11 @@ System_Boundary(host, "Host System", "PC/Notebook") {
       Container(instmedia, "Installation Media from Environment Variable VAGRANT_ANSIBLE_ORACLE_SW mounted on /sw/oracle inside VM", "ORA 19c", $tags="media")
    }
   }
+  SetPropertyHeader("Windows Environment Variable","Description")
+  AddProperty("VAGRANT_ANSIBLE_ORACLE_SW", "Drive with directory on Host System")
+  Container(instmediahost, "Installation Media", "Environment Variable for vboxsf mount in VM", $tags="media")
 }
+Rel_Up(instmediahost, instmedia, "vboxsf")
 Rel_Down(admin, tools, "")
 Rel_Down(conemu, vmansible, "ssh with agent forwarding")
 Rel_Down(vmansible, dbfs, "ssh with key from Agent")
