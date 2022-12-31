@@ -5,6 +5,19 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.4.0
+======
+
+Minor Changes
+-------------
+
+- oradb_manage_db: customize ocenv initialization in bashrc (oravirt#310)
+
+Bugfixes
+--------
+
+- Fixed oracle packages for SLES 15.3 (oravirt#311)
+
 v3.3.0
 ======
 
