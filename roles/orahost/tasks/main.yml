@@ -463,6 +463,7 @@
     state: present
     line: "session required pam_limits.so"
   tags: pamconfig
+  when: configure_limits_pam and configure_limits
 
 - name: Oracle-recommended security limits
   ansible.builtin.template:
@@ -470,7 +471,7 @@
     dest: /etc/security/limits.d/99-oracle-limits.conf
     backup: true
     mode: "0644"
-  when: ansible_os_family == 'RedHat'
+  when: configure_limits and ansible_os_family == 'RedHat'
   tags: seclimit
 
 - name: Oracle-recommended security limits on SLES
