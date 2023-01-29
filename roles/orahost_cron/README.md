@@ -1,13 +1,45 @@
-Role Name
-=========
+# orahost_cron
 
-Manages cron
+Configure cronjobs for ansible-oracle
 
-Example Playbook
-----------------
+## Table of content
+
+- [Default Variables](#default-variables)
+  - [cron_config](#cron_config)
+- [Discovered Tags](#discovered-tags)
+- [Dependencies](#dependencies)
+- [License](#license)
+- [Author](#author)
+
+---
+
+## Default Variables
+
+### cron_config
+
+Define custom cronjobs for ansible-oracle.
+No job is existing by default.
+
+#### Example usage
+
+```YAML
+cron_config:
+  - { user: oracle, name: "clean-up job", job: "some fancy thing", hour: "1", cron_file: oracle-cleanup, state: present }
+```
+
+## Discovered Tags
+
+**_cron_**
 
 
-    - hosts: servers
-      roles:
-         - orahost-cron
+## Dependencies
 
+None.
+
+## License
+
+license (MIT)
+
+## Author
+
+[Mikael Sandström]
