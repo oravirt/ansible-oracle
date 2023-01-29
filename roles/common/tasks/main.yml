@@ -1,10 +1,10 @@
 # Common playbook - sets up the host generic stuff
 ---
 
-- name: Check for correct Ansible Version (>= 2.8)
+- name: Check for correct Ansible Version (>= 2.9)
   ansible.builtin.assert:
     that:
-      - "ansible_version.full is version('2.8', '>=')"
+      - "ansible_version.full is version('2.9', '>=')"
 
 - name: Install EPEL Repo
   when:
@@ -20,7 +20,7 @@
 
     - name: Add EPEL Repo
       ansible.builtin.yum:
-        name: "{{ epel_rpm }}"
+        name: "{{ _common_epel_rpm }}"
         state: installed
 
 # Do not use the old public-yum.repo on OL7 after January 2019 anymore
@@ -29,15 +29,17 @@
   ansible.builtin.stat:
     path: /usr/bin/ol_yum_configure.sh
   register: olyumconfigfile
-  when: configure_public_yum_repo and ansible_distribution == 'OracleLinux'
+  when:
+    - configure_public_yum_repo
+    - ansible_distribution == 'OracleLinux'
   tags:
     - olrepo
 
 # Update public-yum.repo only on old versions of OL7
 - name: Get newest repo-file for OL (public-yum)
   ansible.builtin.get_url:
-    dest: "{{ repo_dir }}/{{ ol_repo_file }}"
-    url: "http://public-yum.oracle.com/{{ ol_repo_file }}"
+    dest: "{{ _common_repo_dir }}/{{ _common_ol_repo_file }}"
+    url: "http://public-yum.oracle.com/{{ _common_ol_repo_file }}"
     backup: true
     mode: 0644
   when:
@@ -51,7 +53,9 @@
   ansible.builtin.yum:
     name: "{{ common_packages }}"
     state: installed
-  when: install_os_packages and ansible_os_family == 'RedHat'
+  when:
+    - install_os_packages
+    - ansible_os_family == 'RedHat'
   tags:
     - commonpackages
 
@@ -59,7 +63,9 @@
   community.general.zypper:
     name: "{{ common_packages_sles }}"
     state: installed
-  when: install_os_packages and ansible_os_family == 'Suse'
+  when:
+    - install_os_packages
+    - ansible_os_family == 'Suse'
   tags:
     - commonpackages
 
