@@ -64,14 +64,20 @@
   community.general.zypper:
     name: "{{ oracle_asm_packages_sles }}"
     state: installed
-  when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'Suse' and asm_diskgroups is defined
+  when:
+    - install_os_packages
+    - device_persistence == 'asmlib'
+    - ansible_os_family == 'Suse'
+    - asm_diskgroups is defined
   tags: os_packages, oscheck, asm1
 
 - name: Check if firewall is installed
   ansible.builtin.yum:
     list: "{{ firewall_service }}"
     disablerepo: "*"
-  when: disable_firewall and ansible_os_family == 'RedHat'
+  when:
+    - disable_firewall
+    - ansible_os_family == 'RedHat'
   tags: iptables,firewalld
   register: firewall
 
@@ -80,14 +86,19 @@
     name: "{{ firewall_service }}"
     state: stopped
     enabled: false
-  when: disable_firewall and ansible_os_family == 'RedHat' and firewall.results
+  when:
+    - disable_firewall
+    - ansible_os_family == 'RedHat'
+    - firewall.results
   tags: iptables,firewalld
   register: iptables
 
 - name: Disable selinux (permanently)
   ansible.posix.selinux:
     state: disabled
-  when: disable_selinux and ansible_os_family == 'RedHat'
+  when:
+    - disable_selinux
+    - ansible_os_family == 'RedHat'
   tags: selinux
   register: selinux
 
@@ -101,15 +112,15 @@
 
 - name: Timezone
   when: os_timezone is defined
-  block:  # noqa name[missing]
-    - name: Set Timezone
+  block:
+    - name: Set Timezone  # noqa args[module]
       community.general.timezone:
         name: "{{ os_timezone }}"
         hwclock: "{{ os_hwclock | default(omit) }}"
       register: timezoneresult
       tags: timezone
 
-    - name: Restart crond after timezone change
+    - name: Restart crond after timezone change  # noqa no-handler
       ansible.builtin.service:
         name: crond
         state: restarted
@@ -204,11 +215,13 @@
     - sudoadd
 
 - name: ssh-keys | Generate SSH keys
-  local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys  # noqa yaml deprecated-command-syntax deprecated-local-action ignore-errors
-  # noqa fqcn[action-core] no-changed-when
+  local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys  # noqa yaml no-handler deprecated-local-action ignore-errors no-changed-when fqcn[action-core]
   ignore_errors: true
   run_once: "{{ configure_cluster }}"
-  when: configure_ssh and configure_cluster and old_ssh_config
+  when:
+    - configure_ssh
+    - configure_cluster
+    - old_ssh_config
   become: false
   tags:
     - sshkeys
@@ -221,7 +234,10 @@
     group: "{{ item[0].primgroup }}"
     force: true
     mode: "0600"
-  when: configure_ssh and configure_cluster and old_ssh_config
+  when:
+    - configure_ssh
+    - configure_cluster
+    - old_ssh_config
   with_nested:
     - "{{ oracle_users }}"
     - "{{ ssh_keys }}"
@@ -236,7 +252,11 @@
     group: "{{ item[0].primgroup }}"
     force: true
     mode: 0600
-  when: configure_ssh and configure_cluster and role_separation and old_ssh_config
+  when:
+    - configure_ssh
+    - configure_cluster
+    - role_separation
+    - old_ssh_config
   with_nested:
     - "{{ grid_users }}"
     - "{{ ssh_keys }}"
@@ -248,7 +268,10 @@
   # noqa fqcn[action-core] no-changed-when
   ignore_errors: true
   become: false
-  when: configure_ssh and configure_cluster and old_ssh_config
+  when:
+    - configure_ssh
+    - configure_cluster
+    - old_ssh_config
   tags:
     - sshkeys
 
@@ -257,7 +280,10 @@
   # noqa fqcn[action-core] no-changed-when
   ignore_errors: true
   become: false
-  when: configure_ssh and configure_cluster and old_ssh_config
+  when:
+    - configure_ssh
+    - configure_cluster
+    - old_ssh_config
   tags:
     - sshkeys
 
@@ -266,7 +292,10 @@
   # noqa fqcn[action-core] no-changed-when
   ignore_errors: true
   become: false
-  when: configure_ssh and configure_cluster and old_ssh_config
+  when:
+    - configure_ssh
+    - configure_cluster
+    - old_ssh_config
   tags:
     - sshkeys
 
@@ -278,7 +307,10 @@
     group: "{{ item.primgroup }}"
     mode: "0644"
   with_items: "{{ oracle_users }}"
-  when: configure_ssh and configure_cluster and old_ssh_config
+  when:
+    - configure_ssh
+    - configure_cluster
+    - old_ssh_config
   tags:
     - sshkeys
 
@@ -290,7 +322,11 @@
     group: "{{ item.primgroup }}"
     mode: "0644"
   with_items: "{{ grid_users }}"
-  when: configure_ssh and configure_cluster and role_separation and old_ssh_config
+  when:
+    - configure_ssh
+    - configure_cluster
+    - role_separation
+    - old_ssh_config
   tags:
     - sshkeys
 
@@ -301,120 +337,116 @@
     - "{{ ssh_keys }}"
     - "{{ keyfile }}"
   run_once: "{{ configure_cluster }}"
-  when: configure_ssh and configure_cluster and old_ssh_config
+  when:
+    - configure_ssh
+    - configure_cluster
+    - old_ssh_config
   ignore_errors: true
   become: false
   tags:
     - sshkeys
 
-- name: filesystem | Create directories
-  ansible.builtin.file:
-    path: "{{ item.1.mntp }}"
-    state: directory
-    owner: "{{ oracle_user }}"
-    group: "{{ oracle_group }}"
-    mode: "0775"
-  with_subelements:
-    - "{{ host_fs_layout }}"
-    - filesystem
-  tags: hostfs
-
-# create partition only when device != pvname
-- name: filesystem | Create partition and pv
-  ansible.builtin.command: parted --script -a optimal -s {{ item.1.device }} "mklabel gpt mkpart primary 1 -1"
-  # noqa
-  args:
-    creates: "{{ item.1.pvname }}"
-  with_subelements:
-    - "{{ host_fs_layout }}"
-    - disk
-    - flags:
-      skip_missing: true
+- name: filesystem | configure hostfs
   when:
-    - configure_host_disks
-    - item.1 is defined
-    - item.1.device != item.1.pvname
+    - configure_host_disks | bool
+    - host_fs_layout is defined
   tags: hostfs
+  block:
+    - name: filesystem | Create directories
+      ansible.builtin.file:
+        path: "{{ item.1.mntp }}"
+        state: directory
+        owner: "{{ oracle_user }}"
+        group: "{{ oracle_group }}"
+        mode: "0775"
+      with_subelements:
+        - "{{ host_fs_layout }}"
+        - filesystem
 
-- name: filesystem | Create vg
-  community.general.lvg:
-    vg: "{{ item.vgname }}"
-    pvs: "{{ host_fs_layout_vgdisks }}"
-    state: "{{ item.state }}"
-  with_items: "{{ host_fs_layout }}"
-  when: configure_host_disks
-  tags: hostfs
+    # create partition only when device != pvname
+    - name: filesystem | Create partition and pv
+      ansible.builtin.command: parted --script -a optimal -s {{ item.1.device }} "mklabel gpt mkpart primary 1 -1"
+      # noqa
+      args:
+        creates: "{{ item.1.pvname }}"
+      with_subelements:
+        - "{{ host_fs_layout }}"
+        - disk
+        - flags:
+          skip_missing: true
+      when:
+        - item.1 is defined
+        - item.1.device != item.1.pvname
 
-- name: filesystem | create lv
-  community.general.lvol:
-    vg: "{{ item.0.vgname }}"
-    lv: "{{ item.1.lvname }}"
-    size: "{{ item.1.lvsize }}"
-    state: present
-    shrink: false
-    resizefs: true
-  with_subelements:
-    - "{{ host_fs_layout }}"
-    - filesystem
-  when: configure_host_disks
-  tags: hostfs
+    - name: filesystem | Create vg  # noqa: args[module]
+      community.general.lvg:
+        vg: "{{ item.vgname }}"
+        pvs: >-
+          {%- for disk in item.disk -%} {{ disk.pvname }}{%- if not loop.last -%},{%- endif -%}{% endfor %}
+        state: "{{ item.state }}"
+      with_items: "{{ host_fs_layout }}"
 
-- name: filesystem | create fs
-  community.general.filesystem:
-    fstype: "{{ item.1.fstype }}"
-    dev: "/dev/{{ item.0.vgname }}/{{ item.1.lvname }}"
-    opts: "{{ item.1.fsopts | default(omit) }}"
-  with_subelements:
-    - "{{ host_fs_layout }}"
-    - filesystem
-  when: configure_host_disks
-  tags: hostfs
+    - name: filesystem | create lv
+      community.general.lvol:
+        vg: "{{ item.0.vgname }}"
+        lv: "{{ item.1.lvname }}"
+        size: "{{ item.1.lvsize }}"
+        state: present
+        shrink: false
+        resizefs: true
+      with_subelements:
+        - "{{ host_fs_layout }}"
+        - filesystem
 
-- name: filesytem | mount dir
-  ansible.posix.mount:
-    name: "{{ item.1.mntp }}"
-    src: "/dev/{{ item.0.vgname }}/{{ item.1.lvname }}"
-    dump: 1
-    passno: 2
-    fstype: "{{ item.1.fstype }}"
-    opts: "{{ item.1.mntopts | default(omit) }}"
-    state: mounted
-  with_subelements:
-    - "{{ host_fs_layout }}"
-    - filesystem
-  when:
-    - configure_host_disks
-    - item.1.fstype is defined
-    - item.1.fstype != 'swap'
-  tags: hostfs
+    - name: filesystem | create fs  # noqa: args[module]
+      community.general.filesystem:
+        fstype: "{{ item.1.fstype }}"
+        dev: "/dev/{{ item.0.vgname }}/{{ item.1.lvname }}"
+        opts: "{{ item.1.fsopts | default(omit) }}"
+      with_subelements:
+        - "{{ host_fs_layout }}"
+        - filesystem
 
-- name: filesytem | add swap to fstab
-  ansible.builtin.lineinfile:
-    path: /etc/fstab
-    regexp: '^/dev/{{ item.0.vgname }}/{{ item.1.lvname }} '
-    line: "/dev/{{ item.0.vgname }}/{{ item.1.lvname }} swap swap defaults 0 0"
-  with_subelements:
-    - "{{ host_fs_layout }}"
-    - filesystem
-  when:
-    - configure_host_disks
-    - item.1.fstype is defined
-    - item.1.fstype == 'swap'
-  notify:
-    - swapon
-  tags: hostfs
+    - name: filesytem | mount dir
+      ansible.posix.mount:
+        name: "{{ item.1.mntp }}"
+        src: "/dev/{{ item.0.vgname }}/{{ item.1.lvname }}"
+        dump: 1
+        passno: 2
+        fstype: "{{ item.1.fstype }}"
+        opts: "{{ item.1.mntopts | default(omit) }}"
+        state: mounted
+      with_subelements:
+        - "{{ host_fs_layout }}"
+        - filesystem
+      when:
+        - item.1.fstype is defined
+        - item.1.fstype != 'swap'
 
-- name: filesystem | Change permission on directories
-  ansible.builtin.file:
-    path: "{{ item.1.mntp }}"
-    owner: "{{ item.1.owner | default(oracle_user) }}"
-    group: "{{ item.1.group | default(oracle_group) }}"
-    mode: "{{ item.1.mode | default('0775') }}"
-    state: directory
-  with_subelements:
-    - "{{ host_fs_layout }}"
-    - filesystem
-  tags: hostfs
+    - name: filesytem | add swap to fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        regexp: '^/dev/{{ item.0.vgname }}/{{ item.1.lvname }} '
+        line: "/dev/{{ item.0.vgname }}/{{ item.1.lvname }} swap swap defaults 0 0"
+      with_subelements:
+        - "{{ host_fs_layout }}"
+        - filesystem
+      when:
+        - item.1.fstype is defined
+        - item.1.fstype == 'swap'
+      notify:
+        - swapon
+
+    - name: filesystem | Change permission on directories
+      ansible.builtin.file:
+        path: "{{ item.1.mntp }}"
+        owner: "{{ item.1.owner | default(oracle_user) }}"
+        group: "{{ item.1.group | default(oracle_group) }}"
+        mode: "{{ item.1.mode | default('0775') }}"
+        state: directory
+      with_subelements:
+        - "{{ host_fs_layout }}"
+        - filesystem
 
 - name: filesystem | Create directory for oraInventory
   ansible.builtin.file:
@@ -452,7 +484,7 @@
 # Work Arroud:
 # => Flush File Cache
 # => retry a sysctl -p
-- name: Flush Buffer Cache
+- name: Flush Buffer Cache  # noqa no-handler
   when:
     - systclcmd is defined
     - systclcmd.changed
@@ -478,7 +510,9 @@
     state: present
     line: "session required pam_limits.so"
   tags: pamconfig
-  when: configure_limits_pam and configure_limits
+  when:
+    - configure_limits_pam
+    - configure_limits
 
 - name: Oracle-recommended security limits
   ansible.builtin.template:
@@ -486,10 +520,12 @@
     dest: /etc/security/limits.d/99-oracle-limits.conf
     backup: true
     mode: "0644"
-  when: configure_limits and ansible_os_family == 'RedHat'
+  when:
+    - configure_limits
+    - ansible_os_family == 'RedHat'
   tags: seclimit
 
-- name: Oracle-recommended security limits on SLES
+- name: Oracle-recommended security limits on SLES  # noqa args[module]
   community.general.pam_limits:
     domain: oracle
     limit_type: "{{ item.name.split(' ')[0] }}"
@@ -518,16 +554,23 @@
     dest: "/etc/sysconfig/network-scripts/ifcfg-{{ oracle_gi_nic_priv }}"
     owner: root
     mode: "0644"
-  when: configure_interconnect and configure_cluster and ansible_os_family == 'RedHat'
+  when:
+    - configure_interconnect
+    - configure_cluster
+    - ansible_os_family == 'RedHat'
   tags:
     - eth1
   register: ic
 
-- name: Network | Bring up eth1
+- name: Network | Bring up eth1  # noqa no-handler
   ansible.builtin.service:
     name: network
     state: restarted
-  when: configure_interconnect and configure_cluster and ic.changed and ansible_os_family == 'RedHat'
+  when:
+    - configure_interconnect
+    - configure_cluster
+    - ic.changed
+    - ansible_os_family == 'RedHat'
   tags:
     - eth1
 
@@ -588,14 +631,19 @@
     name: oracleasm
     state: started
     enabled: true
-  when: device_persistence == 'asmlib' and asm_diskgroups is defined
+  when:
+    - device_persistence == 'asmlib'
+    - asm_diskgroups is defined
   tags:
     - asmlibconfig
 
-- name: Asmlib | Restart Asmlib
+- name: Asmlib | Restart Asmlib  # noqa no-handler
   ansible.builtin.service:
     name: oracleasm
     state: restarted
-  when: asm_diskgroups is defined and device_persistence == 'asmlib' and asmlibconfig.changed
+  when:
+    - asm_diskgroups is defined
+    - device_persistence == 'asmlib'
+    - asmlibconfig.changed
   tags:
     - asmlibconfig
