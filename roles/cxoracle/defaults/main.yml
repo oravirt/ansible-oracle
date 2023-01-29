@@ -1,10 +1,30 @@
 ---
+# @var install_cx_oracle:description: Install cx_Oracle?
 install_cx_oracle: true
+
+# @var use_proxy:description: Use a http_proxy for installation
 use_proxy: false
-http_proxy:
-oracle_base: /u01/app/oracle
-# oracle_home: "{% if item.oracle_home is defined %}{{ item.oracle_home }}{% else %}{{ oracle_base }}/{{ item.oracle_version_db }}/{{ item.home }}{% endif %}"
-# oracle_env:
-#      ORACLE_HOME: "{{ oracle_home }}"
+
+# @var http_proxy:description: Define the http_proxy for cx_oracle installation
+# @var http_proxy:example: http_proxy: proxy.example:3128
+
+# @var cx_oracle_source:description: >
+# @end
+# @var cx_oracle_source:example: >
+# The installation source could be changed to a custom
+# defined source.
+# @end
+# @var cx_oracle_source:example: cx_oracle_source: "file:///tmp/cx_Oracle-7.3.0-cp27-cp27mu-manylinux1_x86_64.whl"
+
+# @var cx_oracle3_source:description: >
+# Source for `pip3 install cx_Oracle`.
+# @end
+
+# @var cx_oracle_umask:description: Define umask for pip installation of cx_Oracle
+
+# @var extra_args:description: >
+# Define optional arguments for extra_args during pip installation.
+# The variable is used by `user_proxy` and `http_proxy`.
+# @end
+# @var extra_args: $ "_unset_"
 extra_args: "{% if use_proxy %}--proxy={{ http_proxy }}{% else %}{% endif %}"
-# cx_oracle_umask: 0022
