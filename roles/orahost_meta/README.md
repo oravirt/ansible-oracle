@@ -305,3 +305,11 @@ role_separation: false
 ## Dependencies
 
 None.
+
+## License
+
+license (MIT)
+
+## Author
+
+[Thorsten Bruhns]
