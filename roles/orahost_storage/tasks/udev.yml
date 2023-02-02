@@ -1,50 +1,44 @@
 ---
-- name: udev | Create device to label mappings for udev
-  ansible.builtin.template:
-    src: udev-label-device-mapping.txt.j2
-    dest: "{{ oracle_stage }}/udev/udev-{{ item.diskgroup }}"
-    mode: "0644"
-  with_items: "{{ asm_diskgroups }}"
-  when: device_persistence == 'udev' and asm_diskgroups is defined
+# @todo bug: udev not tested for a long time, was supported
+- name: udev
+  when:
+    - device_persistence == 'udev'
   tags: udev
+  block:
+    - name: udev | Create device to label mappings for udev
+      ansible.builtin.template:
+        src: udev-label-device-mapping.txt.j2
+        dest: "{{ oracle_stage }}/udev/udev-{{ item.diskgroup }}"
+        mode: "0644"
+      with_items: "{{ asm_diskgroups }}"
+      when:
+        - asm_diskgroups is defined
 
-- name: udev | Assemble into one mapfile
-  ansible.builtin.assemble:
-    src: "{{ oracle_stage }}/udev"
-    dest: "{{ oracle_rsp_stage }}/udev-device-input.txt"
-    mode: "0644"
-  when: device_persistence == 'udev'
-  tags: udev
+    - name: udev | Assemble into one mapfile
+      ansible.builtin.assemble:
+        src: "{{ oracle_stage }}/udev"
+        dest: "{{ oracle_rsp_stage }}/udev-device-input.txt"
+        mode: "0644"
 
-- name: udev | Create script to create rules
-  ansible.builtin.template:
-    src: setup-udev.sh.j2
-    dest: "{{ oracle_rsp_stage }}/setup-udev-rules.sh"
-    mode: "0755"
-  when: device_persistence == 'udev'
-  tags: udev
+    - name: udev | Create script to create rules
+      ansible.builtin.template:
+        src: setup-udev.sh.j2
+        dest: "{{ oracle_rsp_stage }}/setup-udev-rules.sh"
+        mode: "0755"
 
-- name: udev | Run script to create udev rules
-  ansible.builtin.shell: "{{ oracle_rsp_stage }}/setup-udev-rules.sh"
-  # noqa command-instead-of-shell no-changed-when
-  when: device_persistence == 'udev'
-  tags: udev
+    - name: udev | Run script to create udev rules
+      ansible.builtin.shell: "{{ oracle_rsp_stage }}/setup-udev-rules.sh"
+      # noqa command-instead-of-shell no-changed-when
 
-- name: udev | Reload rules
-  ansible.builtin.shell: partprobe;sleep 5; udevadm control --reload-rules; udevadm trigger
-  # noqa no-changed-when
-  when: device_persistence == 'udev'
-  tags: udev
+    - name: udev | Reload rules
+      ansible.builtin.shell: partprobe;sleep 5; udevadm control --reload-rules; udevadm trigger
+      # noqa command-instead-of-shell no-changed-when
 
-- name: udev | List device aliases (register)
-  ansible.builtin.shell: ls -l {{ oracle_asm_disk_string }}
-  # noqa command-instead-of-shell no-changed-when
-  when: device_persistence == 'udev'
-  tags: udev
-  register: lsdevice
+    - name: udev | List device aliases (register)
+      ansible.builtin.shell: ls -l {{ oracle_asm_disk_string }}
+      # noqa command-instead-of-shell no-changed-when
+      register: lsdevice
 
-- name: udev | List device aliases
-  ansible.builtin.debug:
-    var: lsdevice.stdout_lines
-  when: device_persistence == 'udev'
-  tags: udev
+    - name: udev | List device aliases
+      ansible.builtin.debug:
+        var: lsdevice.stdout_lines
