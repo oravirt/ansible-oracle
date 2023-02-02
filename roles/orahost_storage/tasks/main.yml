@@ -13,64 +13,70 @@
   when:
     - partition_devices
     - asm_diskgroups is defined
-  tags: asmstorage,partition
+  tags:
+    - asmstorage
+    - partition
 
 - name: Partition disks for multipath
   ansible.builtin.include_tasks: dm-multipath-kpartx.yml
-  when: multipath == 'dm-multipath' and partition_devices and asm_diskgroups is defined
+  when:
+    - multipath == 'dm-multipath'
+    - partition_devices
+    - asm_diskgroups is defined
 
+# @todo bug: check device_persistence for ASMFD
 - name: Configure disks for device persistency
   ansible.builtin.include_tasks: "{{ device_persistence }}.yml"
   when:
     - device_persistence in ('asmlib', 'udev')
 
-- name: dNFS-storage | Prepare mountpoints
-  ansible.builtin.file:
-    path: "{{ item.1.mount }}"
-    state: "directory"
-    owner: "root"
-    group: "root"
-    mode: 0755
-  with_subelements:
-    - "{{ oradnfs }}"
-    - exports
-  when: oradnfs is defined
+- name: configure dNFS
+  when:
+    - oradnfs is defined
+  block:
+    - name: dNFS-storage | Prepare mountpoints
+      ansible.builtin.file:
+        path: "{{ item.1.mount }}"
+        state: "directory"
+        owner: "root"
+        group: "root"
+        mode: 0755
+      with_subelements:
+        - "{{ oradnfs }}"
+        - exports
 
-- name: dNFS-storage | Configure /etc/fstab and mount
-  ansible.posix.mount:
-    src: "{{ item.0.server }}:{{ item.1.export }}"
-    path: "{{ item.1.mount }}"
-    fstype: "nfs"
-    opts: "{{ dnfstaboptions }}"
-    state: mounted
-  with_subelements:
-    - "{{ oradnfs }}"
-    - exports
-  when: oradnfs is defined
+    - name: dNFS-storage | Configure /etc/fstab and mount
+      ansible.posix.mount:
+        src: "{{ item.0.server }}:{{ item.1.export }}"
+        path: "{{ item.1.mount }}"
+        fstype: "nfs"
+        opts: "{{ dnfstaboptions }}"
+        state: mounted
+      with_subelements:
+        - "{{ oradnfs }}"
+        - exports
 
-- name: dNFS-storage | Change permission on directories
-  ansible.builtin.file:
-    path: "{{ item.1.mount }}"
-    state: directory
-    owner: "{{ oracle_user }}"
-    group: "{{ oracle_group }}"
-    mode: 0775
-  with_subelements:
-    - "{{ oradnfs }}"
-    - exports
-  when: oradnfs is defined
+    - name: dNFS-storage | Change permission on directories
+      ansible.builtin.file:
+        path: "{{ item.1.mount }}"
+        state: directory
+        owner: "{{ oracle_user }}"
+        group: "{{ oracle_group }}"
+        mode: 0775
+      with_subelements:
+        - "{{ oradnfs }}"
+        - exports
 
-- name: dNFS-storage | Create /etc/oranfstab for dNFS
-  ansible.builtin.blockinfile:
-    path: /etc/oranfstab
-    state: present
-    create: true
-    owner: root
-    group: root
-    mode: 0644
-    insertafter: "EOF"
-    marker: "# {mark} Ansible managed for NFS-Server: {{ item.server }}"
-    block: "{{ lookup('template', 'oranfstab.j2') }}"
-  with_items:
-    - "{{ oradnfs }}"
-  when: oradnfs is defined
+    - name: dNFS-storage | Create /etc/oranfstab for dNFS
+      ansible.builtin.blockinfile:
+        path: /etc/oranfstab
+        state: present
+        create: true
+        owner: root
+        group: root
+        mode: 0644
+        insertafter: "EOF"
+        marker: "# {mark} Ansible managed for NFS-Server: {{ item.server }}"
+        block: "{{ lookup('template', 'oranfstab.j2') }}"
+      with_items:
+        - "{{ oradnfs }}"
