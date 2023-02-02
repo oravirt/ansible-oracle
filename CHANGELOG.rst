@@ -5,6 +5,24 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.5.0
+======
+
+Release Summary
+---------------
+
+This is a small monthly release of ansible-oracle.
+
+Minor Changes
+-------------
+
+- add configuration variables for pam_limits to orahost (oravirt#317)
+
+Deprecated Features
+-------------------
+
+- Removal of deprecated directory /inventory from repository with next release.
+
 v3.4.0
 ======
 
