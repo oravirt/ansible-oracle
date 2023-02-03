@@ -1,162 +1,329 @@
 ---
+# @todo bug: add assert for install_from_nfs, nfs_server_sw, nfs_server_sw_path
+# @var install_from_nfs:description: >
+# Mount NFS-Server for installation media?
+#
+# `nfs_server_sw` and `nfs_server_sw_path` are needed, when `install_from_nfs: true`
+# @end
 install_from_nfs: false
 
-oracle_user: oracle                        # User that will own the Oracle Installations.
-grid_user: grid
+# @var nfs_server_sw:description: >
+# Defines the NFS-Server used to mount the installation media from.
+# @end
+# @var nfs_server_sw:example: >
+# nfs_server_sw: nfs-server.example.com
+# @end
+
+# @var apply_patches_db:description: >
+# Apply Patches from db_homes_config for installed ORACLE_HOME?
+#
+# This is a global switch to enable/disable DB-Patching for all ORACLE_HOMEs.
+# @end
+apply_patches_db: true
+
+# @var www_download_bin:description: >
+# @end
+www_download_bin: curl                              # curl (shell module) or get_url module
+
+# @var nfs_server_sw_path:description: >
+# Path to installation medias on NFS-Ser.
+#
+# _Important_
+#
+# `ansible-oracle` expects a fixed structure for installation media and patches!
+#
+# @end
+# @var nfs_server_sw_path:example: >
+# nfs_server_sw_path: /orasw
+# @end
+
+# @var oracle_stage:description: >
+# Defines the base directory for response files, configuration firles etc. for `ansible-oracle`.
+#
+# There is usually no need to change this variable.
+# @end
+oracle_stage: /u01/stage
+
+# @todo bug: why do we need oracle_stage_remote?
+# @var oracle_stage_remote:description: >
+# @end
+oracle_stage_remote: "{{ oracle_stage }}"
+
+# @var oracle_stage_install:description: >
+# @end
+oracle_stage_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
+
+# @var oracle_stage:description: >
+# Defines the directory for response files during installation.
+#
+# There is usually no need to change this variable.
+# @end
+oracle_rsp_stage: "{{ oracle_stage }}/rsp"
+
+# @var oracle_inventory_loc:description: >
+# Central Oracle Inventory location.
+# @end
+oracle_inventory_loc: /u01/app/oraInventory
+
+# @todo bug: is_sw_source_local really needed with default or as dependency from other vars?
+# @var is_sw_source_local:description: >
+# @end
+is_sw_source_local: true
+
+# @todo bug: oracle_base for RDBMS and GI are the same. See (https://github.com/oravirt/ansible-oracle/issues/259) for details.
+# @var oracle_base:description: >
+# `ORACLE_BASE` for Oracle RDBMS and Grid Infrastructure.
+#
+# There is a known bug for Grid-Infrastructure/Restart.
+#
+# See (https://github.com/oravirt/ansible-oracle/issues/259) for details.
+# @end
+oracle_base: /u01/app/oracle
+
+# @todo bug: grid_install_user is wrong here.
 grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
-oracle_user_home: "/home/{{ oracle_user }}"       # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-grid_user_home: "/home/{{ grid_install_user }}"   # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-oracle_group: oinstall                            # Primary group for oracle_user.
-oper_group: oper
-dba_group: dba                                    # Primary group for oracle_user.
-asmoper_group: asmoper
-asmdba_group: asmdba                              # Primary group for oracle_user.
-asmadmin_group: asmadmin                          # Primary group for oracle_user.
 
-db_homes_config:
-  21300-base:
-    home: db1-base
-    version: 21.3.0.0
-    edition: EE
-  19300-base:
-    home: db1-base
-    version: 19.3.0.0
-    edition: EE
-  18300-base:
-    home: db1-base
-    version: 18.3.0.0
-    edition: EE
-  12201-base:
-    home: db1-base
-    version: 12.2.0.1
-    edition: EE
-  12201-180717:
-    home: db1-180717
-    version: 12.2.0.1
-    edition: EE
-    opatch_minversion: 12.2.0.1.12
-    opatchauto:
-      - patchid: 28183653
-        patchversion: 12.2.0.1.180717
-        state: present
-        subpatches:
-          - 28163133
-          - 28163190
-    opatch: []
+# @var oracle_install_option_gi:description: >
+# Define the installation type for Grid Infrastructure or Oracle Restart.
+#
+# | Value | Description |
+# | --- | --- |
+# | "" | Install Single Instance (Default) |
+# | CRS_CONFIG | Install Grid-Infrastructure |
+# | HA_CONFIG | Install Oracle Restart |
+# @end
+# @var oracle_install_option_gi: $ ""
+# @var oracle_install_option_gi:example: >
+#
+# oracle_install_option_gi: ''
+#
+# oracle_install_option_gi: CRS_CONFIG
+#
+# oracle_install_option_gi: HA_CONFIG
+# @end
+oracle_install_option_gi: "{% if configure_cluster %}CRS_CONFIG{% else %}HA_CONFIG{% endif %}"
 
+# @var oracle_install_version_gi:description: >
+# Define the version for Grid-Infrastructure or Oracle Restart.
+#
+# _Important_
+#
+# Do not forget to set `oracle_install_option_gi`.
+# @end
+# @var oracle_install_version_gi:example: >
+#
+# oracle_install_version_gi: 19.3.0.0
+#
+# oracle_install_version_gi: 21.3.0.0
+# @end
+oracle_install_version_gi: 19.3.0.0
 
-db_homes_installed:
-  - home: 19300-base
-    apply_patches: false
-    state: present
-  - home: 12201-base
-    apply_patches: false
-    state: absent
-  - home: 12201-180717
-    apply_patches: true
-    state: absent
+# @todo bug: Open Issue with changed behavior for `configure_cluster`
+# @var oracle_home_gi_cl:description: >
+# Custom setting for CRS_HOME when Grid-Infrastructure is installed.
+#
+# The variable is used as a default for `oracle_home_gi`.
+#
+# Do not forget `` for Cluster installations.
+# @end
+oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid"
 
+# @var oracle_home_gi_so:description: >
+# Custom setting for CRS_HOME when Oracle Restart is installed.
+#
+# The variable is used as a default for the internal variable `oracle_home_gi`.
+# @end
+oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid"  # ORACLE_HOME for Grid Infrastructure (Stand Alone)
 
-oracle_sw_patches:
-  - filename: p28183653_122010_Linux-x86-64.zip
-    patchid: 28183653
-    version: 12.2.0.1
-    patchversion: 12.2.0.1.180717
-    description: GI-RU-July-2018
-    creates: 28183653/28163133/files/suptools/orachk.zip
-  - filename: p27468969_122010_Linux-x86-64.zip
-    patchid: 27468969
-    version: 12.2.0.1
-    patchversion: 12.2.0.1.180417
-    description: GI-RU-April-2018
-    creates: 27468969/27674384/README.txt
-  - filename: p28140658_12201180417DBAPR2018RU_Linux-x86-64.zip
-    patchid: 28140658
-    version: 12.2.0.1
-    patchversion: 12201180417DBAPR2018RU
-    description: 'PARALLEL QUERY Patch for Bug# 28140658 for Linux-x86-64 Platforms'
-    creates: online/files/hpatch/bug28140658.pch
-  - filename: p27967747_121020_Linux-x86-64.zip
-    patchid: 27967747
-    version: 12.1.0.2
-    patchversion: 12.1.0.2.180717
-    description: GI-PSU-Jul-2018
-    creates: 27967747/27762277/etc/xml/ShiphomeDirectoryStructure.xml
-  - filename: p27468957_121020_Linux-x86-64.zip
-    patchid: 27468957
-    version: 12.1.0.2
-    patchversion: 12.1.0.2.180417
-    description: GI-PSU-Apr-2018
-    creates: 27468957/27338013/etc/config/inventory.xml
-  - filename: p19392646_121020_Linux-x86-64.zip
-    patchid: 19392646
-    version: 12.1.0.2
-    patchversion: 12.1.0.2.1
-    description: GI-PSU-Oct-2014
-  - filename: p20485724_121020_Linux-x86-64.zip
-    patchid: 20485724
-    version: 12.1.0.2
-    patchversion: 12.1.0.2.3
-    description: GI-PSU-Apr-2015
-  - filename: p21523234_121020_Linux-x86-64.zip
-    patchid: 21523234
-    version: 12.1.0.2
-    patchversion: 12.1.0.2.5
-    description: GI-PSU-Oct-2015
-  - filename: p24412235_121020_Linux-x86-64.zip
-    patchid: 24412235
-    version: 12.1.0.2
-    patchversion: 12.1.0.2.161018
-    description: GI-PSU-Oct-2016
-  - filename: p24968615_121020_Linux-x86-64.zip
-    patchid: 24968615
-    version: 12.1.0.2
-    patchversion: 12.1.0.2.170117
-    description: GI-PSU-Jan-2017
-  - filename: p25434003_121020_Linux-x86-64.zip
-    patchid: 25434003
-    version: 12.1.0.2
-    patchversion: 12.1.0.2.170418
-    description: GI-PSU-Apr-2017
-  - filename: p27967757_112040_Linux-x86-64.zip
-    patchid: 27967757
-    version: 11.2.0.4
-    patchversion: 11.2.0.4.180717
-    description: GI-PSU-Jul-2018
-    creates: 27967757/27959254/files/lib/acfstoolsdriver.sh
-  - filename: p27475913_112040_Linux-x86-64.zip
-    patchid: 27475913
-    version: 11.2.0.4
-    patchversion: 11.2.0.4.180417
-    description: GI-PSU-Apr-2018
-    creates: 27475913/22502505/files/lib/acfstoolsdriver.sh
-  - filename: p25078431_11204160419forACFS_Linux-x86-64.zip
-    patchid: 25078431
-    version: 11.2.0.4
-    patchversion: 11.2.0.4.160419
-    description: '11.2.0.4.160419 for ACFS'
-  - filename: p19380115_112040_Linux-x86-64.zip
-    patchid: 19380115
-    version: 11.2.0.4
-    patchversion: 11.2.0.4.4
-    description: GI-PSU-Apr-2018
-  - filename: p19380115_112040_Linux-x86-64.zip
-    patchid: 19380115
-    version: 11.2.0.4
-    patchversion: 11.2.0.4.4
-    description: GI-PSU-Oct-2014
-  - filename: p20485808_112040_Linux-x86-64.zip
-    patchid: 20485808
-    version: 11.2.0.4
-    patchversion: 11.2.0.4.6
-    description: GI-PSU-Apr-2015
-  - filename: p21523375_112040_Linux-x86-64.zip
-    patchid: 21523375
-    version: 11.2.0.4
-    patchversion: 11.2.0.4.8
-    description: GI-PSU-Oct-2015
+# @todo information: variable description is missing
+listener_port: 1521
 
 
+# @todo information: variable description is missing
+oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
+oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
+
+
+# @todo information: variable description is missing
+# @todo bug: what exactly is hostgroup in role for?
+hostgroup: "{{ group_names[0] }}"
+
+# @todo bug: Change default from autostartup_service for Single Instance
+# @var autostartup_service:description: >
+# Enable autostart of database during system startup.
+#
+# This switch is only used, when Single Instance without Grid Infrastructure / Restart is installed.
+# @end
+autostartup_service: false
+
+# @todo bug: Check if shell_ps1 is used for oracle and grid
+# @var shell_ps1:description: >
+# Configure shell prompt for OS-User oracle
+# @end
+shell_ps1: "'[$LOGNAME'@'$ORACLE_SID `basename $PWD`]$'"
+
+# @todo bug: Check when shell_aliases is used in ansible-oracle and change description
+# @var shell_aliases:description: >
+# Define shell Aliases for oracle user.
+# @end
+shell_aliases:
+  - "asmcmd='. oraenv ;rlwrap asmcmd -p'"
+  - "sqlsyso='. oraenv ;rlwrap sqlplus \"/ as sysdba\"'"
+  - "dgmgrl='rlwrap dgmgrl'"
+  - "rman='rlwrap rman'"
+  - "sid='export ORACLE_SID=$(ps -ef | grep \"ora_pmon_$ORACLE_DBNAME\" |grep -v grep | sed 's/^.*pmon_//g')'"
+  - "sqlp='rlwrap sqlplus'"
+  - "sqlsys='rlwrap sqlplus \"/ as sysdba\"'"
+  - "dbh='cd $ORACLE_HOME'"
+  - "dbb='cd $ORACLE_BASE'"
+  - "talert='tail -500f $ORACLE_BASE/diag/rdbms/$ORA_DB_UNQ_NAME/$ORACLE_SID/trace/alert_$ORACLE_SID.log'"
+  - "lalert='less $ORACLE_BASE/diag/rdbms/$ORA_DB_UNQ_NAME/$ORACLE_SID/trace/alert_$ORACLE_SID.log'"
+  - "lsnrstart='lsnrctl start $LSNRNAME'"
+  - "lsnrstop='lsnrctl stop $LSNRNAME'"
+  - "lsnrstatus='lsnrctl status $LSNRNAME'"
+  - "lsnrservice='lsnrctl services $LSNRNAME'"
+
+
+# @todo information: variable description is missing
+oracle_patch_stage: "{{ oracle_stage }}/patches"
+oracle_patch_stage_remote: "{{ oracle_stage_remote }}/patches"
+oracle_patch_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_patch_stage_remote }}{% else %}{{ oracle_patch_stage }}{% endif %}"
+ocm_response_file: "{{ oracle_patch_stage }}/{{ db_version }}/ocm.rsp"
+
+
+# @var deploy_ocenv:description: >
+# Install the `ocenv.sh` environment script.
+#
+# Source is from: https://github.com/opitzconsulting/oracle-scripts
+# @end
+deploy_ocenv: true
+
+# @var oracle_dbf_dir_fs:description: >
+# Global default for `db_create_file_dest`in DBCA.
+# @end
+oracle_dbf_dir_fs: /u02/oradata/                                # If storage_type=FS this is where the database is placed.
+
+
+# @todo information: variable description is missing
+oracle_reco_dir_fs: /u02/fra/                                   # If storage_type=FS this is where the fast recovery area is placed.
+oracle_dbf_dir_asm: '+DATA'                                        # If storage_type=ASM this is where the database is placed.
+oracle_reco_dir_asm: '+FRA'
+
+
+# @todo information: variable description is missing
+oracle_asm_disk_string: ORCL:*
+
+# @var oracle_profile_template:description: >
+# Define which template is used to create .profile scripts.
+#
+# _Important_
+#
+# This variable is only used when `deploy_ocenv: false`. The default is `true`.
+# @end
+oracle_profile_template: dotprofile-home.j2
+
+# @todo bug: check if assert for deploy_ocenv + ocenv_bashrc_init is existing
+# @var ocenv_bashrc_init:description: >
+# Add `ocenv.sh` to `bashrc` of oracle user?
+#
+# `deploy_ocenv: true` is needed for the installation.
+# @end
+ocenv_bashrc_init: true
+
+# @var ocenv_bashrc_init_section:description: >
+# Define the conntents to add to `.bashr` when `ocenv_bashrc_init: true`.
+# @end
+ocenv_bashrc_init_section: |
+  echo "execute ocenv to source Oracle Environment"
+  alias ocenv='. "{{ dbenvdir }}/ocenv"'
+
+# @var dbenvdir:description: >
+# Define the directory for db environment configurations.
+#
+# Used during installation of `ocenv.sh`.
+# @end
+dbenvdir: "{{ oracle_user_home }}/dbenv"
+
+# @todo information: variable description is missing
+# @var db_homes_config:description: >
+#
+# This is a central variable for ORACLE_HOME configuration.
+#
+# Defines the known ORACLE_HOMEs with a lot of additional informations but not the installation itself.
+#
+# See `db_homes_installed` for a list of installed ORACLE_HOMEs.
+#
+# The dictionary holds data for:
+#
+# | Attribute | Description |
+# | --- | --- |
+# | imagename | Set an optional name for a golden Image to install from. The archiv is read from same directory as the normal installation medias from Oracle. |
+# | edition | allowed values: `SE`, `SE2`, `EE`. default value: <todo> |
+# | opatch_minversion | Is needed for patching. Automatically installs a new version of OPatch, when existing version is older then `opatch_minversion` |
+# | oracle_home | |
+# | oracle_home_name | Mandatory variable, when `readonly_home: true`. Oracle allows only characters, numbers and '_' as value in `oracle_home_name`. Do _not_ use '-' as a value!|
+# | opatch | |
+# | readonly_home | Should `ansible-oracle` install this ORACLE_HOME as readonly home? Do _NOT_ change this attribute for an installed ORACLE_HOME. default value: false|
+# | version | The base version for the ORACLE_HOME. Use the version from the official 1st release of Oracle. |
+#
+# See examples for allowed values.
+# @end
+# @var db_homes_config:example: >
+# db_homes_config:
+#   21300_base: # 21c without patching - you should never use this in production!
+#     home: db1_base
+#     version: 21.3.0.0
+#     edition: EE
+#   19300_base: # 19c without patching - you should never use this in production!
+#     home: db1_base
+#     version: 19.3.0.0
+#     edition: EE
+# @end
+
+# @todo information: db_homes_installed not used for a long time...
+# @var db_homes_installed:description: >
+#
+# @end
+# @var db_homes_installed:example: >
+# db_homes_installed:
+#   - home: 19300-base
+#     apply_patches: true
+#     state: present
+# @end
+
+# @var oracle_sw_patches:description: >
+# Defines the list of known Patches in `ansible-oracle`.
+#
+# If a complete software repository with pathches is used with a nfs-mount, this variable is not needed.
+# @end
+# @var oracle_sw_patches:example: >
+# oracle_sw_patches:
+#   - filename: p28183653_122010_Linux-x86-64.zip
+#     patchid: 28183653
+#     version: 12.2.0.1
+#     patchversion: 12.2.0.1.180717
+#     description: GI-RU-July-2018
+#     creates: 28183653/28163133/files/suptools/orachk.zip
+#   - filename: p27468969_122010_Linux-x86-64.zip
+#     patchid: 27468969
+#     version: 12.2.0.1
+#     patchversion: 12.2.0.1.180417
+#     description: GI-RU-April-2018
+#     creates: 27468969/27674384/README.txt
+#   - filename: p28140658_12201180417DBAPR2018RU_Linux-x86-64.zip
+#     patchid: 28140658
+#     version: 12.2.0.1
+#     patchversion: 12201180417DBAPR2018RU
+#     description: 'PARALLEL QUERY Patch for Bug# 28140658 for Linux-x86-64 Platforms'
+#     creates: online/files/hpatch/bug28140658.pch
+# @end
+oracle_sw_patches: []
+
+# @var oracle_opatch_patch:description: >
+# Mapping from OPatch ZIP-archive to Oracle Release.
+#
+# The variable is configured for all supported Oracle Release by default.
+# @end
 oracle_opatch_patch:
   - filename: p6880880_210000_Linux-x86-64.zip
     version: 21.3.0.0
@@ -176,86 +343,20 @@ oracle_opatch_patch:
     version: 11.2.0.3
 
 
-oracle_base: /u01/app/oracle
-oracle_home_db: "{%- if dbh is defined -%}
-                    {%- if db_homes_config[dbh.home]['oracle_home'] is defined  -%}
-                         {{ db_homes_config[dbh.home]['oracle_home'] }}
-                    {%- else -%}
-                         {{ oracle_base }}/{{ db_homes_config[dbh.home]['version'] }}/{{ db_homes_config[dbh.home]['home'] }}
-                    {%- endif -%}
-                 {%- elif pdb.0.home is defined %}
-                    {%- if db_homes_config[pdb.0.home]['oracle_home'] is defined  -%}
-                         {{ db_homes_config[pdb.0.home]['oracle_home'] }}
-                    {%- else -%}
-                         {{ oracle_base }}/{{ db_homes_config[pdb.0.home]['version'] }}/{{ db_homes_config[pdb.0.home]['home'] }}
-                    {%- endif -%}
-                 {%- elif item.0 is defined -%}
-                    {%- if db_homes_config[item.0.home]['oracle_home'] is defined  -%}
-                         {{ db_homes_config[item[0].home]['oracle_home'] }}
-                    {%- else -%}
-                         {{ oracle_base }}/{{ db_homes_config[item.0.home]['version'] }}/{{ db_homes_config[item.0.home]['home'] }}
-                    {%- endif -%}
-                 {%- elif item[1] is defined -%}
-                    {%- if db_homes_config[item[1].home]['oracle_home'] is defined  -%}
-                         {{ db_homes_config[item[1].home]['oracle_home'] }}
-                    {%- else -%}
-                         {{ oracle_base }}/{{ db_homes_config[item[1].home]['version'] }}/{{ db_homes_config[item[1].home]['home'] }}
-                    {%- endif -%}
-                 {%- elif item is defined -%}
-                    {%- if db_homes_config[item.home]['oracle_home'] is defined  -%}
-                         {{ db_homes_config[item.home]['oracle_home'] }}
-                    {%- else -%}
-                         {{ oracle_base }}/{{ db_homes_config[item.home]['version'] }}/{{ db_homes_config[item.home]['home'] }}
-                    {%- endif -%}
-                 {%- endif -%}"
-
-db_version: "{%- if dbh is defined and db_homes_config[dbh.home] is defined -%}
-                 {%- if db_homes_config[dbh.home]['version'] is defined  -%}
-                      {{ db_homes_config[dbh.home]['version'] }}
-                 {%- endif -%}
-             {%- elif item.0 is defined and db_homes_config[item.0.home] is defined -%}
-                 {%- if db_homes_config[item.0.home]['version'] is defined  -%}
-                      {{ db_homes_config[item.0.home]['version'] }}
-                  {%- endif -%}
-             {%- elif item[0] is defined and db_homes_config[item[0].home] is defined -%}
-                 {%- if db_homes_config[item[0].home]['version'] is defined  -%}
-                      {{ db_homes_config[item[0].home]['version'] }}
-                 {%- endif -%}
-             {%- elif item[1] is defined and db_homes_config[item[1].home] is defined -%}
-                 {%- if db_homes_config[item[1].home]['version'] is defined  -%}
-                      {{ db_homes_config[item[1].home]['version'] }}
-                 {%- endif -%}
-             {%- elif item is defined and db_homes_config[item.home] is defined -%}
-                 {%- if db_homes_config[item.home]['version'] is defined  -%}
-                      {{ db_homes_config[item.home]['version'] }}
-                 {%- endif -%}
-             {%- endif -%}"
-
-oracle_db_instance_name: "{%- if pdb.0.cdb is defined -%}
-                            {%- for db in oracle_databases -%}
-                              {%- if db.oracle_db_name == pdb.0.cdb -%}
-                              {{ db.oracle_db_instance_name | default(db.oracle_db_unique_name | default(db.oracle_db_name)) }}
-                              {%- endif -%}
-                            {%- endfor -%}
-                          {%- endif -%}"
-
-oracle_home_gi: "{% if configure_cluster %}{{ oracle_home_gi_cl }}{% else %}{{ oracle_home_gi_so }}{% endif %}"
-oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid"  # ORACLE_HOME for Grid Infrastructure (Clustered)
-oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid"  # ORACLE_HOME for Grid Infrastructure (Stand Alone)
-
+# @var disable_ee_options:description: >
+# Global switch to define if Oracle options should be changed in binary for Enterprise-Edition.
+# @end
+# @var disable_ee_options:example: >
+# disable_ee_options: true # change options in binary
+# disable_ee_options: false # do not change options in binary
+# @end
+# @var disable_ee_options: $ "true"
 disable_ee_options: true
 
-# Do not change _oracle_ee_opiton_dict. It is only used for internal purposes.
-_oracle_ee_opiton_dict:
-  '11.2.0.4': "{{ oracle_ee_options_112 }}"
-  '12.1.0.1': "{{ oracle_ee_options_121 }}"
-  '12.1.0.2': "{{ oracle_ee_options_121 }}"
-  '12.2.0.1': "{{ oracle_ee_options_122 }}"
-  '18.3.0.0': "{{ oracle_ee_options_183 }}"
-  '19.3.0.0': "{{ oracle_ee_options_193 }}"
-  '21.3.0.0': "{{ oracle_ee_options_213 }}"
 
-# disable all options who requires extra licences
+# @var oracle_ee_options_112:description: >
+# Define the enabled/disabled options for 11.2 binaries.
+# @end
 oracle_ee_options_112:
   - {option: dm, state: false}
   - {option: dv, state: false}
@@ -264,94 +365,175 @@ oracle_ee_options_112:
   - {option: partitioning, state: false}
   - {option: rat, state: false}
 
+# @var oracle_ee_options_121:description: >
+# Define the enabled/disabled options for 12.1 binaries.
+# @end
 oracle_ee_options_121:
   - {option: dm, state: false}
   - {option: olap, state: false}
   - {option: partitioning, state: false}
   - {option: rat, state: false}
 
+# @var oracle_ee_options_122:description: >
+# Define the enabled/disabled options for 12.2 binaries.
+# @end
 oracle_ee_options_122:
   - {option: oaa, state: false}
   - {option: olap, state: false}
   - {option: partitioning, state: false}
   - {option: rat, state: false}
 
+# @var oracle_ee_options_183:description: >
+# Define the enabled/disabled options for 18c binaries.
+# @end
 oracle_ee_options_183:
   - {option: oaa, state: false}
   - {option: olap, state: false}
   - {option: partitioning, state: false}
   - {option: rat, state: false}
 
+# @var oracle_ee_options_193:description: >
+# Define the enabled/disabled options for 19c binaries.
+# @end
 oracle_ee_options_193:
   - {option: oaa, state: false}
   - {option: olap, state: false}
   - {option: partitioning, state: false}
   - {option: rat, state: false}
 
+# @var oracle_ee_options_213:description: >
+# Define the enabled/disabled options for 21c binaries.
+# @end
 oracle_ee_options_213:
   - {option: oaa, state: false}
   - {option: olap, state: false}
   - {option: partitioning, state: false}
   - {option: rat, state: false}
 
-# This is an example layout of a database installation
-oracle_databases:                                        # Dictionary describing the databases to be installed
-  - home: 19300-base                                     # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
-    oracle_db_name: orcl                                 # Database name
-    oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
-    is_container: true                                   # (true/false) Is the database a container database
-    storage_type: FS                                     # Database storage to be used. ASM or FS.
-    oracle_db_mem_totalmb: 1024                          # Amount of RAM to be used for SGA + PGA
-    oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
-    redolog_size: 100M
-    redolog_groups: 3
-    archivelog: false
-    flashback: false
-    force_logging: false
-    listener_name: LISTENER
-    state: present                                       # present | absent
-    statspack:
-      purgedays: 14
-      snaplevel: 5
-      state: present
-    tablespaces:
-      - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
-      - {name: sysaux, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
-      - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
-      - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
-      - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
-    init_parameters:
-      - {name: audit_trail, value: 'NONE', scope: spfile, state: present}
-      - {name: control_management_pack_access, value: 'NONE', scope: both, state: present}
-      - {name: control_file_record_keep_time, value: '30', scope: both, state: present}
-      - {name: db_files, value: '200', scope: spfile, state: present}
-      - {name: deferred_segment_creation, value: 'false', scope: both, state: present}
-      - {name: filesystemio_options, value: 'setall', scope: spfile, state: present}
-      - {name: job_queue_processes, value: '10', scope: both, state: present}
-      # Disable forcing hugepages on really small systems
-      #  - {name: use_large_pages ,value: 'ONLY', scope: spfile, state: present}
-      - {name: log_archive_dest_1, value: 'location=USE_DB_RECOVERY_FILE_DEST', scope: both, state: present}
-      - {name: log_buffer, value: '64M', scope: spfile, state: present}
-      - {name: pga_aggregate_target, value: '200M', scope: both, state: present, dbca: false}
-      - {name: sga_target, value: '1800M', scope: spfile, state: present, dbca: false}
-      - {name: recyclebin, value: 'off', scope: spfile, state: present}
-      - {name: streams_pool_size, value: '152M', scope: spfile, state: present}
-      - {name: "_cursor_obsolete_threshold", value: '1024', scope: spfile, state: present}
-      - {name: max_pdbs, value: '3', scope: both, state: present}
-      - {name: clonedb, value: 'true', scope: spfile, state: present, dbca: false}
-      - {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
-      - {name: db_create_online_log_dest_1, value: '/u02/oradata', scope: both, state: present}
-      - {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
-    profiles:
-      - name: DEFAULT
-        state: present
-        attributes:
-          - {name: password_life_time, value: unlimited}
-    users:
-      - schema: dbsnmp
-        state: unlocked
-        update_password: always
+# @todo information: variable description is missing
+# @var oracle_databases:description: >
+#
+# Defines the list of databases on a host.
+#
+# There are diffent sub list to define Profiles, Services, Tablespaces, Users ...
+#
+#
+# *Sub-Sections*
+#
+# _statspack_
+#
+# | Attribute | Description |
+# | --- | --- |
+# | purgedays | Purgedays for snapshots |
+# | snaplevel | snaplevel used in job |
+# | state | create (`present`) or remove (`absent`) statspack from nonCDB, CDB or PDB |
+#
+# _tablespaces_
+#
+# Defines the Tablespace to add, drop or modify to the database.
+#
+# Known limitations:
+#
+# Multiple files with dedicated file names are not supported.
+#
+# Use OMF instead, which is the default during creation of Tablespaces.
+#
+# | Attribute | Description |
+# | --- | --- |
+# | name ||
+# | size ||
+# | autoextend ||
+# | next ||
+# | maxsize ||
+# | content ||
+# | state ||
+# | bigfile ||
+# | numfiles | mutually exclusive with datafile |
+# | datafile | mutually exclusive with numfiles |
+# See examples for allowed values.
+# @end
+# @var oracle_databases:example: >
+#
+# # IMPORTANT! This following example shows the general structure of oracle_databases.
+# # Do not use it as a real example.
+#
+# oracle_databases:
+#   - home: 19300-base
+#     oracle_db_name: orcl
+#     state: present
+#     statspack:
+#       purgedays: 14
+#       snaplevel: 5
+#       state: present
+#     tablespaces:
+#       - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+#     init_parameters:
+#       - {name: audit_trail, value: 'NONE', scope: spfile, state: present}
+#     profiles:
+#       - name: DEFAULT
+#     users:
+#       - schema: dbsnmp
+#
+# oracle_databases:
+#   - home: 19300-base
+#     oracle_db_name: orcl
+#     oracle_db_type: SI
+#     is_container: true
+#     storage_type: FS
+#     oracle_db_mem_totalmb: 1024
+#     oracle_database_type: MULTIPURPOSE
+#     redolog_size: 100M
+#     redolog_groups: 3
+#     archivelog: false
+#     flashback: false
+#     force_logging: false
+#     listener_name: LISTENER
+#     state: present
+#     statspack:
+#       purgedays: 14
+#       snaplevel: 5
+#       state: present
+#     tablespaces:
+#       - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+#       - {name: sysaux, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+#       - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
+#       - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
+#       - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+#     init_parameters:
+#       - {name: audit_trail, value: 'NONE', scope: spfile, state: present}
+#       - {name: control_management_pack_access, value: 'NONE', scope: both, state: present}
+#       - {name: control_file_record_keep_time, value: '30', scope: both, state: present}
+#       - {name: db_files, value: '200', scope: spfile, state: present}
+#       - {name: deferred_segment_creation, value: 'false', scope: both, state: present}
+#       - {name: filesystemio_options, value: 'setall', scope: spfile, state: present}
+#       - {name: job_queue_processes, value: '10', scope: both, state: present}
+#       # Disable forcing hugepages on really small systems
+#       #  - {name: use_large_pages ,value: 'ONLY', scope: spfile, state: present}
+#       - {name: log_archive_dest_1, value: 'location=USE_DB_RECOVERY_FILE_DEST', scope: both, state: present}
+#       - {name: log_buffer, value: '64M', scope: spfile, state: present}
+#       - {name: pga_aggregate_target, value: '200M', scope: both, state: present, dbca: false}
+#       - {name: sga_target, value: '1800M', scope: spfile, state: present, dbca: false}
+#       - {name: recyclebin, value: 'off', scope: spfile, state: present}
+#       - {name: streams_pool_size, value: '152M', scope: spfile, state: present}
+#       - {name: "_cursor_obsolete_threshold", value: '1024', scope: spfile, state: present}
+#       - {name: max_pdbs, value: '3', scope: both, state: present}
+#       - {name: clonedb, value: 'true', scope: spfile, state: present, dbca: false}
+#       - {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
+#       - {name: db_create_online_log_dest_1, value: '/u02/oradata', scope: both, state: present}
+#       - {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
+#     profiles:
+#       - name: DEFAULT
+#         state: present
+#         attributes:
+#           - {name: password_life_time, value: unlimited}
+#     users:
+#       - schema: dbsnmp
+#         state: unlocked
+#         update_password: always
+# @end
 
+
+# @todo information: variable description is missing
 oracle_pdbs:
   - home: 19300-base
     listener_port: 1521
@@ -369,17 +551,16 @@ oracle_pdbs:
       - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
       - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
 
-# DB
+# @todo information: variable description is missing
 default_dbpass: "{% if item is defined and item.oracle_db_passwd is defined %}{{ item.oracle_db_passwd }}\
                  {%- elif dbh is defined and dbh.oracle_db_passwd is defined %}{{ dbh.oracle_db_passwd }}\
                  {%- else %}Oracle123\
                  {%- endif %}"
 
+# @todo information: variable description is missing
 dbpasswords:
   orcl:
     sys: Oracle_456
     system: Oracle_456
     dbsnmp: Oracle_456
     pdbadmin: Oracle_456
-
-## END-OF-PASSWORDS

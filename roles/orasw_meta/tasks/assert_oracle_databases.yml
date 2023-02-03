@@ -77,6 +77,8 @@
             that:
               - ass_odb.oracle_db_name is defined
               - ass_odb.home is defined
+              - ass_odb.state is defined
+              - ass_odb.state in ['absent', 'present']
               - db_homes_config[ass_odb.home] is defined
               - db_homes_config[ass_odb.home]['version'] is version('21.3.0.0', '<')
                 or (db_homes_config[ass_odb.home]['version'] is version('21.3.0.0', '>=')
@@ -116,12 +118,17 @@
           ansible.builtin.assert:
             quiet: true
             that:
+              - ass_pdb.cdb is defined
+              - ass_pdb.pdb_name is defined
+              - ass_pdb.state is defined
+              - ass_pdb.state in ['absent', 'present']
               - ass_pdb.home is defined
               - db_homes_config[ass_pdb.home] is defined
           with_items:
             - "{{ oracle_pdbs }}"
           loop_control:
-            label: "{{ ass_pdb.oracle_db_name | default('') }}"
+            label: "cdb {{ ass_pdb.cdb | default('') }} \
+                    pdb {{ ass_pdb.pdb_name | default('') }}"
             loop_var: ass_pdb
           when:
             - oracle_pdbs is defined
