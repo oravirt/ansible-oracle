@@ -164,12 +164,12 @@ use_partition_devices: '{{ partition_devices }}'
 
 ## Open Tasks
 
+- (bug): check device_persistence for ASMFD
+- (bug): udev not tested for a long time, was supported
 - (bug): move default variable oracle_stage
 - (bug): move default variable oracle_rsp_stage
 - (bug): move default variable device_persistence
 - (bug): why is variable multipath only used for dm-multipath?
-- (bug): check device_persistence for ASMFD
-- (bug): udev not tested for a long time, was supported
 
 ## Dependencies
 
