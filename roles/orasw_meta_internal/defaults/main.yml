@@ -1,0 +1,325 @@
+---
+# @var _db_password_cdb:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+# @end
+# @var _db_password_cdb: $ "_internal_used_"
+_db_password_cdb: "{{ dbpasswords[odb.0.oracle_db_name][db_user] | \
+                      default(default_dbpass) }}"
+
+# @var _db_password_pdb:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+# @end
+# @var _db_password_pdb: $ "_internal_used_"
+_db_password_pdb: "{{ dbpasswords[opdb[0]['cdb']][opdb[0]['pdb_name']][db_user] | \
+                      default(default_dbpass) }}"
+
+# @var _db_service_name:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+# @end
+# @var _db_service_name: $ "_internal_used_"
+_db_service_name: "{% if odb[0] is defined -%} \
+                    {%- if odb[0].oracle_db_unique_name is defined -%}{{ odb[0].oracle_db_unique_name }}\
+                    {%- elif odb[0].oracle_db_instance_name is defined -%}{{ odb[0].oracle_db_instance_name }}\
+                    {%- else -%}{{ odb[0].oracle_db_name }}\
+                    {%- endif -%}\
+                  {%- endif %}"
+
+# @var _oracle_home_db:description: >
+# This is an internal variable in `ansible-oracle`.
+#
+# Do not set it in inventory!
+# @end
+# @var _oracle_home_db: $ "_internal_used_"
+_oracle_home_db: "{%- if odb[0] is defined -%}\
+                    {{ db_homes_config[odb[0].home]['oracle_home'] | \
+                       default(oracle_base + '/' + db_homes_config[odb[0].home]['version'] + '/' + odb[0].home) }}\
+                  {%- elif opdb[0] is defined -%}\
+                    {{ db_homes_config[opdb[0].home]['oracle_home'] | \
+                       default(oracle_base + '/' + db_homes_config[opdb[0].home]['version'] + '/' + opdb[0].home) }}\
+                  {%- endif -%}"
+
+# @var _odb_loop_helper:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+# @end
+# @var _odb_loop_helper: $ "_internal_used_"
+_odb_loop_helper: "{{ odb.0 | default(odb) | default({}) }}"
+
+# @var _opdb_loop_helper:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+# @end
+# @var _opdb_loop_helper: $ "_internal_used_"
+_opdb_loop_helper: "{{ opdb.0 | default(opdb) | default({}) }}"
+
+# @var _oracle_db_instance_name:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+# @end
+# @var _oracle_db_instance_name: $ "_internal_used_"
+_oracle_db_instance_name: "{%- if _odb_loop_helper.oracle_db_name is defined -%}\
+                             {{ _odb_loop_helper.oracle_db_instance_name | \
+                                  default(_odb_loop_helper.oracle_db_unique_name | \
+                                    default(_odb_loop_helper.oracle_db_name)) }}\
+                           {%- elif _opdb_loop_helper.cdb is defined -%}\
+                             {%- for db in oracle_databases -%}\
+                               {%- if db.oracle_db_name == _opdb_loop_helper.cdb -%}\
+                                 {{ db.oracle_db_instance_name | \
+                                      default(db.oracle_db_unique_name | \
+                                        default(db.oracle_db_name)) \
+                                 }}\
+                               {%- endif -%}\
+                             {%- endfor -%}\
+                           {%- endif -%}"
+
+# @var _oracle_env:description: >
+# The variable is used for shell, command tasks to set environment Variables.
+#
+# Do not set it in inventory!
+# @end
+_oracle_env:
+  ORACLE_HOME: "{{ _oracle_home_db }}"
+  LD_LIBRARY_PATH: "{{ _oracle_home_db }}/lib"
+
+# @var _oracle_ee_opiton_dict:description: >
+# This is an internal variable in `ansible-oracle`.
+#
+# _IMPORTANT_
+#
+# Do not set this variable in inventory, set_fact ...!
+# @end
+_oracle_ee_opiton_dict:
+  '11.2.0.4': "{{ oracle_ee_options_112 }}"
+  '12.1.0.1': "{{ oracle_ee_options_121 }}"
+  '12.1.0.2': "{{ oracle_ee_options_121 }}"
+  '12.2.0.1': "{{ oracle_ee_options_122 }}"
+  '18.3.0.0': "{{ oracle_ee_options_183 }}"
+  '19.3.0.0': "{{ oracle_ee_options_193 }}"
+  '21.3.0.0': "{{ oracle_ee_options_213 }}"
+
+
+#########################################
+######
+######  old variables - refactoring needed!
+######
+#########################################
+
+# @var configure_cluster:description: >
+# This was an open variable and has been changed to an internal one.
+#
+# The variable will be deprecated and removed in a future release of `ansibe-oracle`.
+# @end
+# @var configure_cluster:example: >
+# configure_cluster: false
+#
+# configure_cluster: true
+# @end
+configure_cluster: false
+
+oracle_sw_copy: "{% if install_from_nfs %}false{% else %}true{% endif %}"
+oracle_sw_unpack: "{% if install_from_nfs %}false{% else %}true{% endif %}"
+oracle_sw_extract_path: "{%- if '18' in db_version -%}\
+                            {{ oracle_home_db }}\
+                          {%- else -%}\
+                              {{ oracle_stage }}/{{ item[0].version }}\
+                          {%- endif -%}"
+
+
+db_user: sys
+db_mode: sysdba
+
+
+db_password_pdb: "{% if dbpasswords is defined \
+                        and dbpasswords[item.0.cdb] is defined \
+                        and dbpasswords[item.0.cdb][db_user] is defined -%}\
+                    {{ dbpasswords[item.0.cdb][db_user] }}
+                  {%- else %}{{ default_dbpass }}
+                  {%- endif %}"
+
+db_password: "{% if dbpasswords is defined\
+                    and dbpasswords[item.oracle_db_name] is defined \
+                    and dbpasswords[item.oracle_db_name][db_user] is defined -%} \
+               {{ dbpasswords[item.oracle_db_name][db_user] }} \
+              {%- else %}{{ default_dbpass }} \
+              {%- endif %}"
+
+db_service_name: "{% if item is defined -%} \
+                    {%- if item.oracle_db_unique_name is defined -%}{{ item.oracle_db_unique_name }}\
+                    {%- elif item.oracle_db_instance_name is defined -%}{{ item.oracle_db_instance_name }}\
+                    {%- else -%}{{ item.oracle_db_name }}\
+                    {%- endif -%}\
+                  {%- endif %}"
+
+user_cdb_password: "{% if dbpasswords is defined \
+                          and dbpasswords[item.0.oracle_db_name] is defined \
+                          and dbpasswords[item.0.oracle_db_name][item.1.schema] is defined -%}{{ dbpasswords[item.0.oracle_db_name][item.1.schema] }}
+                    {%- else -%}{{ default_dbpass }}
+                    {%- endif %}"
+
+user_pdb_password: "{% if dbpasswords is defined \
+                          and dbpasswords[item.0.cdb] is defined \
+                          and dbpasswords[item.0.cdb][item.0.pdb_name] is defined \
+                          and dbpasswords[item.0.cdb][item.0.pdb_name][item.1.schema] is defined -%}\
+                      {{ dbpasswords[item.0.cdb][item.0.pdb_name][item.1.schema] }}
+                    {%- else %}{{ default_dbpass }}
+                    {%- endif %}"
+
+
+listener_home: "{%- if lsnrinst is defined -%}\
+                  {%- if db_homes_config[lsnrinst.home]['oracle_home'] is defined -%}{{ db_homes_config[lsnrinst.home]['oracle_home'] }}\
+                  {%- else -%}{{ oracle_base }}/{{ db_homes_config[lsnrinst.home]['version'] }}/{{ db_homes_config[lsnrinst.home]['home'] }}\
+                  {%- endif -%}\
+                {%- endif -%}"
+
+listener_protocols: TCP
+
+listener_port_template: "{% if item.listener_port is defined %}{{ item.listener_port }}{% else %}{{ listener_port }}{% endif %}"
+
+# @var grid_env:description: >
+# The variable is used for shell, command tasks to set environment Variables.
+#
+# Do not set it in inventory!
+# @end
+grid_env:
+  ORACLE_HOME: "{{ oracle_home_gi }}"
+  LD_LIBRARY_PATH: "{{ oracle_home_gi }}/lib"
+
+# @var oracle_env:description: >
+# The variable is used for shell, command tasks to set environment Variables.
+#
+# Do not set it in inventory!
+# @end
+oracle_env:
+  ORACLE_HOME: "{{ oracle_home_db }}"
+  LD_LIBRARY_PATH: "{{ oracle_home_db }}/lib"
+
+# @var oracle_env_lsnrctl:description: >
+# The variable is used for shell, command tasks to set environment Variables.
+#
+# Do not set it in inventory!
+# @end
+oracle_env_lsnrctl:
+  ORACLE_BASE: "{{ oracle_base }}"
+  ORACLE_HOME: "{{ listener_home }}"
+  LD_LIBRARY_PATH: "{{ listener_home }}/lib"
+  PATH: "{{ listener_home }}/bin:$PATH:/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin"
+
+# @var oracle_home_db:description: >
+# This is an internal variable in `ansible-oracle`.
+#
+# The variable is deprecated and removed in a future version.
+#
+# _IMPORTANT_
+#
+# Do not set this variable in inventory, set_fact ...!
+# @end
+# @var oracle_home_db: $ "_unset_"
+oracle_home_db: "{%- if dbh is defined -%}
+                    {%- if db_homes_config[dbh.home]['oracle_home'] is defined  -%}
+                         {{ db_homes_config[dbh.home]['oracle_home'] }}
+                    {%- else -%}
+                         {{ oracle_base }}/{{ db_homes_config[dbh.home]['version'] }}/{{ db_homes_config[dbh.home]['home'] }}
+                    {%- endif -%}
+                 {%- elif pdb.0.home is defined %}
+                    {%- if db_homes_config[pdb.0.home]['oracle_home'] is defined  -%}
+                         {{ db_homes_config[pdb.0.home]['oracle_home'] }}
+                    {%- else -%}
+                         {{ oracle_base }}/{{ db_homes_config[pdb.0.home]['version'] }}/{{ db_homes_config[pdb.0.home]['home'] }}
+                    {%- endif -%}
+                 {%- elif item.0 is defined -%}
+                    {%- if db_homes_config[item.0.home]['oracle_home'] is defined  -%}
+                         {{ db_homes_config[item[0].home]['oracle_home'] }}
+                    {%- else -%}
+                         {{ oracle_base }}/{{ db_homes_config[item.0.home]['version'] }}/{{ db_homes_config[item.0.home]['home'] }}
+                    {%- endif -%}
+                 {%- elif item[1] is defined -%}
+                    {%- if db_homes_config[item[1].home]['oracle_home'] is defined  -%}
+                         {{ db_homes_config[item[1].home]['oracle_home'] }}
+                    {%- else -%}
+                         {{ oracle_base }}/{{ db_homes_config[item[1].home]['version'] }}/{{ db_homes_config[item[1].home]['home'] }}
+                    {%- endif -%}
+                 {%- elif item is defined -%}
+                    {%- if db_homes_config[item.home]['oracle_home'] is defined  -%}
+                         {{ db_homes_config[item.home]['oracle_home'] }}
+                    {%- else -%}
+                         {{ oracle_base }}/{{ db_homes_config[item.home]['version'] }}/{{ db_homes_config[item.home]['home'] }}
+                    {%- endif -%}
+                 {%- endif -%}"
+
+
+# @var db_version:description: >
+# This is an internal variable in `ansible-oracle`.
+#
+# _IMPORTANT_
+#
+# Do not set this variable in inventory, set_fact ...!
+# @end
+# @var db_version: $ "_unset_"
+db_version: "{%- if dbh is defined and db_homes_config[dbh.home] is defined -%}
+                 {%- if db_homes_config[dbh.home]['version'] is defined  -%}
+                      {{ db_homes_config[dbh.home]['version'] }}
+                 {%- endif -%}
+             {%- elif item.0 is defined and db_homes_config[item.0.home] is defined -%}
+                 {%- if db_homes_config[item.0.home]['version'] is defined  -%}
+                      {{ db_homes_config[item.0.home]['version'] }}
+                  {%- endif -%}
+             {%- elif item[0] is defined and db_homes_config[item[0].home] is defined -%}
+                 {%- if db_homes_config[item[0].home]['version'] is defined  -%}
+                      {{ db_homes_config[item[0].home]['version'] }}
+                 {%- endif -%}
+             {%- elif item[1] is defined and db_homes_config[item[1].home] is defined -%}
+                 {%- if db_homes_config[item[1].home]['version'] is defined  -%}
+                      {{ db_homes_config[item[1].home]['version'] }}
+                 {%- endif -%}
+             {%- elif item is defined and db_homes_config[item.home] is defined -%}
+                 {%- if db_homes_config[item.home]['version'] is defined  -%}
+                      {{ db_homes_config[item.home]['version'] }}
+                 {%- endif -%}
+             {%- endif -%}"
+
+# @var oracle_db_instance_name:description: >
+# This is an internal variable in `ansible-oracle`.
+#
+# _IMPORTANT_
+#
+# Do not set this variable in inventory, set_fact ...!
+# @end
+# @var oracle_db_instance_name: $ "_unset_"
+oracle_db_instance_name: "{%- if pdb.0.cdb is defined -%}
+                            {%- for db in oracle_databases -%}
+                              {%- if db.oracle_db_name == pdb.0.cdb -%}
+                              {{ db.oracle_db_instance_name | default(db.oracle_db_unique_name | default(db.oracle_db_name)) }}
+                              {%- endif -%}
+                            {%- endfor -%}
+                          {%- endif -%}"
+
+
+# @var oracle_profile_name:description: >
+# Variable is only used for old .profile script from `ansible-oracle`.
+# No real need to change the default.
+#
+# `item.oracle_db_name` is `oracle_db_name` from oracle_databases.
+# @end
+oracle_profile_name: ".profile_{{ item.oracle_db_name }}"
+
+# @var oracle_home_gi:description: >
+# Custom setting for CRS_HOME.
+#
+# The default value depends on `configure_cluster` and `oracle_home_gi_cl` or `oracle_home_gi_so`.
+# @end
+oracle_home_gi: "{% if oracle_install_version_gi is defined -%}\
+                    {%- if configure_cluster -%}{{ oracle_home_gi_cl }}\
+                    {%- else -%}{{ oracle_home_gi_so }}\
+                    {%- endif -%}\
+                 {%- endif %}"
+
+cluster_master: "{{ play_hosts[0] }}"
