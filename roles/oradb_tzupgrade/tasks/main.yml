@@ -1,9 +1,12 @@
 ---
-- ansible.builtin.include_tasks: tzpatch_db.yml
-  # noqa unnamed-task
-  vars:
-    oradb_entry: "{{ item }}"
-  with_items: "{{ oracle_databases }}"
-  when: item.state | lower == 'present'
+- name: oradb_tzupgrade | Loop over oracle_databases
+  ansible.builtin.include_tasks: >-
+    {{ odb.is_container | default(false) | ternary('cdb', 'non_cdb') }}.yml
+  with_items:
+    - "{{ oracle_databases }}"
+  when: odb.state | lower == 'present'
   loop_control:
-    label: "home: {{ item.home }} db_name: {{ item.oracle_db_name }}"
+    label: >-
+      home: {{ odb.home }}
+      db_name: {{ odb.oracle_db_name }}
+    loop_var: odb
