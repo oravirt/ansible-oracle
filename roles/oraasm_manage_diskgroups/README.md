@@ -1,50 +1,87 @@
-oraasm-manage-diskgroups
-=========
+# oraasm_manage_diskgroups
 
-- Manages ASM diskgroups.
+Manages ASM diskgroups.
 
-- Uses oracle_asmdg module from [ansible-oracle-modules](https://github.com/oravirt/ansible-oracle-modules)
+_Important_
 
-Role Variables
---------------
-`asm_diskgroups` - defines the various disksgroups and their attributes.
+All variables in this role are internal use only. Do not set them in inventory!
 
-e.g
+## Table of content
 
-```
-asm_diskgroups:
-  - diskgroup: crs
-    state: present
-    properties:
-      - {redundancy: external, ausize: 4}
-    attributes:
-      - {name: compatible.asm, value: 12.2.0.1.0}
-      - {name: compatible.rdbms, value: 11.2.0.4.0}
-    disk:
-      - {device: /dev/sdc, asmlabel: crs01}
-  - diskgroup: data
-    state: present
-    properties:
-      - {redundancy: external, ausize: 4}
-    attributes:
-      - {name: compatible.asm, value: 12.2.0.1}
-      - {name: compatible.rdbms, value: 11.2.0.4.0}
-    disk:
-      - {device: /dev/sdd, asmlabel: data01}
-      - {device: /dev/sde, asmlabel: data02}
+- [Default Variables](#default-variables)
+  - [asmdevice_list](#asmdevice_list)
+  - [attr_name](#attr_name)
+  - [attr_value](#attr_value)
+  - [oracle_asm_disk_prefix](#oracle_asm_disk_prefix)
+  - [oracle_env](#oracle_env)
+- [Discovered Tags](#discovered-tags)
+- [Dependencies](#dependencies)
+- [License](#license)
+- [Author](#author)
+
+---
+
+## Default Variables
+
+### asmdevice_list
+
+#### Default value
+
+```YAML
+asmdevice_list: internal use only
 ```
 
+### attr_name
 
-Example Playbook
-----------------
-```
-    - hosts: vbox-rac-dc1
-      become: True
-      become_user:
-      roles:
-         - { role: oraasm-manage-diskgroups }
+#### Default value
+
+```YAML
+attr_name: internal use only
 ```
 
-Author Information
-------------------
-Mikael Sandström, @oravirt, oravirt@gmail.com
+### attr_value
+
+#### Default value
+
+```YAML
+attr_value: internal use only
+```
+
+### oracle_asm_disk_prefix
+
+#### Default value
+
+```YAML
+oracle_asm_disk_prefix: internal use only
+```
+
+### oracle_env
+
+The variable is used for shell, command tasks to set environment Variables.
+
+Do not set it in inventory!
+
+#### Default value
+
+```YAML
+oracle_env:
+  ORACLE_HOME: '{{ oracle_home_gi }}'
+  LD_LIBRARY_PATH: '{{ oracle_home_gi }}/lib'
+```
+
+## Discovered Tags
+
+**_diskgroup_**
+
+
+## Dependencies
+
+- orasw_meta
+
+## License
+
+license (MIT)
+
+## Author
+
+[Mikael Sandström]
