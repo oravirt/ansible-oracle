@@ -9,18 +9,3 @@ purgedays: 35
 purgeinterval: "FREQ=daily;byhour=3;byminute=15;bysecond=0"
 snapinterval: "FREQ=hourly;byminute=0;bysecond=0"
 snaplevel: 7
-
-db_user: system
-db_password_cdb: "{% if dbpasswords is defined and dbpasswords[dbh.oracle_db_name] is defined and dbpasswords[dbh.oracle_db_name][db_user] is defined %}{{ dbpasswords[dbh.oracle_db_name][db_user] }}{% else %}{{ default_dbpass }}{% endif %}"
-db_password_pdb: "{%- if dbpasswords is defined and dbpasswords[pdb.0.cdb] is defined and dbpasswords[pdb.0.cdb][db_user] is defined -%}\
-                   {{ dbpasswords[pdb.0.cdb][db_user] }}\
-                  {%- else -%}\
-                    {{ default_dbpass }}\
-                  {%- endif -%}"
-
-db_service_name: "{% if dbh is defined %}\
-                    {%- if dbh.oracle_db_unique_name is defined %}{{ dbh.oracle_db_unique_name }}\
-                    {%- elif dbh.oracle_db_instance_name is defined %}{{ dbh.oracle_db_instance_name }}\
-                    {%- else %}{{ dbh.oracle_db_name }}\
-                    {%- endif %}\
-                  {%- endif %}"
