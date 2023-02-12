@@ -1,38 +1,76 @@
-Role Name
-=========
+# oradb_manage_statspack
 
-A brief description of the role goes here.
+Manage Statspack in Oracle
 
-Requirements
-------------
+## Table of content
 
-Do not create the perfstat user before creating the statspack
-inside the database. The detection of existing statspack installation
-is based on the perfstat user. The installation will be skkipped when
-user is existing.
+- [Default Variables](#default-variables)
+  - [purgedays](#purgedays)
+  - [purgeinterval](#purgeinterval)
+  - [snapinterval](#snapinterval)
+  - [snaplevel](#snaplevel)
+- [Discovered Tags](#discovered-tags)
+- [Dependencies](#dependencies)
+- [License](#license)
+- [Author](#author)
 
-Role Variables
---------------
+---
 
-The following example only shows mandatory variables from oracle_databases:
+## Default Variables
 
-```yaml
-oracle_databases:
-  - oracle_db_name: DB1
-    oracle_db_type: SI
-    statspack:
-      state: present
-      tablespace: sysaux
-      tablespace_temp: temp
-      purgedays: 14
-      snaplevel: 7
-      snapinterval: "FREQ=hourly;byminute=0;bysecond=0"
+### purgedays
+
+#### Default value
+
+```YAML
+purgedays: 35
 ```
 
-Dependencies
-------------
+### purgeinterval
 
-Author Information
-------------------
+#### Default value
 
-Thorsten Bruhns <thorsten.bruhns@googlemail.com>
+```YAML
+purgeinterval: FREQ=daily;byhour=3;byminute=15;bysecond=0
+```
+
+### snapinterval
+
+#### Default value
+
+```YAML
+snapinterval: FREQ=hourly;byminute=0;bysecond=0
+```
+
+### snaplevel
+
+#### Default value
+
+```YAML
+snaplevel: 7
+```
+
+## Discovered Tags
+
+**_spcdb_**
+
+**_spcreate_**
+
+**_spdrop_**
+
+**_spjob_**
+
+**_sppdb_**
+
+
+## Dependencies
+
+- orasw_meta
+
+## License
+
+license (MIT)
+
+## Author
+
+[Thorsten Bruhns]
