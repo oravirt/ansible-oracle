@@ -1,170 +1,246 @@
-# oradb-rman
+# oradb_rman
 
-Manages RMAN Backups
+Oracle RMAN Backup for ansible-oracle
 
-This role is written by Thorsten Bruhns <thorsten.bruhns@opitz-consulting.com>
-There is no warranty for any error in the scripts. Please test the Backup/Recovery after setup with ansible-oracle!
-This role used rman_backup.sh from https://github.com/Rendanic/oracleToolbox/blob/master/rman/linux/rman_backup.sh
+## Table of content
 
-# Backup Strategies
-The role has templates for 3 different strategies. Please do not edit this templates, because patches for this role could create conflicts. You can create your own templates and use them within rman_jobs.
+- [Default Variables](#default-variables)
+  - [check_mk_mkjob](#check_mk_mkjob)
+  - [rman_catalog_param](#rman_catalog_param)
+  - [rman_channel_disk](#rman_channel_disk)
+  - [rman_channel_disk_default](#rman_channel_disk_default)
+  - [rman_controlfile_autobackup_disk](#rman_controlfile_autobackup_disk)
+  - [rman_controlfile_autobackup_disk_default](#rman_controlfile_autobackup_disk_default)
+  - [rman_cron_logdir](#rman_cron_logdir)
+  - [rman_cron_mkjob](#rman_cron_mkjob)
+  - [rman_cronfile](#rman_cronfile)
+  - [rman_device_type_disk_default](#rman_device_type_disk_default)
+  - [rman_log_dir](#rman_log_dir)
+  - [rman_retention_policy](#rman_retention_policy)
+  - [rman_retention_policy_default](#rman_retention_policy_default)
+  - [rman_script_dir](#rman_script_dir)
+  - [rman_service_param](#rman_service_param)
+  - [rman_tns_admin](#rman_tns_admin)
+  - [rman_wallet_loc](#rman_wallet_loc)
+  - [rman_wallet_password](#rman_wallet_password)
+  - [rmanautofs](#rmanautofs)
+  - [rmanbackuplogdir](#rmanbackuplogdir)
+  - [rmanbackupscriptdir](#rmanbackupscriptdir)
+- [Discovered Tags](#discovered-tags)
+- [Dependencies](#dependencies)
+- [License](#license)
+- [Author](#author)
 
+---
 
-* Online Backup to NFS
+## Default Variables
 
-  Use the following names in rman_jobs:
+### check_mk_mkjob
 
-  * archivelog
-  * online_level0
-  * online_level1
+#### Default value
 
-* Backup compressed to Recovery-Area and then to NFS
-
-  Use the following names in rman_jobs:
-
-  * archivelog_fra_disk
-  * online_level0_fra_disk
-  * online_level1_fra_disk
-
-
-* Offline Backup to NFS
-
-  Use the following names in rman_jobs:
-
-  * offline_level0
-  * offline_level1
-
-# Example Playbook
-
-You need root permissions for executing the role!
-
-```
-    - hosts: servers
-      roles:
-         - roles/oradb-rman
-```
-
-# Configuration
-## Description of rman_jobs
-Cronjobs are only created when day, weekday, hour and minute are defined.
-
-* name
-
-  Defines the name of the used template from roles/oradb-rman/templates
-* disabled
-
-  Defines the state of cron entry. The cronentry is only disabled but not removed!
-* immediate
-
-  This allows an immediate execution of RMAN for the named script. Please be aware thatt the order of elements defines the executionorder of the scripts. The RMAN is NOT executed in ASYNC mode of Ansible. This parameter is most used for the 1st configuration of the parameter.
-
-* service
-
-  This parameter is only used in RAC Environments!
-  rman_backup.sh will only start a backup when the service is active on te current node. This allows a cronjob on every clusternode with a failoverservice to make sure, that a backup is running when the 'normal' node has failed. The services must be added with srvctl add service for the Database.
-
-* day / weekday / hour / minute
-
-  Variables for the cronjob.
-
-* rman_retention_policy
-
-  This could be used to overwrite the global default of `rman_retention_policy` at database level.
-
-## Using RMAN Catalog
-
-It is possible to configure rman jobs to use RMAN Catalog. In order to achieve this, you need to specify following attributes
-at your `oracle_databases` database block:
-* `rman_tnsalias` - tnsnames alias for RMAN Catalog database (has to be a tnsnames alias present in database home)
-* `rman_user` - username for the catalog database
-* `rman_password` - [deprecated] password for the catalog database. Use `dbpasswords[rman_tnsalias][rman_user]` instead.
-* `rman_wallet` (optionally) - when set to true, this role will configure Oracle Wallet for RMAN not to include plaintext password in crontab file.
-
-## Example
-
-The backup is configured in oracle_databases with rman_jobs:
-
-```
-  oracle_databases:
-    - home: db_home1
-      oracle_db_name: TEST
-      # rman_tnsalias: RCAT
-      # rman_user: rman
-      # rman_wallet: true
-      rman_jobs:
-         - name: parameter
-         - name: archivelog
-           disabled: False
-           day: "*"
-           weekday: "*"
-           hour: "*"
-           minute: "10"
-         - name: online_level0
-           disabled: False
-           day: "*"
-           weekday: "0"
-           hour: "02"
-           minute: "30"
-         - name: online_level1
-           disabled: False
-           day: "*"
-           weekday: "1-6"
-           hour: "02"
-           minute: "30"
+```YAML
+check_mk_mkjob: '{% if rman_cron_mkjob %}/usr/bin/mk-job rman_{{ item.0.oracle_db_name
+  }}_{{ item.1.name }} {% endif %}'
 ```
 
-## Variables
-The following variables are global. They are not part of oracle_databases!
+### rman_catalog_param
 
-* rman_cronfile
+#### Default value
 
-  Defines the name of the cronfile in /etc/cron.d. Setting rman_cronfile: "" will use the cron of the oracle_user instead of /etc/cron.d
+```YAML
+rman_catalog_param: '{% if item.0.rman_wallet is defined and item.0.rman_wallet %}-c
+  /@{{ item.0.rman_tnsalias }} {%- else %} {%- if item.0.rman_user is defined %}-c
+  {{ item.0.rman_user }}/{{ dbpasswords[item.0.rman_tnsalias][item.0.rman_user] |
+  default(item.0.rman_password) }}@{{ item.0.rman_tnsalias }} {%- endif %} {%- endif
+  %}'
+```
 
-* rman_cron_logdir
+### rman_channel_disk
 
-  Destination for cron execution which is redirected with `>> rman_cron_logdir 2>&1`
-  Default is `/var/log/oracle`
+#### Default value
 
-* rman_retention_policy
+```YAML
+rman_channel_disk: '{{ item.0.rman_channel_disk | default(rman_channel_disk_default)
+  }}'
+```
 
-  Use rman_retention_policy_default when not defined. This variable could be used inside rman_jobs for individual retention policies for every Database.
+### rman_channel_disk_default
 
-* rman_channel_disk
+#### Default value
 
-  This parameter must be defined. Otherwise the assert of the role will fail, because there is no usable default for this directory.
+```YAML
+rman_channel_disk_default: "'/u10/rmanbackup/%d/%d_%T_%U'"
+```
 
-* rman_retention_policy_default
+### rman_controlfile_autobackup_disk
 
-  This values is used when rman_retention_policy is not defined inside rman_jobs:.
- `Default: "RECOVERY WINDOW OF 14 DAYS"`
+#### Default value
 
-* rman_channel_disk_default
+```YAML
+rman_controlfile_autobackup_disk: '{{ item.0.rman_controlfile_autobackup_disk | default(rman_controlfile_autobackup_disk_default)
+  }}'
+```
 
-  `Default value: "DISK FORMAT   '/u10/rmanbackup/%d/%d_%T_%U'"`
+### rman_controlfile_autobackup_disk_default
 
-* rman_controlfile_autobackup_disk_default
+#### Default value
 
-  This parameter must be defined. Otherwise the assert of the role will fail, because there is no usable default for this directory.
+```YAML
+rman_controlfile_autobackup_disk_default: "'/u10/rmanbackup/%d/%d_%F'"
+```
 
-* rman_fra_backupdir
+### rman_cron_logdir
 
-  The target directory when you use the templates to backup the FRA to another disk (usually nfs).
+#### Default value
 
-* rmanautofs and rmanautofsmount
+```YAML
+rman_cron_logdir: /var/log/oracle/rman/log
+```
 
-  When `rmanautofs: true`, then autofs is implemented to mount `rmanautofsmount` similar to "/net".
-  Usually, you may then specify the nfs server and the corresponding export in `rman_channel_disk`.
+### rman_cron_mkjob
+
+#### Default value
+
+```YAML
+rman_cron_mkjob: false
+```
+
+### rman_cronfile
+
+#### Default value
+
+```YAML
+rman_cronfile: oracle_rman_ansible
+```
+
+### rman_device_type_disk_default
+
+#### Default value
+
+```YAML
+rman_device_type_disk_default: PARALLELISM 1 BACKUP TYPE TO COMPRESSED BACKUPSET
+```
+
+### rman_log_dir
+
+#### Default value
+
+```YAML
+rman_log_dir: '{% if item is defined and item.0.rman_log_dir is defined %}{{ item.0.rman_log_dir
+  }}{% else %}{{ oracle_base }}/rman/log/{% endif %}'
+```
+
+### rman_retention_policy
+
+#### Default value
+
+```YAML
+rman_retention_policy: '{{ item.0.rman_retention_policy | default(rman_retention_policy_default)
+  }}'
+```
+
+### rman_retention_policy_default
+
+#### Default value
+
+```YAML
+rman_retention_policy_default: RECOVERY WINDOW OF 14 DAYS
+```
+
+### rman_script_dir
+
+#### Default value
+
+```YAML
+rman_script_dir: '{% if item is defined and item.0.rman_script_dir is defined %}{{
+  item.0.rman_script_dir }}{% else %}{{ oracle_base }}/rman/{% endif %}'
+```
+
+### rman_service_param
+
+#### Default value
+
+```YAML
+rman_service_param: '{% if item.1.service is defined %}--service {{ item.1.service
+  }}{% else %}{% endif %}'
+```
+
+### rman_tns_admin
+
+#### Default value
+
+```YAML
+rman_tns_admin: '{{ oracle_base }}/rman/network/admin'
+```
+
+### rman_wallet_loc
+
+#### Default value
+
+```YAML
+rman_wallet_loc: '{{ oracle_base }}/rman/network/wallet'
+```
+
+### rman_wallet_password
+
+#### Default value
+
+```YAML
+rman_wallet_password: oracleWallet1
+```
+
+### rmanautofs
+
+#### Default value
+
+```YAML
+rmanautofs: false
+```
+
+### rmanbackuplogdir
+
+#### Default value
+
+```YAML
+rmanbackuplogdir: '{% if item.0.rman_log_dir is defined %}-l {{ item.0.rman_log_dir
+  }}{% else %}{% endif %}'
+```
+
+### rmanbackupscriptdir
+
+#### Default value
+
+```YAML
+rmanbackupscriptdir: '{% if item.0.rman_script_dir is defined %}-r {{ item.0.rman_script_dir
+  }}{% else %}{% endif %}'
+```
+
+## Discovered Tags
+
+**_assert_**
+
+**_autofs_**
+
+**_rmancopy_**
+
+**_rmancron_**
+
+**_rmanexecute_**
+
+**_tns_**
+
+**_wallet_**
 
 
-## Howtos
-### How to configure the RMAN scripts?
-The role copies the templatefiles from role/oradb-rman/templates to $ORACLE_BASE/admin/<DB_NAME>/rman. The name in the list defines the name of the template with .j2 as extension.
-	
-### How to configure the cron?
+## Dependencies
 
-The dictionary elements name, disabled, day, weekday, hour, minute are mandatory. The creation of cron only starts when every element is defined.
+- orasw_meta
 
-### How to use custom RMAN scripts?
-Copy the script into the template directory `role/oradb-rman/templates` and add a `- name: <filename>` at `rman_jobs`. The filename must end with `.rman.j2` regardless of Jinja2 in the file. You could use your own variables in the custom files and add entries to `rman_jobs`. They will be added as item.1.<dictionaryelement> to the template.
-Please do not edit existing files. They could be changed in future releases of oradb-rman.
+## License
 
+license (MIT)
+
+## Author
+
+[Thorsten Bruhns]
