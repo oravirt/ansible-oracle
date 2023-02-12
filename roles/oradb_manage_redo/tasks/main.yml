@@ -1,25 +1,38 @@
 ---
-- name: Manage redologs
-  opitzconsulting.ansible_oracle.oracle_redo:
-    hostname: "{{ ansible_hostname }}"
-    service_name: "{{ db_service_name }}"
-    port: "{{ listener_port_template }}"
-    user: "{{ db_user }}"
-    password: "{{ db_password_cdb }}"
-    mode: "{{ db_mode }}"
-    size: "{{ item.redolog_size }}"
-    groups: "{{ item.redolog_groups }}"
-  environment: "{{ oracle_env }}"
-  run_once: "{{ configure_cluster }}"
-  with_items:
-    - "{{ oracle_databases }}"
-  when:
-    - oracle_databases is defined
-    - item.redolog_size is defined
-    - item.redolog_groups is defined
-    - item.state | lower == 'present'
-  become_user: "{{ oracle_user }}"
-  loop_control:
-    label: "port: {{ listener_port_template }} service: {{ db_service_name }} groups: {{ item.redolog_groups }} size: {{ item.redolog_size }}"
-  register: param_change
+- name: manage redologs
   tags: redolog
+  block:
+
+    - name: assert
+      ansible.builtin.import_role:
+        name: orasw_meta
+        tasks_from: assert_oracle_databases.yml
+        allow_duplicates: false
+
+    - name: manage redologs
+      opitzconsulting.ansible_oracle.oracle_redo:
+        hostname: "{{ ansible_hostname }}"
+        service_name: "{{ _db_service_name }}"
+        port: "{{ _listener_port_cdb }}"
+        user: "{{ db_user }}"
+        password: "{{ _db_password_cdb }}"
+        mode: "{{ db_mode }}"
+        size: "{{ odb.0.redolog_size }}"
+        groups: "{{ odb.0.redolog_groups }}"
+      environment: "{{ _oracle_env }}"
+      run_once: "{{ configure_cluster }}"
+      loop:
+        - "{{ oracle_databases | flatten(levels=1) }}"
+      when:
+        - oracle_databases is defined
+        - odb.0.redolog_size is defined
+        - odb.0.redolog_groups is defined
+        - odb.0.state == 'present'
+      become_user: "{{ oracle_user }}"
+      become: true
+      loop_control:
+        loop_var: odb
+        label: >-
+          service: {{ _db_service_name }}:{{ _listener_port_cdb }}
+          groups: {{ odb.0.redolog_groups }}
+          size: {{ odb.0.redolog_size }}
