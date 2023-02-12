@@ -1,5 +1,6 @@
 
 # Information for listener configuration
+
 The following special configurations for
 listener are currently supported for
 installations without Oracle Restart or
@@ -22,7 +23,6 @@ When listener_name in oracle_database is defined a static  entry for the instanc
 
 
 # Example Configuration
-```
 
 oracle_listeners_config:
     LISTENER:
@@ -51,5 +51,3 @@ oracle_databases:
       - home: 18300-base
         oracle_db_name: cdb183
         listener_name: LISTENER
-		
-```

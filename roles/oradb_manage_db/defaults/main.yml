@@ -1,40 +1,40 @@
 ---
-
-dbenvdir: "{{ oracle_user_home }}/dbenv"
-hostgroup: "{{ group_names[0] }}"
+# @var oracle_dbca_rsp:description: >
+# This is an internal variable in `ansible-oracle`.
+#
+# _IMPORTANT_
+#
+# Do not set this variable in inventory, set_fact ...!
+# @end
 oracle_dbca_rsp: "dbca_{{ dbh.oracle_db_name }}.rsp"        # Name of responsefile used by dbca. One per database
+
+# @var oracle_netca_rsp:description: >
+# This is an internal variable in `ansible-oracle`.
+#
+# _IMPORTANT_
+#
+# Do not set this variable in inventory, set_fact ...!
+# @end
 oracle_netca_rsp: "netca_{{ dbh.home }}_{{ listener_name_template }}.rsp"
-# oracle_user: oracle                        # User that will own the Oracle Installations.
-# oracle_user_home: "/home/{{ oracle_user }}"  # Home directory for oracle_user. Needed for passing in ssh-keys, profiles etc
-# oracle_group: oinstall                          # Primary group for oracle_user.
-oracle_dba_group: dba                          # Primary group for oracle_user.
-grid_dba_group: asmdba                          # Primary group for oracle_user.
+
+listener_protocols_template: "{% if dbh.listener_protocols is defined %}{{ dbh.listener_protocols }}{% else %}{{ listener_protocols }}{% endif %}"
 
 oracle_env_dbca:
   ORACLE_HOME: "{{ oracle_home_db }}"
   LD_LIBRARY_PATH: "{{ oracle_home_db }}/lib"
 
-oracle_stage: /u01/stage
 oracle_rsp_stage: "{{ oracle_stage }}/rsp"
-oracle_inventory_loc: /u01/app/oraInventory
-oracle_base: /u01/app/oracle
-oracle_profile_name: ".profile_{{ item.oracle_db_name }}"       # Name of profile-file. Sets up the environment for that database. One per database
-oracle_dbf_dir_fs: /u01/oradata/                                # If storage_type=FS this is where the database is placed.
-oracle_reco_dir_fs: /u01/fra/                                   # If storage_type=FS this is where the fast recovery area is placed.
-oracle_dbf_dir_asm: '+DATA'                                        # If storage_type=ASM this is where the database is placed.
-oracle_reco_dir_asm: '+FRA'                                        # If storage_type=ASM this is where the fast recovery area is placed
+
 datafile_dest: "{% if dbh.storage_type | upper == 'FS' %}{{ oracle_dbf_dir_fs }}\
                 {%- elif dbh.storage_type | upper == 'ASM' %}{{ oracle_dbf_dir_asm }}\
                 {%- endif %}"
+
 recoveryfile_dest: "{% if dbh.storage_type | upper == 'FS' %}{{ oracle_reco_dir_fs }}\
                     {%- elif dbh.storage_type | upper == 'ASM' %}{{ oracle_reco_dir_asm }}\
                     {%- endif %}"
 
-configure_cluster: false
-# oracle_install_option_gi: "none"
 oracle_gi_cluster_type: STANDARD
 hostgroup_hub: "{{ hostgroup }}-hub"
-hostgroup_leaf: "{{ hostgroup }}-leaf"
 create_listener: "{%- if oracle_install_option_gi is defined -%}\
                       False\
                   {%- elif oracle_install_option_gi is undefined -%}\
@@ -45,11 +45,7 @@ create_listener: "{%- if oracle_install_option_gi is defined -%}\
                         {%- endif -%}\
                     {%- endif -%}"
 
-listener_name_template: "{% if dbh is defined and dbh.listener_name is defined %}{{ dbh.listener_name }}{% else %}{{ listener_name }}{% endif %}"
-listener_protocols_template: "{% if dbh.listener_protocols is defined %}{{ dbh.listener_protocols }}{% else %}{{ listener_protocols }}{% endif %}"
-listener_port_template: "{% if dbh.listener_port is defined %}{{ dbh.listener_port }}{% else %}{{ listener_port }}{% endif %}"
 listener_name: LISTENER
-listener_protocols: TCP
 listener_port: 1521
 
 listener_home: "{%- if lsnrinst is defined -%}\
@@ -86,13 +82,6 @@ oracle_env_lsnrctl:
   LD_LIBRARY_PATH: "{{ listener_home }}/lib"
   PATH: "{{ listener_home }}/bin:$PATH:/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin"
 
-autostartup_service: false
-
-# Everything between the lines START-OF-PASSWORDS & END-OF-PASSWORDS can be
-# put in an external passwords.yml file and be encrypted by Vault.
-# The file should be put in 'group_vars/<your-config>/passwords.yml'
-# This example will be broken out to a passwords.yml as soon as is allowed in ansible
-
 ## START-OF-PASSWORDS
 # GI
 default_gipass: "{% if oracle_password is defined %}{{ oracle_password }}\
@@ -124,27 +113,3 @@ init_params_list: "{%- if dbh.init_parameters is defined -%}\
                         {%- endif -%}\
                       {%- endfor -%}\
                     {%- endif -%}"
-
-shell_ps1: "'[$LOGNAME'@'$ORACLE_SID `basename $PWD`]$'"
-shell_aliases:
-  - "asmcmd='. oraenv ;rlwrap asmcmd -p'"
-  - "sqlsyso='. oraenv ;rlwrap sqlplus \"/ as sysdba\"'"
-  - "dgmgrl='rlwrap dgmgrl'"
-  - "rman='rlwrap rman'"
-  - "sid='export ORACLE_SID=$(ps -ef | grep \"ora_pmon_$ORACLE_DBNAME\" |grep -v grep | sed 's/^.*pmon_//g')'"
-  - "sqlp='rlwrap sqlplus'"
-  - "sqlsys='rlwrap sqlplus \"/ as sysdba\"'"
-  - "dbh='cd $ORACLE_HOME'"
-  - "dbb='cd $ORACLE_BASE'"
-  - "talert='tail -500f $ORACLE_BASE/diag/rdbms/$ORA_DB_UNQ_NAME/$ORACLE_SID/trace/alert_$ORACLE_SID.log'"
-  - "lalert='less $ORACLE_BASE/diag/rdbms/$ORA_DB_UNQ_NAME/$ORACLE_SID/trace/alert_$ORACLE_SID.log'"
-  - "lsnrstart='lsnrctl start $LSNRNAME'"
-  - "lsnrstop='lsnrctl stop $LSNRNAME'"
-  - "lsnrstatus='lsnrctl status $LSNRNAME'"
-  - "lsnrservice='lsnrctl services $LSNRNAME'"
-
-deploy_ocenv: true  # deploy ocenv scripts
-ocenv_bashrc_init: true
-ocenv_bashrc_init_section: |
-  echo "execute ocenv to source Oracle Environment"
-  alias ocenv='. "{{ dbenvdir }}/ocenv"'
