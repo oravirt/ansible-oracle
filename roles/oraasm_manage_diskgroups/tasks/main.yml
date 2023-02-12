@@ -1,5 +1,5 @@
 ---
-# tasks file for asm-diskgroups
+# @todo bug: missing loop_control
 
 - name: oraasm_manage_diskgroups | Manage diskgroups
   opitzconsulting.ansible_oracle.oracle_asmdg:
@@ -9,13 +9,13 @@
     host: "{{ ansible_hostname }}"
     oh: "{{ oracle_home_gi }}"
     name: "{{ item.diskgroup }}"
-    disks: "{{ asmdevice_list }}"
+    disks: "{{ _oraasm_manage_diskgroups_asmdevice_list }}"
     redundancy: "{{ item.redundancy | default(omit) }}"
-    attribute_name: "{{ attr_name | default(omit) }}"
-    attribute_value: "{{ attr_value | default(omit) }}"
+    attribute_name: "{{ _oraasm_manage_diskgroups_attr_name | default(omit) }}"
+    attribute_value: "{{ _oraasm_manage_diskgroups_attr_value | default(omit) }}"
     state: "{{ item.state }}"
-  environment: "{{ grid_env }}"
-  run_once: "{{ configure_cluster }}"
-  become_user: "{{ grid_install_user }}"
+  environment: "{{ _grid_env }}"
+  run_once: "{{ _orasw_meta_internal_configure_cluster }}"
+  become_user: "{{ _grid_install_user }}"
   with_items: "{{ asm_diskgroups }}"
   tags: diskgroup

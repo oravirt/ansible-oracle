@@ -4,17 +4,17 @@ Manages ASM diskgroups.
 
 _Important_
 
-All variables in this role are internal use only. Do not set them in inventory!
+All variables in this role are internal use only.
+Do not set them in inventory!
 
 ## Table of content
 
 - [Default Variables](#default-variables)
-  - [asmdevice_list](#asmdevice_list)
-  - [attr_name](#attr_name)
-  - [attr_value](#attr_value)
-  - [oracle_asm_disk_prefix](#oracle_asm_disk_prefix)
-  - [oracle_env](#oracle_env)
+  - [_oraasm_manage_diskgroups_asmdevice_list](#_oraasm_manage_diskgroups_asmdevice_list)
+  - [_oraasm_manage_diskgroups_attr_name](#_oraasm_manage_diskgroups_attr_name)
+  - [_oraasm_manage_diskgroups_attr_value](#_oraasm_manage_diskgroups_attr_value)
 - [Discovered Tags](#discovered-tags)
+- [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
 - [License](#license)
 - [Author](#author)
@@ -23,56 +23,37 @@ All variables in this role are internal use only. Do not set them in inventory!
 
 ## Default Variables
 
-### asmdevice_list
+### _oraasm_manage_diskgroups_asmdevice_list
 
 #### Default value
 
 ```YAML
-asmdevice_list: internal use only
+_oraasm_manage_diskgroups_asmdevice_list: internal use only
 ```
 
-### attr_name
+### _oraasm_manage_diskgroups_attr_name
 
 #### Default value
 
 ```YAML
-attr_name: internal use only
+_oraasm_manage_diskgroups_attr_name: internal use only
 ```
 
-### attr_value
+### _oraasm_manage_diskgroups_attr_value
 
 #### Default value
 
 ```YAML
-attr_value: internal use only
-```
-
-### oracle_asm_disk_prefix
-
-#### Default value
-
-```YAML
-oracle_asm_disk_prefix: internal use only
-```
-
-### oracle_env
-
-The variable is used for shell, command tasks to set environment Variables.
-
-Do not set it in inventory!
-
-#### Default value
-
-```YAML
-oracle_env:
-  ORACLE_HOME: '{{ oracle_home_gi }}'
-  LD_LIBRARY_PATH: '{{ oracle_home_gi }}/lib'
+_oraasm_manage_diskgroups_attr_value: internal use only
 ```
 
 ## Discovered Tags
 
 **_diskgroup_**
 
+## Open Tasks
+
+- (bug): missing loop_control
 
 ## Dependencies
 
