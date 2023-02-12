@@ -1,0 +1,21 @@
+---
+# @var _oraasm_manage_diskgroups_asmdevice_list: $ "internal use only"
+_oraasm_manage_diskgroups_asmdevice_list: "{% if device_persistence | lower == 'asmlib' %}\
+                   {%- for disk in item.disk -%}{{ oracle_asm_disk_prefix }}{{ disk.asmlabel | upper }}\
+                     {%- if not loop.last -%},{%- endif -%}\
+                   {%- endfor %}\
+                 {%- elif device_persistence | lower == 'asmfd' %}\
+                   {%- for disk in item.disk -%}AFD:{{ disk.asmlabel | upper }}\
+                     {%- if not loop.last -%},{%- endif -%}\
+                   {%- endfor %}\
+                 {%- elif device_persistence | lower == 'udev' %}\
+                   {%- for disk in item.disk -%}{{ oracle_asm_disk_prefix }}{{ disk.asmlabel }}\
+                     {%- if not loop.last -%},{%- endif -%}\
+                   {%- endfor %}\
+                 {%- endif %}"
+
+# @var _oraasm_manage_diskgroups_attr_name: $ "internal use only"
+_oraasm_manage_diskgroups_attr_name: "{% if item.attributes is defined %}{{ item.attributes | default(omit) | map(attribute='name') | list }}{% else %}None{% endif %}"
+
+# @var _oraasm_manage_diskgroups_attr_value: $ "internal use only"
+_oraasm_manage_diskgroups_attr_value: "{% if item.attributes is defined %}{{ item.attributes | default(omit) | map(attribute='value') | list }}{% else %}None{% endif %}"
