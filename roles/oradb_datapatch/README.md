@@ -1,40 +1,53 @@
-oradb-datapatch
-=========
+# oradb_datapatch
 
-This role will run datapatch on selected databases
+Manage datapatch for Oracle Database
 
+## Table of content
 
+- [Default Variables](#default-variables)
+  - [oradb_datapatch_fail_on_db_not_exist](#oradb_datapatch_fail_on_db_not_exist)
+- [Discovered Tags](#discovered-tags)
+- [Open Tasks](#open-tasks)
+- [Dependencies](#dependencies)
+- [License](#license)
+- [Author](#author)
 
-Role Variables
---------------
+---
 
+## Default Variables
+
+### oradb_datapatch_fail_on_db_not_exist
+
+Should task for datapatch fail when database from `oracle_databases` is not existing?
+
+Important!
+Do not use `fail_on_db_not_exist` anymore.
+The variable is deprecated and will be removed in a future release!
+
+#### Default value
+
+```YAML
+oradb_datapatch_fail_on_db_not_exist: '{{ fail_on_db_not_exist | default(false) }}'
 ```
-oracle_user: oracle
-db_user: sys
-db_password: "{% if dbpasswords is defined and dbpasswords[item.oracle_db_name] is defined and dbpasswords[item.oracle_db_name][db_user] is defined%}{{dbpasswords[item.oracle_db_name][db_user]}}{% else %}{{ default_dbpass}}{% endif%}"
 
-db_service_name: "{%- if item.oracle_db_unique_name is defined -%}
-                       {{ item.oracle_db_unique_name }}
-                  {%- else -%}
-                       {{ item.oracle_db_name }}
-                  {%- endif -%}"
+## Discovered Tags
 
-listener_port_template: "{% if item.listener_port is defined %}{{ item.listener_port }}{% else %}{{ listener_port }}{% endif %}"
-listener_port: 1521
-fail_on_db_not_exist: False   <-- If the DB is not yet created at the time of the datapatch run, we still want the play to continue
-```
+**_datapatch_**
 
+**_startdb_**
 
-Example Playbook
-----------------
+## Open Tasks
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+- (bug): Do we really need db-connection here?
 
-    - hosts: servers
-      roles:
-         - { role: oradb-datapatch }
+## Dependencies
 
-Author Information
-------------------
+- orasw_meta
 
-Mikael Sandström, oravirt@gmail.com, @oravirt
+## License
+
+license (MIT)
+
+## Author
+
+[Mikael Sandström]

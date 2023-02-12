@@ -1,44 +1,9 @@
 ---
-hostgroup: "{{ group_names[0] }}"
-oracle_user: oracle
-
-db_user: sys
-db_password: "{% if dbpasswords is defined and dbpasswords[item.oracle_db_name] is defined and dbpasswords[item.oracle_db_name][db_user] is defined %}{{ dbpasswords[item.oracle_db_name][db_user] }}\
-              {%- else %}{{ default_dbpass }}\
-              {%- endif %}"
-
-db_service_name: "{%- if item.oracle_db_unique_name is defined -%}\
-                       {{ item.oracle_db_unique_name }}\
-                  {%- else -%}\
-                       {{ item.oracle_db_name }}\
-                  {%- endif -%}"
-
-listener_port_template: "{% if item.listener_port is defined %}{{ item.listener_port }}{% else %}{{ listener_port }}{% endif %}"
-listener_port: 1521
-
-listener_home: "{%- if lsnrinst is defined -%}\
-                  {%- if db_homes_config[lsnrinst.home]['oracle_home'] is defined -%}{{ db_homes_config[lsnrinst.home]['oracle_home'] }}\
-                  {%- else -%}{{ oracle_base }}/{{ db_homes_config[lsnrinst.home]['version'] }}/{{ db_homes_config[lsnrinst.home]['home'] }}\
-                  {%- endif -%}\
-                {%- endif -%}"
-
-oracle_env:
-  ORACLE_HOME: "{{ oracle_home_db }}"
-  LD_LIBRARY_PATH: "{{ oracle_home_db }}/lib"
-
-oracle_env_lsnrctl:
-  ORACLE_BASE: "{{ oracle_base }}"
-  ORACLE_HOME: "{{ listener_home }}"
-  LD_LIBRARY_PATH: "{{ listener_home }}/lib"
-  PATH: "{{ listener_home }}/bin:$PATH:/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin"
-
-autostartup_service: false
-fail_on_db_not_exist: false
-
-oracle_db_home: "{%- if item is defined -%}\
-                    {%- if db_homes_config[item.home]['oracle_home'] is defined -%}\
-                         {{ db_homes_config[item.home]['oracle_home'] }}\
-                    {%- else -%}\
-                         {{ oracle_base }}/{{ db_homes_config[item.home]['version'] }}/{{ db_homes_config[item.home]['home'] }}\
-                    {%- endif -%}\
-                 {%- endif -%}"
+# @var oradb_datapatch_fail_on_db_not_exist:description: >
+# Should task for datapatch fail when database from `oracle_databases` is not existing?
+#
+# Important!
+# Do not use `fail_on_db_not_exist` anymore.
+# The variable is deprecated and will be removed in a future release!
+# @end
+oradb_datapatch_fail_on_db_not_exist: "{{ fail_on_db_not_exist | default(false) }}"
