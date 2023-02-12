@@ -1,28 +1,84 @@
-orahost-ssh
-=========
+# orahost_ssh
 
-Manages passwordless ssh between modes. It will make sure the public keys generated for each user (oracle/grid) will be added to authorized_keys on other nodes.
+SSH Setup for Oracle Grid-Infrastructure installations.
 
-It also makes sure known_hosts is generated. **NOTE: This part is not idempotent, so on every run the keys will be added again.**
+This role needs a complete refactoring in the future!
 
-This role will run in serial meaning it will run on 1 host at a time (as opposed to run in parallel which is the default)
-Requirements
-------------
+## Table of content
 
-The user must have ssh-keys already generated. This is taken care of by the orahost role
+- [Default Variables](#default-variables)
+  - [grid_user](#grid_user)
+  - [hostgroup](#hostgroup)
+  - [oracle_group](#oracle_group)
+  - [oracle_user](#oracle_user)
+  - [oracle_users](#oracle_users)
+- [Discovered Tags](#discovered-tags)
+- [Dependencies](#dependencies)
+- [License](#license)
+- [Author](#author)
 
-Example Playbook
-----------------
+---
 
+## Default Variables
+
+### grid_user
+
+#### Default value
+
+```YAML
+grid_user: grid
 ```
-    - hosts: vbox-rac-dc1
-      become: True
-      become_user: root
-      serial: 1
-      roles:
-         - { role: orahost-ssh }
+
+### hostgroup
+
+#### Default value
+
+```YAML
+hostgroup: '{{ group_names[0] }}'
 ```
 
-Author Information
-------------------
-Mikael Sandström, oravirt@gmail.com, @oravirt
+### oracle_group
+
+#### Default value
+
+```YAML
+oracle_group: oinstall
+```
+
+### oracle_user
+
+#### Default value
+
+```YAML
+oracle_user: oracle
+```
+
+### oracle_users
+
+#### Default value
+
+```YAML
+oracle_users:
+  - {username: oracle, primgroup: oinstall}
+  - {username: grid, primgroup: oinstall}
+```
+
+## Discovered Tags
+
+**_sshkeys_**
+
+**_sshkeys,known_hosts_**
+
+
+## Dependencies
+
+- orahost_meta
+- orasw_meta_internal
+
+## License
+
+license (MIT)
+
+## Author
+
+[Mikael Sandström]
