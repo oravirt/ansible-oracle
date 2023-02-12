@@ -110,15 +110,21 @@
 #    when: checkgiinstall.stdout != "1" and "{{ oracle_install_version_gi }}" == "{{ item.version }}" and not oracle_sw_copy and oracle_sw_unpack
 
 - name: Distribute latest opatch
-  ansible.builtin.shell: rm -rf {{ oracle_home_gi }}/OPatch; cp -Rvp {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/OPatch {{ oracle_home_gi }}; chown -R {{ grid_install_user }}:{{ oracle_group }} {{ oracle_home_gi }}/OPatch
-  # noqa yaml deprecated-command-syntax no-changed-when
+  ansible.builtin.shell: |
+    rm -rf {{ oracle_home_gi }}/OPatch
+    cp -Rvp {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/OPatch {{ oracle_home_gi }}
+    chown -R {{ grid_install_user }}:{{ oracle_group }} {{ oracle_home_gi }}/OPatch
+  # noqa no-changed-when
   when: oracle_psu_apply_gi
   tags:
     - oragridnewopatch
 
 - name: Apply PSU to GI (v12.x) (Master node)
-  ansible.builtin.shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }}"  # -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
-  # noqa yaml command-instead-of-shell no-changed-when
+  ansible.builtin.command:  # noqa no-changed-when
+    cmd: |
+      {{ oracle_home_gi }}/OPatch/opatchauto \
+        apply {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} \
+        -oh {{ oracle_home_gi }}
   with_together:
     - "{{ oracle_sw_patches }}"
     - "{{ gi_applied_patches.results }}"
