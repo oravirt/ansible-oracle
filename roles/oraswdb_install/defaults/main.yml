@@ -1,33 +1,17 @@
 ---
 
+# @todo information: hostgroup, hostgroup_hub, hostgroup_leaf needs some more tests
 hostgroup: "{{ group_names[0] }}"
 hostgroup_hub: "{{ hostgroup }}-hub"
 hostgroup_leaf: "{{ hostgroup }}-leaf"
 
-install_from_nfs: false
-nfs_server_sw: nfsserver
-nfs_server_sw_path: /path/to/orasw
-oracle_sw_copy: "{% if install_from_nfs %}false{% else %}true{% endif %}"
-oracle_sw_unpack: "{% if install_from_nfs %}false{% else %}true{% endif %}"
 oracle_db_responsefile: "{{ dbh.home }}_{{ ansible_hostname }}.rsp"
-oracle_stage: /u01/stage
-oracle_stage_remote: "{{ oracle_stage }}"
-oracle_stage_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
-oracle_rsp_stage: "{{ oracle_stage }}/rsp"
-oracle_inventory_loc: /u01/app/oraInventory
-oracle_base: /u01/app/oracle
-oracle_sw_extract_path: "{%- if '18' in db_version -%}\
-                            {{ oracle_home_db }}\
-                          {%- else -%}\
-                              {{ oracle_stage }}/{{ item[0].version }}\
-                          {%- endif -%}"
 
 configure_oracle_profile: true
-oracle_profile_name: ".profile_{{ dbh.home }}"
 oracle_profile_template: dotprofile-home.j2
 
+# @todo bug: oracle_hostname really needed? Maybe as hostname for all the oradb-manage-* roles as extension?
 oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
-www_download_bin: curl                              # curl (shell module) or get_url module
 
 # address to all software if using the get_url module when putting software on the host(s)
 oracle_sw_source_www: ""
@@ -44,7 +28,6 @@ _hostinitdaemon_dict:
   Suse:
     version_highest: 11
 
-# {{ ansible_facts['distribution_version'] is version('12.04', '>=') }}
 hostinitdaemon: "{% if ansible_distribution_major_version is version(_hostinitdaemon_dict[ansible_os_family]['version_highest'], '<=') %}init{% else %}systemd{% endif %}"
 
 forcechopt: false
