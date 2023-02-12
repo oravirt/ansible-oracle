@@ -1,129 +1,155 @@
 ---
-# tasks file for manage-db-users
 - name: Manage role grants (cdb)
   opitzconsulting.ansible_oracle.oracle_grants:
-    role: "{{ item.1.name }}"
-    state: "{{ item.1.state }}"
-    grants: "{{ item.1.grants | default(omit) }}"
-    grants_mode: "{{ item.1.grants_mode | default(omit) }}"
-    object_privs: "{{ item.1.object_privs | default(omit) }}"
-    directory_privs: "{{ item.1.directory_privs | default(omit) }}"
+    role: "{{ odb.1.name }}"
+    state: "{{ odb.1.state }}"
+    grants: "{{ odb.1.grants | default(omit) }}"
+    grants_mode: "{{ odb.1.grants_mode | default(omit) }}"
+    object_privs: "{{ odb.1.object_privs | default(omit) }}"
+    directory_privs: "{{ odb.1.directory_privs | default(omit) }}"
     hostname: "{{ ansible_hostname }}"
-    port: "{{ listener_port_template }}"
-    service_name: "{{ db_service_name }}"
+    port: "{{ _listener_port_cdb }}"
+    service_name: "{{ _db_service_name }}"
     user: "{{ db_user }}"
-    password: "{{ db_password_cdb }}"
-    container: "{{ item.1.container | default(omit) }}"
+    password: "{{ _db_password_cdb }}"
+    container: "{{ odb.1.container | default(omit) }}"
     mode: "{{ db_mode }}"
   with_subelements:
     - "{{ oracle_databases }}"
     - roles
     - flags:
       skip_missing: true
-  environment: "{{ oracle_env }}"
+  environment: "{{ _oracle_env_cdb }}"
   when:
     - oracle_databases is defined
-    - item.0.state|lower == 'present'
-    - (item.1.grants is defined or item.1.object_privs is defined)
+    - odb.0.state == 'present'
+    - (odb.1.grants is defined or odb.1.object_privs is defined)
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   loop_control:
-    label: "port: {{ listener_port_template }}, service: {{ db_service_name }}, role: {{ item.1.name | default('none') }}, grants: {{ item.1.grants | default(omit) }}, state: {{ item.1.state }}"
-    # noqa yaml
-  tags: users,grants
+    loop_var: odb
+    label: >-
+      service: {{ _db_service_name }}:{{ _listener_port_cdb }}
+      role: {{ odb.1.name | default('') }}
+      grants: {{ odb.1.grants | default('') }}
+      state: {{ odb.1.state | default('') }}
+  tags:
+    - users
+    - grants
 
 - name: Manage role grants (pdb)
   opitzconsulting.ansible_oracle.oracle_grants:
-    role: "{{ item.1.name }}"
-    state: "{{ item.1.state }}"
-    grants: "{{ item.1.grants | default(omit) }}"
-    grants_mode: "{{ item.1.grants_mode | default(omit)  }}"
-    object_privs: "{{ item.1.object_privs | default(omit) }}"
-    directory_privs: "{{ item.1.directory_privs | default(omit) }}"
+    role: "{{ opdb.1.name }}"
+    state: "{{ opdb.1.state }}"
+    grants: "{{ opdb.1.grants | default(omit) }}"
+    grants_mode: "{{ opdb.1.grants_mode | default(omit)  }}"
+    object_privs: "{{ opdb.1.object_privs | default(omit) }}"
+    directory_privs: "{{ opdb.1.directory_privs | default(omit) }}"
     hostname: "{{ ansible_hostname }}"
-    port: "{{ listener_port_template }}"
-    service_name: "{{ item.0.pdb_name }}"
+    port: "{{ _listener_port_pdb }}"
+    service_name: "{{ _db_service_pdb }}"
     user: "{{ db_user }}"
-    password: "{{ db_password_pdb }}"
+    password: "{{ _db_password_pdb }}"
     mode: "{{ db_mode }}"
   with_subelements:
     - "{{ oracle_pdbs }}"
     - roles
     - flags:
       skip_missing: true
-  environment: "{{ oracle_env }}"
+  environment: "{{ _oracle_env_pdb }}"
   when:
     - oracle_pdbs is defined
-    - item.0 is defined and item.0.state|lower == 'present' and (item.1.grants is defined or item.1.object_privs is defined)
+    - opdb.0 is defined
+    - opdb.0.state == 'present'
+    - (opdb.1.grants is defined or opdb.1.object_privs is defined)
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   loop_control:
-    label: "port: {{ listener_port_template }}, service: {{ item.0.pdb_name }}, role: {{ item.1.name | default('none') }}, grants: {{ item.1.grants | default(omit) }}, state: {{ item.1.state }}"
-    # noqa yaml
-  tags: users,grants
+    loop_var: opdb
+    label: >-
+      port: {{ _listener_port_pdb }},
+      pdb: {{ opdb.0.pdb_name }},
+      role: {{ opdb.1.name | default('none') }},
+      grants: {{ opdb.1.grants | default(omit) }},
+      state: {{ opdb.1.state }}
+  tags:
+    - users
+    - grants2
 
+# @todo bug: Manage schema grants (cdb) with state: abesent not working
 - name: Manage schema grants (cdb)
   opitzconsulting.ansible_oracle.oracle_grants:
-    schema: "{{ item.1.schema }}"
-    state: "{{ item.1.state }}"
-    grants: "{{ item.1.grants | default(omit) }}"
-    grants_mode: "{{ item.1.grants_mode | default(omit)  }}"
-    object_privs: "{{ item.1.object_privs | default(omit) }}"
-    directory_privs: "{{ item.1.directory_privs | default(omit) }}"
+    schema: "{{ odb.1.schema }}"
+    state: "{{ odb.1.state | default('present') }}"
+    grants: "{{ odb.1.grants | default(omit) }}"
+    grants_mode: "{{ odb.1.grants_mode | default(omit)  }}"
+    object_privs: "{{ odb.1.object_privs | default(omit) }}"
+    directory_privs: "{{ odb.1.directory_privs | default(omit) }}"
     hostname: "{{ ansible_hostname }}"
-    port: "{{ listener_port_template }}"
-    service_name: "{{ db_service_name }}"
+    port: "{{ _listener_port_cdb }}"
+    service_name: "{{ _db_service_name }}"
     user: "{{ db_user }}"
-    password: "{{ db_password_cdb }}"
-    container: "{{ item.1.container | default(omit) }}"
+    password: "{{ _db_password_cdb }}"
+    container: "{{ odb.1.container | default(omit) }}"
     mode: "{{ db_mode }}"
   with_subelements:
     - "{{ oracle_databases }}"
     - users
     - flags:
       skip_missing: true
-  environment: "{{ oracle_env }}"
+  environment: "{{ _oracle_env }}"
   when:
     - oracle_databases is defined
-    - item.0.state | lower == 'present'
-    - (item.1.grants is defined or item.1.object_privs is defined)
+    - odb.0.state == 'present'
+    - (odb.1.grants is defined or odb.1.object_privs is defined)
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   loop_control:
-    label: "port: {{ listener_port_template }}, service: {{ db_service_name }}, schema: {{ item.1.schema }}, grants: {{ item.1.grants | default(omit) }}, state: {{ item.1.state }}"
-    # noqa yaml
-  tags: users,grants
+    loop_var: odb
+    label: >-
+      service: {{ _db_service_name }}:{{ _listener_port_cdb }}
+      schema: {{ odb.1.schema | default('') }}
+      grants: {{ odb.1.grants | default('') }}
+      state: {{ odb.1.state | default('') }}"
+  tags:
+    - users
+    - grants
 
 - name: Manage schema grants (pdb)
   opitzconsulting.ansible_oracle.oracle_grants:
-    schema: "{{ item.1.schema }}"
-    state: "{{ item.1.state }}"
-    grants: "{{ item.1.grants | default(omit) }}"
-    grants_mode: "{{ item.1.grants_mode | default(omit) }}"
-    object_privs: "{{ item.1.object_privs | default(omit) }}"
-    directory_privs: "{{ item.1.directory_privs | default(omit) }}"
+    schema: "{{ opdb.1.schema }}"
+    state: "{{ opdb.1.state }}"
+    grants: "{{ opdb.1.grants | default(omit) }}"
+    grants_mode: "{{ opdb.1.grants_mode | default(omit) }}"
+    object_privs: "{{ opdb.1.object_privs | default(omit) }}"
+    directory_privs: "{{ opdb.1.directory_privs | default(omit) }}"
     hostname: "{{ ansible_hostname }}"
-    port: "{{ listener_port_template }}"
+    port: "{{ _listener_port_pdb }}"
     service_name: "{{ _db_service_pdb }}"
     user: "{{ db_user }}"
-    password: "{{ db_password_pdb }}"
+    password: "{{ _db_password_pdb }}"
     mode: "{{ db_mode }}"
   with_subelements:
     - "{{ oracle_pdbs }}"
     - users
     - flags:
       skip_missing: true
-  environment: "{{ oracle_env }}"
+  environment: "{{ _oracle_env_pdb }}"
   when:
     - oracle_pdbs is defined
-    - item.0 is defined
-    - item.0.state | lower == 'present'
-    - (item.1.grants is defined or item.1.object_privs is defined)
+    - opdb.0 is defined
+    - opdb.0.state == 'present'
+    - (opdb.1.grants is defined or opdb.1.object_privs is defined)
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   loop_control:
-    label: "port: {{ listener_port_template }}, service: {{ _db_service_pdb }}, schema: {{ item.1.schema | default('none') }}, grants: {{ item.1.grants | default(omit) }}, state: {{ item.1.state }}"
-    # noqa yaml
-  tags: users,grants
-  vars:
-    opdb: "{{ item }}"
+    loop_var: opdb
+    label: >-
+      port: {{ _listener_port_pdb }},
+      pdb: {{ opdb.0.pdb_name }},
+      schema: {{ opdb.1.schema | default('none') }},
+      grants: {{ opdb.1.grants | default(omit) }},
+      state: {{ opdb.1.state }}
+  tags:
+    - users
+    - grants4
