@@ -1,37 +1,6 @@
 # oraswdb_install
 
-I
-n
-s
-t
-a
-l
-l
-
-O
-r
-a
-c
-l
-e
-
-D
-a
-t
-a
-b
-a
-s
-e
-
-S
-o
-f
-t
-w
-a
-r
-e
+Install Oracle Database Software
 
 ## Table of content
 
@@ -39,7 +8,6 @@ e
   - [_hostinitdaemon_dict](#_hostinitdaemon_dict)
   - [autostartup_service](#autostartup_service)
   - [choptcheck](#choptcheck)
-  - [configure_cluster](#configure_cluster)
   - [configure_oracle_profile](#configure_oracle_profile)
   - [forcechopt](#forcechopt)
   - [glogin_default_cdb](#glogin_default_cdb)
@@ -48,14 +16,11 @@ e
   - [hostgroup_hub](#hostgroup_hub)
   - [hostgroup_leaf](#hostgroup_leaf)
   - [hostinitdaemon](#hostinitdaemon)
-  - [is_sw_source_local](#is_sw_source_local)
   - [oracle_db_responsefile](#oracle_db_responsefile)
   - [oracle_directories](#oracle_directories)
   - [oracle_ee_options](#oracle_ee_options)
   - [oracle_hostname](#oracle_hostname)
-  - [oracle_profile_template](#oracle_profile_template)
   - [oracle_sw_image_db](#oracle_sw_image_db)
-  - [oracle_sw_source_local](#oracle_sw_source_local)
   - [oracle_sw_source_www](#oracle_sw_source_www)
   - [ulimit_systemd_mapping](#ulimit_systemd_mapping)
 - [Discovered Tags](#discovered-tags)
@@ -94,14 +59,6 @@ autostartup_service: false
 
 ```YAML
 choptcheck: '{% if forcechopt | bool %}dochopt{% endif %}'
-```
-
-### configure_cluster
-
-#### Default value
-
-```YAML
-configure_cluster: false
 ```
 
 ### configure_oracle_profile
@@ -182,14 +139,6 @@ hostinitdaemon: "{% if ansible_distribution_major_version is version(_hostinitda
   \ '<=') %}init{% else %}systemd{% endif %}"
 ```
 
-### is_sw_source_local
-
-#### Default value
-
-```YAML
-is_sw_source_local: true
-```
-
 ### oracle_db_responsefile
 
 #### Default value
@@ -243,14 +192,6 @@ oracle_ee_options: "{{ _oracle_ee_opiton_dict[db_homes_config[dbh.home]['version
 oracle_hostname: '{{ ansible_fqdn }}'
 ```
 
-### oracle_profile_template
-
-#### Default value
-
-```YAML
-oracle_profile_template: dotprofile-home.j2
-```
-
 ### oracle_sw_image_db
 
 #### Default value
@@ -271,14 +212,6 @@ oracle_sw_image_db:
   - filename: p10404530_112030_Linux-x86-64_2of7.zip
     version: 11.2.0.3
     creates: database/stage/Components/oracle.sysman.console.db/11.2.0.3.0/1/DataFiles/filegroup2.jar
-```
-
-### oracle_sw_source_local
-
-#### Default value
-
-```YAML
-oracle_sw_source_local: /tmp
 ```
 
 ### oracle_sw_source_www
@@ -359,4 +292,4 @@ license (MIT)
 
 ## Author
 
-Mikael Sandström
+[Mikael Sandström]
