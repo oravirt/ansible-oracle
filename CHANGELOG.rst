@@ -5,6 +5,14 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.5.1
+======
+
+Bugfixes
+--------
+
+- oradb_manage_tablespace: added missing defaults for password (oravirt#323)
+
 v3.5.0
 ======
 

@@ -13,6 +13,16 @@ user_pdb_password: "{% if dbpasswords is defined and dbpasswords[item.0.cdb] is 
                     {%- endif%}"
 # noqa yaml
 
+db_password_cdb: "{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name] is defined and dbpasswords[item.0.oracle_db_name][db_user] is defined %}{{ dbpasswords[item.0.oracle_db_name][db_user] }}
+                  {%- else %}{{ default_dbpass }}
+                  {%- endif %}"
+# noqa yaml
+
+db_password_pdb: "{% if dbpasswords is defined and dbpasswords[item.0.cdb] is defined and dbpasswords[item.0.cdb][db_user] is defined %}{{ dbpasswords[item.0.cdb][db_user] }}
+                  {%- else %}{{ default_dbpass }}
+                  {%- endif%}"
+# noqa yaml
+
 db_service_name: "{% if item.0 is defined %}
                     {%- if item.0.oracle_db_unique_name is defined %}{{ item.0.oracle_db_unique_name }}
                     {%- elif item.0.oracle_db_instance_name is defined %}{{ item.0.oracle_db_instance_name }}
