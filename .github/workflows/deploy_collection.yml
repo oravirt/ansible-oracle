@@ -1,0 +1,19 @@
+---
+# This is onyl for manual upload of ansible-oracle collection to galaxy
+#
+name: Deploy Collection
+
+# Trigger the workflow however you prefer
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build and Deploy Collection
+        uses: artis3n/ansible_galaxy_collection@v2
+        with:
+          api_key: '${{ secrets.GALAXY_API_KEY }}'
