@@ -1,0 +1,146 @@
+---
+# @tag assert_ansible_oracle:description: Assert inventory variables from ansible-oracle
+- name: assert ansible-oracle variables
+  tags:
+    - always
+    - assert_ansible_oracle
+  block:
+    - name: assert db_homes_config
+      block:
+        - name: assert db_homes_config
+          ansible.builtin.assert:
+            quiet: true
+            that:
+              - dbc.value['version'] is defined
+              - dbc.value['version'] in [
+                  '21.3.0.0',
+                  '19.3.0.0', '18.3.0.0', '12.2.0.1',
+                  '12.1.0.2',
+                  '11.2.0.4', '11.2.0.3'
+                  ]
+              - dbc.value['edition'] is defined
+              - dbc.value['edition'] in ['EE', 'SE', 'SE2']
+              - dbc.value['opatch'] is not defined
+                or (dbc.value['opatch'] is defined
+                    and dbc.value['opatch_minversion'] is defined
+                  )
+              - dbc.value['opatchauto'] is not defined
+                or (dbc.value['opatchauto'] is defined
+                    and dbc.value['opatch_minversion'] is defined
+                  )
+          with_dict:
+            - "{{ db_homes_config }}"
+          loop_control:
+            label: "{{ dbc.key | default('') }}"
+            loop_var: dbc
+          when:
+            - db_homes_config is defined
+          register: assertdb_homes_config
+
+      rescue:
+
+        - name: assert failed assertdb_homes_config
+          ansible.builtin.debug:
+            msg: "{{ item.assertion }}"
+          with_items:
+            - "{{ assertdb_homes_config['results'] }}"
+          loop_control:
+            label: "{{ item['dbc']['key'] | default('') }}"
+          when:
+            - assertdb_homes_config.results is defined
+            - item.failed is defined
+            - item.failed | bool
+
+        - name: fail assertdb_homes_config
+          ansible.builtin.fail:
+            msg: "See previous debug task for assertation failure"
+
+    - name: assert db_homes_installed
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - ass_dbh.home is defined
+          - db_homes_config[ass_dbh.home] is defined
+      with_items:
+        - "{{ db_homes_installed }}"
+      loop_control:
+        label: "{{ ass_dbh.home | default('') }}"
+        loop_var: ass_dbh
+      when:
+        - db_homes_installed is defined
+
+    - name: assert oracle_databases minimal
+      block:
+        - name: assert oracle_databases minimal
+          ansible.builtin.assert:
+            quiet: true
+            that:
+              - ass_odb.oracle_db_name is defined
+              - ass_odb.home is defined
+              - db_homes_config[ass_odb.home] is defined
+              - db_homes_config[ass_odb.home]['version'] is version('21.3.0.0', '<')
+                or (db_homes_config[ass_odb.home]['version'] is version('21.3.0.0', '>=')
+                    and ass_odb.is_container is defined
+                    and ass_odb.is_container
+                  )
+          with_items:
+            - "{{ oracle_databases }}"
+          loop_control:
+            label: "{{ ass_odb.oracle_db_name | default('') }}"
+            loop_var: ass_odb
+          when:
+            - oracle_databases is defined
+          register: assertoracle_databases
+
+      rescue:
+
+        - name: assert failed assert oracle_databases
+          ansible.builtin.debug:
+            msg: "{{ item.assertion }}"
+          with_items:
+            - "{{ assertoracle_databases['results'] }}"
+          loop_control:
+            label: "{{ item['dbc']['key'] | default('') }}"
+          when:
+            - assertoracle_databases.results is defined
+            - item.failed is defined
+            - item.failed | bool
+
+        - name: fail assert oracle_databases
+          ansible.builtin.fail:
+            msg: "See previous debug task for assertation failure"
+
+    - name: assert oracle_pdbs
+      block:
+        - name: assert oracle_pdbs
+          ansible.builtin.assert:
+            quiet: true
+            that:
+              - ass_pdb.home is defined
+              - db_homes_config[ass_pdb.home] is defined
+          with_items:
+            - "{{ oracle_pdbs }}"
+          loop_control:
+            label: "{{ ass_pdb.oracle_db_name | default('') }}"
+            loop_var: ass_pdb
+          when:
+            - oracle_pdbs is defined
+          register: assertoracle_pdbs
+
+      rescue:
+
+        - name: assert failed assert oracle_pdbs
+          ansible.builtin.debug:
+            msg: "{{ item.assertion }}"
+          with_items:
+            - "{{ assertoracle_pdbs['results'] }}"
+          loop_control:
+            label: "{{ item['ass_pdb']['key'] | default('') }}"
+          when:
+            - assertoracle_pdbs.results is defined
+            - item.failed is defined
+            - item.failed | bool
+
+        - name: fail assert oracle_pdbs
+          ansible.builtin.fail:
+            msg: "See previous debug task for assertation failure"
