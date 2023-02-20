@@ -1,0 +1,29 @@
+# https://docs.github.com/en/github-ae@latest/actions/managing-issues-and-pull-requests/closing-inactive-issues
+# https://github.com/marketplace/actions/close-stale-issues
+#
+name: 'Close stale issues and PRs'
+on:
+  schedule:
+    - cron: '30 1 * * *'
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/stale@v7
+        with:
+          # debug-only: true
+          exempt-all-milestones: true
+          exempt-all-assignees: true
+          days-before-issue-stale: 30
+          days-before-issue-close: 30
+          stale-issue-label: "stale"
+          exempt-milestones: "Backlog"
+          exempt-issue-labels: "work in progress",
+          stale-issue-message: "This issue is stale because it has been open for 30 days with no activity. Auto close in 30 days."
+          close-issue-message: "This issue was closed because it has been inactive for 30 days since being marked as stale."
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
