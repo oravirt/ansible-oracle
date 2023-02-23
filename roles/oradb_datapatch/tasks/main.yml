@@ -1,6 +1,7 @@
 ---
 - name: oradb_datapatch | Start listener
   ansible.builtin.shell: "export PATH=${ORACLE_HOME}/bin:${PATH}; lsnrctl start {{ lsnrinst.listener_name }} /dev/null; exit 0"
+  # noqa no-changed-when
   environment: "{{ oracle_env_lsnrctl }}"
   become_user: "{{ oracle_user }}"
   with_items: "{{ listener_installed }}"

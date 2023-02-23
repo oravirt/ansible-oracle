@@ -212,6 +212,7 @@
 - name: Wallet createCredential
   ansible.builtin.shell:
     cmd: 'echo "$stdin" | {{ oracle_home_db }}/bin/mkstore -wrl "{{ rman_wallet_loc }}" -nologo -createCredential "$rman_tnsalias" "$rman_user" "$rman_password"'
+  # noqa no-changed-when
   become: true
   become_user: "{{ oracle_user }}"
   environment:
@@ -259,7 +260,7 @@
 # The task is only execute once on master_node when GI is installed!
 # no catalog connection, because setting initial parameters with catalog takes much more time
 - name: Execute RMAN-Script at playbook
-  # noqa risky-shell-pipe
+  # noqa risky-shell-pipe no-changed-when
   ansible.builtin.shell: "{{ oracle_base }}/bin/rman_backup.sh -a {{ item.1.name }} -s {{ item.0.oracle_db_instance_name | default(item.0.oracle_db_name) }} -r {{ rman_script_dir }} -l {{ rman_log_dir }} | tee -a {{ rman_cron_logdir }}/rman_{{ item.1.name }}.log"
   environment:
     PATH: /bin:/usr/bin

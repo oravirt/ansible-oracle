@@ -26,18 +26,19 @@
 
 - name: udev | Run script to create udev rules
   ansible.builtin.shell: "{{ oracle_rsp_stage }}/setup-udev-rules.sh"
-  # noqa command-instead-of-shell
+  # noqa command-instead-of-shell no-changed-when
   when: device_persistence == 'udev'
   tags: udev
 
 - name: udev | Reload rules
   ansible.builtin.shell: partprobe;sleep 5; udevadm control --reload-rules; udevadm trigger
+  # noqa no-changed-when
   when: device_persistence == 'udev'
   tags: udev
 
 - name: udev | List device aliases (register)
   ansible.builtin.shell: ls -l {{ oracle_asm_disk_string }}
-  # noqa command-instead-of-shell
+  # noqa command-instead-of-shell no-changed-when
   when: device_persistence == 'udev'
   tags: udev
   register: lsdevice

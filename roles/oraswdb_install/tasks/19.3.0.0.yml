@@ -1,7 +1,7 @@
 ---
 - name: install_home_db | Install Oracle Database Server
   ansible.builtin.shell: "{% if ansible_os_family == 'RedHat' and ansible_distribution_major_version | int == 8 and db_homes_config[dbh.home]['imagename'] is not defined %}CV_ASSUME_DISTID=OL7 {% endif %}{{ oracle_home_db }}/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -silent -waitforcompletion {% if db_homes_config[dbh.home]['oracle_home_name'] is defined %}ORACLE_HOME_NAME={{ db_homes_config[dbh.home]['oracle_home_name'] }}{% endif %}"
-  # noqa command-instead-of-shell
+  # noqa command-instead-of-shell no-changed-when
   become: true
   become_user: "{{ oracle_user }}"
   run_once: "{{ configure_cluster }}"

@@ -187,6 +187,7 @@
       ansible.builtin.shell: |
         sleep {{ item.0 * 60 }}
         {{ oracle_home_gi }}/root.sh
+      # noqa no-changed-when
       args:
         executable: /usr/bin/bash
       become: true
@@ -205,6 +206,7 @@
 
     - name: install_home_gi | Execute ConfigTools
       ansible.builtin.command: "{{ oracle_home_gi }}/gridSetup.sh -executeConfigTools -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -silent"
+      # noqa no-changed-when
       become: true
       become_user: "{{ grid_install_user }}"
       run_once: "{{ configure_cluster }}"

@@ -2,7 +2,7 @@
 
 - name: Check which GI patches are applied
   ansible.builtin.shell: "{{ oracle_home_gi }}/OPatch/opatch lspatches -oh {{ oracle_home_gi }}  |grep  {{ item.patchversion }} |wc -l"
-  # noqa risky-shell-pipe
+  # noqa risky-shell-pipe no-changed-when
   become: true
   become_user: "{{ grid_install_user }}"
   with_items: "{{ oracle_sw_patches }}"
@@ -111,14 +111,14 @@
 
 - name: Distribute latest opatch
   ansible.builtin.shell: rm -rf {{ oracle_home_gi }}/OPatch; cp -Rvp {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/OPatch {{ oracle_home_gi }}; chown -R {{ grid_install_user }}:{{ oracle_group }} {{ oracle_home_gi }}/OPatch
-  # noqa yaml deprecated-command-syntax
+  # noqa yaml deprecated-command-syntax no-changed-when
   when: oracle_psu_apply_gi
   tags:
     - oragridnewopatch
 
 - name: Apply PSU to GI (v12.x) (Master node)
   ansible.builtin.shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }}"  # -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
-  # noqa yaml command-instead-of-shell
+  # noqa yaml command-instead-of-shell no-changed-when
   with_together:
     - "{{ oracle_sw_patches }}"
     - "{{ gi_applied_patches.results }}"
@@ -134,7 +134,7 @@
 
 - name: Apply PSU to GI (v11.2) (Master node)
   ansible.builtin.shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
-  # noqa yaml command-instead-of-shell
+  # noqa yaml command-instead-of-shell no-changed-when
   with_together:
     - "{{ oracle_sw_patches }}"
     - "{{ gi_applied_patches.results }}"
@@ -152,7 +152,7 @@
 
 - name: Check if stuff is running
   ansible.builtin.shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
-  # noqa command-instead-of-shell
+  # noqa command-instead-of-shell no-changed-when
   run_once: "{{ configure_cluster }}"
   tags:
     - crsctl
@@ -168,7 +168,7 @@
 
 - name: Apply PSU to GI (v12.1) (other nodes)
   ansible.builtin.shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
-  # noqa yaml command-instead-of-shell
+  # noqa yaml command-instead-of-shell no-changed-when
   with_together:
     - "{{ oracle_sw_patches }}"
     - "{{ gi_applied_patches.results }}"
@@ -185,7 +185,7 @@
 
 - name: Apply PSU to GI (v11.2) (other nodes)
   ansible.builtin.shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_psu_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
-  # noqa yaml command-instead-of-shell
+  # noqa yaml command-instead-of-shell no-changed-when
   with_together:
     - "{{ oracle_sw_patches }}"
     - "{{ gi_applied_patches.results }}"
@@ -207,7 +207,7 @@
 
 - name: Check if stuff is running
   ansible.builtin.shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
-  # noqa yaml command-instead-of-shell
+  # noqa yaml command-instead-of-shell no-changed-when
   tags:
     - crsctl-opatch
   register: crsctl
@@ -221,7 +221,7 @@
 
 - name: Check opatch lsinventory
   ansible.builtin.shell: "{{ oracle_home_gi }}/OPatch/opatch lsinventory"
-  # noqa yaml command-instead-of-shell
+  # noqa yaml command-instead-of-shell no-changed-when
   become: true
   become_user: "{{ grid_install_user }}"
   register: opatchls
