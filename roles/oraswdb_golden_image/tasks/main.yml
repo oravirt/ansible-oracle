@@ -26,6 +26,7 @@
 
     - name: Create Golden-Image
       ansible.builtin.command: "{{ oracle_home_db }}/runInstaller -silent -createGoldImage -destinationLocation {{ golden_image_dest }}/{{ dbh.home }}"
+      # noqa no-changed-when
       with_items:
         - "{{ db_homes_installed | list | unique }}"
       loop_control:

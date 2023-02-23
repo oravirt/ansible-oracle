@@ -129,7 +129,7 @@
 
 - name: install_home_db | Run root script after installation
   ansible.builtin.shell: "{{ oracle_home_db }}/root.sh"
-  # noqa command-instead-of-shell no-handler
+  # noqa command-instead-of-shell no-handler no-changed-when
   run_once: "{{ configure_cluster }}"
   when: oradbinstall.changed
   tags:

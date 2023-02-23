@@ -190,7 +190,7 @@
 
 - name: ssh-keys | Generate SSH keys
   local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys  # noqa yaml deprecated-command-syntax deprecated-local-action ignore-errors
-    # noqa fqcn[action-core]
+    # noqa fqcn[action-core] no-changed-when
   ignore_errors: true
   run_once: "{{ configure_cluster }}"
   when: configure_ssh and configure_cluster and old_ssh_config
@@ -230,7 +230,7 @@
 
 - name: ssh-keys | Add short name to known_hosts
   local_action: shell ssh-keyscan -p {{ ansible_ssh_port | default(22) }} -H {{ ansible_hostname }} 2> /dev/null >> {{ keyfile }}  # noqa deprecated-local-action ignore-errors
-  # noqa fqcn[action-core]
+  # noqa fqcn[action-core] no-changed-when
   ignore_errors: true
   become: false
   when: configure_ssh and configure_cluster and old_ssh_config
@@ -239,7 +239,7 @@
 
 - name: ssh-keys | Add FQDN to known_hosts
   local_action: shell ssh-keyscan -p {{ ansible_ssh_port | default(22) }} -H {{ ansible_fqdn }} 2> /dev/null >> {{ keyfile }}  # noqa yaml ignore-errors deprecated-local-action
-  # noqa fqcn[action-core]
+  # noqa fqcn[action-core] no-changed-when
   ignore_errors: true
   become: false
   when: configure_ssh and configure_cluster and old_ssh_config
@@ -248,7 +248,7 @@
 
 - name: ssh-keys | Add IPv4 to known_hosts
   local_action: shell ssh-keyscan -p {{ ansible_ssh_port | default(22) }} -H {{ ansible_default_ipv4.address }} 2> /dev/null >> {{ keyfile }}  # noqa ignore-errors deprecated-local-action
-  # noqa fqcn[action-core]
+  # noqa fqcn[action-core] no-changed-when
   ignore_errors: true
   become: false
   when: configure_ssh and configure_cluster and old_ssh_config

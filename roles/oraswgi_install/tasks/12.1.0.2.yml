@@ -51,7 +51,7 @@
 
 - name: install_home_gi | Install Grid Infrastructure
   ansible.builtin.shell: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -ignoreSysPrereqs -showProgress -silent"
-  # noqa command-instead-of-shell
+  # noqa command-instead-of-shell no-changed-when
   become: true
   become_user: "{{ grid_install_user }}"
   run_once: "{{ configure_cluster }}"
@@ -76,7 +76,7 @@
 
 - name: install_home_gi | Run oraInstroot script after installation
   ansible.builtin.shell: "{{ oracle_inventory_loc }}/orainstRoot.sh"
-  # noqa command-instead-of-shell
+  # noqa command-instead-of-shell no-changed-when
   become: true
   tags:
     - runroot
@@ -84,7 +84,7 @@
 
 - name: install_home_gi | Run root script after installation (Master Node)
   ansible.builtin.shell: "{{ oracle_home_gi }}/root.sh"
-  # noqa command-instead-of-shell
+  # noqa command-instead-of-shell no-changed-when
   become: true
   run_once: "{{ configure_cluster }}"
   tags:
@@ -99,7 +99,7 @@
 
 - name: install_home_gi | Run root script after installation (Other Nodes)
   ansible.builtin.shell: "sleep {{ item.0 * 60 }}; {{ oracle_home_gi }}/root.sh"
-  # noqa command-instead-of-shell
+  # noqa command-instead-of-shell no-changed-when
   become: true
   with_indexed_items: "{{ groups[hostgroup] }}"
   tags:
@@ -127,7 +127,7 @@
 
 - name: install_home_gi | Run configToolAllCommands
   ansible.builtin.shell: "{{ oracle_home_gi }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_rsp_stage }}/configtoolallcommands.rsp"
-  # noqa command-instead-of-shell
+  # noqa command-instead-of-shell no-changed-when
   become: true
   become_user: "{{ grid_install_user }}"
   run_once: "{{ configure_cluster }}"

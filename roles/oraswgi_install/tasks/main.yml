@@ -2,7 +2,7 @@
 
 - name: install_home_gi | Check if GI is already installed
   ansible.builtin.shell: cat "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" | grep -w {{ oracle_home_gi }} |awk  '{print $3}' | cut -f2 -d'"'
-  # noqa command-instead-of-shell risky-shell-pipe
+  # noqa command-instead-of-shell no-changed-when risky-shell-pipe
   tags:
     - always
   changed_when: false
@@ -113,7 +113,7 @@
 
 - name: install_home_gi | Check if stuff is running
   ansible.builtin.shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
-  # noqa command-instead-of-shell
+  # noqa command-instead-of-shell no-changed-when
   tags:
     - crsctl
   register: crsctl
@@ -129,7 +129,7 @@
 
 - name: install_home_gi | Update Nodelist, set CRS=TRUE
   ansible.builtin.shell: "{{ oracle_home_gi }}/oui/bin/runInstaller -updateNodeList ORACLE_HOME={{ oracle_home_gi }} CRS=TRUE"
-  # noqa command-instead-of-shell ignore-errors
+  # noqa command-instead-of-shell no-changed-when ignore-errors
   become: true
   become_user: "{{ grid_install_user }}"
   run_once: "{{ configure_cluster }}"
@@ -165,7 +165,7 @@
 
 - name: install_home_gi | Check opatch lsinventory (GI)
   ansible.builtin.shell: "{{ oracle_home_gi }}/OPatch/opatch lspatches"
-  # noqa command-instead-of-shell
+  # noqa command-instead-of-shell no-changed-when
   become: true
   become_user: "{{ grid_install_user }}"
   environment: "{{ oracle_env }}"
@@ -183,7 +183,7 @@
 
 - name: install_home_gi | Check olsnodes (GI)
   ansible.builtin.shell: "{{ oracle_home_gi }}/bin/olsnodes -a -n -s -t"
-  # noqa command-instead-of-shell
+  # noqa command-instead-of-shell no-changed-when
   become: true
   become_user: "{{ grid_install_user }}"
   when: oracle_gi_cluster_type | upper == 'FLEX' and '12' in oracle_install_version_gi
