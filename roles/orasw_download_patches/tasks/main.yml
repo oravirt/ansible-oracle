@@ -1,0 +1,133 @@
+---
+- name: Download patches from Oracle on ansible-controller just once
+  run_once: true
+  delegate_to: "{{ oracle_patch_download_host }}"
+  block:
+    - name: Check if credentials are known
+      ansible.builtin.assert:
+        that:
+          - mos_login is defined
+          - mos_password is defined
+          - oracle_patch_download_dir is defined
+
+    - name: Ensure destination directory exists
+      ansible.builtin.file:
+        path: "{{ oracle_patch_download_dir }}"
+        state: directory
+        mode: 0755
+
+    - name: Login to Oracle
+      ansible.builtin.uri:
+        url: https://updates.oracle.com/Orion/Services/download
+        url_username: "{{ mos_login }}"
+        url_password: "{{ mos_password }}"
+        force_basic_auth: true
+        http_agent: "Wget/1.14 (linux-gnu)"
+        use_proxy: "{{ use_proxy }}"
+        return_content: true
+      environment: "{{ proxy_env }}"
+      register: mos_cookies
+
+    - name: Prepare list of OPatch patches needed
+      vars:
+        opatch:
+          patchid: 6880880
+          filename: "{{ oracle_opatch_patch | selectattr('version', 'equalto', db_version) | map(attribute='filename') | join }}"
+          description: "Current OPatch for {{ db_version }}"
+      ansible.builtin.set_fact:
+        opatchinfo: "{{ opatchinfo + [opatch] }}"
+      with_items:
+        - "{{ db_homes_installed }}"
+      when:
+        - opatch.filename | length > 0
+        - "opatch.filename not in (opatchinfo | map(attribute='filename'))"  # do not create duplicates
+      loop_control:
+        label: "{{ item.home }}: {{ opatch.filename | d('cannot find oracle_opatch_patch entry for ' + db_version, true) }}"
+
+    - name: Get ARU and URL
+      vars:
+        url: "https://updates.oracle.com/Orion/SimpleSearch/process_form?search_type=patch&plat_lang={{ oracle_plat_lang }}&patch_number={{ item.patchid }}"
+        aru: "{{ aru_list.content | regex_findall(item.filename + '[^ ]+aru=(\\d+)') | d(['missing'], true) | first }}"
+        password_required: "{{ aru_list.content is regex('password is required') }}"
+        summary: >-
+          {% if password_required %}
+          Password is needed for download, yet currently not supported. Please open Issue.
+          {% elif aru == 'missing' %}
+          Could not determine ARU - is patch number valid? see URL {{ url }}
+          {% else %}
+          ARU={{ aru }}
+          {% endif %}
+      ansible.builtin.uri:
+        url: "{{ url }}"
+        http_agent: "Wget/1.14 (linux-gnu)"
+        return_content: true
+        headers:
+          Cookie: "{{ mos_cookies.cookies_string }}"
+        use_proxy: "{{ use_proxy }}"
+      environment: "{{ proxy_env }}"
+      with_items:
+        - "{{ opatchinfo }}"
+        - "{{ oracle_sw_patches }}"
+      failed_when: "aru == 'missing' or password_required"
+      loop_control:
+        label: "{{ item.filename }} {{ summary }}"
+      register: aru_list
+
+    - name: Get Digest checksums
+      vars:
+        url: "https://updates.oracle.com//Orion/ViewDigest/get_form?aru={{ aru }}"
+        aru: "{{ aru_list.results[idx].content | d('') | regex_findall(item.filename + '[^ ]+aru=(\\d+)') | first }}"
+        sha256: "{{ sha_list.content | regex_findall('([A-F0-9]{64})') | d(['missing'], true) | first }}"
+        summary: >-
+          {% if sha256 == 'missing' %}
+          Could not get SHA256. Check URL output: {{ url }}
+          {% else %}
+          SHA256:{{ sha256 | lower }}
+          {% endif %}
+      ansible.builtin.uri:
+        url: "{{ url }}"
+        http_agent: "Wget/1.14 (linux-gnu)"
+        return_content: true
+        headers:
+          Cookie: "{{ mos_cookies.cookies_string }}"
+        use_proxy: "{{ use_proxy }}"
+      environment: "{{ proxy_env }}"
+      register: sha_list
+      when: aru != 'missing'
+      failed_when: sha256 == 'missing'
+      with_items:
+        - "{{ aru_list.results | map(attribute='item') }}"  # use original loop
+      loop_control:
+        index_var: idx
+        label: "{{ item.filename }} {{ summary }}"
+
+    - name: Download Patches
+      vars:
+        aru: "{{ aru_list.results[idx].content | regex_findall(item.filename + '[^ ]+aru=(\\d+)') | first }}"
+        download_url: "{{ aru_list.results[idx].content | regex_findall('(https://[^ ]+/process_form/' + item.filename + '[^ ]+). ') | first }}"
+        sha256: "{{ sha_list.results[idx].content | regex_findall('([A-F0-9]{64})') | first }}"
+        summary: >-
+          {% if download_patches.msg is search('exists') %}
+          Already downloaded (SHA256 match)
+          {% else %}
+          {{ item.description | d('no description available') }} {{ download_patches.msg | default('') }}
+          {% endif %}
+      ansible.builtin.get_url:
+        url: "{{ download_url }}"
+        dest: "{{ oracle_sw_source_local }}/{{ item.filename }}"
+        http_agent: "Wget/1.14 (linux-gnu)"
+        headers:
+          Cookie: "{{ mos_cookies.cookies_string }}"
+          Accept: "application/zip"
+        checksum: "sha256:{{ sha256 }}"
+        use_proxy: "{{ use_proxy }}"
+        # owner: "{{ oracle_user }}"   # not always ansible contorller knows this user
+        # group: "{{ oracle_group }}"  # not always ansible contorller knows this group
+        mode: 0644
+      environment: "{{ proxy_env }}"
+      register: download_patches
+      with_items:
+        - "{{ aru_list.results | map(attribute='item') }}"  # use original loop
+      loop_control:
+        index_var: idx
+        label: "{{ item.filename }} - {{ summary }}"
