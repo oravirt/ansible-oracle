@@ -2,20 +2,41 @@
 # @var mos_login:description: Login name for My Oracle Support (required)
 # @var mos_password:description: Password for My Oracle Support (required)
 
-# proxy support
+# @var use_proxy:description: Enable Proxy for Download
 use_proxy: false
+
+# @var http_proxy:description: Define the http proxy for downloads
 http_proxy:
+
+# @var https_proxy:description: Define the https proxy for downloads
 https_proxy:
+
+# @var no_proxy:description: Define no_proxy list für downlads.
 no_proxy:
 
+# @var proxy_env:description: >
+# This is an internal variable for downloading patches.
+# Usually no need to change it.
+# @end
 proxy_env:
   http_proxy: "{{ http_proxy }}"
   https_proxy: "{{ https_proxy }}"
   no_proxy: "{{ no_proxy }}"
 
+# @var oracle_plat_lang:description: >
+# This is an internal variable for downloading patches.
+# Usually no need to change it.
+# @end
 oracle_plat_lang: 226P  # Linux x86-64
 
+# @var opatchinfo:description: >
+# This is an internal variable for downloading patches.
+# Usually no need to change it.
+# @end
 opatchinfo: []
 
-oracle_patch_download_dir: "{{ oracle_sw_source_local }}"  # by default download to ansible controller stage area
-oracle_patch_download_host: "localhost"                    # by default download on ansible controller
+# @var oracle_patch_download_dir:description: Target directory for patch downloads
+oracle_patch_download_dir: "{{ oracle_sw_source_local }}"
+
+# @var oracle_patch_download_host:description: `delegate_to` host for downloads
+oracle_patch_download_host: "localhost"
