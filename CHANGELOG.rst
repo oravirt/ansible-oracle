@@ -5,6 +5,18 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.6.0
+======
+
+Minor Changes
+-------------
+
+- added new orasw_download_patches role (oravirt#332)
+- common: assert python2 interpreter on OL/RHEL7 (oravirt#330)
+- github action: deploy collection (oravirt#324)
+- github action: stale issues & PRs  (oravirt#326)
+- orasw_meta: added central assert tasks for ansible-oracle (oravirt#325)
+
 v3.5.1
 ======
 
