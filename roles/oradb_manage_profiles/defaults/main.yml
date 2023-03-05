@@ -1,6 +1,8 @@
 ---
 
-attr_name: "{% if item.1.attributes is defined %}{{ item.1.attributes | default (omit) | map(attribute='name') | list }}
+attr_name: "{% if opdb.1.attributes is defined %}{{ opdb.1.attributes | default (omit) | map(attribute='name') | list }}
             {%- else %}None
             {%- endif %}"
-attr_value: "{% if item.1.attributes is defined %}{{ item.1.attributes | default (omit) | map(attribute='value') | list }}{% else %}None{% endif %}"
+
+attr_value: "{% if opdb.1.attributes is defined -%}{{ opdb.1.attributes | default (omit) | map(attribute='value') | list }}
+             {%- else %}None{% endif %}"

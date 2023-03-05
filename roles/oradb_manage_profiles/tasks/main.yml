@@ -1,49 +1,107 @@
 ---
-# tasks file for manage-db-users
-- name: Manage profiles (cdb)
-  opitzconsulting.ansible_oracle.oracle_profile:
-    name: "{{ item.1.name }}"
-    state: "{{ item.1.state }}"
-    attribute_name: "{{ attr_name | default(omit) }}"
-    attribute_value: "{{ attr_value | default(omit) }}"
-    hostname: "{{ ansible_hostname }}"
-    port: "{{ listener_port_template }}"
-    service_name: "{{ db_service_name }}"
-    user: "{{ db_user }}"
-    password: "{{ db_password_cdb }}"
-  with_subelements:
-    - "{{ oracle_databases }}"
-    - profiles
-    - flags:
-      skip_missing: true
-  environment: "{{ oracle_env }}"
-  loop_control:
-    label: "home: {{ item.0.home }} db_name: {{ item.0.oracle_db_name }} Profile: {{ item.1.name }} attributes: {{ item.1.attributes }}"
-  when: oracle_databases is defined and item.0.state|lower == 'present' and item.1 is defined
-  run_once: "{{ configure_cluster }}"
-  become_user: "{{ oracle_user }}"
+- name: manage profiles
   tags: dbprofiles
+  block:
 
-- name: Manage profiles (pdb)
-  opitzconsulting.ansible_oracle.oracle_profile:
-    name: "{{ item.1.name }}"
-    state: "{{ item.1.state }}"
-    attribute_name: "{{ attr_name | default(omit) }}"
-    attribute_value: "{{ attr_value | default(omit) }}"
-    hostname: "{{ ansible_hostname }}"
-    port: "{{ listener_port_template }}"
-    service_name: "{{ item.0.pdb_name }}"
-    user: "{{ db_user }}"
-    password: "{{ db_password_pdb }}"
-  with_subelements:
-    - "{{ oracle_pdbs }}"
-    - profiles
-    - flags:
-      skip_missing: true
-  environment: "{{ oracle_env }}"
-  loop_control:
-    label: "home: {{ item.0.home }} CDB: {{ item.0.cdb }} PDB: {{ item.0.pdb_name }} Profile: {{ item.1.name }} attributes: {{ item.1.attributes }}"
-  when: oracle_pdbs is defined and item.0 is defined and item.0.state|lower == 'present' and item.1 is defined
-  run_once: "{{ configure_cluster }}"
-  become_user: "{{ oracle_user }}"
-  tags: dbprofiles
+    - name: assert
+      ansible.builtin.import_role:
+        name: orasw_meta
+        tasks_from: assert_oracle_databases.yml
+        allow_duplicates: false
+
+    - name: manage profiles (cdb)
+      opitzconsulting.ansible_oracle.oracle_profile:
+        name: "{{ odb.1.name }}"
+        state: "{{ odb.1.state }}"
+        attribute_name: "{{ attr_name_odb | default(omit) }}"
+        attribute_value: "{{ attr_value_odb | default(omit) }}"
+        hostname: "{{ ansible_hostname }}"
+        port: "{{ listener_port_template }}"
+        service_name: "{{ _db_service_name }}"
+        user: "{{ db_user }}"
+        password: "{{ _db_password_cdb }}"
+        mode: "{{ db_mode }}"
+      with_subelements:
+        - "{{ oracle_databases }}"
+        - profiles
+        - flags:
+          skip_missing: true
+      environment: "{{ _oracle_env }}"
+      loop_control:
+        loop_var: odb
+        label: >-
+          service: {{ _db_service_name }}:{{ listener_port_template }}
+          db_name: {{ odb.0.oracle_db_name }}
+          Profile: {{ odb.1.name }}
+          attributes: {{ odb.1.attributes }}
+      when:
+        - oracle_databases is defined
+        - odb.0.state | lower == 'present'
+        - odb.1 is defined
+      run_once: "{{ configure_cluster }}"
+      become: true
+      become_user: "{{ oracle_user }}"
+      vars:
+        attr_name_odb: >-
+          {%- if odb.1.attributes is defined -%}
+          {{ odb.1.attributes | default (omit) | map(attribute='name') | list }}
+          {%- else -%}
+          None
+          {%- endif %}
+
+        attr_value_odb: >-
+          {%- if odb.1.attributes is defined -%}
+          {{ odb.1.attributes | default (omit) | map(attribute='value') | list }}
+          {%- else -%}
+          None
+          {%- endif %}
+
+
+    - name: manage profiles (pdb)
+      opitzconsulting.ansible_oracle.oracle_profile:
+        name: "{{ opdb.1.name }}"
+        state: "{{ opdb.1.state }}"
+        attribute_name: "{{ attr_name_opdb | default(omit) }}"
+        attribute_value: "{{ attr_value_opdb | default(omit) }}"
+        hostname: "{{ ansible_hostname }}"
+        port: "{{ _listener_port }}"
+        service_name: "{{ opdb.0.pdb_name }}"
+        user: "{{ db_user }}"
+        password: "{{ _db_password_pdb }}"
+        mode: "{{ db_mode }}"
+      with_subelements:
+        - "{{ oracle_pdbs }}"
+        - profiles
+        - flags:
+          skip_missing: true
+      environment: "{{ _oracle_env }}"
+      loop_control:
+        loop_var: opdb
+        label: >-
+          service: {{ _db_service_name }}:{{ _listener_port }}
+          CDB: {{ opdb.0.cdb }}
+          PDB: {{ opdb.0.pdb_name }}
+          Profile: {{ opdb.1.name }}
+          attributes: {{ opdb.1.attributes }}
+      when:
+        - oracle_pdbs is defined
+        - opdb.0 is defined
+        - opdb.0.state == 'present'
+        - opdb.1 is defined
+      run_once: "{{ configure_cluster }}"
+      become: true
+      become_user: "{{ oracle_user }}"
+      vars:
+        attr_name_opdb: >-
+          {%- if opdb.1.attributes is defined -%}
+          {{ opdb.1.attributes | default (omit) | map(attribute='name') | list }}
+          {%- else -%}
+          None
+          {%- endif %}
+
+        attr_value_opdb: >-
+          {%- if opdb.1.attributes is defined -%}
+          {{ opdb.1.attributes | default (omit) | map(attribute='value') | list }}
+          {%- else -%}
+          None
+          {%- endif %}
