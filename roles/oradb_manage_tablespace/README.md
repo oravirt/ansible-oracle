@@ -26,4 +26,6 @@ license (MIT)
 
 ## Author
 
-[Mikael Sandström]
+- Mikael Sandström
+
+- Thorsten Bruhns
