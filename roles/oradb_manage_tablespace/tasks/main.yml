@@ -1,58 +1,84 @@
 ---
-- name: Manage tablespaces (db/cdb)
-  opitzconsulting.ansible_oracle.oracle_tablespace:
-    hostname: "{{ ansible_hostname }}"
-    port: "{{ listener_port_template }}"
-    service_name: "{{ db_service_name }}"
-    user: "{{ db_user }}"
-    password: "{{ db_password_cdb }}"
-    tablespace: "{{ item.1.name }}"
-    datafile: "{{ item.1.datafile | default(omit) }}"
-    numfiles: "{{ item.1.numfiles | default(omit) }}"
-    bigfile: "{{ item.1.bigfile | default(omit) }}"
-    size: "{{ item.1.size | default(omit) }}"
-    autoextend: "{{ item.1.autoextend | default(omit) }}"
-    next: "{{ item.1.next | default(omit) }}"
-    maxsize: "{{ item.1.maxsize | default(omit) }}"
-    content: "{{ item.1.content | default(omit) }}"
-    state: "{{ item.1.state | default('present') }}"
-  environment: "{{ oracle_env }}"
-  run_once: "{{ configure_cluster }}"
-  with_subelements:
-    - "{{ oracle_databases }}"
-    - tablespaces
-    - flags:
-      skip_missing: true
-  loop_control:
-    label: "port: {{ listener_port_template }} service: {{ db_service_name }} tablespace: {{ item.1.name }} content: {{ item.1.content | default(omit) }} state: {{ item.1.state | default('present') }}"  # noqa yaml
-  when: oracle_databases is defined and item.1 is defined and item.0.state | upper == 'PRESENT'
+- name: manage tablespaces
   tags: tablespace
+  block:
 
-- name: Manage tablespaces (pdb)
-  opitzconsulting.ansible_oracle.oracle_tablespace:
-    hostname: "{{ ansible_hostname }}"
-    port: "{{ listener_port_template }}"
-    service_name: "{{ item.0.pdb_name }}"
-    user: "{{ db_user }}"
-    password: "{{ db_password_pdb }}"
-    tablespace: "{{ item.1.name }}"
-    datafile: "{{ item.1.datafile | default(omit) }}"
-    numfiles: "{{ item.1.numfiles | default(omit) }}"
-    bigfile: "{{ item.1.bigfile | default(omit) }}"
-    size: "{{ item.1.size | default(omit) }}"
-    autoextend: "{{ item.1.autoextend | default(omit) }}"
-    next: "{{ item.1.next | default(omit) }}"
-    maxsize: "{{ item.1.maxsize | default(omit) }}"
-    content: "{{ item.1.content | default(omit) }}"
-    state: "{{ item.1.state | default('present') }}"
-  environment: "{{ oracle_env }}"
-  run_once: "{{ configure_cluster }}"
-  with_subelements:
-    - "{{ oracle_pdbs }}"
-    - tablespaces
-    - flags:
-      skip_missing: true
-  when: oracle_pdbs is defined and item.1 is defined and item.0.state | upper == 'PRESENT'
-  loop_control:
-    label: "port: {{ listener_port_template }} service: {{ item.0.pdb_name }} tablespace: {{ item.1.name }} content: {{ item.1.content | default(omit) }} state: {{ item.1.state | default('present') }}"  # noqa yaml
-  tags: tablespace
+    - name: assert
+      ansible.builtin.import_role:
+        name: orasw_meta
+        tasks_from: assert_oracle_databases.yml
+        allow_duplicates: false
+
+    - name: manage tablespaces (db/cdb)
+      opitzconsulting.ansible_oracle.oracle_tablespace:
+        hostname: "{{ ansible_hostname }}"
+        port: "{{ listener_port_template }}"
+        service_name: "{{ _db_service_name }}"
+        user: "{{ db_user }}"
+        password: "{{ _db_password_cdb }}"
+        mode: "{{ db_mode }}"
+        tablespace: "{{ odb.1.name }}"
+        datafile: "{{ odb.1.datafile | default(omit) }}"
+        numfiles: "{{ odb.1.numfiles | default(omit) }}"
+        bigfile: "{{ odb.1.bigfile | default(omit) }}"
+        size: "{{ odb.1.size | default(omit) }}"
+        autoextend: "{{ odb.1.autoextend | default(omit) }}"
+        next: "{{ odb.1.next | default(omit) }}"
+        maxsize: "{{ odb.1.maxsize | default(omit) }}"
+        content: "{{ odb.1.content | default(omit) }}"
+        state: "{{ odb.1.state | default('present') }}"
+      environment: "{{ _oracle_env }}"
+      run_once: "{{ configure_cluster }}"
+      with_subelements:
+        - "{{ oracle_databases }}"
+        - tablespaces
+        - flags:
+          skip_missing: true
+      loop_control:
+        loop_var: odb
+        label: >-
+          service: {{ _db_service_name }}:{{ listener_port_template }}
+          tablespace: {{ odb.1.name }}
+          content: {{ odb.1.content | default(omit) }}
+          state: {{ odb.1.state | default('present') }}
+      when:
+        - oracle_databases is defined
+        - odb.1 is defined
+        - odb.0.state | upper == 'PRESENT'
+
+    - name: manage tablespaces (pdb)
+      opitzconsulting.ansible_oracle.oracle_tablespace:
+        hostname: "{{ ansible_hostname }}"
+        port: "{{ listener_port_template }}"
+        service_name: "{{ opdb.0.pdb_name }}"
+        user: "{{ db_user }}"
+        password: "{{ _db_password_pdb }}"
+        mode: "{{ db_mode }}"
+        tablespace: "{{ opdb.1.name }}"
+        datafile: "{{ opdb.1.datafile | default(omit) }}"
+        numfiles: "{{ opdb.1.numfiles | default(omit) }}"
+        bigfile: "{{ opdb.1.bigfile | default(omit) }}"
+        size: "{{ opdb.1.size | default(omit) }}"
+        autoextend: "{{ opdb.1.autoextend | default(omit) }}"
+        next: "{{ opdb.1.next | default(omit) }}"
+        maxsize: "{{ opdb.1.maxsize | default(omit) }}"
+        content: "{{ opdb.1.content | default(omit) }}"
+        state: "{{ opdb.1.state | default('present') }}"
+      environment: "{{ _oracle_env }}"
+      run_once: "{{ configure_cluster }}"
+      with_subelements:
+        - "{{ oracle_pdbs }}"
+        - tablespaces
+        - flags:
+          skip_missing: true
+      when:
+        - oracle_pdbs is defined
+        - opdb.1 is defined
+        - opdb.0.state | upper == 'PRESENT'
+      loop_control:
+        loop_var: opdb
+        label: >-
+          service: {{ opdb.0.pdb_name }}:{{ listener_port_template }}
+          tablespace: {{ opdb.1.name }}
+          content: {{ opdb.1.content | default(omit) }}
+          state: {{ opdb.1.state | default('present') }}
