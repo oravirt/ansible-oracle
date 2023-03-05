@@ -21,7 +21,7 @@ Manage database profiles in Oracle
 #### Default value
 
 ```YAML
-attr_name: "{% if item.1.attributes is defined %}{{ item.1.attributes | default (omit)\
+attr_name: "{% if opdb.1.attributes is defined %}{{ opdb.1.attributes | default (omit)\
   \ | map(attribute='name') | list }} {%- else %}None {%- endif %}"
 ```
 
@@ -30,8 +30,8 @@ attr_name: "{% if item.1.attributes is defined %}{{ item.1.attributes | default 
 #### Default value
 
 ```YAML
-attr_value: "{% if item.1.attributes is defined %}{{ item.1.attributes | default (omit)\
-  \ | map(attribute='value') | list }}{% else %}None{% endif %}"
+attr_value: "{% if opdb.1.attributes is defined -%}{{ opdb.1.attributes | default\
+  \ (omit) | map(attribute='value') | list }} {%- else %}None{% endif %}"
 ```
 
 ## Discovered Tags
@@ -49,4 +49,6 @@ license (MIT)
 
 ## Author
 
-[Mikael Sandström]
+- Mikael Sandström
+
+- Thorsten Bruhns
