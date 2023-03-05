@@ -1,31 +1,47 @@
 ---
-- name: Manage pdb(s)
-  opitzconsulting.ansible_oracle.oracle_pdb:
-    name: "{{ item[1].pdb_name }}"
-    sourcedb: "{{ item[1].cdb }}"
-    datafile_dest: "{{ item[1].datafile_dest | default(omit) }}"
-    save_state: "{{ item[1].save_state | default(omit) }}"
-    pdb_admin_username: "{{ pdbadmin_user | default(omit) }}"
-    pdb_admin_password: "{{ pdbadmin_password | default(omit) }}"
-    host: "{{ ansible_hostname }}"
-    username: "{{ db_user | default('sys') }}"
-    password: "{{ db_password_cdb }}"
-    mode: "{{ db_mode }}"
-    service_name: "{{ item[0].oracle_db_unique_name | default(item[0].oracle_db_name) }}"
-    port: "{{ listener_port_template }}"
-    state: "{{ item[1].state | default(omit) }}"
-  environment: "{{ oracle_env }}"
-  run_once: "{{ configure_cluster }}"
-  with_nested:
-    - "{{ oracle_databases | default([]) }}"
-    - "{{ oracle_pdbs | default([]) }}"
-  become_user: "{{ oracle_user }}"
-  loop_control:
-    label: "CDB: {{ item[1].cdb }}, PDB: {{ item[1].pdb_name }}, {{ item.1.home }}, state: {{ item[1].state }}"
-  when:
-    - oracle_databases is defined
-    - oracle_pdbs is defined
-    - item[0].state|upper == 'PRESENT'
-    - item[1].cdb == item[0].oracle_db_name
-    - item[0].is_container
+- name: manage pdb(s)
   tags: pdb
+  block:
+
+    - name: assert
+      ansible.builtin.import_role:
+        name: orasw_meta
+        tasks_from: assert_oracle_databases.yml
+        allow_duplicates: false
+
+    - name: manage pdb(s)
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ odb[1].pdb_name }}"
+        sourcedb: "{{ odb[1].cdb }}"
+        datafile_dest: "{{ odb[1].datafile_dest | default(omit) }}"
+        save_state: "{{ odb[1].save_state | default(omit) }}"
+        pdb_admin_username: "{{ pdbadmin_user | default(omit) }}"
+        pdb_admin_password: "{{ pdbadmin_password | default(omit) }}"
+        host: "{{ ansible_hostname }}"
+        username: "{{ db_user | default('sys') }}"
+        password: "{{ _db_password_cdb }}"
+        mode: "{{ db_mode }}"
+        service_name: "{{ odb[0].oracle_db_unique_name | default(odb[0].oracle_db_name) }}"
+        port: "{{ listener_port_template }}"
+        state: "{{ odb[1].state | default(omit) }}"
+      environment: "{{ _oracle_env }}"
+      run_once: "{{ configure_cluster }}"
+      with_nested:
+        - "{{ oracle_databases }}"
+        - "{{ oracle_pdbs }}"
+      become: true
+      become_user: "{{ oracle_user }}"
+      loop_control:
+        label: >-
+          CDB: {{ odb[1].cdb | default('') }},
+          PDB: {{ odb[1].pdb_name | default('') }},
+          state: {{ odb[1].state | default('') }}
+        loop_var: odb
+      when:
+        - oracle_databases is defined
+        - odb[0].oracle_db_name
+        - oracle_pdbs is defined
+        - odb[1].cdb
+        - odb[0].state|upper == 'PRESENT'
+        - odb[1].cdb == odb[0].oracle_db_name
+        - odb[0].is_container
