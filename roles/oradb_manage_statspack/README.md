@@ -1,6 +1,8 @@
 # oradb_manage_statspack
 
-Manage Statspack in Oracle
+Manage Statspack in Oracle.
+
+Not RAC aware at the moment.
 
 ## Table of content
 
@@ -20,6 +22,10 @@ Manage Statspack in Oracle
 
 ### purgedays
 
+Global default variable for Statspack purgetime in days.
+Could be defined for each database with `oracle_databases`.
+An example is shown there.
+
 #### Default value
 
 ```YAML
@@ -27,6 +33,10 @@ purgedays: 35
 ```
 
 ### purgeinterval
+
+Global default variable for Statspack purge interval in scheduler job.
+Could be defined for each database with `oracle_databases`.
+An example is shown there.
 
 #### Default value
 
@@ -36,6 +46,10 @@ purgeinterval: FREQ=daily;byhour=3;byminute=15;bysecond=0
 
 ### snapinterval
 
+Global default variable for Statspack snap interval in scheduler job.
+Could be defined for each database with `oracle_databases`.
+An example is shown there.
+
 #### Default value
 
 ```YAML
@@ -43,6 +57,10 @@ snapinterval: FREQ=hourly;byminute=0;bysecond=0
 ```
 
 ### snaplevel
+
+Global default variable for Statspack snaplevel.
+Could be defined for each database with `oracle_databases`.
+An example is shown there.
 
 #### Default value
 
@@ -52,20 +70,23 @@ snaplevel: 7
 
 ## Discovered Tags
 
-**_spcdb_**
+**_spcreate_**\
+&emsp;Install Statspack in nonCDB, CDB or PDB
 
-**_spcreate_**
+**_spdrop_**\
+&emsp;Remove Statspack from nonCDB, CDB or PDB
 
-**_spdrop_**
+**_spjob_**\
+&emsp;Configure Statspack Scheduler Jobs
 
-**_spjob_**
-
-**_sppdb_**
+**_statspack_**\
+&emsp;Do all Tasks for Statspack
 
 
 ## Dependencies
 
 - orasw_meta
+- oradb_facts
 
 ## License
 
