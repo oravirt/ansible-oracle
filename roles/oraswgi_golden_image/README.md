@@ -1,51 +1,6 @@
 # oraswgi_golden_image
 
-C
-r
-e
-a
-t
-e
-
-G
-o
-l
-d
-e
-n
--
-I
-m
-a
-g
-e
-s
-
-f
-r
-o
-m
-
-O
-r
-a
-c
-l
-e
-
-R
-e
-s
-t
-a
-r
-t
-
-H
-o
-m
-e
-s
+Create Golden-Images from Oracle Restart Homes
 
 ## Table of content
 
