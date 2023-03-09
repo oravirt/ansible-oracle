@@ -1,54 +1,6 @@
 # oraswgi_manage_patches
 
-I
-n
-s
-t
-a
-l
-l
-/
-R
-e
-m
-o
-v
-e
-
-P
-a
-t
-c
-h
-e
-s
-
-f
-r
-o
-m
-
-O
-r
-a
-c
-l
-e
-
-D
-a
-t
-a
-b
-a
-s
-e
-
-H
-o
-m
-e
-s
+Install/Remove Patches from Oracle Database Homes
 
 ## Table of content
 
