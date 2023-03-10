@@ -23,12 +23,10 @@ _db_password_pdb: "{{ dbpasswords[opdb[0]['cdb']][opdb[0]['pdb_name']][db_user] 
 # Do not set it in inventory!
 # @end
 # @var _db_service_name: $ "_internal_used_"
-_db_service_name: "{% if odb[0] is defined -%} \
-                    {%- if odb[0].oracle_db_unique_name is defined -%}{{ odb[0].oracle_db_unique_name }}\
-                    {%- elif odb[0].oracle_db_instance_name is defined -%}{{ odb[0].oracle_db_instance_name }}\
-                    {%- else -%}{{ odb[0].oracle_db_name }}\
-                    {%- endif -%}\
-                  {%- endif %}"
+_db_service_name: "{{ _odb_loop_helper.oracle_db_unique_name | \
+                        default(_odb_loop_helper.oracle_db_instance_name | \
+                          default (_odb_loop_helper.oracle_db_name)\
+                        ) }}"
 
 # @var _oracle_home_db:description: >
 # This is an internal variable in `ansible-oracle`.
@@ -80,6 +78,15 @@ _oracle_db_instance_name: "{%- if _odb_loop_helper.oracle_db_name is defined -%}
                                {%- endif -%}\
                              {%- endfor -%}\
                            {%- endif -%}"
+
+# @var _listener_port:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+# @end
+# @var _listener_port: $ "_internal_used_"
+_listener_port: "{{ _opdb_loop_helper.listener_port | \
+                    default(listener_port) }}"
 
 # @var _oracle_env:description: >
 # The variable is used for shell, command tasks to set environment Variables.
@@ -158,21 +165,6 @@ db_service_name: "{% if item is defined -%} \
                     {%- else -%}{{ item.oracle_db_name }}\
                     {%- endif -%}\
                   {%- endif %}"
-
-user_cdb_password: "{% if dbpasswords is defined \
-                          and dbpasswords[item.0.oracle_db_name] is defined \
-                          and dbpasswords[item.0.oracle_db_name][item.1.schema] is defined -%}{{ dbpasswords[item.0.oracle_db_name][item.1.schema] }}
-                    {%- else -%}{{ default_dbpass }}
-                    {%- endif %}"
-
-user_pdb_password: "{% if dbpasswords is defined \
-                          and dbpasswords[item.0.cdb] is defined \
-                          and dbpasswords[item.0.cdb][item.0.pdb_name] is defined \
-                          and dbpasswords[item.0.cdb][item.0.pdb_name][item.1.schema] is defined -%}\
-                      {{ dbpasswords[item.0.cdb][item.0.pdb_name][item.1.schema] }}
-                    {%- else %}{{ default_dbpass }}
-                    {%- endif %}"
-
 
 listener_home: "{%- if lsnrinst is defined -%}\
                   {%- if db_homes_config[lsnrinst.home]['oracle_home'] is defined -%}{{ db_homes_config[lsnrinst.home]['oracle_home'] }}\
