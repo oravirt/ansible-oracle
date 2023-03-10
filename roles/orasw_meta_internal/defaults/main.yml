@@ -1,4 +1,11 @@
 ---
+# @var _orasw_meta_internal_configure_cluster:description: >
+# Defines, if a Node is part of a cluster or not.
+#
+# Do not set it in inventory!
+# @end
+_orasw_meta_internal_configure_cluster: false
+
 # @var _db_password_cdb:description: >
 # The variable is internal used only.
 #
@@ -23,10 +30,47 @@ _db_password_pdb: "{{ dbpasswords[opdb[0]['cdb']][opdb[0]['pdb_name']][db_user] 
 # Do not set it in inventory!
 # @end
 # @var _db_service_name: $ "_internal_used_"
-_db_service_name: "{{ _odb_loop_helper.oracle_db_unique_name | \
+_db_service_name: "{% if _odb_loop_helper.oracle_db_name is defined -%}
+                     {{ _odb_loop_helper.oracle_db_unique_name | \
                         default(_odb_loop_helper.oracle_db_instance_name | \
-                          default (_odb_loop_helper.oracle_db_name)\
-                        ) }}"
+                          default(_odb_loop_helper.oracle_db_name)\
+                        ) }}\
+                   {%- elif _opdb_loop_helper.cdb is defined -%}
+                     {{ _opdb_loop_helper.service_name | \
+                        default(_opdb_loop_helper.pdb_name) }}\
+                   {%- endif %}"
+
+# @var _db_unique_name_for_pdb:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+#
+# get db_unique_name from CDB for current pdb
+# Requires `opdb` as `loop_var`.
+# @end
+# @var _db_unique_name_for_pdb: $ "_internal_used_"
+_db_unique_name_for_pdb: >-
+  {{ (oracle_databases
+    | selectattr('oracle_db_name', 'match', opdb[0]['cdb'])
+    | map(attribute='oracle_db_unique_name', default=opdb[0]['cdb']))[0]
+  }}
+
+# @var _db_service_pdb:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+#
+# Get the service_name for a PDB.
+#
+# Requires `opdb` as `loop_var`.
+# @end
+# @var _db_service_pdb: $ "_internal_used_"
+_db_service_pdb: >-
+  {%- set __db_domain_pdb = oracledb_facts[_db_unique_name_for_pdb]['parameter']['db_domain']['value'] -%}
+  {%- if __db_domain_pdb is defined and __db_domain_pdb is string and __db_domain_pdb | length > 0 -%}{{ opdb[0]['pdb_name'] }}.{{ __db_domain_pdb }}{%- else -%}
+  {{ opdb[0]['pdb_name'] }}{% endif %}
+
+_opdb_home: "{{ (oracle_databases | selectattr('oracle_db_name', 'match', opdb[0]['cdb']))[0]['home'] }}"
 
 # @var _oracle_home_db:description: >
 # This is an internal variable in `ansible-oracle`.
@@ -34,13 +78,15 @@ _db_service_name: "{{ _odb_loop_helper.oracle_db_unique_name | \
 # Do not set it in inventory!
 # @end
 # @var _oracle_home_db: $ "_internal_used_"
-_oracle_home_db: "{%- if odb[0] is defined -%}\
-                    {{ db_homes_config[odb[0].home]['oracle_home'] | \
-                       default(oracle_base + '/' + db_homes_config[odb[0].home]['version'] + '/' + odb[0].home) }}\
+_oracle_home_db: "{%- if _odb_loop_helper is defined -%}\
+                    {{ db_homes_config[_odb_loop_helper.home]['oracle_home'] | \
+                       default(oracle_base + '/' + db_homes_config[_odb_loop_helper.home]['version'] + '/' + _odb_loop_helper.home) }}\
                   {%- elif opdb[0] is defined -%}\
-                    {{ db_homes_config[opdb[0].home]['oracle_home'] | \
-                       default(oracle_base + '/' + db_homes_config[opdb[0].home]['version'] + '/' + opdb[0].home) }}\
+                    {{ db_homes_config[_opdb_home]['oracle_home'] | \
+                       default(oracle_base + '/' + db_homes_config[_opdb_home]['version'] + '/' + _opdb_home) }}\
                   {%- endif -%}"
+
+_oracle_home_db_pdb: "{{ db_homes_config[_opdb_home]['oracle_home'] }}"
 
 # @var _odb_loop_helper:description: >
 # The variable is internal used only.
@@ -64,20 +110,20 @@ _opdb_loop_helper: "{{ opdb.0 | default(opdb) | default({}) }}"
 # Do not set it in inventory!
 # @end
 # @var _oracle_db_instance_name: $ "_internal_used_"
-_oracle_db_instance_name: "{%- if _odb_loop_helper.oracle_db_name is defined -%}\
-                             {{ _odb_loop_helper.oracle_db_instance_name | \
-                                  default(_odb_loop_helper.oracle_db_unique_name | \
-                                    default(_odb_loop_helper.oracle_db_name)) }}\
-                           {%- elif _opdb_loop_helper.cdb is defined -%}\
-                             {%- for db in oracle_databases -%}\
-                               {%- if db.oracle_db_name == _opdb_loop_helper.cdb -%}\
-                                 {{ db.oracle_db_instance_name | \
-                                      default(db.oracle_db_unique_name | \
-                                        default(db.oracle_db_name)) \
-                                 }}\
-                               {%- endif -%}\
-                             {%- endfor -%}\
-                           {%- endif -%}"
+_oracle_db_instance_name: >-
+  {%- if _odb_loop_helper.oracle_db_name is defined -%}
+    {{- _odb_loop_helper.oracle_db_instance_name
+      | default(_odb_loop_helper.oracle_db_unique_name
+        | default(_odb_loop_helper.oracle_db_name)) -}}
+  {%- elif _opdb_loop_helper.cdb is defined -%}
+    {%- for db in oracle_databases -%}
+      {%- if db.oracle_db_name == _opdb_loop_helper.cdb -%}
+        {{- db.oracle_db_instance_name
+          | default(db.oracle_db_unique_name
+            | default(db.oracle_db_name)) -}}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endif -%}
 
 # @var _listener_port:description: >
 # The variable is internal used only.
@@ -88,6 +134,24 @@ _oracle_db_instance_name: "{%- if _odb_loop_helper.oracle_db_name is defined -%}
 _listener_port: "{{ _opdb_loop_helper.listener_port | \
                     default(listener_port) }}"
 
+# @var _listener_port_cdb:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+# @end
+# @var _listener_port_cdb: $ "_internal_used_"
+_listener_port_cdb: "{{ _odb_loop_helper.listener_port | \
+                    default(listener_port) }}"
+
+# @var _listener_port_pdb:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+# @end
+# @var _listener_port_pdb: $ "_internal_used_"
+_listener_port_pdb: "{{ _opdb_loop_helper.listener_port | \
+                    default(listener_port) }}"
+
 # @var _oracle_env:description: >
 # The variable is used for shell, command tasks to set environment Variables.
 #
@@ -96,6 +160,19 @@ _listener_port: "{{ _opdb_loop_helper.listener_port | \
 _oracle_env:
   ORACLE_HOME: "{{ _oracle_home_db }}"
   LD_LIBRARY_PATH: "{{ _oracle_home_db }}/lib"
+
+_oracle_env_pdb:
+  ORACLE_HOME: "{{ _oracle_home_db_pdb }}"
+  LD_LIBRARY_PATH: "{{ _oracle_home_db_pdb }}/lib"
+
+# @var _grid_env:description: >
+# The variable is used for shell, command tasks to set environment Variables.
+#
+# Do not set it in inventory!
+# @end
+_grid_env:
+  ORACLE_HOME: "{{ oracle_home_gi }}"
+  LD_LIBRARY_PATH: "{{ oracle_home_gi }}/lib"
 
 # @var _oracle_ee_opiton_dict:description: >
 # This is an internal variable in `ansible-oracle`.
@@ -120,16 +197,20 @@ _oracle_ee_opiton_dict:
 ######
 #########################################
 
-# @var configure_cluster:description: >
-# This was an open variable and has been changed to an internal one.
-#
-# The variable will be deprecated and removed in a future release of `ansibe-oracle`.
+oracle_patch_stage: "{{ oracle_stage }}/patches"
+oracle_patch_stage_remote: "{{ oracle_stage_remote }}/patches"
+oracle_patch_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_patch_stage_remote }}{% else %}{{ oracle_patch_stage }}{% endif %}"
+ocm_response_file: "{{ oracle_patch_stage }}/{{ db_version }}/ocm.rsp"
+
+# @var oracle_stage_install:description: >
+# This is an internal variable. Do not set it in Inventory.
 # @end
-# @var configure_cluster:example: >
-# configure_cluster: false
-#
-# configure_cluster: true
-# @end
+oracle_stage_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
+
+# @todo bug: grid_install_user is wrong here.
+grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
+
+
 configure_cluster: false
 
 oracle_sw_copy: "{% if install_from_nfs %}false{% else %}true{% endif %}"
@@ -159,6 +240,8 @@ db_password: "{% if dbpasswords is defined\
               {%- else %}{{ default_dbpass }} \
               {%- endif %}"
 
+# @var db_service_name:deprecated: true
+# @var db_service_name:deprecated: since v4.0.0
 db_service_name: "{% if item is defined -%} \
                     {%- if item.oracle_db_unique_name is defined -%}{{ item.oracle_db_unique_name }}\
                     {%- elif item.oracle_db_instance_name is defined -%}{{ item.oracle_db_instance_name }}\
@@ -166,16 +249,24 @@ db_service_name: "{% if item is defined -%} \
                     {%- endif -%}\
                   {%- endif %}"
 
+# @var listener_home:deprecated: true
+# @var listener_home:deprecated: since v4.0.0
 listener_home: "{%- if lsnrinst is defined -%}\
                   {%- if db_homes_config[lsnrinst.home]['oracle_home'] is defined -%}{{ db_homes_config[lsnrinst.home]['oracle_home'] }}\
                   {%- else -%}{{ oracle_base }}/{{ db_homes_config[lsnrinst.home]['version'] }}/{{ db_homes_config[lsnrinst.home]['home'] }}\
                   {%- endif -%}\
                 {%- endif -%}"
 
+# @var listener_protocols:deprecated: true
+# @var listener_protocols:deprecated: since v4.0.0
 listener_protocols: TCP
 
+# @var listener_port_template:deprecated: true
+# @var listener_port_template:deprecated: since v4.0.0
 listener_port_template: "{% if item.listener_port is defined %}{{ item.listener_port }}{% else %}{{ listener_port }}{% endif %}"
 
+# @var grid_env:deprecated: true
+# @var grid_env:deprecated: since v4.0.0
 # @var grid_env:description: >
 # The variable is used for shell, command tasks to set environment Variables.
 #
@@ -185,6 +276,8 @@ grid_env:
   ORACLE_HOME: "{{ oracle_home_gi }}"
   LD_LIBRARY_PATH: "{{ oracle_home_gi }}/lib"
 
+# @var oracle_env:deprecated: true
+# @var oracle_env:deprecated: since v4.0.0
 # @var oracle_env:description: >
 # The variable is used for shell, command tasks to set environment Variables.
 #
@@ -194,6 +287,8 @@ oracle_env:
   ORACLE_HOME: "{{ oracle_home_db }}"
   LD_LIBRARY_PATH: "{{ oracle_home_db }}/lib"
 
+# @var oracle_env_lsnrctl:deprecated: true
+# @var oracle_env_lsnrctl:deprecated: since v4.0.0
 # @var oracle_env_lsnrctl:description: >
 # The variable is used for shell, command tasks to set environment Variables.
 #
@@ -205,6 +300,8 @@ oracle_env_lsnrctl:
   LD_LIBRARY_PATH: "{{ listener_home }}/lib"
   PATH: "{{ listener_home }}/bin:$PATH:/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin"
 
+# @var oracle_home_db:deprecated: true
+# @var oracle_home_db:deprecated: since v4.0.0
 # @var oracle_home_db:description: >
 # This is an internal variable in `ansible-oracle`.
 #
@@ -248,6 +345,8 @@ oracle_home_db: "{%- if dbh is defined -%}
                  {%- endif -%}"
 
 
+# @var db_version:deprecated: true
+# @var db_version:deprecated: since v4.0.0
 # @var db_version:description: >
 # This is an internal variable in `ansible-oracle`.
 #

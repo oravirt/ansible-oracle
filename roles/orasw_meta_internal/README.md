@@ -12,12 +12,22 @@ This will create issues and problems in `ansible-oracle` and is not supported.
   - [_db_password_cdb](#_db_password_cdb)
   - [_db_password_pdb](#_db_password_pdb)
   - [_db_service_name](#_db_service_name)
+  - [_db_service_pdb](#_db_service_pdb)
+  - [_db_unique_name_for_pdb](#_db_unique_name_for_pdb)
+  - [_grid_env](#_grid_env)
+  - [_listener_port](#_listener_port)
+  - [_listener_port_cdb](#_listener_port_cdb)
+  - [_listener_port_pdb](#_listener_port_pdb)
   - [_odb_loop_helper](#_odb_loop_helper)
+  - [_opdb_home](#_opdb_home)
   - [_opdb_loop_helper](#_opdb_loop_helper)
   - [_oracle_db_instance_name](#_oracle_db_instance_name)
   - [_oracle_ee_opiton_dict](#_oracle_ee_opiton_dict)
   - [_oracle_env](#_oracle_env)
+  - [_oracle_env_pdb](#_oracle_env_pdb)
   - [_oracle_home_db](#_oracle_home_db)
+  - [_oracle_home_db_pdb](#_oracle_home_db_pdb)
+  - [_orasw_meta_internal_configure_cluster](#_orasw_meta_internal_configure_cluster)
   - [cluster_master](#cluster_master)
   - [configure_cluster](#configure_cluster)
   - [db_mode](#db_mode)
@@ -27,20 +37,25 @@ This will create issues and problems in `ansible-oracle` and is not supported.
   - [db_user](#db_user)
   - [db_version](#db_version)
   - [grid_env](#grid_env)
+  - [grid_install_user](#grid_install_user)
   - [listener_home](#listener_home)
   - [listener_port_template](#listener_port_template)
   - [listener_protocols](#listener_protocols)
+  - [ocm_response_file](#ocm_response_file)
   - [oracle_db_instance_name](#oracle_db_instance_name)
   - [oracle_env](#oracle_env)
   - [oracle_env_lsnrctl](#oracle_env_lsnrctl)
   - [oracle_home_db](#oracle_home_db)
   - [oracle_home_gi](#oracle_home_gi)
+  - [oracle_patch_install](#oracle_patch_install)
+  - [oracle_patch_stage](#oracle_patch_stage)
+  - [oracle_patch_stage_remote](#oracle_patch_stage_remote)
   - [oracle_profile_name](#oracle_profile_name)
+  - [oracle_stage_install](#oracle_stage_install)
   - [oracle_sw_copy](#oracle_sw_copy)
   - [oracle_sw_extract_path](#oracle_sw_extract_path)
   - [oracle_sw_unpack](#oracle_sw_unpack)
-  - [user_cdb_password](#user_cdb_password)
-  - [user_pdb_password](#user_pdb_password)
+- [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
 - [License](#license)
 - [Author](#author)
@@ -85,6 +100,87 @@ Do not set it in inventory!
 _db_service_name: _internal_used_
 ```
 
+### _db_service_pdb
+
+The variable is internal used only.
+
+Do not set it in inventory!
+
+Get the service_name for a PDB.
+
+Requires `opdb` as `loop_var`.
+
+#### Default value
+
+```YAML
+_db_service_pdb: _internal_used_
+```
+
+### _db_unique_name_for_pdb
+
+The variable is internal used only.
+
+Do not set it in inventory!
+
+get db_unique_name from CDB for current pdb
+Requires `opdb` as `loop_var`.
+
+#### Default value
+
+```YAML
+_db_unique_name_for_pdb: _internal_used_
+```
+
+### _grid_env
+
+The variable is used for shell, command tasks to set environment Variables.
+
+Do not set it in inventory!
+
+#### Default value
+
+```YAML
+_grid_env:
+  ORACLE_HOME: '{{ oracle_home_gi }}'
+  LD_LIBRARY_PATH: '{{ oracle_home_gi }}/lib'
+```
+
+### _listener_port
+
+The variable is internal used only.
+
+Do not set it in inventory!
+
+#### Default value
+
+```YAML
+_listener_port: _internal_used_
+```
+
+### _listener_port_cdb
+
+The variable is internal used only.
+
+Do not set it in inventory!
+
+#### Default value
+
+```YAML
+_listener_port_cdb: _internal_used_
+```
+
+### _listener_port_pdb
+
+The variable is internal used only.
+
+Do not set it in inventory!
+
+#### Default value
+
+```YAML
+_listener_port_pdb: _internal_used_
+```
+
 ### _odb_loop_helper
 
 The variable is internal used only.
@@ -95,6 +191,15 @@ Do not set it in inventory!
 
 ```YAML
 _odb_loop_helper: _internal_used_
+```
+
+### _opdb_home
+
+#### Default value
+
+```YAML
+_opdb_home: "{{ (oracle_databases | selectattr('oracle_db_name', 'match', opdb[0]['cdb']))[0]['home']\
+  \ }}"
 ```
 
 ### _opdb_loop_helper
@@ -156,6 +261,16 @@ _oracle_env:
   LD_LIBRARY_PATH: '{{ _oracle_home_db }}/lib'
 ```
 
+### _oracle_env_pdb
+
+#### Default value
+
+```YAML
+_oracle_env_pdb:
+  ORACLE_HOME: '{{ _oracle_home_db_pdb }}'
+  LD_LIBRARY_PATH: '{{ _oracle_home_db_pdb }}/lib'
+```
+
 ### _oracle_home_db
 
 This is an internal variable in `ansible-oracle`.
@@ -168,6 +283,26 @@ Do not set it in inventory!
 _oracle_home_db: _internal_used_
 ```
 
+### _oracle_home_db_pdb
+
+#### Default value
+
+```YAML
+_oracle_home_db_pdb: "{{ db_homes_config[_opdb_home]['oracle_home'] }}"
+```
+
+### _orasw_meta_internal_configure_cluster
+
+Defines, if a Node is part of a cluster or not.
+
+Do not set it in inventory!
+
+#### Default value
+
+```YAML
+_orasw_meta_internal_configure_cluster: false
+```
+
 ### cluster_master
 
 #### Default value
@@ -178,22 +313,10 @@ cluster_master: '{{ play_hosts[0] }}'
 
 ### configure_cluster
 
-This was an open variable and has been changed to an internal one.
-
-The variable will be deprecated and removed in a future release of `ansibe-oracle`.
-
 #### Default value
 
 ```YAML
 configure_cluster: false
-```
-
-#### Example usage
-
-```YAML
-configure_cluster: false
-
-configure_cluster: true
 ```
 
 ### db_mode
@@ -271,6 +394,15 @@ grid_env:
   LD_LIBRARY_PATH: '{{ oracle_home_gi }}/lib'
 ```
 
+### grid_install_user
+
+#### Default value
+
+```YAML
+grid_install_user: '{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user
+  }}{% endif %}'
+```
+
 ### listener_home
 
 #### Default value
@@ -297,6 +429,14 @@ listener_port_template: '{% if item.listener_port is defined %}{{ item.listener_
 
 ```YAML
 listener_protocols: TCP
+```
+
+### ocm_response_file
+
+#### Default value
+
+```YAML
+ocm_response_file: '{{ oracle_patch_stage }}/{{ db_version }}/ocm.rsp'
 ```
 
 ### oracle_db_instance_name
@@ -373,6 +513,31 @@ oracle_home_gi: '{% if oracle_install_version_gi is defined -%}{%- if configure_
   %}'
 ```
 
+### oracle_patch_install
+
+#### Default value
+
+```YAML
+oracle_patch_install: '{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_patch_stage_remote
+  }}{% else %}{{ oracle_patch_stage }}{% endif %}'
+```
+
+### oracle_patch_stage
+
+#### Default value
+
+```YAML
+oracle_patch_stage: '{{ oracle_stage }}/patches'
+```
+
+### oracle_patch_stage_remote
+
+#### Default value
+
+```YAML
+oracle_patch_stage_remote: '{{ oracle_stage_remote }}/patches'
+```
+
 ### oracle_profile_name
 
 Variable is only used for old .profile script from `ansible-oracle`.
@@ -384,6 +549,17 @@ No real need to change the default.
 
 ```YAML
 oracle_profile_name: .profile_{{ item.oracle_db_name }}
+```
+
+### oracle_stage_install
+
+This is an internal variable. Do not set it in Inventory.
+
+#### Default value
+
+```YAML
+oracle_stage_install: '{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote
+  }}{% else %}{{ oracle_stage }}{% endif %}'
 ```
 
 ### oracle_sw_copy
@@ -411,29 +587,10 @@ oracle_sw_extract_path: "{%- if '18' in db_version -%}{{ oracle_home_db }}{%- el
 oracle_sw_unpack: '{% if install_from_nfs %}false{% else %}true{% endif %}'
 ```
 
-### user_cdb_password
 
-#### Default value
+## Open Tasks
 
-```YAML
-user_cdb_password: '{% if dbpasswords is defined and dbpasswords[item.0.oracle_db_name]
-  is defined and dbpasswords[item.0.oracle_db_name][item.1.schema] is defined -%}{{
-  dbpasswords[item.0.oracle_db_name][item.1.schema] }} {%- else -%}{{ default_dbpass
-  }} {%- endif %}'
-```
-
-### user_pdb_password
-
-#### Default value
-
-```YAML
-user_pdb_password: '{% if dbpasswords is defined and dbpasswords[item.0.cdb] is defined
-  and dbpasswords[item.0.cdb][item.0.pdb_name] is defined and dbpasswords[item.0.cdb][item.0.pdb_name][item.1.schema]
-  is defined -%}{{ dbpasswords[item.0.cdb][item.0.pdb_name][item.1.schema] }} {%-
-  else %}{{ default_dbpass }} {%- endif %}'
-```
-
-
+- (bug): grid_install_user is wrong here.
 
 ## Dependencies
 
