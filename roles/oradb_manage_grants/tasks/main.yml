@@ -84,9 +84,9 @@
       skip_missing: true
   environment: "{{ oracle_env }}"
   when:
-   - oracle_databases is defined
-   - item.0.state | lower == 'present'
-   - (item.1.grants is defined or item.1.object_privs is defined)
+    - oracle_databases is defined
+    - item.0.state | lower == 'present'
+    - (item.1.grants is defined or item.1.object_privs is defined)
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   loop_control:
