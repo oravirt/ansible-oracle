@@ -175,7 +175,10 @@
 
 - name: Wallet create
   ansible.builtin.shell:
-    cmd: 'echo -e "$stdin" | {{ oracle_home_db }}/bin/mkstore -create -nologo -wrl "{{ rman_wallet_loc }}"'
+    cmd: |
+      set -eu
+      set -o pipefail
+      echo -e "$stdin" | "{{ oracle_home_db }}/bin/mkstore" -create -nologo -wrl "{{ rman_wallet_loc }}"
     creates: "{{ rman_wallet_loc }}/ewallet.p12"
   become: true
   become_user: "{{ oracle_user }}"
@@ -192,7 +195,10 @@
 
 - name: List wallet contents
   ansible.builtin.shell:
-    cmd: 'echo "$stdin" | {{ oracle_home_db }}/bin/mkstore -listCredential -nologo -wrl "{{ rman_wallet_loc }}"'
+    cmd: |
+      set -eu
+      set -o pipefail
+      echo "$stdin" | "{{ oracle_home_db }}/bin/mkstore" -listCredential -nologo -wrl "{{ rman_wallet_loc }}"
   become: true
   become_user: "{{ oracle_user }}"
   environment:
@@ -211,7 +217,10 @@
 
 - name: Wallet createCredential
   ansible.builtin.shell:
-    cmd: 'echo "$stdin" | {{ oracle_home_db }}/bin/mkstore -wrl "{{ rman_wallet_loc }}" -nologo -createCredential "$rman_tnsalias" "$rman_user" "$rman_password"'
+    cmd: |
+      set -eu
+      set -o pipefail
+      echo "$stdin" | "{{ oracle_home_db }}/bin/mkstore" -wrl "{{ rman_wallet_loc }}" -nologo -createCredential "$rman_tnsalias" "$rman_user" "$rman_password"
   # noqa no-changed-when
   become: true
   become_user: "{{ oracle_user }}"
@@ -234,7 +243,10 @@
 
 - name: Wallet modifyCredential to ensure password is up to date
   ansible.builtin.shell:
-    cmd: 'echo "$stdin" | {{ oracle_home_db }}/bin/mkstore -wrl "{{ rman_wallet_loc }}" -nologo -modifyCredential "$rman_tnsalias" "$rman_user" "$rman_password"'
+    cmd: |
+      set -eu
+      set -o pipefail
+      echo "$stdin" | "{{ oracle_home_db }}/bin/mkstore" -wrl "{{ rman_wallet_loc }}" -nologo -modifyCredential "$rman_tnsalias" "$rman_user" "$rman_password"
   become: true
   become_user: "{{ oracle_user }}"
   changed_when: false  # no simple way to figure out whether this changed the password or not, does not matter.
