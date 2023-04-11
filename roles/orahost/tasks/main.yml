@@ -190,7 +190,7 @@
 
 - name: ssh-keys | Generate SSH keys
   local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys  # noqa yaml deprecated-command-syntax deprecated-local-action ignore-errors
-    # noqa fqcn[action-core] no-changed-when
+  # noqa fqcn[action-core] no-changed-when
   ignore_errors: true
   run_once: "{{ configure_cluster }}"
   when: configure_ssh and configure_cluster and old_ssh_config
