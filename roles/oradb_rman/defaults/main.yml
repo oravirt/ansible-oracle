@@ -39,3 +39,11 @@ rman_catalog_param: "{% if item.0.rman_wallet is defined and item.0.rman_wallet 
                        {%- if item.0.rman_user is defined %}-c {{ item.0.rman_user }}/{{ dbpasswords[item.0.rman_tnsalias][item.0.rman_user] | default(item.0.rman_password) }}@{{ item.0.rman_tnsalias }}
                        {%- endif %}
                      {%- endif %}"
+rman_register_connect: "\
+  {%- if item.rman_wallet is defined -%}\
+    /@{{ item.rman_tnsalias }}\
+  {%- else -%}\
+    {{ item.rman_user -}}/\
+    {{ dbpasswords[item.rman_tnsalias][item.rman_user] | default(item.rman_password) -}}\
+    @{{ item.rman_tnsalias }}\
+  {%- endif -%}"

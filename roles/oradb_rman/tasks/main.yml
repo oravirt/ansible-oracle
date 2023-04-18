@@ -266,6 +266,26 @@
   tags:
     - wallet
 
+- name: Register Database in RMAN Catalog
+  become_user: "{{ oracle_user }}"
+  ansible.builtin.shell:
+    cmd: "$ORACLE_HOME/bin/rman target / catalog $CONNECTSTRING"
+    stdin: "REGISTER DATABASE;\n"
+  environment:
+    ORACLE_HOME: "{{ db_homes_config[item.home]['oracle_home'] }}"
+    ORACLE_SID: "{{ item.oracle_db_name }}"
+    CONNECTSTRING: "{{ rman_register_connect }}"
+    TNS_ADMIN: "{{ rman_tns_admin }}"
+  with_items:
+    - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') }}"
+  loop_control:
+    label: "{{ item.oracle_db_name | default('') }}"
+  register: rman_catalog_register
+  failed_when: '"RMAN-" in rman_catalog_register.stdout and "RMAN-20002" not in rman_catalog_register.stdout'
+  changed_when: '"RMAN-20002" not in rman_catalog_register.stdout'
+  tags:
+    - rmanregister
+
 # the following task is usefull for configuration of rman-parameters during setup of RMAN
 # It's also possible to execute the 1st Level0-Backup after setup, but be aware to configure the RMAN before starting a backup
 # The execution isn't done in async mode!
