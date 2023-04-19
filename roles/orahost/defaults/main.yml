@@ -245,158 +245,64 @@ oracle_packages:
 
 # based on https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/database-installation-guide-linux.pdf
 oracle_packages_sles_multi:
-  fallback:
-    - ksh
-    - binutils
-    - gcc
-    - gcc48
-    - glibc
-    - glibc-32bit
-    - glibc-devel
-    - glibc-devel-32bit
-    - mksh
-    - libaio1
-    - libaio-devel
-    - libcap1
-    - libstdc++48-devel
-    - libstdc++48-devel
-    - libstdc++6
-    - libstdc++6-32bit
-    - libstdc++-devel
-    - libstdc++-devel-32bit
-    - libgcc_s1
-    - libgcc_s1-32bit
-    - lsof
-    - make
-    - sysstat
-    - xorg-x11-driver-video
-    - xorg-x11-server
-    - xorg-x11-essentials
-    - xorg-x11-Xvnc
-    - xorg-x11-fonts-core
-    - xorg-x11
-    - xorg-x11-server-extra
-    - xorg-x11-libs
-    - xorg-x11-fonts
-  v12:  # Suse 12.x
-    - bc
-    - binutils
-    - glibc
-    - glibc-devel
-    - libX11
-    - libXau6
-    - libXtst6
-    - libcap-ng-utils
-    - libcap-ng0
-    - libcap-progs
-    - libcap1
-    - libcap2
-    - libelf-devel
-    - libgcc_s1
-    - libjpeg-turbo
-    - libjpeg62
-    - libjpeg62-turbo
-    - libpcap1
-    - libpcre1
-    - libpcre16-0
-    - libpng16-16
-    - libstdc++6
-    - libtiff5
-    - libaio-devel
-    - libaio1
-    - libXrender1
-    - make
-    - mksh
-    - pixz
-    - rdma-core
-    - rdma-core-devel
-    - smartmontools
-    - sysstat
-    - xorg-x11-libs
-    - xz
-  v15:  # Suse 15.x
-    - bc
-    - binutils
-    - glibc
-    - glibc-devel
-    - insserv-compat
-    - libaio-devel
-    - libaio1
-    - libX11-6
-    - libXau6
-    - libXext-devel
-    - libXext6
-    - libXi-devel
-    - libXi6
-    - libXrender-devel
-    - libXrender1
-    - libXtst6
-    - libcap-ng-utils
-    - libcap-ng0
-    - libcap-progs
-    # - libcap1 # "No provider of '+libcap1' found."
-    - libcap2
-    - libelf1
-    - libgcc_s1
-    - libjpeg8
-    - libpcap1
-    - libpcre1
-    - libpcre16-0
-    - libpng16-16
-    - libstdc++6
-    - libtiff5
-    - libgfortran4
-    - mksh
-    - make
-    - pixz
-    - rdma-core
-    - rdma-core-devel
-    - smartmontools
-    - sysstat
-    - xorg-x11-libs
-    - xz
-  v15.3:
-    - compat-libpthread-nonshared  # only difference to 15.x yet required - https://www.suse.com/releasenotes/x86_64/SUSE-SLES/15-SP3/index.html
-    - bc
-    - binutils
-    - glibc
-    - glibc-devel
-    - insserv-compat
-    - libaio-devel
-    - libaio1
-    - libX11-6
-    - libXau6
-    - libXext-devel
-    - libXext6
-    - libXi-devel
-    - libXi6
-    - libXrender-devel
-    - libXrender1
-    - libXtst6
-    - libcap-ng-utils
-    - libcap-ng0
-    - libcap-progs
-    # - libcap1 # "No provider of '+libcap1' found."
-    - libcap2
-    - libelf1
-    - libgcc_s1
-    - libjpeg8
-    - libpcap1
-    - libpcre1
-    - libpcre16-0
-    - libpng16-16
-    - libstdc++6
-    - libtiff5
-    - libgfortran4
-    - mksh
-    - make
-    - pixz
-    - rdma-core
-    - rdma-core-devel
-    - smartmontools
-    - sysstat
-    - xorg-x11-libs
-    - xz
+  - name: SLES common packages
+    condition: true
+    packages:
+      - bc
+      - binutils
+      - glibc
+      - glibc-devel
+      - libaio-devel
+      - libaio1
+      - libcap-ng-utils
+      - libcap-ng0
+      - libcap-progs
+      - libcap2
+      - libgcc_s1
+      - libpcap1
+      - libpcre1
+      - libpcre16-0
+      - libpng16-16
+      - libstdc++6
+      - libtiff5
+      - libXau6
+      - libXrender1
+      - libXtst6
+      - make
+      - mksh
+      - pixz
+      - rdma-core
+      - rdma-core-devel
+      - smartmontools
+      - sysstat
+      - xorg-x11-libs
+      - xz
+  - name: SLES 12 packages
+    condition: "{{ ansible_distribution_major_version == '12' }}"
+    packages:
+      - libcap1
+      - libelf-devel
+      - libjpeg-turbo
+      - libjpeg62
+      - libjpeg62-turbo
+      - libX11
+  - name: SLES 15 packages
+    condition: "{{ ansible_distribution_major_version == '15' }}"
+    packages:
+      - insserv-compat
+      - libelf1
+      - libgfortran4
+      - libjpeg8
+      - libX11-6
+      - libXext-devel
+      - libXext6
+      - libXi-devel
+      - libXi6
+      - libXrender-devel
+  - name: "SLES 15 SP3+ extra packages"
+    condition: "{{ ansible_distribution_version is version('15.3', 'ge') }}"
+    packages:
+      - compat-libpthread-nonshared  # only difference to 15.2 yet required - https://www.suse.com/releasenotes/x86_64/SUSE-SLES/15-SP3/index.html
 
 oracle_asm_packages:
   - "{{ asmlib_rpm }}"

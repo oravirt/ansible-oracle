@@ -22,14 +22,29 @@
     - ansible_distribution_major_version is version('7', '<=')
   tags: os_packages, oscheck
 
-- name: Install packages required by Oracle on SLES
+- name: Install custom packages required by Oracle on SLES (oracle_packages_sles)
   community.general.packaging.os.zypper:
-    name: "{{ oracle_packages_sles
-            | default(oracle_packages_sles_multi['v' + ansible_distribution_version])
-            | default(oracle_packages_sles_multi['v' + ansible_distribution_major_version])
-            | default(oracle_packages_sles_multi['fallback']) }}"
+    name: "{{ oracle_packages_sles }}"
     state: installed
-  when: install_os_packages and ansible_os_family == 'Suse'
+  when:
+    - oracle_packages_sles is defined
+    - install_os_packages
+    - ansible_os_family == 'Suse'
+  tags: os_packages, oscheck
+
+- name: Install default packages required by Oracle on SLES (version dependant)
+  community.general.packaging.os.zypper:
+    name: "{{ item.packages }}"
+    state: installed
+  with_items:
+    - "{{ oracle_packages_sles_multi }}"
+  loop_control:
+    label: "{{ item.name | default('') }}"
+  when:
+    - not oracle_packages_sles is defined
+    - install_os_packages
+    - ansible_os_family == 'Suse'
+    - item.condition | default(false)
   tags: os_packages, oscheck
 
 - name: Install packages required by Oracle for ASMlib on OL/RHEL
