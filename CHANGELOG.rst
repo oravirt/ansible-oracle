@@ -5,6 +5,16 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.7.0
+======
+
+Minor Changes
+-------------
+
+- added task to REGISTER DATABASE in Rman Catalog (oravirt#336)
+- ansible-lint: Update to 6.14.4 (oravirt#329)
+- orahost: improve oracle os packages selection for Suse (oravirt#337)
+
 v3.6.0
 ======
 
