@@ -23,7 +23,7 @@
   tags: os_packages, oscheck
 
 - name: Install custom packages required by Oracle on SLES (oracle_packages_sles)
-  community.general.packaging.os.zypper:
+  community.general.zypper:
     name: "{{ oracle_packages_sles }}"
     state: installed
   when:
@@ -33,7 +33,7 @@
   tags: os_packages, oscheck
 
 - name: Install default packages required by Oracle on SLES (version dependant)
-  community.general.packaging.os.zypper:
+  community.general.zypper:
     name: "{{ item.packages }}"
     state: installed
   with_items:
@@ -61,7 +61,7 @@
   tags: os_packages, oscheck
 
 - name: Install packages required by Oracle for ASMlib on SLES
-  community.general.packaging.os.zypper:
+  community.general.zypper:
     name: "{{ oracle_asm_packages_sles }}"
     state: installed
   when: install_os_packages and device_persistence == 'asmlib' and ansible_os_family == 'Suse' and asm_diskgroups is defined
@@ -103,7 +103,7 @@
   when: os_timezone is defined
   block:  # noqa name[missing]
     - name: Set Timezone
-      community.general.system.timezone:
+      community.general.timezone:
         name: "{{ os_timezone }}"
         hwclock: "{{ os_hwclock | default(omit) }}"
       register: timezoneresult
@@ -337,7 +337,7 @@
   tags: hostfs
 
 - name: filesystem | Create vg
-  community.general.system.lvg:
+  community.general.lvg:
     vg: "{{ item.vgname }}"
     pvs: "{{ host_fs_layout_vgdisks }}"
     state: "{{ item.state }}"
@@ -346,7 +346,7 @@
   tags: hostfs
 
 - name: filesystem | create lv
-  community.general.system.lvol:
+  community.general.lvol:
     vg: "{{ item.0.vgname }}"
     lv: "{{ item.1.lvname }}"
     size: "{{ item.1.lvsize }}"
@@ -360,7 +360,7 @@
   tags: hostfs
 
 - name: filesystem | create fs
-  community.general.system.filesystem:
+  community.general.filesystem:
     fstype: "{{ item.1.fstype }}"
     dev: "/dev/{{ item.0.vgname }}/{{ item.1.lvname }}"
     opts: "{{ item.1.fsopts | default(omit) }}"
@@ -490,7 +490,7 @@
   tags: seclimit
 
 - name: Oracle-recommended security limits on SLES
-  community.general.system.pam_limits:
+  community.general.pam_limits:
     domain: oracle
     limit_type: "{{ item.name.split(' ')[0] }}"
     limit_item: "{{ item.name.split(' ')[1] }}"
