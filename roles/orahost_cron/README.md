@@ -4,6 +4,7 @@ Configure cronjobs for ansible-oracle
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [cron_config](#cron_config)
 - [Discovered Tags](#discovered-tags)
@@ -12,6 +13,11 @@ Configure cronjobs for ansible-oracle
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

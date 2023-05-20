@@ -4,6 +4,7 @@ Manage Oracle Database Parameters
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [restart_spparameter_changed](#restart_spparameter_changed)
 - [Discovered Tags](#discovered-tags)
@@ -12,6 +13,11 @@ Manage Oracle Database Parameters
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

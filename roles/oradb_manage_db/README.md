@@ -4,6 +4,7 @@ Create, modify and remove Oracle Databases
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [asmmonitorpassword](#asmmonitorpassword)
   - [create_listener](#create_listener)
@@ -33,6 +34,11 @@ Create, modify and remove Oracle Databases
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

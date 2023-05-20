@@ -4,6 +4,7 @@ Manage database profiles in Oracle
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [attr_name](#attr_name)
   - [attr_value](#attr_value)
@@ -13,6 +14,11 @@ Manage database profiles in Oracle
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

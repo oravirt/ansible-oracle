@@ -4,6 +4,7 @@ Download all patches from Oracle
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [http_proxy](#http_proxy)
   - [https_proxy](#https_proxy)
@@ -21,6 +22,11 @@ Download all patches from Oracle
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

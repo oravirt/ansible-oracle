@@ -9,6 +9,7 @@ Do not set them in inventory!
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [_oraasm_manage_diskgroups_asmdevice_list](#_oraasm_manage_diskgroups_asmdevice_list)
   - [_oraasm_manage_diskgroups_attr_name](#_oraasm_manage_diskgroups_attr_name)
@@ -20,6 +21,11 @@ Do not set them in inventory!
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

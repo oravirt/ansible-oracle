@@ -8,6 +8,7 @@ This will create issues and problems in `ansible-oracle` and is not supported.
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [_db_password_cdb](#_db_password_cdb)
   - [_db_password_pdb](#_db_password_pdb)
@@ -61,6 +62,11 @@ This will create issues and problems in `ansible-oracle` and is not supported.
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

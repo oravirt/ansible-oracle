@@ -6,6 +6,7 @@ This role has a dependency to `orahost_meta` and `orasw_meta` for default parame
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [apply_patches_gi](#apply_patches_gi)
   - [asmmonitorpassword](#asmmonitorpassword)
@@ -54,6 +55,11 @@ This role has a dependency to `orahost_meta` and `orasw_meta` for default parame
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

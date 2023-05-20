@@ -4,6 +4,7 @@ Install cx_Oracle with pip
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [cx_oracle3_source](#cx_oracle3_source)
   - [cx_oracle_source](#cx_oracle_source)
@@ -18,6 +19,11 @@ Install cx_Oracle with pip
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

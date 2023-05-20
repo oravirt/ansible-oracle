@@ -4,6 +4,7 @@ Meta role used by other roles to share variable defaults.
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [asm_diskgroups](#asm_diskgroups)
   - [asmadmin_group](#asmadmin_group)
@@ -30,6 +31,11 @@ Meta role used by other roles to share variable defaults.
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

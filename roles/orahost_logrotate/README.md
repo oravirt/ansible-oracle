@@ -4,6 +4,7 @@ Configure logrotate for ansible-oracle
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [configure_cluster](#configure_cluster)
   - [logrotate_config](#logrotate_config)
@@ -20,6 +21,11 @@ Configure logrotate for ansible-oracle
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

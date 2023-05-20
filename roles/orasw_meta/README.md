@@ -13,6 +13,7 @@ There are a lot of variables who are used by `orasw_meta`
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [apply_patches_db](#apply_patches_db)
   - [autostartup_service](#autostartup_service)
@@ -74,6 +75,11 @@ There are a lot of variables who are used by `orasw_meta`
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

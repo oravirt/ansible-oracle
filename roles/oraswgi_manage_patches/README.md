@@ -4,6 +4,7 @@ Install/Remove Patches from Oracle Database Homes
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [apply_patches_gi](#apply_patches_gi)
   - [cluster_master](#cluster_master)
@@ -20,6 +21,11 @@ Install/Remove Patches from Oracle Database Homes
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

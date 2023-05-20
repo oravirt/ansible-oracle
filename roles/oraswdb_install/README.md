@@ -4,6 +4,7 @@ Install Oracle Database Software
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [_hostinitdaemon_dict](#_hostinitdaemon_dict)
   - [autostartup_service](#autostartup_service)
@@ -30,6 +31,11 @@ Install Oracle Database Software
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 
