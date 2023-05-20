@@ -6,6 +6,7 @@ This role needs a complete refactoring in the future!
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [grid_user](#grid_user)
   - [hostgroup](#hostgroup)
@@ -18,6 +19,11 @@ This role needs a complete refactoring in the future!
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

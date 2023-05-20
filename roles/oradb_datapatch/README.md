@@ -4,6 +4,7 @@ Manage datapatch for Oracle Database
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [oradb_datapatch_fail_on_db_not_exist](#oradb_datapatch_fail_on_db_not_exist)
 - [Discovered Tags](#discovered-tags)
@@ -13,6 +14,11 @@ Manage datapatch for Oracle Database
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

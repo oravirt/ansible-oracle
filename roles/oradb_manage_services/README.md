@@ -4,6 +4,7 @@ Manage services in Oracle
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Discovered Tags](#discovered-tags)
 - [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
@@ -11,6 +12,11 @@ Manage services in Oracle
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Discovered Tags
 

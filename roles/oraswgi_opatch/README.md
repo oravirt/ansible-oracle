@@ -4,6 +4,7 @@ Install patches with opatch in Grid-Infrastructure/Restart.
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [grid_install_user](#grid_install_user)
   - [oracle_hostname](#oracle_hostname)
@@ -19,6 +20,11 @@ Install patches with opatch in Grid-Infrastructure/Restart.
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

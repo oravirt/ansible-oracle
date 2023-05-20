@@ -6,6 +6,7 @@ Not RAC aware at the moment.
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [purgedays](#purgedays)
   - [purgeinterval](#purgeinterval)
@@ -17,6 +18,11 @@ Not RAC aware at the moment.
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

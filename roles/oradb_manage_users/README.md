@@ -4,6 +4,7 @@ Manage Users in Oracle
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [__user_cdb_password](#__user_cdb_password)
   - [__user_pdb_password](#__user_pdb_password)
@@ -13,6 +14,11 @@ Manage Users in Oracle
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

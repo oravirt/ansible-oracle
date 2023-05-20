@@ -4,6 +4,7 @@ Role to configure the storage for oracle.
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [asmlib_binary](#asmlib_binary)
   - [device_persistence](#device_persistence)
@@ -23,6 +24,11 @@ Role to configure the storage for oracle.
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

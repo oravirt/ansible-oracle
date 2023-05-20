@@ -4,6 +4,7 @@ sets up the host generic stuff
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [common_packages](#common_packages)
   - [common_packages_el6](#common_packages_el6)
@@ -28,6 +29,11 @@ sets up the host generic stuff
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 

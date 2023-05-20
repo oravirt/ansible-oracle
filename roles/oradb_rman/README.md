@@ -4,6 +4,7 @@ Oracle RMAN Backup for ansible-oracle
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [check_mk_mkjob](#check_mk_mkjob)
   - [rman_catalog_param](#rman_catalog_param)
@@ -16,6 +17,7 @@ Oracle RMAN Backup for ansible-oracle
   - [rman_cronfile](#rman_cronfile)
   - [rman_device_type_disk_default](#rman_device_type_disk_default)
   - [rman_log_dir](#rman_log_dir)
+  - [rman_register_connect](#rman_register_connect)
   - [rman_retention_policy](#rman_retention_policy)
   - [rman_retention_policy_default](#rman_retention_policy_default)
   - [rman_script_dir](#rman_script_dir)
@@ -32,6 +34,11 @@ Oracle RMAN Backup for ansible-oracle
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Default Variables
 
@@ -131,6 +138,16 @@ rman_log_dir: '{% if item is defined and item.0.rman_log_dir is defined %}{{ ite
   }}{% else %}{{ oracle_base }}/rman/log/{% endif %}'
 ```
 
+### rman_register_connect
+
+#### Default value
+
+```YAML
+rman_register_connect: '{%- if item.rman_wallet is defined -%}/@{{ item.rman_tnsalias
+  }}{%- else -%}{{ item.rman_user -}}/{{ dbpasswords[item.rman_tnsalias][item.rman_user]
+  | default(item.rman_password) -}}@{{ item.rman_tnsalias }}{%- endif -%}'
+```
+
 ### rman_retention_policy
 
 #### Default value
@@ -227,6 +244,8 @@ rmanbackupscriptdir: '{% if item.0.rman_script_dir is defined %}-r {{ item.0.rma
 **_rmancron_**
 
 **_rmanexecute_**
+
+**_rmanregister_**
 
 **_tns_**
 

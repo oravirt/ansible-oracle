@@ -4,12 +4,18 @@ Manage Patch Installation in Database ORACLE_HOMEs.
 
 ## Table of content
 
+- [Requirements](#requirements)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
 - [Author](#author)
 
 ---
+
+## Requirements
+
+- Minimum Ansible version: `2.9.0`
+
 
 ## Discovered Tags
 
