@@ -40,7 +40,76 @@ pre-commit install
 pre-commit run
 ----
 
+=== Ansible Navigator
+
+IMPORTANT: python3 should point to Python >=3.9, otherwise ansible-navigator and ansible-lint could not beused. +
+The `activate` script is used to change the Python environment in current shell.
+
+.configure venv for ansible-oracle
+----
+python3.10 -V
+
+Python 3.10.6
+
+python3.10 -m venv ~/venv/ansible-oracle
+----
+
+.install Python modules
+----
+. ~/venv/ansible-oracle/bin/activate
+pip --require-virtualenv -v install -r requirements_dev.txt
+----
+
+.Start ansible-navigator
+----
+. ~/venv/ansible-oracle/bin/activate
+ansible-navigator --version
+
+ansible-navigator 3.3.0
+----
+
+=== Using ansible-doctor
+
+IMPORTANT: `ansible-doctor` has har dmodule dpendencies with conflicts between `ansible-lint`.
+We have to use a dedicated venv for `ansible-doctor'
+
+.configure venv for ansible-oracle
+----
+python3 -m venv ~/venv/ansible-doctor
+----
+
+.install Python modules
+----
+. ~/venv/ansible-doctor/bin/activate
+pip --require-virtualenv -v install -r requirements_doctor.txt
+----
+
+.Start ansible-doctor
+----
+~/venv/ansible-doctor/bin/ansible-doctor --version
+
+ansible-doctor 2.0.4
+----
+
+IMPORTANT: Do not forget to place change files in stage area of git before starting `pre-commit`. +
+`pre-commit` works only on the data of the stage area! +
+`pre-commit` could be executed without an active venv.
+
+
+.Start ansible-doctor with pre-commit
+----
+pre-commit run ansible-doctor
+----
+
+.Start ansible-doctor to create new README.md file
+----
+cd ansible-oracle
+~/venv/ansible-doctor/bin/ansible-doctor -f -r roles
+----
+
 === Start Ansible-Container
+
+IMPORTANT: Replaced by `ansible-navigator` and `venv`.
 
 === Start Playbook
 
@@ -76,18 +145,11 @@ If multiple PRs are open, the upper rule makes sure that no duplicate files are 
 
 IMPORTANT: Each Pull-Requests needs a fragment from Release 3.0.0 onwards!
 
-<<<<<<< HEAD
 == Create new Releases in `ansible-oracle`
 
 IMPORTANT: This is only needed for creating new Releases in `ansible-oracle` - not for development!
 
 
-=======
-== Create new Releases in `ansible-oracle`
-
-IMPORTANT: This is only needed for creating new Releases in `ansible-oracle` - not for development!
-
->>>>>>> 2226b8a9fe5dec919cdb916059f233c63b914fc9
 === Install antsibull-changelog
 
 ----
