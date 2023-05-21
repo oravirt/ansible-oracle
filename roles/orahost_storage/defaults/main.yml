@@ -1,12 +1,4 @@
 ---
-# @todo bug: move default variable oracle_stage
-oracle_stage: /u01/stage
-
-# @todo bug: move default variable oracle_rsp_stage
-oracle_rsp_stage: "{{ oracle_stage }}/rsp"
-
-# @todo bug: move default variable device_persistence
-device_persistence: asmlib
 
 # @todo bug: why is variable multipath only used for dm-multipath?
 # @var multipath:description: Configure multipath
@@ -15,10 +7,6 @@ device_persistence: asmlib
 # multipath: dm-multipath
 # @end
 multipath: none
-
-# @var oracle_asm_disk_string:description: This is an internal variable only. Do not define it!
-# @var oracle_asm_disk_string: $ "_unset_"
-oracle_asm_disk_string: "{% if device_persistence | lower == 'asmlib' %}{% elif device_persistence | lower == 'udev' %}/dev/oracle/{% else %}{% endif %}"
 
 # @var partition_devices:description: >
 # Create a partition on storage disk?
@@ -38,11 +26,6 @@ use_partition_devices: "{{ partition_devices }}"
 partition_suffix: "{% if multipath | lower == 'dm-multipath' and ansible_distribution_major_version | int == 6 %}p1{% else %}1{% endif %}"
 
 asmlib_binary: /usr/sbin/oracleasm
-
-# @var dnfstaboptions:description: This is an internal variable only. Do not define it!
-# @var dnfstaboptions: $ "_unset_"
-dnfstaboptions: "{%- if item.1.fstaboptions is defined %}{{ item.1.fstaboptions }}
-                  {%- else %}rw,bg,hard,nointr,tcp,vers=3,timeo=600,rsize=32768,wsize=32768,nolock{% endif %}"
 
 # @var oradnfs:description: >
 # Defines the settings for dnfstab in Oracle.
