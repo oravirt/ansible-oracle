@@ -7,12 +7,7 @@ Role to configure the storage for oracle.
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [asmlib_binary](#asmlib_binary)
-  - [device_persistence](#device_persistence)
-  - [dnfstaboptions](#dnfstaboptions)
   - [multipath](#multipath)
-  - [oracle_asm_disk_string](#oracle_asm_disk_string)
-  - [oracle_rsp_stage](#oracle_rsp_stage)
-  - [oracle_stage](#oracle_stage)
   - [oradnfs](#oradnfs)
   - [partition_devices](#partition_devices)
   - [partition_suffix](#partition_suffix)
@@ -40,24 +35,6 @@ Role to configure the storage for oracle.
 asmlib_binary: /usr/sbin/oracleasm
 ```
 
-### device_persistence
-
-#### Default value
-
-```YAML
-device_persistence: asmlib
-```
-
-### dnfstaboptions
-
-This is an internal variable only. Do not define it!
-
-#### Default value
-
-```YAML
-dnfstaboptions: _unset_
-```
-
 ### multipath
 
 Configure multipath
@@ -72,32 +49,6 @@ multipath: none
 
 ```YAML
 multipath: dm-multipath
-```
-
-### oracle_asm_disk_string
-
-This is an internal variable only. Do not define it!
-
-#### Default value
-
-```YAML
-oracle_asm_disk_string: _unset_
-```
-
-### oracle_rsp_stage
-
-#### Default value
-
-```YAML
-oracle_rsp_stage: '{{ oracle_stage }}/rsp'
-```
-
-### oracle_stage
-
-#### Default value
-
-```YAML
-oracle_stage: /u01/stage
 ```
 
 ### oradnfs
@@ -170,11 +121,6 @@ use_partition_devices: '{{ partition_devices }}'
 
 ## Open Tasks
 
-- (bug): check device_persistence for ASMFD
-- (bug): udev not tested for a long time, was supported
-- (bug): move default variable oracle_stage
-- (bug): move default variable oracle_rsp_stage
-- (bug): move default variable device_persistence
 - (bug): why is variable multipath only used for dm-multipath?
 
 ## Dependencies

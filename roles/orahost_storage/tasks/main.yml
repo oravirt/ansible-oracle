@@ -24,7 +24,6 @@
     - partition_devices
     - asm_diskgroups is defined
 
-# @todo bug: check device_persistence for ASMFD
 - name: Configure disks for device persistency
   ansible.builtin.include_tasks: "{{ device_persistence }}.yml"
   when:
@@ -50,7 +49,7 @@
         src: "{{ item.0.server }}:{{ item.1.export }}"
         path: "{{ item.1.mount }}"
         fstype: "nfs"
-        opts: "{{ dnfstaboptions }}"
+        opts: "{{ item.1.fstaboptions | default('rw,bg,hard,nointr,tcp,vers=3,timeo=600,rsize=32768,wsize=32768,nolock') }}"
         state: mounted
       with_subelements:
         - "{{ oradnfs }}"
