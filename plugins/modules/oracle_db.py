@@ -489,7 +489,7 @@ def create_db(
             initparam += 'db_name=%s,db_unique_name=%s,' % (db_name, db_unique_name)
 
         if domain is not None:
-            initparam += ' db_domain=%s,' % domain
+            initparam += 'db_domain=%s,' % domain
 
         if initparams is not None:
             paramslist = ",".join(initparams)
@@ -595,7 +595,7 @@ def create_db(
             command += ' -customScripts %s ' % (scriptlist)
 
         if db_unique_name is not None:
-            initparam += 'db_name=%s, db_unique_name=%s,' % (db_name, db_unique_name)
+            initparam += 'db_name=%s,db_unique_name=%s,' % (db_name, db_unique_name)
 
         if initparams is not None:
             # paramslist = ",".join(initparams)
@@ -818,11 +818,6 @@ def ensure_db_state(
                     israc,
                     change_restart_sql,
                 )
-                if len(change_db_sql) > 0:
-                    # allow the DB to register with the listener, as following
-                    # apply_norestart_changes need connection and we just
-                    # started
-                    time.sleep(10)
 
             if len(change_db_sql) > 0:
                 # Apply changes that does not require a restart
@@ -881,7 +876,6 @@ def apply_restart_changes(
     start_instance(
         module, oracle_home, db_name, db_unique_name, sid, 'mount', israc, instance_name
     )
-    time.sleep(10)  # <- To allow the DB to register with the listener
     cursor = getconn(module)
     for sql in change_restart_sql:
         execute_sql(module, cursor, sql)
@@ -915,7 +909,7 @@ def spfile_restart_needed(module, force_restart):
             "(order by value) as value, con_id from v$spparameter"
             "  group by name, con_id) vsp, "
             "( select name, listagg(value,', ') within group "
-            "(order by value) as value, con_id from v$parameter "
+            "(order by value) as value, con_id from v$parameter2 "
             " group by name, con_id) vp "
             "where vsp.name=vp.name "
             "and vsp.con_id = vp.con_id "
@@ -929,7 +923,7 @@ def spfile_restart_needed(module, force_restart):
             "(order by value) as value from v$spparameter "
             "group by name) vsp, "
             "( select name, listagg(value,', ') within group "
-            "(order by value) as value from v$parameter "
+            "(order by value) as value from v$parameter2 "
             "group by name) vp "
             "where vsp.name=vp.name and upper(vsp.value) != upper(vp.value)"
         )
@@ -970,10 +964,10 @@ def stop_db(module, oracle_home, db_name, db_unique_name, sid):
         # query current open_mode for potential restart in case of non-grid
         cursor = getconn(module)
         open_mode_sql = (
-            "SELECT CASE OPEN_MODE WHEN \'MOUNTED\' "
-            "THEN \'mount\' "
-            "WHEN \'READ WRITE\' THEN \'open read write\' "
-            "ELSE \'open read only\' END AS open_mode FROM V$DATABASE"
+            "SELECT CASE OPEN_MODE WHEN 'MOUNTED' "
+            "THEN 'mount' "
+            "WHEN 'READ WRITE' THEN 'open read write' "
+            "ELSE 'open read only' END AS open_mode FROM V$DATABASE"
         )
         open_mode = execute_sql_get(module, cursor, open_mode_sql)
 
@@ -1000,7 +994,7 @@ def stop_db(module, oracle_home, db_name, db_unique_name, sid):
         # debug.append('stop_db env: USER:%s ORACLE_HOME:%s ORACLE_SID:%s' %
         #              (os.environ['USER'], os.environ['ORACLE_SID'],
         #               os.environ['ORACLE_HOME']))
-        if rc != 0 or ('ORA-' in stdout and 'ORA-01109:' not in stdout):
+        if rc != 0 or (b'ORA-' in stdout and b'ORA-01109:' not in stdout):
             msg = 'Error(stop_db) - STDOUT: %s, STDERR: %s, COMMAND: %s' % (
                 stdout,
                 stderr,
@@ -1073,11 +1067,15 @@ def start_instance(
             if open_mode is not None:
                 command += ' -o %s ' % (open_mode)
             (rc, stdout, stderr) = module.run_command(command)
+
+            # To allow the DB to register with the listener,
+            # as following tasks may want to connect to it immediately and fail
+            time.sleep(10)
+
             if rc != 0:
                 msg = (
-                    'Error(start_instance) - STDOUT: %s, STDERR: %s, " \
-                    "COMMAND: %s'
-                    % (stdout, stderr, command)
+                    'Error(start_instance) - STDOUT: %s, STDERR: %s, '
+                    'COMMAND: %s' % (stdout, stderr, command)
                 )
                 module.fail_json(msg=msg, changed=False)
             else:
@@ -1112,17 +1110,22 @@ def start_instance(
         )
         (stdout, stderr) = p.communicate(startup_sql.encode('utf-8'))
         rc = p.returncode
+
+        # To allow the DB to register with the listener,
+        # as following tasks may want to connect to it immediately and fail
+        time.sleep(10)
+
         # debug.append('start_instance: rc=%d, Error - STDOUT: %s, ' \
-        #              STDERR: %s,' 'COMMAND: %s' % \
+        #              'STDERR: %s, COMMAND: %s' % \
         #              (rc, stdout, stderr, startup_sql))
         # debug.append('start_instance: env: USER:%s ORACLE_HOME:%s ' \
         #              'ORACLE_SID:%s' % (os.environ['USER'],
         #                                 os.environ['ORACLE_SID'],
         #                                 os.environ['ORACLE_HOME']))
-        if 'ORA-01081:' in stdout:
+        if b'ORA-01081:' in stdout:
             return 'ok'
-        elif rc != 0 or 'ORA-' in stdout:
-            msg = 'Error(start_instance) - STDOUT: %s, STDERR: %s, ' 'COMMAND: %s' % (
+        elif rc != 0 or b'ORA-' in stdout:
+            msg = 'Error(start_instance) - STDOUT: %s, STDERR: %s, COMMAND: %s' % (
                 stdout,
                 stderr,
                 startup_sql,
@@ -1251,12 +1254,12 @@ def main():
             supplemental_logging       = dict(default=False, type='bool'), # noqa E231
             flashback           = dict(default=False, type='bool'), # noqa E231
             datapatch           = dict(default=True, type='bool'), # noqa E231
-            domain	            = dict(required=False), # noqa E231
+            domain              = dict(required=False), # noqa E231
             timezone            = dict(required=False), # noqa E231
             output              = dict(default="short", choices = ["short", "verbose"]), # noqa E231
             state               = dict(default="present", choices = ["present", "absent", "started", "restarted"]), # noqa E231
             hostname            = dict(required=False, default = 'localhost', aliases = ['host']), # noqa E231
-            port                = dict(required=False, default = 1521),  # noqa E231
+            port                = dict(required=False, default = 1521), # noqa E231
         ),
         mutually_exclusive=[['memory_percentage', 'memory_totalmb']],
     )

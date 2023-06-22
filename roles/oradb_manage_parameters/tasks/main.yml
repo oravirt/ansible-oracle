@@ -23,7 +23,7 @@
   loop_control:
     label: "port: {{ listener_port_template }} service: {{ db_service_name }} name: {{ item.1.name }} value: {{ item.1.value }} scope: {{ item.1.scope | default ('both') }} state:{{ item.1.state }}"
     # noqa yaml
-  register: param_change
+  register: param_change_cdb
   tags: initparams
 
 - name: Manage parameters (pdb)
@@ -50,5 +50,27 @@
   loop_control:
     label: "port: {{ listener_port_template }} service: {{ item.0.pdb_name }} name: {{ item.1.name }} value: {{ item.1.value }} scope: {{ item.1.scope | default ('both') }} state:{{ item.1.state }}"
     # noqa yaml
-  register: param_change
+  register: param_change_pdb
   tags: initparams
+
+- name: Bounce database to activate changed parameters with scope=spfile
+  opitzconsulting.ansible_oracle.oracle_db:
+    oracle_home: "{{ oracle_home_db }}"
+    db_name: "{{ item.0.oracle_db_name }}"
+    db_unique_name: "{{ item.0.oracle_db_unique_name | default(omit) }}"
+    sys_password: "{{ db_password_cdb }}"
+    sid: "{{ item.0.oracle_db_instance_name | default(omit) }}"
+    state: "restarted"
+    force_restart: false
+  run_once: "{{ configure_cluster }}"
+  with_nested:
+    - "{{ oracle_databases }}"
+    - ""  # dummy to force item.0 instead of item.
+  when:
+    - item.0.restart_spparameter_changed | default(true)
+    - restart_spparameter_changed
+  loop_control:
+    label: "dbname: {{ item.0.oracle_db_name | d('') }} - {{ param_change_reboot.msg | default('restart_spparameter_changed is false') }}"
+  become_user: "{{ oracle_user }}"
+  register: param_change_reboot
+  tags: spfile_bounce
