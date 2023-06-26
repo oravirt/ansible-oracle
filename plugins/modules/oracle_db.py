@@ -192,9 +192,18 @@ options:
         type: bool
     state:
         description:
-            - The intended state of the database
+            - The intended state of the database. For 'restarted' the database has to be running.
         default: present
-        choices: ['present','absent']
+        choices: ['present','absent','started','restarted']
+    force_restart:
+        description:
+            - Effective only when using state == 'restarted'
+            - If true (default), database will be restarted without checking for spfile vs runtime parameters
+            - If false, database will ONLY be restarted if spfile is in use and spfile parameters do not match runtime parameters
+        required: false
+        default: True
+        choices: ['True','False']
+        type: bool
     hostname:
         description:
             - The host of the database if using dbms_service
@@ -282,8 +291,6 @@ oracle_db:
 '''
 import os, re, time
 
-msg = ['']
-
 try:
     import cx_Oracle
 except ImportError:
@@ -292,7 +299,7 @@ else:
     cx_oracle_exists = True
 
 
-def get_version(module, msg, oracle_home):
+def get_version(module, oracle_home):
     command = '%s/bin/sqlplus -V' % (oracle_home)
     (rc, stdout, stderr) = module.run_command(command)
     if rc != 0:
@@ -322,7 +329,7 @@ def check_db_exists(module, oracle_home, db_name, sid, db_unique_name):
             elif '%s' % (db_name) in stdout:  # <-- db doesn't exist
                 return False
             else:
-                msg = 'Error: command is  %s. stdout is %s' % (command, stdout)
+                msg = 'Error: command is %s. stdout is %s' % (command, stdout)
                 return False
         elif 'Database name: %s' % (db_name) in stdout:  # <-- Database already exist
             return True
@@ -360,7 +367,7 @@ def check_db_exists(module, oracle_home, db_name, sid, db_unique_name):
                             return True
 
 
-def create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb,
+def create_db(module, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb,
               local_undo, datafile_dest, recoveryfile_dest, storage_type, dbconfig_type, racone_service, characterset, memory_percentage, memory_totalmb,
               nodelist, db_type, amm, initparams, customscripts, datapatch, domain):
 
@@ -377,7 +384,7 @@ def create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_pa
             module.fail_json(msg=msg, changed=False)
 
         if db_unique_name is not None:
-            initparam += 'db_name=%s, db_unique_name=%s,' % (db_name, db_unique_name)
+            initparam += 'db_name=%s,db_unique_name=%s,' % (db_name, db_unique_name)
 
         if domain is not None:
             initparam += ' db_domain=%s,' % domain
@@ -484,7 +491,7 @@ def create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_pa
             scriptlist = ",".join(customscripts)
             command += ' -customScripts %s ' % (scriptlist)
         if db_unique_name is not None:
-            initparam += 'db_name=%s,db_unique_name=%s,' % (db_name, db_unique_name)
+            initparam += 'db_name=%s, db_unique_name=%s,' % (db_name, db_unique_name)
         if initparams is not None:
             # paramslist = ",".join(initparams)
             # initparam += ' %s' % (paramslist)
@@ -509,16 +516,16 @@ def create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_pa
             # module.exit_json(msg=verbosemsg, changed=True)
 
     # elif rc == 0 and datapatch:
-    #     if run_datapatch(module, msg, oracle_home, db_name, db_unique_name, sys_password):
+    #     if run_datapatch(module, oracle_home, db_name, db_unique_name):
     #         return True
     # else:
     #     return True
 
-# def run_datapatch(module, msg, oracle_home, db_name, db_unique_name, sys_password):
+# def run_datapatch(module, oracle_home, db_name, db_unique_name):
 #
-#     cursor = getconn(module,msg)
+#     cursor = getconn(module)
 #     sid_sql = 'select instance_name from v$instance'
-#     sid_ = execute_sql_get(module,msg,cursor,sid_sql)
+#     sid_ = execute_sql_get(module, cursor, sid_sql)
 #     os.environ['ORACLE_SID'] = sid_[0][0]
 #
 #     if major_version > '11.2':
@@ -536,9 +543,9 @@ def create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_pa
 #         exit
 #         '''
 #         sqlplus_bin = '%s/bin/sqlplus' % (oracle_home)
-#         p = subprocess.Popen([sqlplus_bin,'/nolog'],stdin=subprocess.PIPE,
-#         stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-#         (stdout,stderr) = p.communicate(datapatch_sql.encode('utf-8'))
+#         p = subprocess.Popen([sqlplus_bin,'/nolog'], stdin=subprocess.PIPE,
+#         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+#         (stdout, stderr) = p.communicate(datapatch_sql.encode('utf-8'))
 #         rc = p.returncode
 #         if rc != 0:
 #             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, datapatch_sql)
@@ -546,12 +553,11 @@ def create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_pa
 #         else:
 #             return True
 
-def remove_db(module, msg, oracle_home, db_name, sid, db_unique_name, sys_password):
+def remove_db(module, oracle_home, db_name, sid, db_unique_name, sys_password):
 
-    cursor = getconn(module, msg)
-    # israc = ''
-    israc_sql = 'select parallel,instance_name,host_name from v$instance'
-    israc_ = execute_sql_get(module, msg, cursor, israc_sql)
+    cursor = getconn(module)
+    israc_sql = 'select parallel, instance_name, host_name from v$instance'
+    israc_ = execute_sql_get(module, cursor, israc_sql)
     remove_db = ''
     if gimanaged:
         if db_unique_name is not None:
@@ -580,35 +586,31 @@ def remove_db(module, msg, oracle_home, db_name, sid, db_unique_name, sys_passwo
             msg = 'STDOUT: %s,  COMMAND: %s' % (stdout, command)
             module.exit_json(msg=msg, changed=True)
 
-def ensure_db_state(module, msg, oracle_home, db_name, db_unique_name, sid, archivelog, force_logging, supplemental_logging,
-                    flashback, default_tablespace_type, default_tablespace, default_temp_tablespace, timezone):
+def ensure_db_state(module, oracle_home, db_name, db_unique_name, sid, archivelog, force_logging, supplemental_logging,
+                     flashback, default_tablespace_type, default_tablespace, default_temp_tablespace, timezone):
 
-    cursor = getconn(module, msg)
-    israc = ''
-    archcomp = ''
-    flcomp = ''
-    fbcomp = ''
+    cursor = getconn(module)
+    global israc
     slcomp = ''
     alterdb_sql = 'alter database'
 
-    propsql = "select lower(property_value) from database_properties where property_name in ('DEFAULT_TBS_TYPE', 'DEFAULT_PERMANENT_TABLESPACE', 'DEFAULT_TEMP_TABLESPACE') order by 1"
+    propsql = "select lower(property_value) from database_properties where property_name in ('DEFAULT_TBS_TYPE','DEFAULT_PERMANENT_TABLESPACE','DEFAULT_TEMP_TABLESPACE') order by 1"
     tzsql = "select lower(property_value) from database_properties where property_name = 'DBTIMEZONE'"
 
-    curr_time_zone = execute_sql_get(module, msg, cursor, tzsql)
-    def_tbs_type, def_tbs, def_temp_tbs = execute_sql_get(module, msg, cursor, propsql)
-    israc_sql = 'select parallel,instance_name,host_name from v$instance'
-    israc_ = execute_sql_get(module, msg, cursor, israc_sql)
+    curr_time_zone = execute_sql_get(module, cursor, tzsql)
+    def_tbs_type, def_tbs, def_temp_tbs = execute_sql_get(module, cursor, propsql)
+    israc_sql = 'select parallel, instance_name from v$instance'
+    israc_ = execute_sql_get(module, cursor, israc_sql)
     instance_name = israc_[0][1]
-    host_name = israc_[0][2]
 
     change_restart_sql = []
     change_db_sql = []
-    log_check_sql = 'select log_mode,force_logging, flashback_on from v$database'
-    log_check_ = execute_sql_get(module, msg, cursor, log_check_sql)
+    log_check_sql = 'select log_mode, force_logging, flashback_on from v$database'
+    log_check_ = execute_sql_get(module, cursor, log_check_sql)
 
     if major_version >= '19.0':
-        supp_log_check_sql = 'select SUPPLEMENTAL_LOG_DATA_MIN,SUPPLEMENTAL_LOG_DATA_PL,SUPPLEMENTAL_LOG_DATA_SR,SUPPLEMENTAL_LOG_DATA_PK,SUPPLEMENTAL_LOG_DATA_UI from v$database'
-        supp_log_check_ = execute_sql_get(module, msg, cursor, supp_log_check_sql)
+        supp_log_check_sql = 'select SUPPLEMENTAL_LOG_DATA_MIN, SUPPLEMENTAL_LOG_DATA_PL, SUPPLEMENTAL_LOG_DATA_SR, SUPPLEMENTAL_LOG_DATA_PK, SUPPLEMENTAL_LOG_DATA_UI from v$database'
+        supp_log_check_ = execute_sql_get(module, cursor, supp_log_check_sql)
         if supp_log_check_[0][0] != slcomp:
 
             if supplemental_logging is True:
@@ -676,16 +678,18 @@ def ensure_db_state(module, msg, oracle_home, db_name, db_unique_name, sid, arch
         if log_check_[0][0] == 'ARCHIVELOG' and log_check_[0][2] == 'YES' and not archivelog and not flashback:  # Flashback database needs to be turned off before archivelog is turned off
 
             if len(change_db_sql) > 0:  # <- Apply changes that does not require a restart
-                apply_norestart_changes(module, msg, change_db_sql)
+                apply_norestart_changes(module, change_db_sql)
 
             if len(change_restart_sql) > 0:  # <- Apply changes that requires a restart
-                apply_restart_changes(module, msg, oracle_home, db_name, db_unique_name, sid, instance_name, host_name, israc, archcomp, change_restart_sql)
+                apply_restart_changes(module, oracle_home, db_name, db_unique_name, sid, instance_name, israc, change_restart_sql)
         else:
             if len(change_restart_sql) > 0:  # <- Apply changes that requires a restart
-                apply_restart_changes(module, msg, oracle_home, db_name, db_unique_name, sid, instance_name, host_name, israc, archcomp, change_restart_sql)
+                apply_restart_changes(module, oracle_home, db_name, db_unique_name, sid, instance_name, israc, change_restart_sql)
+                if len(change_db_sql) > 0:
+                    time.sleep(10)  # <- To allow the DB to register with the listener, as following apply_norestart_changes need connection and we just started
 
             if len(change_db_sql) > 0:  # <- Apply changes that does not require a restart
-                apply_norestart_changes(module, msg, change_db_sql)
+                apply_norestart_changes(module, change_db_sql)
 
 
         msg = ('Database %s has been put in the intended state - Archivelog: %s, Force Logging: %s, Flashback: %s, Supplemental Logging: %s, Timezone: %s' %
@@ -699,43 +703,61 @@ def ensure_db_state(module, msg, oracle_home, db_name, db_unique_name, sid, arch
             changed = True
         else:
             msg = ('Database %s already exists and is in the intended state - Archivelog: %s, Force Logging: %s, Flashback: %s, Supplemental Logging: %s, Timezone: %s' %
-                (db_name, archivelog, force_logging, flashback, supplemental_logging, timezone))
+                    (db_name, archivelog, force_logging, flashback, supplemental_logging, timezone))
             changed = False
         module.exit_json(msg=msg, changed=changed)
 
 
-def apply_restart_changes(module, msg, oracle_home, db_name, db_unique_name, sid, instance_name, host_name, israc, archcomp, change_restart_sql):
+def apply_restart_changes(module, oracle_home, db_name, db_unique_name, sid, instance_name, israc, change_restart_sql):
 
+    open_mode = stop_db(module, oracle_home, db_name, db_unique_name, sid)
+    start_instance(module, oracle_home, db_name, db_unique_name, sid, 'mount', israc, instance_name)
+    time.sleep(10)  # <- To allow the DB to register with the listener
+    cursor = getconn(module)
+    for sql in change_restart_sql:
+        execute_sql(module, cursor, sql)
+    stop_db(module, oracle_home, db_name, db_unique_name, sid)
+    start_db(module, oracle_home, db_name, db_unique_name, sid, open_mode)
 
-    if stop_db(module, msg, oracle_home, db_name, db_unique_name, sid):
-        if start_instance(module, msg, oracle_home, db_name, db_unique_name, sid, 'mount', instance_name, host_name, israc):
-            time.sleep(10)  # <- To allow the DB to register with the listener
-            cursor = getconn(module, msg)
-            for sql in change_restart_sql:
-                execute_sql(module, msg, cursor, sql)
-                if stop_db(module, msg, oracle_home, db_name, db_unique_name, sid):
-                    start_db_state = start_db(module, msg, oracle_home, db_name, db_unique_name, sid)
-                    if start_db_state in ('ok', 'changed'):
-                        if newdb:
-                            msg = 'Database %s successfully created (%s) ' % (db_name, archcomp)
-                            if output == 'verbose':
-                                msg += ' ,'.join(verboselist)
-                            changed = True
-                        else:
-                            msg = 'Database %s has been put in the intended state - (%s) ' % (db_name, archcomp)
-                            if output == 'verbose':
-                                msg += ' ,'.join(verboselist)
-                            changed = True
+def apply_norestart_changes(module, change_db_sql):
 
-
-
-def apply_norestart_changes(module, msg, change_db_sql):
-
-    cursor = getconn(module, msg)
+    cursor = getconn(module)
     for sql in change_db_sql:
-        execute_sql(module, msg, cursor, sql)
+        execute_sql(module, cursor, sql)
 
-def stop_db(module, msg, oracle_home, db_name, db_unique_name, sid):
+def spfile_restart_needed(module, force_restart):
+
+    if force_restart:
+        return True, ['force_restart option was given']
+    cursor = getconn(module)
+    init_parameter_sql = 'SELECT DECODE(value, NULL, \'PFILE\', \'SPFILE\') "Init File Type" FROM sys.v$parameter WHERE name = \'spfile\''
+    init_parameter_style = execute_sql_get(module, cursor, init_parameter_sql)
+    if init_parameter_style[0][0] == 'PFILE':
+        return False, ['database running without spfile and force_restart is false']  # no restart needed if running with PFILE
+
+    if major_version > '11.2':
+        spf_check_sql = ("select vsp.name || ':' || vp.value || ' -> ' || vsp.value as change from "
+                        "( select name, listagg(value,', ') within group (order by value) as value, con_id from v$spparameter group by name, con_id) vsp, "
+                        "( select name, listagg(value,', ') within group (order by value) as value, con_id from v$parameter group by name, con_id) vp "
+                        "where vsp.name=vp.name "
+                        "and vsp.con_id = vp.con_id "
+                        "and upper(vsp.value) != upper(vp.value)")
+    else:
+        spf_check_sql = ("select vsp.name || ':' || vp.value || ' -> ' || vsp.value as change from "
+                        "( select name, listagg(value,', ') within group (order by value) as value from v$spparameter group by name) vsp, "
+                        "( select name, listagg(value,', ') within group (order by value) as value from v$parameter group by name) vp "
+                        "where vsp.name=vp.name "
+                        "and upper(vsp.value) != upper(vp.value)")
+    init_changes = execute_sql_get(module, cursor, spf_check_sql)
+    if len(init_changes) == 0:
+        return False, ['spfile parameters match runtime']
+    else:
+        return True, [i[0] for i in init_changes]
+
+
+def stop_db(module, oracle_home, db_name, db_unique_name, sid):
+    # global debug
+    # debug.append('stop_db called')
 
     if gimanaged:
         if db_unique_name is not None:
@@ -743,11 +765,17 @@ def stop_db(module, msg, oracle_home, db_name, db_unique_name, sid):
         command = '%s/bin/srvctl stop database -d %s -o immediate' % (oracle_home, db_name)
         (rc, stdout, stderr) = module.run_command(command)
         if rc != 0:
-            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
+            msg = 'Error(stop_db) - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
             module.fail_json(msg=msg, changed=False)
         else:
-            return True
+            return None  # Grid knows the right open mode, so return None to be passed to start_instance
     else:
+
+        # query current open_mode for potential restart in case of non-grid
+        cursor = getconn(module)
+        open_mode_sql = 'SELECT CASE OPEN_MODE WHEN \'MOUNTED\' THEN \'mount\' WHEN \'READ WRITE\' THEN \'open read write\' ELSE \'open read only\' END AS open_mode FROM V$DATABASE'
+        open_mode = execute_sql_get(module, cursor, open_mode_sql)
+
         if sid is not None:
             os.environ['ORACLE_SID'] = sid
         else:
@@ -762,37 +790,56 @@ def stop_db(module, msg, oracle_home, db_name, db_unique_name, sid):
         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdout, stderr) = p.communicate(shutdown_sql.encode('utf-8'))
         rc = p.returncode
-        if rc != 0:
-            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, shutdown_sql)
+        # debug.append('stop_db: rc=%d, STDOUT: %s, STDERR: %s, COMMAND: %s' % (rc, stdout, stderr, shutdown_sql))
+        # debug.append('stop_db env: USER:%s ORACLE_HOME:%s ORACLE_SID:%s' % (os.environ['USER'], os.environ['ORACLE_SID'], os.environ['ORACLE_HOME']))
+        if rc != 0 or ('ORA-' in stdout and 'ORA-01109:' not in stdout):
+            msg = 'Error(stop_db) - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, shutdown_sql)
+            # module.fail_json(msg=msg, changed=False, debug=debug)
             module.fail_json(msg=msg, changed=False)
         else:
-            return True
+            return open_mode[0][0]  # return previous open_mode in format suitable for startup command
 
 
-def start_db(module, msg, oracle_home, db_name, db_unique_name, sid):
+def start_db(module, oracle_home, db_name, db_unique_name, sid, open_mode=None):
+    # global debug
+    # debug.append('start_db called with open_mode %s, calling start_instance' % (open_mode or "None"))
+    return start_instance(module, oracle_home, db_name, db_unique_name, sid, open_mode, False, '')
+
+def start_instance(module, oracle_home, db_name, db_unique_name, sid, open_mode=None, israc=False, instance_name=''):
+    # global debug
+    # debug.append('start_instance called with open_mode %s' % (open_mode or "None"))
 
     if gimanaged:
         if db_unique_name is not None:
             db_name = db_unique_name
-        command = '%s/bin/srvctl status database -d %s' % (oracle_home, db_name)
+        if israc:
+            command = '%s/bin/srvctl status instance -d %s -i %s' % (oracle_home, db_name, instance_name)
+        else:
+            command = '%s/bin/srvctl status database -d %s ' % (oracle_home, db_name)
         (rc, stdout, stderr) = module.run_command(command)
         if rc != 0:
-            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
+            msg = 'Error(start_instance) - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
             module.fail_json(msg=msg, changed=False)
-        elif 'Database is running' in stdout:
+        elif 'is running' in stdout:
             return 'ok'
-        elif 'Database is not running' in stdout:
+        elif 'is not running' in stdout:
 
-            command = '%s/bin/srvctl start database -d %s' % (oracle_home, db_name)
+            if israc:
+                command = '%s/bin/srvctl start instance -d %s -i %s' % (oracle_home, db_name, instance_name)
+            else:
+                command = '%s/bin/srvctl start database -d %s ' % (oracle_home, db_name)
+            if open_mode is not None:
+                command += ' -o %s ' % (open_mode)
             (rc, stdout, stderr) = module.run_command(command)
             if rc != 0:
-                msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
+                msg = 'Error(start_instance) - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
                 module.fail_json(msg=msg, changed=False)
             else:
                 return 'changed'
         else:
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
             module.fail_json(msg=msg, changed=False)
+
     else:
         if sid is not None:
             os.environ['ORACLE_SID'] = sid
@@ -801,62 +848,27 @@ def start_db(module, msg, oracle_home, db_name, db_unique_name, sid):
 
         startup_sql = '''
         connect / as sysdba
-        startup;
+        startup %s;
         exit
-        '''
-        sqlplus_bin = '%s/bin/sqlplus' % (oracle_home)
-        p = subprocess.Popen([sqlplus_bin, '/nolog'], stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        (stdout, stderr) = p.communicate(startup_sql.encode('utf-8'))
-        rc = p.returncode
-        if rc != 0:
-            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, startup_sql)
-            module.fail_json(msg=msg, changed=False)
-        else:
-            return 'changed'
-
-
-def start_instance(module, msg, oracle_home, db_name, db_unique_name, sid, open_mode, instance_name, host_name, israc):
-
-    if gimanaged:
-        if db_unique_name is not None:
-            db_name = db_unique_name
-        if israc:
-            command = '%s/bin/srvctl start instance  -d %s -i %s' % (oracle_home, db_name, instance_name)
-        else:
-            command = '%s/bin/srvctl start database -d %s ' % (oracle_home, db_name)
-        if open_mode is not None:
-            command += ' -o %s ' % (open_mode)
-        (rc, stdout, stderr) = module.run_command(command)
-        if rc != 0:
-            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
-            module.fail_json(msg=msg, changed=False)
-        else:
-            return True
-    else:
-        if sid is not None:
-            os.environ['ORACLE_SID'] = sid
-        else:
-            os.environ['ORACLE_SID'] = db_name
-
-        startup_sql = '''
-        connect / as sysdba
-        startup mount;
-        exit
-        '''
+        ''' % (open_mode or "")
         sqlplus_bin = '%s/bin/sqlplus' % (oracle_home)
         p = subprocess.Popen([sqlplus_bin, '/nolog'], stdin=subprocess.PIPE,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdout, stderr) = p.communicate(startup_sql.encode('utf-8'))
         rc = p.returncode
-        if rc != 0:
-            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, shutdown_sql)
+        # debug.append('start_instance: rc=%d, Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (rc, stdout, stderr, startup_sql))
+        # debug.append('start_instance: env: USER:%s ORACLE_HOME:%s ORACLE_SID:%s' % (os.environ['USER'], os.environ['ORACLE_SID'], os.environ['ORACLE_HOME']))
+        if 'ORA-01081:' in stdout:
+            return 'ok'
+        elif rc != 0 or 'ORA-' in stdout:
+            msg = 'Error(start_instance) - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, startup_sql)
+            # module.fail_json(msg=msg, changed=False, debug=debug)
             module.fail_json(msg=msg, changed=False)
         else:
-            return True
+            return 'changed'
 
 
-def execute_sql_get(module, msg, cursor, sql):
+def execute_sql_get(module, cursor, sql):
 
     try:
         cursor.execute(sql)
@@ -865,10 +877,9 @@ def execute_sql_get(module, msg, cursor, sql):
         error, = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
-        return False
     return result
 
-def execute_sql(module, msg, cursor, sql):
+def execute_sql(module, cursor, sql):
 
     try:
         cursor.execute(sql)
@@ -876,10 +887,9 @@ def execute_sql(module, msg, cursor, sql):
         error, = exc.args
         msg = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
-        return False
     return True
 
-def getconn(module, msg):
+def getconn(module):
 
     hostname = os.uname()[1]
     wallet_connect = '/@%s' % service_name
@@ -921,50 +931,53 @@ def main():
     global verbosemsg
     global verboselist
     global domain
+    # global debug
     verbosemsg = ''
     verboselist = []
+    # debug = []
     newdb = False
 
     module = AnsibleModule(
         argument_spec=dict(
-            oracle_home=dict(default=None, aliases=['oh']),
-            db_name=dict(required=True, aliases=['db', 'database_name', 'name']),
-            sid=dict(required=False),
-            db_unique_name=dict(required=False, aliases=['dbunqn', 'unique_name']),
-            sys_password=dict(required=False, no_log=True, aliases=['syspw', 'sysdbapassword', 'sysdbapw']),
-            system_password=dict(required=False, no_log=True, aliases=['systempw']),
-            dbsnmp_password=dict(required=False, no_log=True, aliases=['dbsnmppw']),
-            responsefile=dict(required=False),
-            template=dict(default='General_Purpose.dbc'),
-            cdb=dict(default=False, type='bool', aliases=['container']),
-            local_undo=dict(default=True, type='bool'),
-            datafile_dest=dict(required=False, aliases=['dfd']),
-            recoveryfile_dest=dict(required=False, aliases=['rfd']),
-            storage_type = dict(default='FS', aliases= ['storage'], choices = ['FS', 'ASM']), # noqa E221
-            dbconfig_type = dict(default='SI', choices = ['SI', 'RAC', 'RACONENODE']), # noqa E221
-            db_type             = dict(default='MULTIPURPOSE', choices = ['MULTIPURPOSE', 'DATA_WAREHOUSING', 'OLTP']), # noqa E221
-            racone_service      = dict(required=False, aliases = ['ron_service']), # noqa E221
-            characterset        = dict(default='AL32UTF8'), # noqa E221
-            memory_percentage   = dict(required=False), # noqa E221
-            memory_totalmb      = dict(default='1024'), # noqa E221
-            nodelist            = dict(required=False, type='list'), # noqa E221
-            amm                 = dict(default=False, type='bool', aliases = ['automatic_memory_management']), # noqa E221
-            initparams          = dict(required=False, type='list'), # noqa E221
-            customscripts            = dict(required=False, type='list'), # noqa E221
-            default_tablespace_type  = dict(default='smallfile', choices = ['smallfile', 'bigfile']), # noqa E221
-            default_tablespace       = dict(required=False), # noqa E221
-            default_temp_tablespace  = dict(required=False), # noqa E221
-            archivelog               = dict(default=False, type='bool'), # noqa E221
-            force_logging            = dict(default=False, type='bool'), # noqa E221
-            supplemental_logging     = dict(default=False, type='bool'), # noqa E221
-            flashback                = dict(default=False, type='bool'), # noqa E221
-            datapatch                = dict(default=True, type='bool'), # noqa E221
-            domain                   = dict(required=False), # noqa E221
-            timezone                 = dict(required=False), # noqa E221
-            output                   = dict(default="short", choices = ["short", "verbose"]), # noqa E221
-            state               = dict(default="present", choices = ["present", "absent", "started"]), # noqa E221
-            hostname            = dict(required=False, default = 'localhost', aliases = ['host']), # noqa E221
-            port                = dict(required=False, default = 1521), # noqa E221
+            oracle_home         = dict(default=None, aliases = ['oh']), # noqa E231
+            db_name             = dict(required=True, aliases = ['db', 'database_name', 'name']), # noqa E231
+            sid                 = dict(required=False), # noqa E231
+            db_unique_name      = dict(required=False, aliases = ['dbunqn','unique_name']), # noqa E231
+            sys_password        = dict(required=False, no_log=True, aliases = ['syspw', 'sysdbapassword', 'sysdbapw']), # noqa E231
+            system_password     = dict(required=False, no_log=True, aliases = ['systempw']), # noqa E231
+            dbsnmp_password     = dict(required=False, no_log=True, aliases = ['dbsnmppw']), # noqa E231
+            responsefile        = dict(required=False), # noqa E231
+            template            = dict(default='General_Purpose.dbc'), # noqa E231
+            cdb                 = dict(default=False, type='bool', aliases=['container']), # noqa E231
+            local_undo          = dict(default=True, type='bool'), # noqa E231
+            datafile_dest       = dict(required=False, aliases= ['dfd']), # noqa E231
+            recoveryfile_dest   = dict(required=False, aliases= ['rfd']), # noqa E231
+            storage_type        = dict(default='FS', aliases= ['storage'], choices = ['FS','ASM']), # noqa E231
+            dbconfig_type       = dict(default='SI', choices = ['SI', 'RAC', 'RACONENODE']), # noqa E231
+            db_type             = dict(default='MULTIPURPOSE', choices = ['MULTIPURPOSE', 'DATA_WAREHOUSING', 'OLTP']), # noqa E231
+            racone_service      = dict(required=False, aliases = ['ron_service']), # noqa E231
+            characterset        = dict(default='AL32UTF8'), # noqa E231
+            memory_percentage   = dict(required=False), # noqa E231
+            memory_totalmb      = dict(default='1024'), # noqa E231
+            nodelist            = dict(required=False, type='list'), # noqa E231
+            amm                 = dict(default=False, type='bool', aliases = ['automatic_memory_management']), # noqa E231
+            initparams          = dict(required=False, type='list'), # noqa E231
+            force_restart       = dict(default=True, type='bool'), # noqa E231
+            customscripts       = dict(required=False, type='list'), # noqa E231
+            default_tablespace_type = dict(default='smallfile', choices = ['smallfile', 'bigfile']), # noqa E231
+            default_tablespace  = dict(required=False), # noqa E231
+            default_temp_tablespace  = dict(required=False), # noqa E231
+            archivelog          = dict(default=False, type='bool'), # noqa E231
+            force_logging       = dict(default=False, type='bool'), # noqa E231
+            supplemental_logging       = dict(default=False, type='bool'), # noqa E231
+            flashback           = dict(default=False, type='bool'), # noqa E231
+            datapatch           = dict(default=True, type='bool'), # noqa E231
+            domain	            = dict(required=False), # noqa E231
+            timezone            = dict(required=False), # noqa E231
+            output              = dict(default="short", choices = ["short", "verbose"]), # noqa E231
+            state               = dict(default="present", choices = ["present", "absent", "started", "restarted"]), # noqa E231
+            hostname            = dict(required=False, default = 'localhost', aliases = ['host']), # noqa E231
+            port                = dict(required=False, default = 1521), # noqa E231
 
 
 
@@ -995,6 +1008,7 @@ def main():
     db_type             = module.params["db_type"] # noqa E221
     amm                 = module.params["amm"] # noqa E221
     initparams          = module.params["initparams"] # noqa E221
+    force_restart       = module.params["force_restart"] # noqa E231
     customscripts       = module.params["customscripts"] # noqa E221
     default_tablespace_type = module.params["default_tablespace_type"] # noqa E221
     default_tablespace      = module.params["default_tablespace"] # noqa E221
@@ -1049,18 +1063,35 @@ def main():
         service_name = "%s.%s" % (service_name, domain)
 
     # Get the Oracle version
-    major_version = get_version(module, msg, oracle_home)
+    major_version = get_version(module, oracle_home)
 
-    if state == 'started':
+    if state == 'started' or state == 'restarted':
         msg = "oracle_home: %s db_name: %s sid: %s db_unique_name: %s" % (oracle_home, db_name, sid, db_unique_name)
+        spf_restart_needed = False
         if not check_db_exists(module, oracle_home, db_name, sid, db_unique_name):
             msg = "Database not found. %s" % msg
             module.fail_json(msg=msg, changed=False)
         else:
-            start_db_state = start_db(module, msg, oracle_home, db_name, db_unique_name, sid)
-            if start_db_state == 'changed':
+            if state == 'restarted':
+                spf_restart_needed, spf_restart_reason = spfile_restart_needed(module, force_restart)
+                if spf_restart_needed:
+                    open_mode = stop_db(module, oracle_home, db_name, db_unique_name, sid)
+                else:
+                    open_mode = None  # ensure db runs (in default open mode) if not restarting
+                start_db_state = start_db(module, oracle_home, db_name, db_unique_name, sid, open_mode)
+            else:
+                start_db_state = start_db(module, oracle_home, db_name, db_unique_name, sid)
+            if start_db_state == 'changed' and not spf_restart_needed:
                 msg = "Database started."
+                # module.exit_json(msg=msg, changed=True, debug=debug)
                 module.exit_json(msg=msg, changed=True)
+            elif start_db_state == 'changed':
+                msg = "Database restarted."
+                # module.exit_json(msg=msg, restart_reason=spf_restart_reason, changed=True, debug=debug)
+                module.exit_json(msg=msg, restart_reason=spf_restart_reason, changed=True)
+            elif start_db_state == 'ok' and state == 'restarted':
+                msg = "No restart needed (%s)" % (spf_restart_reason[0])
+                module.exit_json(msg=msg, changed=False)
             elif start_db_state == 'ok':
                 msg = "Database already running."
                 module.exit_json(msg=msg, changed=False)
@@ -1068,24 +1099,22 @@ def main():
                 msg = "Startup failed. %s" % msg
                 module.fail_json(msg=msg, changed=False)
 
-
-
     elif state == 'present':
         if not check_db_exists(module, oracle_home, db_name, sid, db_unique_name):
-            if create_db(module, msg, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb, local_undo, datafile_dest, recoveryfile_dest,
-                    qstorage_type, dbconfig_type, racone_service, characterset, memory_percentage, memory_totalmb, nodelist, db_type, amm, initparams, customscripts, datapatch, domain):
+            if create_db(module, oracle_home, sys_password, system_password, dbsnmp_password, db_name, sid, db_unique_name, responsefile, template, cdb, local_undo, datafile_dest, recoveryfile_dest,
+                        storage_type, dbconfig_type, racone_service, characterset, memory_percentage, memory_totalmb, nodelist, db_type, amm, initparams, customscripts, datapatch, domain):
                 newdb = True
-                ensure_db_state(module, msg, oracle_home, db_name, db_unique_name, sid, archivelog, force_logging, supplemental_logging, flashback, default_tablespace_type, default_tablespace, default_temp_tablespace, timezone)
+                ensure_db_state(module, oracle_home, db_name, db_unique_name, sid, archivelog, force_logging, supplemental_logging, flashback, default_tablespace_type, default_tablespace, default_temp_tablespace, timezone)
             else:
                 module.fail_json(msg=msg, changed=False)
         else:
-            ensure_db_state(module, msg, oracle_home, db_name, db_unique_name, sid, archivelog, force_logging, supplemental_logging, flashback, default_tablespace_type, default_tablespace, default_temp_tablespace, timezone)
+            ensure_db_state(module, oracle_home, db_name, db_unique_name, sid, archivelog, force_logging, supplemental_logging, flashback, default_tablespace_type, default_tablespace, default_temp_tablespace, timezone)
             # msg = 'Database %s already exists' % (db_name)
             # module.exit_json(msg=msg, changed=False)
 
     elif state == 'absent':
         if check_db_exists(module, oracle_home, db_name, sid, db_unique_name):
-            if remove_db(module, msg, oracle_home, db_name, sid, db_unique_name, sys_password):
+            if remove_db(module, oracle_home, db_name, sid, db_unique_name, sys_password):
                 msg = 'Successfully removed database %s' % (db_name)
                 module.exit_json(msg=msg, changed=True)
             else:
