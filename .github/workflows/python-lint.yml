@@ -1,0 +1,36 @@
+name: Python-lint
+
+on:
+  pull_request:
+    branches:
+      - master
+      - development
+  push:
+    branches:
+      - 'pr*'
+
+jobs:
+  black-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: black
+        uses: psf/black@stable
+        with:
+          options: "--diff --check --verbose"
+          src: "./plugins/modules"
+          version: "23.3.0"
+
+  flake8-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@v3
+      - name: Set up Python environment
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: flake8 Lint
+        uses: py-actions/flake8@v2
+        with:
+          include: "./plugins/modules"
