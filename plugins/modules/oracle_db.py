@@ -17,223 +17,253 @@ description:
       defined, those will be attached to the createDatabase command
     - If no responsefile is created, the database will be created based on all
       other parameters
-version_added: "2.4.0.0"
+version_added: "2.4.0"
 options:
     oracle_home:
-        description:
-            - The home where the database will be created
-        required: False
+        description: >
+            The home where the database will be created
+        required: false
+        type: str
         aliases: ['oh']
     db_name:
-        description:
-            - The name of the database
-        required: True
+        description: The name of the database
+        required: true
         default: None
-        aliases: ['db','database_name','name']
+        type: str
+        aliases: ['db', 'database_name', 'name']
     sid:
-        description:
-            - The instance name
-        required: False
+        description: The instance name
+        required: false
+        type: str
         default: None
     db_unique_name:
-        description:
-            - The database db_unique_name
-        required: False
+        description: The database db_unique_name
+        required: false
         default: None
-        aliases: ['dbunqn','unique_name']
+        type: str
+        aliases: ['dbunqn', 'unique_name']
     sys_password:
-        description:
-            - Password for the sys user
-        required: False
+        description: Password for the sys user
+        required: false
         default: None
-        aliases: ['syspw','sysdbapassword','sysdbapw']
+        type: str
+        aliases: ['syspw', 'sysdbapassword', 'sysdbapw']
     system_password:
-        description:
-            - Password for the system user
-            - If not set, defaults to sys_password
-        required: False
+        description: >
+            Password for the system user.
+            If not set, defaults to sys_password
+        required: false
+        type: str
         default: None
         aliases: ['systempw']
     dbsnmp_password:
-        description:
-            - Password for the dbsnmp user
-            - If not set, defaults to sys_password
-        required: False
+        description: >
+            Password for the dbsnmp user.
+            If not set, defaults to sys_password
+        required: false
+        type: str
         default: None
         aliases: ['dbsnmppw']
     responsefile:
-        description:
-            - The name of responsefile
-        required: True
+        description: The name of responsefile
+        required: true
+        type: str
         default: None
     template:
-        description:
-            - The template the database will be based off
-        required: False
+        description: >
+            The template the database will be based off
+        required: false
+        type: str
         default: General_Purpose.dbc
     cdb:
-        description:
-            - Should the database be a container database
-        required: False
-        default: False
+        description: >
+            Should the database be a container database
+        required: false
+        default: false
+        type: str
         aliases: ['container']
         choices: ['True','False']
     datafile_dest:
-        description:
-            - Where the database files should be placed
-              (ASM diskgroup or filesystem path)
-        required: False
-        default: False
+        description: >
+            Where the database files should be placed \
+            (ASM diskgroup or filesystem path)
+        required: false
+        default: false
+        type: str
         aliases: ['dfd']
     recoveryfile_dest:
-        description:
-            - Where the database files should be placed
-              (ASM diskgroup or filesystem path)
-        required: False
-        default: False
+        description: >
+            Where the database files should be placed
+            (ASM diskgroup or filesystem path)
+        required: false
+        default: false
         aliases: ['rfd']
     storage_type:
-        description:
-            - Type of underlying storage (Filesystem or ASM)
-        required: False
+        description: >
+            Type of underlying storage (Filesystem or ASM)
+        required: false
         default: FS
+        type: str
         aliases: ['storage']
-        choices: ['FS','ASM']
+        choices: ['FS', 'ASM']
     dbconfig_type:
-        description:
-            - Type of database (SI,RAC,RON)
-        required: False
+        description: >
+            Type of database (SI,RAC,RON)
+        required: false
+        type: str
         default: SI
-        choices: ['SI','RAC','RACONENODE']
+        choices: ['SI', 'RAC', 'RACONENODE']
     db_type:
-        description:
-            - Default Type of database (MULTIPURPOSE, OLTP, DATA_WAREHOUSING)
-        required: False
+        description: >
+            Default Type of database (MULTIPURPOSE, OLTP, DATA_WAREHOUSING)
+        required: false
+        type: str
         default: MULTIPURPOSE
-        choices: ['MULTIPURPOSE','OLTP','DATA_WAREHOUSING']
+        choices: ['MULTIPURPOSE', 'OLTP', 'DATA_WAREHOUSING']
     racone_service:
-        description:
-            - If dbconfig_type = RACONENODE, a service has to be created along
-              with the DB. This is the name of that service
-            - If no name is defined, the service will be called
-              "{{ db_name }}_ronserv"
-        required: False
+        description: >
+            If dbconfig_type = RACONENODE, a service has to be created along
+            with the DB. This is the name of that service
+            If no name is defined, the service will be called
+            "{{ db_name }}_ronserv"
+        required: false
+        type: str
         default: None
         aliases: ['ron_service']
     characterset:
-        description:
-            - The database characterset
-        required: False
+        description: >
+            The database characterset
+        required: false
+        type: str
         default: AL32UTF8
     memory_percentage:
-        description:
-            - The database total memory in % of available memory
-        required: False
+        description: >
+            The database total memory in % of available memory
+        required: false
+        type: str
     memory_totalmb:
-        description:
-            - The database total memory in MB. Defaults to 1G
-        required: False
+        description: >
+            The database total memory in MB. Defaults to 1G
+        required: false
+        type: str
         default: ['1024']
     nodelist:
-        description:
-            - The list of nodes a RAC DB should be created on
-        required: False
+        description: >
+            The list of nodes a RAC DB should be created on
+        required: false
+        type: str
     amm:
-        description:
-            - Should Automatic Memory Management be used
-              (memory_target, memory_max_target)
-        required: False
-        Default: False
-        choices: ['True','False']
+        description: >
+            Should Automatic Memory Management be used
+            (memory_target, memory_max_target)
+        required: false
+        Default: false
+        type: bool
+        choices: ['true', 'false']
     initparams:
-        description:
-            - List of key=value pairs
-            - e.g
-              init_params:
-                  - sga_target=1G
-                  - sga_max_size=1G
-        required: False
+        description: >
+            List of dict for init.ora parameter.
+        required: false
+        type: list
+        suboptions:
+            name:
+                description: The init.ora parameter name.
+                type: str
+            value:
+                description: The parameter value.
+                type: str
+            scope:
+                description: The scope of the parameter
+                type: str
+                default: both
+                choices:
+                    - "both"
+                    - "spfile"
     customscripts:
-        description:
-            - List of scripts to run after database is created
-            - e.g
-              customScripts:
-                  - /tmp/xxx.sql
-                  - /tmp/yyy.sql
-        required: False
+        description: >
+            List of scripts to run after database is created
+        required: false
+        type: list
     default_tablespace_type:
-        description:
-            - Database default tablespace type (DEFAULT_TBS_TYPE)
+        description: >
+            Database default tablespace type (DEFAULT_TBS_TYPE)
+        required: false
         default: smallfile
-        choices: ['smallfile','bigfile']
+        type: str
+        choices: ['smallfile', 'bigfile']
     default_tablespace:
-        description:
-            - Database default tablespace
+        description: >
+            Database default tablespace
         default: smallfile
-        required: False
+        required: false
+        type: str
     default_temp_tablespace:
-        description:
-            - Database default temporary tablespace
-        required: False
+        description: >
+            Database default temporary tablespace
+        required: false
+        type: str
     archivelog:
-        description:
-            - Puts the database is archivelog mode
-        required: False
+        description: >
+            Puts the database is archivelog mode
+        required: false
         default: false
-        choices: ['True','False']
+        choices: ['true', 'false']
         type: bool
     force_logging:
-        description:
-            - Enables force logging for the Database
+        description: >
+            Enables force logging for the Database
         required: False
         default: false
-        choices: ['True','False']
+        choices: ['true', 'false']
         type: bool
     supplemental_logging:
-        description:
-            - Enables supplemental (minimal) logging for the Database
-              (basically 'add supplemental log data')
-        required: False
+        description: >
+            Enables supplemental (minimal) logging for the Database
+            (basically 'add supplemental log data')
+        required: false
         default: false
-        choices: ['True','False']
+        choices: ['true', 'false']
         type: bool
     flashback:
-        description:
-            - Enables flashback for the database
+        description: >
+            Enables flashback for the database
         required: False
         default: false
-        choices: ['True','False']
+        choices: ['True', 'False']
         type: bool
     state:
-        description:
-            - The intended state of the database. For 'restarted' the database
-              has to be running.
+        description: >
+            The intended state of the database. For 'restarted' the database
+            has to be running.
         default: present
-        choices: ['present','absent','started','restarted']
+        type: str
+        choices: ['present', 'absent','started','restarted']
     force_restart:
-        description:
-            - Effective only when using state == 'restarted'
-            - If true (default), database will be restarted without checking
-              for spfile vs runtime parameters
-            - If false, database will ONLY be restarted if spfile is in use
-              and spfile parameters do not match runtime parameters
+        description: >
+            Effective only when using state == 'restarted'
+            If true (default), database will be restarted without checking \
+            for spfile vs runtime parameters
+            If false, database will ONLY be restarted if spfile is in use \
+            and spfile parameters do not match runtime parameters
         required: false
-        default: True
-        choices: ['True','False']
+        default: true
+        choices: ['true', 'false']
         type: bool
+        version_added: "3.8.0"
     hostname:
-        description:
-            - The host of the database if using dbms_service
+        description: >
+            The host of the database if using dbms_service
         required: false
+        type: str
         default: localhost
         aliases: ['host']
     port:
-        description:
-            - The listener port to connect to the database if using
-              dbms_service
+        description: >
+            The listener port to connect to the database if using
+            dbms_service
         required: false
+        type: str
         default: 1521
-
 
 
 notes:
