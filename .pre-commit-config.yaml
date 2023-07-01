@@ -16,16 +16,6 @@ repos:
       - id: check-executables-have-shebangs
       - id: no-commit-to-branch
 
-  - repo: https://github.com/ansible-community/ansible-lint.git
-    rev: v6.14.4
-    hooks:
-      - id: ansible-lint
-        entry: ansible-lint --force-color -p
-        files: \.(yaml|yml)$
-        pass_filenames: false
-        always_run: true
-        verbose: true
-
   - repo: https://github.com/python/black.git
     rev: 23.3.0
     hooks:
@@ -39,3 +29,13 @@ repos:
     rev: '6.0.0'
     hooks:
       - id: flake8
+
+  - repo: https://github.com/ansible-community/ansible-lint.git
+    rev: v6.14.4
+    hooks:
+      - id: ansible-lint
+        entry: ansible-lint --force-color -p
+        files: \.(yaml|yml)$
+        pass_filenames: false
+        always_run: true
+        verbose: true
