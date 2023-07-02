@@ -1,10 +1,16 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+import os
+import re
+import socket
+import subprocess
+from ansible.module_utils.basic import AnsibleModule
 
 ANSIBLE_METADATA = {
     'metadata_version': '1.1',
     'status': ['preview'],
-    'supported_by': 'community'
+    'supported_by': 'community',
 }
 
 DOCUMENTATION = '''
@@ -17,9 +23,11 @@ description:
 version_added: "2.4"
 options:
     oracle_home:
-        description:
-            - Grid Infrastructure home, can be absent if ORACLE_HOME environment variable is set
+        description: >
+            Grid Infrastructure home, can be absent if ORACLE_HOME environment
+            variable is set
         required: false
+        type: str
 notes:
     - Oracle Grid Infrastructure 12cR1 or later required
     - Must be run as (become) GI owner
@@ -38,9 +46,6 @@ EXAMPLES = '''
       environment: "{{ oracle_env }}"
 '''
 
-import os, re
-from socket import gethostname, getfqdn
-
 # The following is to make the module usable in python 2.6 (RHEL6/OEL6)
 # Source: http://pydoc.net/pep8radius/0.9.0/pep8radius.shell/
 try:
@@ -49,29 +54,27 @@ except ImportError:  # pragma: no cover
     # python 2.6 doesn't include check_output
     # monkey patch it in!
     import subprocess
+
     STDOUT = subprocess.STDOUT
 
     def check_output(*popenargs, **kwargs):
         if 'stdout' in kwargs:  # pragma: no cover
-            raise ValueError('stdout argument not allowed, '
-                             'it will be overridden.')
-        process = subprocess.Popen(stdout=subprocess.PIPE,
-                                   *popenargs, **kwargs)
+            raise ValueError('stdout argument not allowed, ' 'it will be overridden.')
+        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
         output, _ = process.communicate()
         retcode = process.poll()
         if retcode:
             cmd = kwargs.get("args")
             if cmd is None:
                 cmd = popenargs[0]
-            raise subprocess.CalledProcessError(retcode, cmd,
-                                                output=output)
+            raise subprocess.CalledProcessError(retcode, cmd, output=output)
         return output
+
     subprocess.check_output = check_output
 
     # overwrite CalledProcessError due to `output`
     # keyword not being available (in 2.6)
     class CalledProcessError(Exception):
-
         def __init__(self, returncode, cmd, output=None):
             self.returncode = returncode
             self.cmd = cmd
@@ -79,11 +82,16 @@ except ImportError:  # pragma: no cover
 
         def __str__(self):
             return "Command '%s' returned non-zero exit status %d" % (
-                self.cmd, self.returncode)
+                self.cmd,
+                self.returncode,
+            )
+
     subprocess.CalledProcessError = CalledProcessError
+
 
 def is_executable(fpath):
     return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
 
 def exec_program_lines(arguments):
     try:
@@ -93,14 +101,17 @@ def exec_program_lines(arguments):
         # Just ignore the error
         return ['']
 
+
 def exec_program(arguments):
     return exec_program_lines(arguments)[0]
 
+
 def hostname_to_fqdn(hostname):
     if "." not in hostname:
-        return getfqdn(hostname)
+        return socket.getfqdn(hostname)
     else:
         return hostname
+
 
 def local_listener():
     global srvctl, shorthostname, iscrs, vips
@@ -111,20 +122,22 @@ def local_listener():
     re_listener_name = re.compile('Listener (.+) is enabled')
     listeners = []
     out = []
-    for l in listeners_out:
-        if "is enabled" in l:
-            m = re_listener_name.search(l)
-            listeners.append(m.group(1))
-    for l in listeners:
+    for iot in listeners_out:
+        if "is enabled" in iot:
+            m = re_listener_name.search(iot)
+            listeners.append(m.group(iot))
+    for lis in listeners:
         config = {}
-        output = exec_program_lines([srvctl, 'config', 'listener', '-l', l])
+        output = exec_program_lines([srvctl, 'config', 'listener', '-l', lis])
         for line in output:
             if line.startswith('Name:'):
                 config['name'] = line[6:]
             elif line.startswith('Type:'):
                 config['type'] = line[6:]
             elif line.startswith('Network:'):
+                # fmt: off
                 config['network'] = line[9:line.find(',')]
+                # fmt: on
             elif line.startswith('End points:'):
                 config['endpoints'] = line[12:]
                 for proto in config['endpoints'].split('/'):
@@ -136,6 +149,7 @@ def local_listener():
             config['ipv6'] = vips[config['network']]['ipv6']
         out.append(config)
     return out
+
 
 def scan_listener():
     global srvctl, shorthostname, iscrs, networks, scans
@@ -154,12 +168,19 @@ def scan_listener():
                 if m is not None:
                     endpoints = m.group(2)
             if endpoints:
-                out[n] = {'network': n, 'scan_address': scans[n]['fqdn'], 'endpoints': endpoints, 'ipv4': scans[n]['ipv4'], 'ipv6': scans[n]['ipv6']}
+                out[n] = {
+                    'network': n,
+                    'scan_address': scans[n]['fqdn'],
+                    'endpoints': endpoints,
+                    'ipv4': scans[n]['ipv4'],
+                    'ipv6': scans[n]['ipv6'],
+                }
                 for proto in endpoints.split('/'):
                     p = proto.split(':')
                     out[n][p[0].lower()] = p[1]
                 break
     return out
+
 
 def get_networks():
     global srvctl, shorthostname, iscrs
@@ -179,6 +200,7 @@ def get_networks():
     if "network" in item.keys():
         out[item['network']] = item
     return out
+
 
 def get_vips():
     global srvctl, shorthostname, iscrs
@@ -202,7 +224,8 @@ def get_vips():
     if "network" in vip.keys():
         out[vip['network']] = vip
     return out
-    
+
+
 def get_scans():
     global srvctl, shorthostname, iscrs
     out = {}
@@ -222,16 +245,23 @@ def get_scans():
     if "network" in item.keys():
         out[item['network']] = item
     return out
-    
+
+
 # Ansible code
 def main():
-    global module, shorthostname, hostname, srvctl, crsctl, cemutlo, iscrs, vips, networks, scans
+    global module
+    global shorthostname
+    global hostname
+    global srvctl
+    global crsctl
+    global cemutlo
+    global iscrs
+    global vips
+    global networks
+    global scans
     msg = ['']
     module = AnsibleModule(
-        argument_spec = dict(
-            oracle_home = dict(required=False)
-        ),
-        supports_check_mode=True
+        argument_spec=dict(oracle_home=dict(required=False)), supports_check_mode=True
     )
     # Preparation
     facts = {}
@@ -241,9 +271,18 @@ def main():
     crsctl = os.path.join(os.environ['ORACLE_HOME'], 'bin', 'crsctl')
     cemutlo = os.path.join(os.environ['ORACLE_HOME'], 'bin', 'cemutlo')
     if not is_executable(srvctl) or not is_executable(crsctl):
-        module.fail_json(changed=False, msg="Are you sure ORACLE_HOME=%s points to GI home? I can't find executables srvctl or crsctl under bin/." % os.environ['ORACLE_HOME'])
-    iscrs = True # This needs to be dynamically set if it is full clusterware or Oracle restart
-    hostname = gethostname()
+        module.fail_json(
+            changed=False,
+            msg=(
+                "Are you sure ORACLE_HOME=%s points to GI home? I can't find "
+                "executables srvctl or crsctl under bin/."
+            )
+            % os.environ['ORACLE_HOME'],
+        )
+    # iscrs: This needs to be dynamically set if it is full clusterware
+    # or Oracle restart
+    iscrs = True
+    hostname = socket.gethostname()
     shorthostname = hostname.split('.')[0]
     #
     if module.check_mode:
@@ -255,10 +294,10 @@ def main():
         facts.update({'clustername': 'ORACLE_RESTART'})
     # Cluster version
     if iscrs:
-        version = exec_program([crsctl, 'query','crs','activeversion'])
+        version = exec_program([crsctl, 'query', 'crs', 'activeversion'])
     else:
-        version = exec_program([crsctl, 'query','has','releaseversion'])
-    m = re.search('\[([0-9\.]+)\]$', version)
+        version = exec_program([crsctl, 'query', 'has', 'releaseversion'])
+    m = re.search('\[([0-9\.]+)\]$', version)  # noqa W605
     facts.update({'version': m.group(1)})
     # VIPS
     vips = get_vips()
@@ -278,6 +317,5 @@ def main():
     module.exit_json(msg=", ".join(msg), changed=False, ansible_facts=facts)
 
 
-from ansible.module_utils.basic import *
 if __name__ == '__main__':
     main()
