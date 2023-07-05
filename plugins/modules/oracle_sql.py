@@ -1,5 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+import os
+import re
+from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = '''
 ---
@@ -10,45 +14,39 @@ description:
 version_added: "2.1.0.0"
 options:
     username:
-        description:
-            - The database username to connect to the database
+        description: The database username to connect to the database
         required: false
         default: None
         aliases: ['un']
     password:
-        description:
-            - The password to connect to the database
+        description: The password to connect to the database
         required: false
         default: None
         aliases: ['pw']
     service_name:
-        description:
-            - The service_name to connect to the database
+        description: The service_name to connect to the database
         required: false
         default: database_name
         aliases: ['sn']
     hostname:
-        description:
-            - The host of the database
+        description: The host of the database
         required: false
         default: localhost
         aliases: ['host']
     port:
-        description:
-            - The listener port to connect to the database
+        description: The listener port to connect to the database
         required: false
         default: 1521
     sql:
-        description:
-            - The sql you want to execute
+        description: The sql you want to execute
         required: false
     script:
-        description:
-            - The script you want to execute. Doesn't handle selects
+        description: The script you want to execute. Doesn't handle selects
         required: false
 notes:
     - cx_Oracle needs to be installed
-    - Oracle client libraries need to be installed along with ORACLE_HOME and LD_LIBRARY_PATH settings.
+    - Oracle client libraries need to be installed along with ORACLE_HOME and
+      LD_LIBRARY_PATH settings.
 requirements: [ "cx_Oracle" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
@@ -73,9 +71,6 @@ EXAMPLES = '''
     service_name: one.world
     script: /u01/scripts/create-tables-and-insert-default-values.sql
 '''
-import os
-import re
-from ansible.module_utils.basic import AnsibleModule
 
 try:
     import cx_Oracle
@@ -88,10 +83,13 @@ else:
 def execute_sql_get(module, cursor, sql):
     try:
         cursor.execute(sql)
-        result = (cursor.fetchall())
+        result = cursor.fetchall()
     except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        msg = 'Something went wrong while executing sql_get - %s sql: %s' % (error.message, sql)
+        (error,) = exc.args
+        msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
+            error.message,
+            sql,
+        )
         module.fail_json(msg=msg, changed=False)
         return False
     return result
@@ -107,8 +105,11 @@ def execute_sql(module, cursor, conn, sql):
         # module.exit_json(msg=sql.strip())
         cursor.execute(sql)
     except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        msg = 'Something went wrong while executing sql - %s sql: %s' % (error.message, sql)
+        (error,) = exc.args
+        msg = 'Something went wrong while executing sql - %s sql: %s' % (
+            error.message,
+            sql,
+        )
         module.fail_json(msg=msg, changed=False)
         return False
     if docommit:
@@ -137,7 +138,6 @@ def clean_sqlfile(sqlfile):
 
 
 def main():
-
     module = AnsibleModule(
         argument_spec=dict(
             user=dict(required=False, aliases=['un', 'username']),
@@ -148,9 +148,8 @@ def main():
             port=dict(required=False, default=1521),
             sql=dict(required=False),
             script=dict(required=False),
-
         ),
-        mutually_exclusive=[['sql', 'script']]
+        mutually_exclusive=[['sql', 'script']],
     )
 
     user = module.params["user"]
@@ -169,7 +168,9 @@ def main():
     wallet_connect = '/@%s' % service_name
 
     try:
-        if not user and not password:  # If neither user or password is supplied, the use of an oracle wallet is assumed
+        if not user and not password:
+            # If neither user or password is supplied, the use of an
+            # oracle wallet is assumed
             if mode == 'sysdba':
                 connect = wallet_connect
                 conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
@@ -182,15 +183,21 @@ def main():
 
         elif user and password:
             if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                dsn = cx_Oracle.makedsn(
+                    host=hostname, port=port, service_name=service_name
+                )
                 connect = dsn
                 conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
             elif mode == 'sysasm':
-                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                dsn = cx_Oracle.makedsn(
+                    host=hostname, port=port, service_name=service_name
+                )
                 connect = dsn
                 conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSASM)
             else:
-                dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+                dsn = cx_Oracle.makedsn(
+                    host=hostname, port=port, service_name=service_name
+                )
                 connect = dsn
                 conn = cx_Oracle.connect(user, password, dsn)
 
@@ -198,8 +205,11 @@ def main():
             module.fail_json(msg='Missing username or password for cx_Oracle')
 
     except cx_Oracle.DatabaseError as exc:
-        error, = exc.args
-        msg = 'Could not connect to database - %s, connect descriptor: %s' % (error.message, connect)
+        (error,) = exc.args
+        msg = 'Could not connect to database - %s, connect descriptor: %s' % (
+            error.message,
+            connect,
+        )
         module.fail_json(msg=msg, changed=False)
 
     cursor = conn.cursor()
@@ -223,18 +233,20 @@ def main():
         sqlfile = read_file(module, script)
         if len(sqlfile) > 0:
             sqlfile = clean_sqlfile(sqlfile)
-            
+
             if sqlfile.endswith('/') or ('create or replace') in sqlfile.lower():
                 sqldelim = '/'
             else:
                 sqldelim = ';'
-            
+
             # fixed problems with quoted sqldelim using
             # https://stackoverflow.com/questions/2785755/how-to-split-but-ignore-separators-in-quoted-strings-in-python
-            PATTERN = re.compile(r'''((?:[^''' + sqldelim + r'''"']|"[^"]*"|'[^']*')+)''')
+            PATTERN = re.compile(
+                r'''((?:[^''' + sqldelim + r'''"']|"[^"]*"|'[^']*')+)'''
+            )
             sqlfile = sqlfile.strip(sqldelim)
             sql = PATTERN.split(sqlfile)[1::2]
-            
+
             for q in sql:
                 execute_sql(module, cursor, conn, q)
             msg = 'Finished running script %s \nContents: \n%s' % (script, sqlfile)
