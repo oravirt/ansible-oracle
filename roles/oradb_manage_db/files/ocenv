@@ -31,7 +31,7 @@
 ################################################################################
 
 ## Version of this script. Simply uses the date in YYYY-MM-DD format
-GV_OCENV_VERSION="2022-11-22"
+GV_OCENV_VERSION="2023-06-06"
 
 ###############################################################################
 ## Environment support homogenization
@@ -140,7 +140,7 @@ then
   export ORIGINAL_LD_LIBRARY_PATH_PRE_ENVLOAD="${LD_LIBRARY_PATH}"
 
   export GV_INITIAL_VARS_SAVED=TRUE
-  GV_ENV_SPECIFIC_VARS=()
+  declare -a GV_ENV_SPECIFIC_VARS
 fi
 
 export NLS_LANG=AMERICAN_AMERICA.AL32UTF8
@@ -275,9 +275,9 @@ Available commands:
     * distribute_env
                 distributes environment file for the current user on all other
                 RAC nodes
-    * pull_ocenv_master
+    * pull_ocenv_main
                 Downloads the current version of the script from the git repository
-                https://git.opitz-consulting.de/users/jas/repos/skriptsammlung
+                https://github.com/opitzconsulting/oracle-scripts
                 and puts it to "${GV_SOURCED_SCRIPT}".
 EOT
 }
@@ -620,6 +620,7 @@ clroraenv() {
   do
     unset "${LV_VAR_NAME}"
   done
+  # do not use "declare -a" since that would declare a local variable
   GV_ENV_SPECIFIC_VARS=()
   unset ORACLE_BASE
   unset ORACLE_HOME
@@ -696,10 +697,15 @@ myoraenv() {
   elif [[ -n "${GV_GRID_HOME}" ]]
   then
     LV_ORACLE_HOME=$("${GV_GRID_HOME}"/bin/crsctl stat res -p -w "((TYPE = ora.database.type) and (GEN_USR_ORA_INST_NAME = ${LV_ORACLE_SID}))" | grep "^ORACLE_HOME=" | cut -d"=" -f2)
-    LV_TNS_ADMIN=$("${GV_GRID_HOME}"/bin/crsctl stat res -p -w "((TYPE = ora.database.type) and (GEN_USR_ORA_INST_NAME = ${LV_ORACLE_SID}))" | grep "^USR_ORA_ENV=TNS_ADMIN=" | cut -d"=" -f3)
-    LV_DB_NAME=$("${GV_GRID_HOME}"/bin/crsctl stat res -p -w "((TYPE = ora.database.type) and (GEN_USR_ORA_INST_NAME = ${LV_ORACLE_SID}))" | grep "^USR_ORA_DB_NAME=" | cut -d"=" -f2)
-    LV_DB_UNIQUE_NAME=$("${GV_GRID_HOME}"/bin/crsctl stat res -p -w "((TYPE = ora.database.type) and (GEN_USR_ORA_INST_NAME = ${LV_ORACLE_SID}))" | grep "^DB_UNIQUE_NAME=" | cut -d"=" -f2)
-  else
+    if [[ -n "${LV_ORACLE_HOME}" ]]
+    then
+      LV_TNS_ADMIN=$("${GV_GRID_HOME}"/bin/crsctl stat res -p -w "((TYPE = ora.database.type) and (GEN_USR_ORA_INST_NAME = ${LV_ORACLE_SID}))" | grep "^USR_ORA_ENV=TNS_ADMIN=" | cut -d"=" -f3)
+      LV_DB_NAME=$("${GV_GRID_HOME}"/bin/crsctl stat res -p -w "((TYPE = ora.database.type) and (GEN_USR_ORA_INST_NAME = ${LV_ORACLE_SID}))" | grep "^USR_ORA_DB_NAME=" | cut -d"=" -f2)
+      LV_DB_UNIQUE_NAME=$("${GV_GRID_HOME}"/bin/crsctl stat res -p -w "((TYPE = ora.database.type) and (GEN_USR_ORA_INST_NAME = ${LV_ORACLE_SID}))" | grep "^DB_UNIQUE_NAME=" | cut -d"=" -f2)
+    fi
+  fi
+  if [[ -z "${LV_ORACLE_HOME}" ]]
+  then
     LV_ORACLE_HOME=$(grep "^${LV_ORACLE_SID}:" /etc/oratab | cut -d":" -f2)
   fi
   if [[ -z "${LV_ORACLE_HOME}" ]]
@@ -1268,19 +1274,34 @@ edf() {
       v_wrn="\033[01;33m";
       v_ok="\033[00;32m";
       v_clr="\033[0m";
+      v_maxelems=0;
     }
-    NR == 1 {
-      printf("%-35s  %10s  %10s  %10s  %8s  %s %s\n", $1, $2, $3, $4, $5, $6, $7)
+    {
+      a_lines[NR]=$0;
+      for (i = 1; i <= NF; i++) {
+        if (length($i) > a_lengths[i]) {
+          a_lengths[i] = length($i);
+        }
+      }
     }
-    NR > 1 {
-      v_used=$5 + 0;
-      if ( v_used > C )
-        v_color_used=v_crt
-      else if ( v_used > W )
-        v_color_used=v_wrn
-      else
-        v_color_used=v_ok;
-      printf("%-35s  %10s  %10s  %10s  %s%8s%s  %s %s\n", $1, $2, $3, $4, v_color_used, $5, v_clr, $6, $7)
+    END {
+      for (i = 1; i <= NR; i++) {
+        v_nf = split(a_lines[i], a_line);
+        if (i == 1) {
+          printf( "%-"a_lengths[1]"s  %"a_lengths[2]"s  %"a_lengths[3]"s  %"a_lengths[4]"s  %"a_lengths[5]"s  %s %s\n",
+                  a_line[1], a_line[2], a_line[3], a_line[4], a_line[5], a_line[6], a_line[7]);
+        } else {
+          v_used=a_line[5] + 0;
+          if ( v_used > C )
+            v_color_used=v_crt
+          else if ( v_used > W )
+            v_color_used=v_wrn
+          else
+            v_color_used=v_ok;
+          printf( "%-"a_lengths[1]"s  %"a_lengths[2]"s  %"a_lengths[3]"s  %"a_lengths[4]"s  %s%"a_lengths[5]"s%s  %s %s\n",
+                  a_line[1], a_line[2], a_line[3], a_line[4], v_color_used, a_line[5], v_clr, a_line[6], a_line[7]);
+        }
+      }
     }'
 }
 unalias gdf 2>/dev/null
@@ -1522,7 +1543,7 @@ bkup_api_list_jobs () {
       LV_LINE_FILTER=""
     ;;
   esac
-  /var/opt/oracle/bkup_api/bkup_api --dbname="${GV_DB_UNIQUE_NAME}" list jobs | awk -v cnt=10 'BEGIN{v_list_started=0} /^UUID/{v_list_started=1; v_head=$0} '"${LV_LINE_FILTER}"'{if (v_list_started==1) {v_buffer=v_buffer RS $0}} v_buffer~/(\n.*){'${P_LINE_COUNT}'}/{sub(/[^\n]*\n/,"",v_buffer)} END{print v_head; print v_buffer}'
+  /var/opt/oracle/bkup_api/bkup_api --dbname="${GV_DB_UNIQUE_NAME}" list jobs | awk -v cnt=10 'BEGIN{v_list_started=0} /^UUID/{v_list_started=1; v_head=$0} '"${LV_LINE_FILTER}"'{if (v_list_started==1) {v_buffer=v_buffer RS $0}} v_buffer~/(\n.*){'"${P_LINE_COUNT}"'}/{sub(/[^\n]*\n/,"",v_buffer)} END{print v_head; print v_buffer}'
 }
 bkup_api_last_job () {
   local P_BACKUP_TYPE LV_UUID
@@ -1623,6 +1644,8 @@ get_running_sids() {
 }
 ##############################################################################
 # Find out if database-instance is running by looking for ora_smon process
+# Oracle XE databases use "xe_smon" as process-prefix
+# Oracle 23c FREE databases use "db_smon" as process-prefix
 #
 # Prerequisites: None
 ##############################################################################
@@ -1630,7 +1653,7 @@ is_db_running() {
   local LV_ORACLE_SID
   LV_ORACLE_SID=$1
   # shellcheck disable=2009 # no pgrep on AIX
-  ps -ef | grep -q -E -w "(ora|xe)_smon_${LV_ORACLE_SID}"
+  ps -ef | grep -q -E -w "(ora|xe|db)_smon_${LV_ORACLE_SID}"
 }
 ##############################################################################
 # Find out if ASM-instance is running by looking for asm_smon process
@@ -1747,7 +1770,7 @@ get_lsnr_tracefile(){
     return 1
   fi
   local LV_LSNR_NAME_LOWER
-  LV_LSNR_NAME_LOWER="$(echo ${LV_LSNR_NAME} | to_lower)"
+  LV_LSNR_NAME_LOWER="$(echo "${LV_LSNR_NAME}" | to_lower)"
   local LV_LSNR_STATUS
   if LV_LSNR_STATUS="$(set_ora_home_env "${LV_LSNR_ORA_HOME}"; "${ORACLE_HOME}/bin/lsnrctl" status "${LV_LSNR_NAME}")"
   then
@@ -2030,14 +2053,14 @@ get_oracle_home_owner() {
   fi
 }
 list_homes() {
-  local LV_ORA_INSTLOC_LIST
+  declare -a LV_ORA_INSTLOC_LIST
   while read -r LV_ORA_INSTLOC_ELEM
   do
     if [[ -n "${LV_ORA_INSTLOC_ELEM}" ]]
     then
       LV_ORA_INSTLOC_LIST[${#LV_ORA_INSTLOC_LIST[@]}]="${LV_ORA_INSTLOC_ELEM}"
     fi
-  done <<< "$( ( awk -F: '/^[^#]*:[^#]+:/{printf("%s/oraInst.loc\n", $2)}' /etc/oratab 2>/dev/null; awk -F: '/[^[:space:]]/{printf("%s/oraInst.loc\n", $1)}' /etc/oragchomelist 2>/dev/null; awk -F= '/crs_home/{printf("%s/oraInst.loc\n", $2)}' /etc/oracle/olr.loc 2>/dev/null; ls -1 /etc/oraInst.loc 2>/dev/null) | sort -u)"
+  done <<< "$( ( awk -F: '/^[^#]*:[^#]+:/{printf("%s/oraInst.loc\n", $2)}' /etc/oratab 2>/dev/null; awk -F: '/[^[:space:]]/{printf("%s/oraInst.loc\n", $1)}' /etc/oragchomelist 2>/dev/null; awk -F= '/crs_home/{printf("%s/oraInst.loc\n", $2)}' /etc/oracle/olr.loc 2>/dev/null; ls -1 /etc/oraInst.loc 2>/dev/null) | sort -u )"
   if [[ "${#LV_ORA_INSTLOC_LIST[@]}" -gt 0 ]]
   then
     local LV_ORA_INVENTORY_LIST
