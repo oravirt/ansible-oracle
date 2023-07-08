@@ -1,18 +1,5 @@
 # Common playbook - sets up the host generic stuff
 ---
-# ansible-oracle needs python2 on some distributions for later installation of cx_Oracle
-- name: Check for correct Ansible Interpreter on RHEL/OL 7
-  ansible.builtin.assert:
-    quiet: true
-    that:
-      - discovered_interpreter_python == '/usr/bin/python'
-    fail_msg: Set interpreter_python to /usr/bin/python
-  when:
-    - ansible_distribution in('OracleLinux', 'RedHat')
-    - ansible_distribution_major_version == '7'
-    - interpreter_python is not defined
-  tags:
-    - assert
 
 - name: Check for correct Ansible Version (>= 2.8)
   ansible.builtin.assert:
