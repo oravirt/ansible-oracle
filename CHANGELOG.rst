@@ -5,6 +5,56 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.8.0
+======
+
+Release Summary
+---------------
+
+This is ansible-oracle 3.8.0.
+The target database server must have Python3 installaed which is automatically done with role `orahost`.
+It is mandatory for the module `oracle_db` which is used in `oradb_manage_db`.
+
+
+Minor Changes
+-------------
+
+- Add restart possibility after scope=spfile init parameters change (oravirt#342)
+- Add state=restarted to oracle_db (oravirt#342)
+- Remove deprecation warnings for community.general 7.x (oravirt#339)
+- black: adding black to pre-commit (oravirt#343)
+- flake8: adding flake8 to pre-commit (oravirt#343)
+- github Actions: adding Action for black and flake8 (oravirt#343)
+- ocenv: version 2023-06-06 of ocenv environment script (oravirt#347)
+- oracle_db: Refactoring code for flake8 (oravirt#342)
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- cx_Oracle: requires Python3 installed on target system  (oravirt#342)
+- cx_oracle: Added installation of cx_Oracle for Python3 (oravirt#346)
+- oradb_manage_db: requires Python3 installed on target system  (oravirt#342)
+
+Deprecated Features
+-------------------
+
+- modules: all modules will loose support for Python2 in ansible-oracle 4.0.0  (oravirt#346)
+
+Bugfixes
+--------
+
+- common: removed assert for python due to oravirt#346 (oravirt#350)
+- orasw_download_patches: added missing assert for oracle_sw_source_local (oravirt#340)
+- oraswdb_install: changed oracle_databases to db_homes_installed for installation source of ORACLE_HOMEs (oravirt#348)
+- oraswdb_manage_patches: Bugfix for missing opatch or opatchauto in db_homs_config dict (oravirt#349)
+- pre-commit: added antsibull-changelog-lint (oravirt#345)
+- pre-commit: moved ansible-lint to end of pre-commit hooks (oravirt#344)
+
+Known Issues
+------------
+
+- pre-commit: Ignore [WARNING] The 'rev' field of repo 'https://github.com/ansible-community/antsibull-changelog.git'. This will be fixed with next antsibull-changelog release.
+
 v3.7.0
 ======
 
