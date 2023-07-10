@@ -5,6 +5,14 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.8.1
+======
+
+Bugfixes
+--------
+
+- oraswdb_install: bugfix for imagename in db_homes_config  (oravirt#352)
+
 v3.8.0
 ======
 
