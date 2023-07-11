@@ -1,9 +1,9 @@
 # ansible-oracle
 * Automated installation of 
-   * Oracle RAC, 
-   * RAC One Node and 
-   * normal single instances.
-* Start with one or more clean machine(s), end up with a fully configured Oracle database
+   * Oracle RAC databases
+   * RAC One Node database and 
+   * normal single Oracle database instances.
+* Start with one or more clean Linux machine(s), end up with a fully configured Oracle database system
 
 Read documentation at <https://github.com/oravirt/ansible-oracle> for more details.
 
