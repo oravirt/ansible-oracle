@@ -10,8 +10,8 @@ Read documentation at <https://github.com/oravirt/ansible-oracle> for more detai
 
 ## Pre-requisites
 
-* Ansible >= 2.9
+* Ansible Version >= 2.9
 
-  2.12 is recommended
+  Version 2.12 or newer of Ansible is recommended
 * Oracle Linux (or any RHEL-based Linux System) >= 7
 * Oracle Database/Grid Infrastructure 21.3.0.0, 19.3.0.0
