@@ -1,5 +1,6 @@
 :toc:
 :toc-placement!:
+:toclevels: 4
 toc::[]
 
 :sectnums:
@@ -7,8 +8,7 @@ toc::[]
 
 == Overview
 
-IMPORTANT: This documentation is a short description to install all needed tools for ansible-oracle on a Windows based hostsystem. +
-Please read further notes for more informations.
+IMPORTANT: This documentation describes the installation of the required tools for ansible-oracle on a Windows based hostsystem. +
 
 :puml: http://www.plantuml.com/plantuml/proxy?src=https://raw.githubusercontent.com/oravirt/ansible-oracle/master/doc
 
@@ -23,18 +23,18 @@ The free space is needed in your home directory in Windows.
 ** Admin priviledges on Host machine
 ** Hyper-V disabled
 ** no WSL/WSL2 for installation +
-You could try it by your own, but the documentation expect that Hyper-V is completly disabled and no WSL/WSL2 is used.
+While you may try it, the documentation states that Hyper-V should be completely disabled and that no WSL/WSL2 is used.
 
-WARNING: There are a lot issues wehn Hyper-V is active on host machine. +
-Please switch Hyper-V completly off, before starting the boxes with Vagrant. +
-Really working solutions with Vagrant + VirtualBox and Hyper-V are welcome.
+WARNING: There are many issues when Hyper-V is active on the host machine. +
+Please switch Hyper-V off completely, before starting the boxes with Vagrant. +
+If you do find a really good working solution with Vagrant + VirtualBox and Hyper-V, feedback is welcome.
 
 == Installation
 
 === Disable Hyper-V in Windows
 
 WARNING: There are numerous problems with Vagrant & VirtualBox when Hyper-V is enabled. +
-It could work, but it is recommended to disable it for `ansible-oracle`.
+It is therefore recommended to disable it for `ansible-oracle`.
 
 IMPORTANT: All commands require a cmd.exe with admin rights.
 
@@ -44,7 +44,7 @@ bcdedit
 ----
 
 The output should contain a line with `hypervisorlaunchtype`. +
-If the line is not shown or `Off`, Hyper-V is completly disabled.
+If the line is not shown or `Off`, Hyper-V is completely disabled.
 
 .Output
 [quote,output from bcdedit]
@@ -73,7 +73,7 @@ shutdown -r -t 0
 === Chocolatey
 
 IMPORTANT: The installation of Chocolatey is not mandatory for `ansible-oracle`. +
-All tools could be installed manually. Make sure, that all are executable from `git+bash`. +
+All tools could be installed manually. Please ensure, that they are all executable from `git+bash`. +
 *It is highly recommended to use Chocolatey with `ansible-oracle`.*
 
 IMPORTANT: See the link:https://chocolatey.org/install[Homepage of chocolatey] for more details.
@@ -95,7 +95,7 @@ choco install git vagrant virtualbox
 IMPORTANT: This step is optional.
 
 This is a really good alternative terminal to `cmd.exe` for windows. +
-It is not recommended for `ansible-oracle` but you should give it a try and enfoy it - especially when VSCode is not used.
+It is not recommended for `ansible-oracle` but you should give it a try and enjoy it - especially when VSCode is not used.
 
 link:https://conemu.github.io[Homepage of ConEmu]
 
@@ -210,3 +210,7 @@ This is an experimental plugin which is needed to resize the 1. disk of a vagran
 ----
 vagrant plugin install vagrant-disksize
 ----
+
+
+== See also
+* link:vagrant_basics.md[Basic command and setup of Vagrant]: Preparation for beginner

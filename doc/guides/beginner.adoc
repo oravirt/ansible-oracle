@@ -13,11 +13,23 @@ Please follow the link:../vagrant.adoc[documentation].
 
 === Overview
 
+==== Architecture overview
 :puml: http://www.plantuml.com/plantuml/proxy?src=https://raw.githubusercontent.com/oravirt/ansible-oracle/master/doc
 
 image::{puml}/guides/beginner.puml[Architecturview]
 
-.Used defaults in this guide
+
+==== What are we going to do?
+With one command, the following will happen...
+
+- An Oracle Linux VM will be created.
+- A docker container is setup in this Linux VM.
+- Why do we need a docker container? Ansible runs in the docker container to configure the Oracle Linux VM and install the Oracle database. See link:../README-ansible.adoc[Details of Ansible as a Docker Container] for more information
+- The Oracle database installation is started from the docker container. See details below.
+
+
+==== Defaults
+.Defaults used in this guide
 [options="header,footer"]
 |=======================
 |Value |Description
@@ -88,12 +100,24 @@ cd ~/git/ansible-oracle/example/beginner/vagrant
 VAGRANT_EXPERIMENTAL=disks vagrant up
 ----
 
+===== What happens when I start vagrant?
+
+1. Using the vagrantfile, an Oracle Linux VM is installed (2x CPU, 4096MB RAM, 150GB HDD). IP = 192.168.56.161
+1. A mount point /vagrant is available in the Oracle Linux VM. This is a shared folder from your Windows machine.
+1. Your ssh key is used to connect to the VM in a secure way
+1. docker is installed in the Oracle Linux VM
+1. docker-compose is installed in the Oracle Linux VM
+1. The ansible-oracle repository is cloned to the Oracle Linux VM
+1. A docker container "Ansible Container" is built with docker-compose. This runs in the Oracle Linux VM
+1. No Oracle database is yet installed. See below
+
+
 === Working inside the VM
 
 ==== Connect to VM
 
-IMPORTANT: All furter steps are done inside the VM. +
-The SSH-Setup from previous chapter must be completed before!
+IMPORTANT: The next steps are done inside the VM. +
+The SSH-Setup from the previous chapter must be completed before continuing!
 
 .Connect into VM with SSH from `git+bash`
 ----
@@ -102,8 +126,8 @@ ssh -A vagrant@192.168.56.161
 
 ==== Note about Installation media
 
-The installation media is mounted with vboxsf from Vagrant into the VM at `/vagrant`. +
-You can check this.
+The installation media is mounted with vboxsf from Vagrant into the Linux VM, mounted as `/vagrant`. +
+Use the following command to check this...
 
 .check for Installation media
 ----
@@ -114,7 +138,7 @@ You can check this.
 
 ==== Start Ansible-Container inside VM
 
-IMPORTANT: Check the prompt while starting the commands in shell or inside the Ansible-Container. +
+IMPORTANT: Check the prompt shown in this documentation, as to whether you should start the commands in the shell or inside the Ansible-Container. +
 `ansible@ansible-oracle` is for working inside the container.
 
 .Start Ansible-Container
@@ -135,7 +159,7 @@ ansible@ansible-oracle:/git/ansible-oracle/example/beginner/ansible$
 ----
 
 
-IMPORTANT: The collection are installed once and stored on the docker volume.
+IMPORTANT: The collection is installed once and stored on the docker volume.
 
 .Install Collections
 ----
@@ -181,11 +205,11 @@ cd /git/ansible-oracle/example/beginner/ansible
 ansible-playbook -i inventory/ -e hostgroup=dbfs playbooks/single-instance-fs.yml
 ----
 
-The Database creation has been completed. +
+The Database creation is now complete. +
 See the following chapter for details about how to work with the VM.
 
 
-=== How to work with installed database
+=== How to work with the installed database
 
 ==== Login as vagrant
 
@@ -211,7 +235,7 @@ execute ocenv to source Oracle Environment
 
 ==== Start ocenv
 
-.Initialize ocenv
+.Initialize ocenv to set the environment variables
 ----
 [oracle@beginner-dbfs-151-192-168-56-161 ~]$ ocenv
 ----
@@ -263,9 +287,8 @@ PDBs
 [oracle@beginner-dbfs-151-192-168-56-161] [DB1] [~]
 ----
 
-==== Start SQLPlus
-
-.SQLPlus login
+==== Database Login
+.Start SQLPlus
 ----
 [oracle@beginner-dbfs-151-192-168-56-161] [DB1] [~]
 $ sql
