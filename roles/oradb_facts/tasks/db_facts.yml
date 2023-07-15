@@ -1,0 +1,29 @@
+---
+- name: Gather Facts from Database
+  opitzconsulting.ansible_oracle.oracle_facts:
+    hostname: "{{ ansible_hostname }}"
+    port: "{{ __listener_port }}"
+    service_name: "{{ __db_service_name }}"
+    user: "{{ __db_user }}"
+    password: "{{ _db_password_cdb }}"
+    mode: sysdba
+  environment: "{{ __oracle_env }}"
+  register: dbfactsreg
+
+# 2nd execution of oracle_factswill overwrite data of last execution.
+# => Store facts from oracle_facts in structure
+- name: Write facts to oracledb.db_unique_name
+  ansible.builtin.set_fact:
+    cacheable: true
+    oracledb_facts: "{{ oracledb_facts | default({}) | combine(_db_facts | items2dict) }}"
+  vars:
+    _db_facts:
+      - key: "{{ odb[0]['oracle_db_unique_name'] | default(odb[0]['oracle_db_name']) }}"
+        value:
+          database: "{{ ansible_facts['database'] }}"
+          instance: "{{ ansible_facts['instance'] }}"
+          parameter: "{{ ansible_facts['parameter'] }}"
+          rac: "{{ ansible_facts['rac'] }}"
+          redolog: "{{ ansible_facts['redolog'] }}"
+          tablespace: "{{ ansible_facts['tablespace'] }}"
+          userenv: "{{ ansible_facts['userenv'] }}"
