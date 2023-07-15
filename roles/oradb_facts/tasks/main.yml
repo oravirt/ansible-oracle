@@ -1,0 +1,28 @@
+---
+- name: Gather Facts from Database
+  when:
+    - oracle_databases is defined
+  tags: db_facts
+  block:
+    - name: Assert inventory data
+      ansible.builtin.import_role:
+        name: orasw_meta
+        tasks_from: assert_oracle_databases.yml
+
+    # IMPORTANT
+    # loop over module oracle_facts, because each execution
+    # overwrites ansible_facts from the previous one
+    - name: Gather Facts from Database
+      ansible.builtin.include_tasks: db_facts.yml
+      loop:
+        - "{{ oracle_databases }}"
+      loop_control:
+        loop_var: odb
+        label: >-
+          db_name: {{ odb[0]['oracle_db_name'] | default('') }}
+          db_unique_name: {{ odb[0]['oracle_db_unique_name'] | default('') }}
+          port: {{ listener_port }}
+          service: {{ db_service_name }}
+          state: {{ odb[0]['state'] | default('present') }}
+      when:
+        - odb[0]['state'] | default('present') == 'present'
