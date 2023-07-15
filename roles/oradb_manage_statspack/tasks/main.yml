@@ -148,12 +148,12 @@
       environment:
         ORACLE_HOME: "{{ oracle_home_db }}"
         ORACLE_SID: "{{ oracle_db_instance_name }}"
-        pdb_name: "{{ pdb.0.pdb_name }}"
+        pdb_name: "{{ opdb.0.pdb_name }}"
       loop:
         - "{{ oracle_pdbs | flatten(levels=1) }}"
       loop_control:
-        loop_var: pdb
-        label: "{{ pdb.0.cdb | default('') }} {{ pdb.0.pdb_name | default('') }} {{ oracle_db_instance_name | default('') }}"
+        loop_var: opdb
+        label: "{{ opdb.0.cdb | default('') }} {{ opdb.0.pdb_name | default('') }} {{ oracle_db_instance_name | default('') }}"
       register: statspackdropcmd
       become: true
       become_user: "{{ oracle_user }}"
@@ -162,8 +162,8 @@
         - '"ORA-01920:" not in statspackdropcmd.stdout'  # ORA-01920: user name 'PERFSTAT' conflicts with another user
       when:
         - oracle_pdbs is defined
-        - pdb.0.statspack is defined
-        - pdb.0.statspack.state | default('present') == 'absent'
+        - opdb.0.statspack is defined
+        - opdb.0.statspack.state | default('present') == 'absent'
 
     - ansible.builtin.debug:  # noqa name[missing]
         msg: "{{ item.stdout_lines }}"
@@ -191,12 +191,12 @@
         default_tablespace: "{{ pdb.statspack.tablespace | default('sysaux') }}"
         purgedates: "{{ pdb.statspack.purgedays | default(35) }}"
         snaplevel: "{{ pdb.statspack.snaplevel | default(7) }}"
-        pdb_name: "{{ pdb.0.pdb_name }}"
+        pdb_name: "{{ opdb.0.pdb_name }}"
       loop:
         - "{{ oracle_pdbs | flatten(levels=1) }}"
       loop_control:
-        loop_var: pdb
-        label: "{{ pdb.0.cdb | default('') }} {{ pdb.0.pdb_name | default('') }} {{ oracle_db_instance_name | default('') }}"
+        loop_var: opdb
+        label: "{{ opdb.0.cdb | default('') }} {{ opdb.0.pdb_name | default('') }} {{ oracle_db_instance_name | default('') }}"
       register: statspackcmd
       become: true
       become_user: "{{ oracle_user }}"
@@ -205,9 +205,9 @@
         - '"ORA-01920:" not in statspackcmd.stdout'  # ORA-01920: user name 'PERFSTAT' conflicts with another user
       when:
         - oracle_pdbs is defined
-        - pdb.0.state | default('present') == 'present'
-        - pdb.0.statspack is defined
-        - pdb.0.statspack.state | default('present') == 'present'
+        - opdb.0.state | default('present') == 'present'
+        - opdb.0.statspack is defined
+        - opdb.0.statspack.state | default('present') == 'present'
 
     - ansible.builtin.debug:  # noqa name[missing]
         msg: "{{ item.stdout_lines }}"
@@ -222,7 +222,7 @@
 - name: oradb_manage_statspack | Create/Modify Purge Job (PDB)
   opitzconsulting.ansible_oracle.oracle_job:
     hostname: "{{ ansible_hostname }}"
-    service_name: "{{ pdb.0.pdb_name }}"
+    service_name: "{{ _db_service_pdb }}"
     port: "{{ pdb.listener_port | default(listener_port | default(1521)) }}"
     user: "{{ db_user }}"
     password: "{{ db_password_pdb }}"
@@ -231,22 +231,22 @@
     job_type: "plsql_block"
     job_action: "PERFSTAT.STATSPACK.PURGE({{ pdb.statspack.purgedays | default(purgedays) }});"
     logging_level: "runs"
-    repeat_interval: "{{ pdb.0.statspack.purgeinterval | default(purgeinterval) }}"
+    repeat_interval: "{{ opdb.0.statspack.purgeinterval | default(purgeinterval) }}"
     state: "present"
   environment:
     ORACLE_HOME: "{{ oracle_home_db }}"
   loop:
     - "{{ oracle_pdbs | flatten(levels=1) }}"
   loop_control:
-    loop_var: pdb
-    label: "{{ pdb.0.cdb | default('') }} {{ pdb.0.pdb_name | default('') }}"
+    loop_var: opdb
+    label: "{{ opdb.0.cdb | default('') }} {{ opdb.0.pdb_name | default('') }}"
   when:
     - oracle_pdbs is defined
-    - pdb.0.cdb is defined
-    - pdb.0.pdb_name is defined
-    - pdb.0.state | default('present') == 'present'
-    - pdb.0.statspack is defined
-    - pdb.0.statspack.state | default('present') == 'present'
+    - opdb.0.cdb is defined
+    - opdb.0.pdb_name is defined
+    - opdb.0.state | default('present') == 'present'
+    - opdb.0.statspack is defined
+    - opdb.0.statspack.state | default('present') == 'present'
   become_user: "{{ oracle_user }}"
   tags:
     - spjob
@@ -255,31 +255,31 @@
 - name: oradb_manage_statspack | Create/Modify Snapshot Job (PDB)
   opitzconsulting.ansible_oracle.oracle_job:
     hostname: "{{ ansible_hostname }}"
-    service_name: "{{ pdb.0.pdb_name }}"
+    service_name: "{{ _db_service_pdb }}"
     port: "{{ pdb.listener_port | default(listener_port | default(1521)) }}"
     user: "{{ db_user }}"
     password: "{{ db_password_pdb }}"
     job_name: "PERFSTAT.SNAPSHOT"
     comments: "Statspack Snapshot-Job"
     job_type: "plsql_block"
-    job_action: "PERFSTAT.STATSPACK.SNAP(i_snap_level => {{ pdb.0.statspack.snaplevel | default(snaplevel) }});"
+    job_action: "PERFSTAT.STATSPACK.SNAP(i_snap_level => {{ opdb.0.statspack.snaplevel | default(snaplevel) }});"
     logging_level: "runs"
-    repeat_interval: "{{ pdb.0.statspack.snapinterval | default(snapinterval) }}"
+    repeat_interval: "{{ opdb.0.statspack.snapinterval | default(snapinterval) }}"
     state: "present"
   environment:
     ORACLE_HOME: "{{ oracle_home_db }}"
   loop:
     - "{{ oracle_pdbs | flatten(levels=1) }}"
   loop_control:
-    loop_var: pdb
-    label: "{{ pdb.0.cdb | default('') }} {{ pdb.0.pdb_name | default('') }}"
+    loop_var: opdb
+    label: "{{ opdb.0.cdb | default('') }} {{ opdb.0.pdb_name | default('') }}"
   when:
     - oracle_pdbs is defined
-    - pdb.0.cdb is defined
-    - pdb.0.pdb_name is defined
-    - pdb.0.state | default('present') == 'present'
-    - pdb.0.statspack is defined
-    - pdb.0.statspack.state | default('present') == 'present'
+    - opdb.0.cdb is defined
+    - opdb.0.pdb_name is defined
+    - opdb.0.state | default('present') == 'present'
+    - opdb.0.statspack is defined
+    - opdb.0.statspack.state | default('present') == 'present'
   become: true
   become_user: "{{ oracle_user }}"
   tags:
