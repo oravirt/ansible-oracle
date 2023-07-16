@@ -32,7 +32,7 @@
   opitzconsulting.ansible_oracle.oracle_tablespace:
     hostname: "{{ ansible_hostname }}"
     port: "{{ listener_port_template }}"
-    service_name: "{{ _db_service_pdb }}"
+    service_name: "{{ item.0.pdb_name }}"
     user: "{{ db_user }}"
     password: "{{ db_password_pdb }}"
     tablespace: "{{ item.1.name }}"
@@ -54,5 +54,5 @@
       skip_missing: true
   when: oracle_pdbs is defined and item.1 is defined and item.0.state | upper == 'PRESENT'
   loop_control:
-    label: "port: {{ listener_port_template }} pdb: {{ item.0.pdb_name }} tablespace: {{ item.1.name }} content: {{ item.1.content | default(omit) }} state: {{ item.1.state | default('present') }}"  # noqa yaml
+    label: "port: {{ listener_port_template }} service: {{ item.0.pdb_name }} tablespace: {{ item.1.name }} content: {{ item.1.content | default(omit) }} state: {{ item.1.state | default('present') }}"  # noqa yaml
   tags: tablespace

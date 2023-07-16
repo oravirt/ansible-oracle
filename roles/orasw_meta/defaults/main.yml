@@ -1,19 +1,4 @@
 ---
-_meta_helper_pdb: "{{ opdb.0 | default(item.0 | default({})) }}"
-
-# get db_unique_name from CDB for current pdb
-# get db_name when db_unique_name is missing
-_db_unique_name_for_pdb: >-
-  {{ (oracle_databases
-    | selectattr('oracle_db_name', 'match', _meta_helper_pdb.cdb)
-    | map(attribute='oracle_db_unique_name', default=_meta_helper_pdb.cdb))[0]
-  }}
-
-_db_service_pdb: >-
-  {%- set __db_domain_pdb = oracledb_facts[_db_unique_name_for_pdb]['parameter']['db_domain']['value'] -%}
-  {%- if __db_domain_pdb is defined and __db_domain_pdb is string and __db_domain_pdb | length > 0 -%}{{ _meta_helper_pdb.pdb_name }}.{{ __db_domain_pdb }}{%- else -%}
-  {{ _meta_helper_pdb.pdb_name }}{% endif %}
-
 install_from_nfs: false
 
 oracle_user: oracle                        # User that will own the Oracle Installations.
@@ -246,9 +231,9 @@ db_version: "{%- if dbh is defined and db_homes_config[dbh.home] is defined -%}
                  {%- endif -%}
              {%- endif -%}"
 
-oracle_db_instance_name: "{%- if opdb.0.cdb is defined -%}
+oracle_db_instance_name: "{%- if pdb.0.cdb is defined -%}
                             {%- for db in oracle_databases -%}
-                              {%- if db.oracle_db_name == opdb.0.cdb -%}
+                              {%- if db.oracle_db_name == pdb.0.cdb -%}
                               {{ db.oracle_db_instance_name | default(db.oracle_db_unique_name | default(db.oracle_db_name)) }}
                               {%- endif -%}
                             {%- endfor -%}
