@@ -49,8 +49,8 @@
     - name: manage tablespaces (pdb)
       opitzconsulting.ansible_oracle.oracle_tablespace:
         hostname: "{{ ansible_hostname }}"
-        port: "{{ listener_port_template }}"
-        service_name: "{{ opdb.0.pdb_name }}"
+        port: "{{ _listener_port }}"
+        service_name: "{{ _db_service_pdb }}"
         user: "{{ db_user }}"
         password: "{{ _db_password_pdb }}"
         mode: "{{ db_mode }}"
@@ -78,7 +78,7 @@
       loop_control:
         loop_var: opdb
         label: >-
-          service: {{ opdb.0.pdb_name }}:{{ listener_port_template }}
+          pdb: {{ opdb.0.pdb_name }}:{{ _listener_port }}
           tablespace: {{ opdb.1.name }}
           content: {{ opdb.1.content | default(omit) }}
           state: {{ opdb.1.state | default('present') }}
