@@ -1,7 +1,6 @@
 ---
 # @tag assert_ansible_oracle:description: Assert inventory variables from ansible-oracle
 - name: assert ansible-oracle variables
-  when: orasw_meta_assert_databases | default(true)
   tags:
     - always
     - assert_ansible_oracle
@@ -145,9 +144,3 @@
         - name: fail assert oracle_pdbs
           ansible.builtin.fail:
             msg: "See previous debug task for assertation failure"
-
-    # the orasw_meta role is defined as a dependency in many roles
-    # disable reexecution of assert now
-    - name: Set orasw_meta_assert_databases to false
-      ansible.builtin.set_fact:
-        orasw_meta_assert_databases: false
