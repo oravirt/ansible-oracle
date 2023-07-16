@@ -5,6 +5,26 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.9.0
+======
+
+Release Summary
+---------------
+
+This release adds support for db_domain in init.ora for nonCDB and CDB. Read (oravirt#356) for requirements and notes.
+
+Minor Changes
+-------------
+
+- Added support for db_domain in init.ora (oravirt#356)
+- oradb_facts: Backported role from dev release (oravirt#356)
+- oraswdb_install: fixed wrong creates in curl.yml (oravirt#354)
+
+Bugfixes
+--------
+
+- oraswdb_install: enable CV_ASSUME_DISTID=OL7 for Golden-Image on OL/RHEL8 (oravirt#355)
+
 v3.8.1
 ======
 
