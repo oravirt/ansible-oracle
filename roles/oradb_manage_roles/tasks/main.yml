@@ -2,53 +2,63 @@
 # tasks file for manage-db-users
 - name: Manage roles (cdb)
   opitzconsulting.ansible_oracle.oracle_role:
-    role: "{{ item.1.name }}"
-    state: "{{ item.1.state }}"
+    role: "{{ odb.1.name }}"
+    state: "{{ odb.1.state }}"
     hostname: "{{ ansible_hostname }}"
-    port: "{{ listener_port_template }}"
-    service_name: "{{ db_service_name }}"
+    port: "{{ _listener_port_cdb }}"
+    service_name: "{{ _db_service_name }}"
     user: "{{ db_user }}"
-    password: "{{ db_password_cdb }}"
+    password: "{{ _db_password_cdb }}"
     mode: "{{ db_mode }}"
   with_subelements:
     - "{{ oracle_databases }}"
     - roles
     - flags:
       skip_missing: true
-  environment: "{{ oracle_env }}"
+  environment: "{{ _oracle_env }}"
   when:
     - oracle_databases is defined
-    - item.0.state | lower == 'present'
-    - item.1 is defined
+    - odb.0.state == 'present'
+    - odb.1 is defined
   loop_control:
-    label: "port: {{ listener_port_template }}, service: {{ db_service_name }}, role: {{ item.1.name }}, state: {{ item.1.state }}"
+    loop_var: odb
+    label: >-
+      port {{ _listener_port_cdb }}
+      service {{ _db_service_name }}
+      role {{ odb.1.name }}
+      state {{ odb.1.state }}
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   tags: users,grants
 
 - name: Manage roles (pdb)
   opitzconsulting.ansible_oracle.oracle_role:
-    role: "{{ item.1.name }}"
-    state: "{{ item.1.state }}"
+    role: "{{ opdb.1.name }}"
+    state: "{{ opdb.1.state }}"
     hostname: "{{ ansible_hostname }}"
-    port: "{{ listener_port_template }}"
-    service_name: "{{ item.0.pdb_name }}"
+    port: "{{ _listener_port_pdb }}"
+    service_name: "{{ _db_service_pdb }}"
     user: "{{ db_user }}"
-    password: "{{ db_password_pdb }}"
+    password: "{{ _db_password_pdb }}"
     mode: "{{ db_mode }}"
   with_subelements:
     - "{{ oracle_pdbs }}"
     - roles
     - flags:
       skip_missing: true
-  environment: "{{ oracle_env }}"
+  environment: "{{ _oracle_env_pdb }}"
   when:
     - oracle_pdbs is defined
-    - item.0 is defined
-    - item.0.state | lower == 'present'
-    - item.1 is defined
+    - opdb.0 is defined
+    - opdb.0.state == 'present'
+    - opdb.1 is defined
   loop_control:
-    label: "port: {{ listener_port_template }}, service: {{ item.0.pdb_name }}, role: {{ item.1.name }}, state: {{ item.1.state }}"
+    loop_var: opdb
+    label: >-
+      port: {{ _listener_port_pdb }},
+      service: {{ _db_service_pdb }},
+      role: {{ opdb.1.name }},
+      state: {{ opdb.1.state }}
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   tags: users,grants
