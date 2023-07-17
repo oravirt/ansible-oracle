@@ -25,6 +25,7 @@ Manage roles in Oracle
 ## Dependencies
 
 - orasw_meta
+- oradb_facts
 
 ## License
 
