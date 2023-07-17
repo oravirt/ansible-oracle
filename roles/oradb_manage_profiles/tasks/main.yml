@@ -13,10 +13,10 @@
       opitzconsulting.ansible_oracle.oracle_profile:
         name: "{{ odb.1.name }}"
         state: "{{ odb.1.state }}"
-        attribute_name: "{{ attr_name_odb | default(omit) }}"
-        attribute_value: "{{ attr_value_odb | default(omit) }}"
+        attribute_name: "{{ __attr_name_odb | default(omit) }}"
+        attribute_value: "{{ __attr_value_odb | default(omit) }}"
         hostname: "{{ ansible_hostname }}"
-        port: "{{ listener_port_template }}"
+        port: "{{ _listener_port_cdb }}"
         service_name: "{{ _db_service_name }}"
         user: "{{ db_user }}"
         password: "{{ _db_password_cdb }}"
@@ -30,26 +30,26 @@
       loop_control:
         loop_var: odb
         label: >-
-          service: {{ _db_service_name }}:{{ listener_port_template }}
+          service: {{ _db_service_name }}:{{ _listener_port_cdb }}
           db_name: {{ odb.0.oracle_db_name }}
           Profile: {{ odb.1.name }}
           attributes: {{ odb.1.attributes }}
       when:
         - oracle_databases is defined
-        - odb.0.state | lower == 'present'
+        - odb.0.state == 'present'
         - odb.1 is defined
       run_once: "{{ configure_cluster }}"
       become: true
       become_user: "{{ oracle_user }}"
       vars:
-        attr_name_odb: >-
+        __attr_name_odb: >-
           {%- if odb.1.attributes is defined -%}
           {{ odb.1.attributes | default (omit) | map(attribute='name') | list }}
           {%- else -%}
           None
           {%- endif %}
 
-        attr_value_odb: >-
+        __attr_value_odb: >-
           {%- if odb.1.attributes is defined -%}
           {{ odb.1.attributes | default (omit) | map(attribute='value') | list }}
           {%- else -%}
@@ -61,11 +61,11 @@
       opitzconsulting.ansible_oracle.oracle_profile:
         name: "{{ opdb.1.name }}"
         state: "{{ opdb.1.state }}"
-        attribute_name: "{{ attr_name_opdb | default(omit) }}"
-        attribute_value: "{{ attr_value_opdb | default(omit) }}"
+        attribute_name: "{{ __attr_name_opdb | default(omit) }}"
+        attribute_value: "{{ __attr_value_opdb | default(omit) }}"
         hostname: "{{ ansible_hostname }}"
-        port: "{{ _listener_port }}"
-        service_name: "{{ opdb.0.pdb_name }}"
+        port: "{{ _listener_port_pdb }}"
+        service_name: "{{ _db_service_pdb }}"
         user: "{{ db_user }}"
         password: "{{ _db_password_pdb }}"
         mode: "{{ db_mode }}"
@@ -74,11 +74,11 @@
         - profiles
         - flags:
           skip_missing: true
-      environment: "{{ _oracle_env }}"
+      environment: "{{ _oracle_env_pdb }}"
       loop_control:
         loop_var: opdb
         label: >-
-          service: {{ _db_service_name }}:{{ _listener_port }}
+          service: {{ _db_service_pdb }}:{{ _listener_port_pdb }}
           CDB: {{ opdb.0.cdb }}
           PDB: {{ opdb.0.pdb_name }}
           Profile: {{ opdb.1.name }}
@@ -92,14 +92,14 @@
       become: true
       become_user: "{{ oracle_user }}"
       vars:
-        attr_name_opdb: >-
+        __attr_name_opdb: >-
           {%- if opdb.1.attributes is defined -%}
           {{ opdb.1.attributes | default (omit) | map(attribute='name') | list }}
           {%- else -%}
           None
           {%- endif %}
 
-        attr_value_opdb: >-
+        __attr_value_opdb: >-
           {%- if opdb.1.attributes is defined -%}
           {{ opdb.1.attributes | default (omit) | map(attribute='value') | list }}
           {%- else -%}
