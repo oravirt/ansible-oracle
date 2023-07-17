@@ -5,9 +5,6 @@ Manage database profiles in Oracle
 ## Table of content
 
 - [Requirements](#requirements)
-- [Default Variables](#default-variables)
-  - [attr_name](#attr_name)
-  - [attr_value](#attr_value)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -20,26 +17,6 @@ Manage database profiles in Oracle
 - Minimum Ansible version: `2.9.0`
 
 
-## Default Variables
-
-### attr_name
-
-#### Default value
-
-```YAML
-attr_name: "{% if opdb.1.attributes is defined %}{{ opdb.1.attributes | default (omit)\
-  \ | map(attribute='name') | list }} {%- else %}None {%- endif %}"
-```
-
-### attr_value
-
-#### Default value
-
-```YAML
-attr_value: "{% if opdb.1.attributes is defined -%}{{ opdb.1.attributes | default\
-  \ (omit) | map(attribute='value') | list }} {%- else %}None{% endif %}"
-```
-
 ## Discovered Tags
 
 **_dbprofiles_**
@@ -48,6 +25,7 @@ attr_value: "{% if opdb.1.attributes is defined -%}{{ opdb.1.attributes | defaul
 ## Dependencies
 
 - orasw_meta
+- oradb_facts
 
 ## License
 
