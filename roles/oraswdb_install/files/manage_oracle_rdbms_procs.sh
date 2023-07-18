@@ -96,8 +96,22 @@ function start_database() {
     echo "ORACLE_HOME: ${ORACLE_HOME}"
     echo "ORACLE_SID : ${ORACLE_SID}"
 
+    # set PFILEDIR as default
+    # => will be replaced when readonly home ist used
+    PFILEDIR="${ORACLE_HOME}/dbs"
+
+    # Do we have a potential readonly Home?
+    if test -f "${ORACLE_HOME}/install/orabasetab" ; then
+        # we could check for a readonly home
+        # shellcheck disable=SC2046
+        if [ ! $("${ORACLE_HOME}/bin/orabasehome") = "${ORACLE_HOME}" ] ; then
+            # readonly Home
+            PFILEDIR=$("$ORACLE_HOME/bin/orabaseconfig")/dbs
+        fi
+    fi
+
     # Check for SPFile/PFile
-    test -f "${ORACLE_HOME}/dbs/spfile${ORACLE_SID}.ora" || test -f "${ORACLE_HOME}/dbs/init${ORACLE_SID}.ora"
+    test -f "${PFILEDIR}/spfile${ORACLE_SID}.ora" || test -f "${PFILEDIR}/init${ORACLE_SID}.ora"
     # shellcheck disable=2181
     if [ "${?}" -ne 0 ] ; then
         echo "no parameter file found."
@@ -123,7 +137,7 @@ function start_database() {
 
     fi
 
-    if [ "${STARTDB:-'N'}" = "Y" ] ; then
+    if [ "${STARTDB:-N}" = "Y" ] ; then
 
         # Using RMAN for startup
         # => easy to switch from mount to open for running instance during execution
@@ -227,7 +241,7 @@ function do_sidline() {
         if test -f "${PROFILE_FILE}" ; then
             # shellcheck source=/dev/null
             . "${PROFILE_FILE}" > /dev/null
-            stop_database "${ORA_HOME}" "${ORA_SID}" "${global_dbmode:-'immediate'}"
+            stop_database "${ORA_HOME}" "${ORA_SID}" "${global_dbmode:-immediate}"
         fi
 
         if test -f "${PROFILE_FILE}" ; then
