@@ -12,11 +12,34 @@
                     {%- else -%}\
                           {{ oracle_base }}/{{ db_homes_config[dbh.home]['version'] }}/{{ db_homes_config[dbh.home]['home'] }}\
                     {%- endif -%}"
+  tags: always
 
 - ansible.builtin.include_tasks: ocenv.yml  # noqa name[missing]
   when: deploy_ocenv
   tags:
     - always
+
+# The systemd service needs an information for
+# starting the listener from right home
+# Mapping from listener to ORACLE_HOME is done with oracle_databases
+# => use the old .profile_<DB_SID> for this
+# => use the loop over oracle_databases
+- name: listener | Deploy dotprofile for listener autostart
+  ansible.builtin.template:
+    src: dotprofile-db.j2
+    dest: >-
+      {{ oracle_user_home }}/.profile_{{ dbh.oracle_db_instance_name
+            | default(dbh.oracle_db_unique_name)
+            | default(dbh.oracle_db_name)}}
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0644
+  when: dbh.state | lower == 'present'
+  loop_control:
+    label: >-
+      db_name: {{ dbh.oracle_db_name | default('') }}
+      listener: {{ dbh.listener_name | default('') }}
+  tags: listener2
 
 - ansible.builtin.debug:
     msg: "Maintaining DB - {{ dbh.oracle_db_name }}, ORACLE_HOME - {{ oracle_home_db }}"  # noqa name[missing]
