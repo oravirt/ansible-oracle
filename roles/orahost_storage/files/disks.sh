@@ -1,12 +1,15 @@
-#!/bin/bash
-#Create a single primary partiton with whole disk size and create LVM PV on it
-disk=$1
+#!/usr/bin/env bash
+#
+# Create a single primary partiton with whole disk size and create LVM PV on it
+#
+disk="$1"
 #remove ending numbers if found
 disk=${disk%%[0-9]}
 partno=1
 export PATH=$PATH:/sbin/:/usr/sbin/
-#only new version parted supports -a
-if [ $(parted -h | grep -- -a | wc -l) -gt 0  ]; then
+# only new version parted supports -a
+# shellcheck disable=2046
+if [ $(parted -h | grep -c -- -a) -gt 0  ]; then
  partedcmd='parted -a optimal'
 else
  partedcmd='parted'
@@ -23,16 +26,16 @@ if [[ -e ${disk}${partno} ]]; then
 fi
 
 echo "==> Create MBR label"
-parted -s $disk  mklabel msdos
-ncyl=$(parted $disk unit cyl print  | sed -n 's/.*: \([0-9]*\)cyl/\1/p')
+parted -s "$disk"  mklabel msdos
+ncyl=$(parted "$disk" unit cyl print  | sed -n 's/.*: \([0-9]*\)cyl/\1/p')
 
-if [[ $ncyl != [0-9]* ]]; then
+if [[ "$ncyl" != [0-9]* ]]; then
 	echo "disk $disk has invalid cylinders number: $ncyl"
 	exit 1
 fi
 
 echo "==> create primary parition  $partno with $ncyl cylinders"
-$partedcmd $disk mkpart primary 0cyl ${ncyl}cyl
+$partedcmd "$disk" mkpart primary 0cyl "${ncyl}cyl"
 #echo "==> set partition $partno to type: lvm "
 #parted $disk set $partno lvm on
 partprobe > /dev/null 2>&1
