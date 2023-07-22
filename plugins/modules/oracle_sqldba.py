@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 import errno
@@ -291,7 +291,7 @@ def run_sql(sql, username, password, pdb):
         return "[ERR]\n%s\n" % sout.strip()
 
     changed = True
-    return sout.decode().strip()
+    return sout.decode('utf-8').strip()
 
 
 def check_creates_sql(sql, scope):
@@ -380,7 +380,7 @@ def run_catcon_pl(catcon_pl):
             serr,
         )
         return
-    result += sout
+    result += sout.decode('utf-8')
     changed = True
 
 
