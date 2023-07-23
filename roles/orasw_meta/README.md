@@ -15,6 +15,7 @@ There are a lot of variables who are used by `orasw_meta`
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
+  - [_www_download_bin](#_www_download_bin)
   - [apply_patches_db](#apply_patches_db)
   - [autostartup_service](#autostartup_service)
   - [db_homes_config](#db_homes_config)
@@ -24,7 +25,6 @@ There are a lot of variables who are used by `orasw_meta`
   - [default_dbpass](#default_dbpass)
   - [deploy_ocenv](#deploy_ocenv)
   - [disable_ee_options](#disable_ee_options)
-  - [grid_install_user](#grid_install_user)
   - [hostgroup](#hostgroup)
   - [install_from_nfs](#install_from_nfs)
   - [is_sw_source_local](#is_sw_source_local)
@@ -33,7 +33,6 @@ There are a lot of variables who are used by `orasw_meta`
   - [nfs_server_sw_path](#nfs_server_sw_path)
   - [ocenv_bashrc_init](#ocenv_bashrc_init)
   - [ocenv_bashrc_init_section](#ocenv_bashrc_init_section)
-  - [ocm_response_file](#ocm_response_file)
   - [oracle_asm_disk_string](#oracle_asm_disk_string)
   - [oracle_base](#oracle_base)
   - [oracle_databases](#oracle_databases)
@@ -49,25 +48,17 @@ There are a lot of variables who are used by `orasw_meta`
   - [oracle_home_gi_so](#oracle_home_gi_so)
   - [oracle_install_option_gi](#oracle_install_option_gi)
   - [oracle_install_version_gi](#oracle_install_version_gi)
-  - [oracle_inventory_loc](#oracle_inventory_loc)
   - [oracle_opatch_patch](#oracle_opatch_patch)
-  - [oracle_patch_install](#oracle_patch_install)
-  - [oracle_patch_stage](#oracle_patch_stage)
-  - [oracle_patch_stage_remote](#oracle_patch_stage_remote)
   - [oracle_pdbs](#oracle_pdbs)
   - [oracle_profile_template](#oracle_profile_template)
   - [oracle_reco_dir_asm](#oracle_reco_dir_asm)
   - [oracle_reco_dir_fs](#oracle_reco_dir_fs)
-  - [oracle_rsp_stage](#oracle_rsp_stage)
-  - [oracle_stage](#oracle_stage)
-  - [oracle_stage_install](#oracle_stage_install)
   - [oracle_stage_remote](#oracle_stage_remote)
   - [oracle_sw_patches](#oracle_sw_patches)
   - [oracle_sw_source_local](#oracle_sw_source_local)
   - [oracle_sw_source_www](#oracle_sw_source_www)
   - [shell_aliases](#shell_aliases)
   - [shell_ps1](#shell_ps1)
-  - [www_download_bin](#www_download_bin)
 - [Discovered Tags](#discovered-tags)
 - [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
@@ -82,6 +73,17 @@ There are a lot of variables who are used by `orasw_meta`
 
 
 ## Default Variables
+
+### _www_download_bin
+
+The variable will be removed soon.
+The download will be changed to get_url to simplify the code.
+
+#### Default value
+
+```YAML
+_www_download_bin: curl
+```
 
 ### apply_patches_db
 
@@ -220,16 +222,11 @@ disable_ee_options: true # change options in binary
 disable_ee_options: false # do not change options in binary
 ```
 
-### grid_install_user
-
-#### Default value
-
-```YAML
-grid_install_user: '{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user
-  }}{% endif %}'
-```
-
 ### hostgroup
+
+Defines the hostgroup with nodes for a Grid-Infrastructure Cluster.
+
+The variable needs a refactoring.
 
 #### Default value
 
@@ -258,6 +255,8 @@ is_sw_source_local: true
 ```
 
 ### listener_port
+
+The global default port for listener when no dedicated port is configured in listener itself.
 
 #### Default value
 
@@ -311,14 +310,6 @@ Define the conntents to add to `.bashr` when `ocenv_bashrc_init: true`.
 ocenv_bashrc_init_section: |
   echo "execute ocenv to source Oracle Environment"
   alias ocenv='. "{{ dbenvdir }}/ocenv"'
-```
-
-### ocm_response_file
-
-#### Default value
-
-```YAML
-ocm_response_file: '{{ oracle_patch_stage }}/{{ db_version }}/ocm.rsp'
 ```
 
 ### oracle_asm_disk_string
@@ -646,16 +637,6 @@ oracle_install_version_gi: 19.3.0.0
 oracle_install_version_gi: 21.3.0.0
 ```
 
-### oracle_inventory_loc
-
-Central Oracle Inventory location.
-
-#### Default value
-
-```YAML
-oracle_inventory_loc: /u01/app/oraInventory
-```
-
 ### oracle_opatch_patch
 
 Mapping from OPatch ZIP-archive to Oracle Release.
@@ -682,31 +663,6 @@ oracle_opatch_patch:
     version: 11.2.0.4
   - filename: p6880880_112000_Linux-x86-64.zip
     version: 11.2.0.3
-```
-
-### oracle_patch_install
-
-#### Default value
-
-```YAML
-oracle_patch_install: '{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_patch_stage_remote
-  }}{% else %}{{ oracle_patch_stage }}{% endif %}'
-```
-
-### oracle_patch_stage
-
-#### Default value
-
-```YAML
-oracle_patch_stage: '{{ oracle_stage }}/patches'
-```
-
-### oracle_patch_stage_remote
-
-#### Default value
-
-```YAML
-oracle_patch_stage_remote: '{{ oracle_stage_remote }}/patches'
 ```
 
 ### oracle_pdbs
@@ -767,35 +723,6 @@ oracle_reco_dir_asm: +FRA
 oracle_reco_dir_fs: /u02/fra/
 ```
 
-### oracle_rsp_stage
-
-#### Default value
-
-```YAML
-oracle_rsp_stage: '{{ oracle_stage }}/rsp'
-```
-
-### oracle_stage
-
-Defines the directory for response files during installation.
-
-There is usually no need to change this variable.
-
-#### Default value
-
-```YAML
-oracle_stage: /u01/stage
-```
-
-### oracle_stage_install
-
-#### Default value
-
-```YAML
-oracle_stage_install: '{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote
-  }}{% else %}{{ oracle_stage }}{% endif %}'
-```
-
 ### oracle_stage_remote
 
 #### Default value
@@ -807,6 +734,8 @@ oracle_stage_remote: '{{ oracle_stage }}'
 ### oracle_sw_patches
 
 Defines the list of known Patches in `ansible-oracle`.
+
+Usage of this variable:
 
 If a complete software repository with pathches is used with a nfs-mount, this variable is not needed.
 
@@ -842,6 +771,10 @@ oracle_sw_patches:
 
 ### oracle_sw_source_local
 
+Define the directory when `` is set.
+
+The archives are directly read from this directory.
+
 #### Default value
 
 ```YAML
@@ -849,6 +782,9 @@ oracle_sw_source_local: /tmp
 ```
 
 ### oracle_sw_source_www
+
+Define the URL for downloading installation medias and patches from a central
+server during software installation and patching.
 
 #### Default value
 
@@ -892,14 +828,6 @@ Configure shell prompt for OS-User oracle
 shell_ps1: "'[$LOGNAME'@'$ORACLE_SID `basename $PWD`]$'"
 ```
 
-### www_download_bin
-
-#### Default value
-
-```YAML
-www_download_bin: curl
-```
-
 ## Discovered Tags
 
 **_always_**
@@ -919,17 +847,12 @@ www_download_bin: curl
 - (bug): add assert for install_from_nfs, nfs_server_sw, nfs_server_sw_path
 - (bug): why do we need oracle_stage_remote?
 - (bug): is_sw_source_local really needed with default or as dependency from other vars?
-- (bug): grid_install_user is wrong here.
 - (bug): Open Issue with changed behavior for `configure_cluster`
-- (bug): what exactly is hostgroup in role for?
+- (bug): Variable hosgroup needs a refactoring
 - (bug): Change default from autostartup_service for Single Instance
 - (bug): Check if shell_ps1 is used for oracle and grid
 - (bug): Check when shell_aliases is used in ansible-oracle and change description
 - (bug): check if assert for deploy_ocenv + ocenv_bashrc_init is existing
-- (information): variable description is missing
-- (information): variable description is missing
-- (information): variable description is missing
-- (information): variable description is missing
 - (information): variable description is missing
 - (information): variable description is missing
 - (information): variable description is missing
@@ -938,6 +861,7 @@ www_download_bin: curl
 - (information): variable description is missing
 - (information): variable description is missing
 - (information): variable description is missing
+- (todo): Remove variable _www_download_bin
 
 ## Dependencies
 

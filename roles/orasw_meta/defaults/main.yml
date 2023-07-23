@@ -21,9 +21,12 @@ install_from_nfs: false
 # @end
 apply_patches_db: true
 
-# @var www_download_bin:description: >
+# @todo todo: Remove variable _www_download_bin
+# @var _www_download_bin:description: >
+# The variable will be removed soon.
+# The download will be changed to get_url to simplify the code.
 # @end
-www_download_bin: curl                              # curl (shell module) or get_url module
+_www_download_bin: curl
 
 # @var nfs_server_sw_path:description: >
 # Path to installation medias on NFS-Ser.
@@ -37,33 +40,10 @@ www_download_bin: curl                              # curl (shell module) or get
 # nfs_server_sw_path: /orasw
 # @end
 
-# @var oracle_stage:description: >
-# Defines the base directory for response files, configuration firles etc. for `ansible-oracle`.
-#
-# There is usually no need to change this variable.
-# @end
-oracle_stage: /u01/stage
-
 # @todo bug: why do we need oracle_stage_remote?
 # @var oracle_stage_remote:description: >
 # @end
 oracle_stage_remote: "{{ oracle_stage }}"
-
-# @var oracle_stage_install:description: >
-# @end
-oracle_stage_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
-
-# @var oracle_stage:description: >
-# Defines the directory for response files during installation.
-#
-# There is usually no need to change this variable.
-# @end
-oracle_rsp_stage: "{{ oracle_stage }}/rsp"
-
-# @var oracle_inventory_loc:description: >
-# Central Oracle Inventory location.
-# @end
-oracle_inventory_loc: /u01/app/oraInventory
 
 # @todo bug: is_sw_source_local really needed with default or as dependency from other vars?
 # @var is_sw_source_local:description: >
@@ -79,9 +59,6 @@ is_sw_source_local: true
 # See (https://github.com/oravirt/ansible-oracle/issues/259) for details.
 # @end
 oracle_base: /u01/app/oracle
-
-# @todo bug: grid_install_user is wrong here.
-grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
 
 # @var oracle_install_option_gi:description: >
 # Define the installation type for Grid Infrastructure or Oracle Restart.
@@ -135,17 +112,32 @@ oracle_home_gi_cl: "/u01/app/{{ oracle_install_version_gi }}/grid"
 # @end
 oracle_home_gi_so: "{{ oracle_base }}/{{ oracle_install_version_gi }}/grid"  # ORACLE_HOME for Grid Infrastructure (Stand Alone)
 
-# @todo information: variable description is missing
+# @var listener_port:description: >
+# The global default port for listener when no dedicated port is configured in listener itself.
+# @end
 listener_port: 1521
 
 
-# @todo information: variable description is missing
+# @var oracle_sw_source_www:description: >
+# Define the URL for downloading installation medias and patches from a central
+# server during software installation and patching.
+# @end
 oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
-oracle_sw_source_local: /tmp  # Path to all software if using the copy module when putting software on the host(s)
+
+# @var oracle_sw_source_local:description: >
+# Define the directory when `` is set.
+#
+# The archives are directly read from this directory.
+# @end
+oracle_sw_source_local: /tmp
 
 
-# @todo information: variable description is missing
-# @todo bug: what exactly is hostgroup in role for?
+# @todo bug: Variable hosgroup needs a refactoring
+# @var hostgroup:description: >
+# Defines the hostgroup with nodes for a Grid-Infrastructure Cluster.
+#
+# The variable needs a refactoring.
+# @end
 hostgroup: "{{ group_names[0] }}"
 
 # @todo bug: Change default from autostartup_service for Single Instance
@@ -183,14 +175,6 @@ shell_aliases:
   - "lsnrstatus='lsnrctl status $LSNRNAME'"
   - "lsnrservice='lsnrctl services $LSNRNAME'"
 
-
-# @todo information: variable description is missing
-oracle_patch_stage: "{{ oracle_stage }}/patches"
-oracle_patch_stage_remote: "{{ oracle_stage_remote }}/patches"
-oracle_patch_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_patch_stage_remote }}{% else %}{{ oracle_patch_stage }}{% endif %}"
-ocm_response_file: "{{ oracle_patch_stage }}/{{ db_version }}/ocm.rsp"
-
-
 # @var deploy_ocenv:description: >
 # Install the `ocenv.sh` environment script.
 #
@@ -205,8 +189,8 @@ oracle_dbf_dir_fs: /u02/oradata/                                # If storage_typ
 
 
 # @todo information: variable description is missing
-oracle_reco_dir_fs: /u02/fra/                                   # If storage_type=FS this is where the fast recovery area is placed.
-oracle_dbf_dir_asm: '+DATA'                                        # If storage_type=ASM this is where the database is placed.
+oracle_reco_dir_fs: /u02/fra/
+oracle_dbf_dir_asm: '+DATA'
 oracle_reco_dir_asm: '+FRA'
 
 
@@ -293,6 +277,8 @@ dbenvdir: "{{ oracle_user_home }}/dbenv"
 
 # @var oracle_sw_patches:description: >
 # Defines the list of known Patches in `ansible-oracle`.
+#
+# Usage of this variable:
 #
 # If a complete software repository with pathches is used with a nfs-mount, this variable is not needed.
 # @end
