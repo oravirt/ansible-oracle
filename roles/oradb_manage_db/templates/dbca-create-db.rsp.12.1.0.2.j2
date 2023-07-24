@@ -497,7 +497,7 @@ DBSNMPPASSWORD = "{{default_dbpass }}"
 {% if dbh.datafile_dest is defined %}
 DATAFILEDESTINATION={{ dbh.datafile_dest }}
 {% else %}
-DATAFILEDESTINATION={{ datafile_dest }}
+DATAFILEDESTINATION={{ _oradb_manage_db_datafile_dest }}
 {% endif %}
 #-----------------------------------------------------------------------------
 # Name          : RECOVERYAREADESTINATION
@@ -510,7 +510,7 @@ DATAFILEDESTINATION={{ datafile_dest }}
 {% if dbh.recoveryfile_dest is defined %}
 RECOVERYAREADESTINATION={{ dbh.recoveryfile_dest }}
 {% else %}
-RECOVERYAREADESTINATION={{ recoveryfile_dest }}
+RECOVERYAREADESTINATION={{ _oradb_manage_db_recoveryfile_dest }}
 {% endif %}
 
 #-----------------------------------------------------------------------------
@@ -533,7 +533,7 @@ STORAGETYPE="{{ dbh.storage_type }}"
 {% if dbh.datafile_dest is defined %}
 DISKGROUPNAME={{ dbh.datafile_dest }}
 {% else %}
-DISKGROUPNAME={{ datafile_dest }}
+DISKGROUPNAME={{ _oradb_manage_db_datafile_dest }}
 {% endif %}
 
 #-----------------------------------------------------------------------------
@@ -543,7 +543,7 @@ DISKGROUPNAME={{ datafile_dest }}
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-ASMSNMP_PASSWORD={%if asmmonitorpassword is defined %}{{asmmonitorpassword}}{% else %}{{default_gipass}}{% endif %}
+ASMSNMP_PASSWORD={%if _oradb_manage_db_asmmonitorpassword is defined %}{{ _oradb_manage_db_asmmonitorpassword }}{% else %}{{ _oradb_manage_db_default_gipass }}{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : RECOVERYGROUPNAME
@@ -555,7 +555,7 @@ ASMSNMP_PASSWORD={%if asmmonitorpassword is defined %}{{asmmonitorpassword}}{% e
 {% if dbh.recoveryfile_dest is defined %}
 RECOVERYGROUPNAME={{ dbh.recoveryfile_dest }}
 {% else %}
-RECOVERYGROUPNAME={{ recoveryfile_dest }}
+RECOVERYGROUPNAME={{ _oradb_manage_db_recoveryfile_dest }}
 {% endif %}
 
 #-----------------------------------------------------------------------------

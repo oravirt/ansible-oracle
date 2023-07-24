@@ -440,7 +440,7 @@ datafileJarLocation=
 {% if dbh.datafile_dest is defined %}
 datafileDestination={{ dbh.datafile_dest }}
 {% else %}
-datafileDestination={{ datafile_dest }}
+datafileDestination={{ _oradb_manage_db_datafile_dest }}
 {% endif %}
 
 #-----------------------------------------------------------------------------
@@ -454,7 +454,7 @@ datafileDestination={{ datafile_dest }}
 {% if dbh.recoveryfile_dest is defined %}
 recoveryAreaDestination={{ dbh.recoveryfile_dest }}
 {% else %}
-recoveryAreaDestination={{ recoveryfile_dest }}
+recoveryAreaDestination={{ _oradb_manage_db_recoveryfile_dest }}
 {% endif %}
 
 #-----------------------------------------------------------------------------
@@ -477,7 +477,7 @@ storageType={{ dbh.storage_type }}
 {% if dbh.datafile_dest is defined %}
 diskGroupName={{ dbh.datafile_dest }}
 {% else %}
-diskGroupName={{ datafile_dest }}
+diskGroupName={{ _oradb_manage_db_datafile_dest }}
 {% endif %}
 
 #-----------------------------------------------------------------------------
@@ -487,7 +487,7 @@ diskGroupName={{ datafile_dest }}
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-asmsnmpPassword={%if asmmonitorpassword is defined %}{{asmmonitorpassword}}{% else %}{{default_gipass}}{% endif %}
+asmsnmpPassword={%if _oradb_manage_db_asmmonitorpassword is defined %}{{ _oradb_manage_db_asmmonitorpassword }}{% else %}{{ _oradb_manage_db_default_gipass }}{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : recoveryGroupName
@@ -499,7 +499,7 @@ asmsnmpPassword={%if asmmonitorpassword is defined %}{{asmmonitorpassword}}{% el
 {% if dbh.recoveryfile_dest is defined %}
 recoveryGroupName={{ dbh.recoveryfile_dest }}
 {% else %}
-recoveryGroupName={{ recoveryfile_dest }}
+recoveryGroupName={{ _oradb_manage_db_recoveryfile_dest }}
 {% endif %}
 
 

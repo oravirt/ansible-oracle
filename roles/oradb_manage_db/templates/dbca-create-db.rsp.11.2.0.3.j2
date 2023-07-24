@@ -392,7 +392,7 @@ DBSNMPPASSWORD = "{{default_dbpass }}"
 {% if dbh.datafile_dest is defined %}
 DATAFILEDESTINATION={{ dbh.datafile_dest }}
 {% else %}
-DATAFILEDESTINATION={{ datafile_dest }}
+DATAFILEDESTINATION={{ _oradb_manage_db_datafile_dest }}
 {% endif %}
 #-----------------------------------------------------------------------------
 # Name          : RECOVERYAREADESTINATION
@@ -405,7 +405,7 @@ DATAFILEDESTINATION={{ datafile_dest }}
 {% if dbh.recoveryfile_dest is defined %}
 RECOVERYAREADESTINATION={{ dbh.recoveryfile_dest }}
 {% else %}
-RECOVERYAREADESTINATION={{ recoveryfile_dest }}
+RECOVERYAREADESTINATION={{ _oradb_manage_db_recoveryfile_dest }}
 {% endif %}
 #-----------------------------------------------------------------------------
 # Name          : STORAGETYPE
@@ -427,7 +427,7 @@ STORAGETYPE="{{ dbh.storage_type }}"
 {% if dbh.datafile_dest is defined %}
 DISKGROUPNAME={{ dbh.datafile_dest.lstrip('+') }}
 {% else %}
-DISKGROUPNAME={{ datafile_dest.lstrip('+') }}
+DISKGROUPNAME={{ _oradb_manage_db_datafile_dest.lstrip('+') }}
 {% endif %}
 
 #-----------------------------------------------------------------------------

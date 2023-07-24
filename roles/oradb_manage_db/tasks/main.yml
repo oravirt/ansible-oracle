@@ -1,10 +1,12 @@
 ---
 # tasks file for manage_db
-- ansible.builtin.include_tasks: assert.yml  # noqa name[missing]
+- name: manage_db | assert
+  ansible.builtin.include_tasks: assert.yml
   tags:
     always
 
-- ansible.builtin.include_tasks: tnsnames.yml  # noqa name[missing]
+- name: manage_db | include tnsnames.yml
+  ansible.builtin.include_tasks: tnsnames.yml
   with_items:
     - "{{ tnsnames_installed }}"
   loop_control:
@@ -14,14 +16,17 @@
 
 - name: manage_db | set fact for Listener
   ansible.builtin.set_fact:
-    create_listener: "{{ create_listener }}"
+    _oradb_manage_db_create_listener: "{{ _oradb_manage_db_create_listener }}"
   with_items: "{{ oracle_databases }}"
   loop_control:
-    loop_var: dbh
-    label: "create_listener {{ create_listener | default('') }}  oracle_home {{ dbh.home | default('') }}"
+    loop_var: odb
+    label: >-
+      create_listener {{ _oradb_manage_db_create_listener | default('') }}
+      oracle_home {{ odb.home | default('') }}
   tags: set_fact
 
-- ansible.builtin.include_tasks: sqlnet.yml  # noqa name[missing]
+- name: manage_db | include sqlnet.yml
+  ansible.builtin.include_tasks: sqlnet.yml
   with_items:
     - "{{ sqlnet_installed }}"
   loop_control:
@@ -29,7 +34,8 @@
   when: sqlnet_installed is defined
   tags: sqlnet2
 
-- ansible.builtin.include_tasks: listener_details.yml  # noqa name[missing]
+- name: manage_db | include listener_details.yml
+  ansible.builtin.include_tasks: listener_details.yml
   with_items:
     - "{{ listener_installed }}"
   loop_control:
@@ -37,12 +43,21 @@
   when: listener_installed is defined
   tags: listener2
 
-- ansible.builtin.include_tasks: listener.yml  # noqa name[missing]
+# old listener logic
+# => only used when listener_installed is not existing
+- name: manage_db | Create listener with netca
+  ansible.builtin.include_tasks: listener.yml
   with_items:
     - "{{ oracle_databases }}"
   loop_control:
-    loop_var: dbh
-  when: create_listener and oracle_databases is defined and listener_installed is not defined
+    loop_var: odb
+    label: >-
+      listener_name {{ odb.listener_name | default('') }}
+      oracle_home {{ odb.home | default('') }}
+  when:
+    - _oradb_manage_db_create_listener
+    - oracle_databases is defined
+    - listener_installed is not defined
   tags: listener
 
 - name: manage_db | Add change-pdb script
@@ -54,12 +69,14 @@
     mode: 0644
   tags: sql_script
 
-- ansible.builtin.include_tasks: manage-db.yml  # noqa name[missing]
+- name: Create/Modify database
+  ansible.builtin.include_tasks: manage-db.yml
   with_items:
     - "{{ oracle_databases }}"
   loop_control:
-    loop_var: dbh
-    label: " oracle_db_name={{ dbh.oracle_db_name | default('') }}"
+    loop_var: odb
+    label: >-
+      oracle_db_name={{ odb.oracle_db_name | default('') }}
   when: oracle_databases is defined
   tags: create_db,dbca,customdbcatemplate,dotprofile_db,listener2
 
@@ -72,8 +89,9 @@
   failed_when: false
   ignore_errors: true
 
-- ansible.builtin.debug:
-    var: psout.stdout_lines  # noqa name[missing]
+- name: manage_db | psout
+  ansible.builtin.debug:
+    var: psout.stdout_lines
   changed_when: false
   failed_when: false
   when: psout is defined
