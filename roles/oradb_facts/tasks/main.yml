@@ -21,8 +21,8 @@
         label: >-
           db_name: {{ odb[0]['oracle_db_name'] | default('') }}
           db_unique_name: {{ odb[0]['oracle_db_unique_name'] | default('') }}
-          port: {{ listener_port }}
-          service: {{ __db_service_name }}
+          port: {{ _listener_port_cdb }}
+          service: {{ _db_service_name }}
           state: {{ odb[0]['state'] | default('present') }}
       when:
         - odb[0]['state'] | default('present') == 'present'

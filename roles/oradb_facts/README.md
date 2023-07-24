@@ -6,6 +6,7 @@ Gather Ansible Facts from database
 
 - [Requirements](#requirements)
 - [Discovered Tags](#discovered-tags)
+- [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
 - [License](#license)
 - [Author](#author)
@@ -21,6 +22,9 @@ Gather Ansible Facts from database
 
 **_db_facts_**
 
+## Open Tasks
+
+- (bug): parameter user, password and sysdba needs a refactoring
 
 ## Dependencies
 

@@ -1,4 +1,5 @@
 ---
+# @todo bug: parameter user, password and sysdba needs a refactoring
 - name: Gather Facts from Database
   opitzconsulting.ansible_oracle.oracle_facts:
     hostname: "{{ ansible_hostname }}"
@@ -9,8 +10,6 @@
     mode: sysdba
   environment: "{{ _oracle_env }}"
   register: dbfactsreg
-  vars:
-    db_user: "{{ __db_user }}"
 
 # 2nd execution of oracle_factswill overwrite data of last execution.
 # => Store facts from oracle_facts in structure
