@@ -16,7 +16,7 @@
 ## or db administrator who owns this installation.               			##
 ##############################################################################
 #-------------------------------------------------------------------------------
-# Do not change the following system generated value. 
+# Do not change the following system generated value.
 #-------------------------------------------------------------------------------
 responseFileVersion=/oracle/assistants/rspfmt_dbca_response_schema_v21.0.0
 
@@ -54,7 +54,7 @@ databaseConfigType={{ dbh.oracle_db_type }}
 #-----------------------------------------------------------------------------
 # Name          : RACOneNodeServiceName
 # Datatype      : String
-# Description   : Service is required by application to connect to RAC One 
+# Description   : Service is required by application to connect to RAC One
 #		  Node Database
 # Valid values  : Service Name
 # Default value : None
@@ -69,7 +69,7 @@ RACOneNodeServiceName={{ dbh.service_name }}
 #-----------------------------------------------------------------------------
 # Name          : policyManaged
 # Datatype      : Boolean
-# Description   : Set to true if Database is policy managed and 
+# Description   : Set to true if Database is policy managed and
 #		  set to false if  Database is admin managed
 # Valid values  : TRUE\FALSE
 # Default value : FALSE
@@ -90,9 +90,9 @@ managementPolicy=
 #-----------------------------------------------------------------------------
 # Name          : createServerPool
 # Datatype      : Boolean
-# Description   : Set to true if new server pool need to be created for database 
-#		  if this option is specified then the newly created database 
-#		  will use this newly created serverpool. 
+# Description   : Set to true if new server pool need to be created for database
+#		  if this option is specified then the newly created database
+#		  will use this newly created serverpool.
 #		  Multiple serverpoolname can not be specified for database
 # Valid values  : TRUE\FALSE
 # Default value : FALSE
@@ -103,8 +103,8 @@ managementPolicy=
 #-----------------------------------------------------------------------------
 # Name          : serverPoolName
 # Datatype      : String
-# Description   : Only one serverpool name need to be specified 
-#		   if Create Server Pool option is specified. 
+# Description   : Only one serverpool name need to be specified
+#		   if Create Server Pool option is specified.
 #		   Comma-separated list of Serverpool names if db need to use
 #		   multiple Server pool
 # Valid values  : ServerPool name
@@ -128,7 +128,7 @@ managementPolicy=
 #-----------------------------------------------------------------------------
 # Name          : force
 # Datatype      : Boolean
-# Description   : Set to true if new server pool need to be created by force 
+# Description   : Set to true if new server pool need to be created by force
 #		  if this option is specified then the newly created serverpool
 #		  will be assigned server even if no free servers are available.
 #		  This may affect already running database.
@@ -142,10 +142,10 @@ managementPolicy=
 #-----------------------------------------------------------------------------
 # Name          : pqPoolName
 # Datatype      : String
-# Description   : Only one serverpool name needs to be specified 
-#		   if create server pool option is specified. 
+# Description   : Only one serverpool name needs to be specified
+#		   if create server pool option is specified.
 #		   Comma-separated list of serverpool names if use
-#		   server pool. This is required to 
+#		   server pool. This is required to
 #                  create Parallel Query (PQ) database. Applicable to Big Cluster
 # Valid values  :  Parallel Query (PQ) pool name
 # Default value : None
@@ -157,7 +157,7 @@ managementPolicy=
 # Name          : pqCardinality
 # Datatype      : Number
 # Description   : Specify Cardinality for create server pool operation.
-#                 Applicable to Big Cluster 
+#                 Applicable to Big Cluster
 # Valid values  : any positive Integer value
 # Default value : Number of qualified nodes on cluster
 # Mandatory     : No [Required when a new serverpool need to be created]
@@ -165,9 +165,9 @@ managementPolicy=
 #pqCardinality=
 
 #-----------------------------------------------------------------------------
-# Name          : createAsContainerDatabase 
+# Name          : createAsContainerDatabase
 # Datatype      : boolean
-# Description   : flag to create database as container database 
+# Description   : flag to create database as container database
 # Valid values  : Check Oracle21c Administrator's Guide
 # Default value : false
 # Mandatory     : No
@@ -185,7 +185,7 @@ createAsContainerDatabase={% if dbh.is_container is defined %}{{ dbh.is_containe
 numberOfPDBs={% if dbh.is_container and dbh.num_pdbs is defined %}{{ dbh.num_pdbs | default(3) }}{%endif%}
 
 #-----------------------------------------------------------------------------
-# Name          : pdbName 
+# Name          : pdbName
 # Datatype      : String
 # Description   : Specify the pdbname/pdbanme prefix if one or more pdb need to be created
 # Valid values  : Check Oracle21c Administrator's Guide
@@ -195,7 +195,7 @@ numberOfPDBs={% if dbh.is_container and dbh.num_pdbs is defined %}{{ dbh.num_pdb
 pdbName={% if dbh.is_container and dbh.pdb_prefix is defined %}{{ dbh.pdb_prefix }}{%endif%}
 
 #-----------------------------------------------------------------------------
-# Name          : useLocalUndoForPDBs 
+# Name          : useLocalUndoForPDBs
 # Datatype      : boolean
 # Description   : Flag to create local undo tablespace for all PDB's.
 # Valid values  : TRUE\FALSE
@@ -429,9 +429,9 @@ dvAccountManagerPassword=
 olsConfiguration=
 
 #-----------------------------------------------------------------------------
-# Name          : datafileJarLocation 
+# Name          : datafileJarLocation
 # Datatype      : String
-# Description   : Location of the data file jar 
+# Description   : Location of the data file jar
 # Valid values  : Directory containing compressed datafile jar
 # Default value : None
 # Mandatory     : No
@@ -439,7 +439,7 @@ olsConfiguration=
 datafileJarLocation=
 
 #-----------------------------------------------------------------------------
-# Name          : datafileDestination 
+# Name          : datafileDestination
 # Datatype      : String
 # Description   : Location of the data file's
 # Valid values  : Directory for all the database files
@@ -449,7 +449,7 @@ datafileJarLocation=
 {% if dbh.datafile_dest is defined %}
 datafileDestination={{ dbh.datafile_dest }}
 {% else %}
-datafileDestination={{ datafile_dest }}
+datafileDestination={{ _oradb_manage_db_datafile_dest }}
 {% endif %}
 
 #-----------------------------------------------------------------------------
@@ -463,7 +463,7 @@ datafileDestination={{ datafile_dest }}
 {% if dbh.recoveryfile_dest is defined %}
 recoveryAreaDestination={{ dbh.recoveryfile_dest }}
 {% else %}
-recoveryAreaDestination={{ recoveryfile_dest }}
+recoveryAreaDestination={{ _oradb_manage_db_recoveryfile_dest }}
 {% endif %}
 
 #-----------------------------------------------------------------------------
@@ -486,7 +486,7 @@ storageType=
 {% if dbh.datafile_dest is defined %}
 diskGroupName={{ dbh.datafile_dest }}
 {% else %}
-diskGroupName={{ datafile_dest }}
+diskGroupName={{ _oradb_manage_db_datafile_dest }}
 {% endif %}
 
 #-----------------------------------------------------------------------------
@@ -496,7 +496,7 @@ diskGroupName={{ datafile_dest }}
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-asmsnmpPassword={%if asmmonitorpassword is defined %}{{asmmonitorpassword}}{% else %}{{default_gipass}}{% endif %}
+asmsnmpPassword={%if _oradb_manage_db_asmmonitorpassword is defined %}{{ _oradb_manage_db_asmmonitorpassword }}{% else %}{{ _oradb_manage_db_default_gipass }}{% endif %}
 
 #-----------------------------------------------------------------------------
 # Name          : recoveryGroupName
@@ -508,7 +508,7 @@ asmsnmpPassword={%if asmmonitorpassword is defined %}{{asmmonitorpassword}}{% el
 {% if dbh.recoveryfile_dest is defined %}
 recoveryGroupName={{ dbh.recoveryfile_dest }}
 {% else %}
-recoveryGroupName={{ recoveryfile_dest }}
+recoveryGroupName={{ _oradb_manage_db_recoveryfile_dest }}
 {% endif %}
 
 #-----------------------------------------------------------------------------
@@ -580,18 +580,18 @@ walletPassword=
 # Name          : listeners
 # Datatype      : String
 # Description   : Specifies list of listeners to register the database with.
-#		  By default the database is configured for all the listeners specified in the 
-#		  $ORACLE_HOME/network/admin/listener.ora 	
+#		  By default the database is configured for all the listeners specified in the
+#		  $ORACLE_HOME/network/admin/listener.ora
 # Valid values  : The list should be comma separated like "listener1,listener2".
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
 listeners=
 
 #-----------------------------------------------------------------------------
-# Name          : variablesFile 
+# Name          : variablesFile
 # Datatype      : String
 # Description   : Location of the file containing variable value pair
-# Valid values  : A valid file-system file. The variable value pair format in this file 
+# Valid values  : A valid file-system file. The variable value pair format in this file
 #		  is <variable>=<value>. Each pair should be in a new line.
 # Default value : None
 # Mandatory     : NO
@@ -663,8 +663,8 @@ automaticMemoryManagement=false
 # Name          : totalMemory
 # Datatype      : String
 # Description   : total memory in MB to allocate to Oracle
-# Valid values  : 
-# Default value : 
+# Valid values  :
+# Default value :
 # Mandatory     : NO
 #-----------------------------------------------------------------------------
 {% if dbh.oracle_db_mem_totalmb is defined %}

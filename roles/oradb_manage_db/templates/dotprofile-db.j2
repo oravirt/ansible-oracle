@@ -2,25 +2,25 @@
 # {{ ansible_managed }}
 #
 . {{ oracle_user_home }}/dbenv/ocenv 2>&1 > /dev/null
-myoraenv {{ dbh.oracle_db_instance_name
-            | default(dbh.oracle_db_unique_name)
-            | default(dbh.oracle_db_name) }} 2>&1 > /dev/null
+myoraenv {{ odb.oracle_db_instance_name
+            | default(odb.oracle_db_unique_name)
+            | default(odb.oracle_db_name) }} 2>&1 > /dev/null
 
 {# Remove possible old LSNRNAME from environmet
    Maybe we cannot set it because it is not defined for this database...
 #}
 unset LSNRNAME
-{% if dbh.listener_name is defined %}
-LSNRNAME={{ dbh.listener_name }}
+{% if odb.listener_name is defined %}
+LSNRNAME={{ odb.listener_name }}
 export LSNRNAME
 {% endif %}
 
 {# create environemt variables when rman is configured in oracle_databases #}
-{% if dbh.rman_jobs is defined %}
+{% if odb.rman_jobs is defined %}
 # setup some variables for oradb-rman
-export RMANTNS_ADMIN={{ rman_tns_admin  | default(dbh.rman_tns_admin  | default(oracle_base + '/rman/network/admin')) }}
-export RMANLOGDIR={{ rman_log_dir       | default(dbh.rman_log_dir    | default(oracle_base + '/rman/log/')) }}
-export RMANSCRIPTDIR={{ rman_script_dir | default(dbh.rman_script_dir | default(oracle_base + '/rman/script')) }}
+export RMANTNS_ADMIN={{ rman_tns_admin  | default(odb.rman_tns_admin  | default(oracle_base + '/rman/network/admin')) }}
+export RMANLOGDIR={{ rman_log_dir       | default(odb.rman_log_dir    | default(oracle_base + '/rman/log/')) }}
+export RMANSCRIPTDIR={{ rman_script_dir | default(odb.rman_script_dir | default(oracle_base + '/rman/script')) }}
 {% endif %}
 
 export PATH=${ORACLE_BASE}/bin:${PATH}

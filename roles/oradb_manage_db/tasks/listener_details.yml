@@ -1,11 +1,11 @@
 ---
 - ansible.builtin.debug:  # noqa name[missing]
-    msg: "ORACLE_BASE_HOME {{ listener_home_config }}"
+    msg: "ORACLE_BASE_HOME {{ _oradb_manage_db_listener_home_config }}"
   tags: listener2
 
 - name: listener | create custom configuration in listener.ora
   ansible.builtin.blockinfile:
-    path: "{{ listener_home_config }}/network/admin/listener.ora"
+    path: "{{ _oradb_manage_db_listener_home_config }}/network/admin/listener.ora"
     backup: true
     create: true
     mode: 0644
