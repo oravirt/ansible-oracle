@@ -2,7 +2,7 @@
 - name: Manage users (db/cdb)
   opitzconsulting.ansible_oracle.oracle_user:
     hostname: "{{ ansible_hostname }}"
-    port: "{{ _listener_port }}"
+    port: "{{ _listener_port_cdb }}"
     service_name: "{{ _db_service_name }}"
     user: "{{ db_user }}"
     password: "{{ _db_password_cdb }}"
@@ -34,15 +34,18 @@
   loop_control:
     loop_var: odb
     label: >-
-      service: {{ _db_service_name }}:{{ _listener_port }}
+      service: {{ _db_service_name }}:{{ _listener_port_cdb }}
       schema: {{ odb.1.schema }}
       state: {{ odb.1.state }}
   tags: users
+  vars:
+    __user_cdb_password: >-
+      {{ dbpasswords[odb.0.oracle_db_name][odb.1.schema] | default(default_dbpass) }}
 
 - name: Manage users (pdb)
   opitzconsulting.ansible_oracle.oracle_user:
     hostname: "{{ ansible_hostname }}"
-    port: "{{ _listener_port }}"
+    port: "{{ _listener_port_pdb }}"
     service_name: "{{ _db_service_pdb }}"
     user: "{{ db_user }}"
     password: "{{ _db_password_pdb }}"
@@ -62,7 +65,7 @@
     - users
     - flags:
       skip_missing: true
-  environment: "{{ _oracle_env }}"
+  environment: "{{ _oracle_env_pdb }}"
   when:
     - oracle_pdbs is defined
     - opdb.0.state == 'present'
@@ -78,3 +81,6 @@
       state: {{ opdb.1.state }}
     loop_var: opdb
   tags: users
+  vars:
+    __user_pdb_password: >-
+      {{ dbpasswords[opdb.0.cdb][opdb.0.pdb_name][opdb.1.schema] | default(default_dbpass) }}
