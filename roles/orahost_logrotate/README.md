@@ -6,9 +6,7 @@ Configure logrotate for ansible-oracle
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
-  - [configure_cluster](#configure_cluster)
   - [logrotate_config](#logrotate_config)
-  - [oracle_base](#oracle_base)
   - [oracle_cleanup_days](#oracle_cleanup_days)
   - [oracle_home_gi](#oracle_home_gi)
   - [oracle_home_gi_cl](#oracle_home_gi_cl)
@@ -28,14 +26,6 @@ Configure logrotate for ansible-oracle
 
 
 ## Default Variables
-
-### configure_cluster
-
-#### Default value
-
-```YAML
-configure_cluster: false
-```
 
 ### logrotate_config
 
@@ -72,14 +62,6 @@ logrotate_config:
       - weekly
       - rotate 24
       - dateext
-```
-
-### oracle_base
-
-#### Default value
-
-```YAML
-oracle_base: /u01/app/oracle
 ```
 
 ### oracle_cleanup_days
