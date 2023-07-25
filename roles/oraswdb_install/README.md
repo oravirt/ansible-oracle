@@ -6,23 +6,16 @@ Install Oracle Database Software
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
-  - [_hostinitdaemon_dict](#_hostinitdaemon_dict)
   - [autostartup_service](#autostartup_service)
-  - [choptcheck](#choptcheck)
   - [configure_oracle_profile](#configure_oracle_profile)
-  - [forcechopt](#forcechopt)
   - [glogin_default_cdb](#glogin_default_cdb)
   - [glogin_default_nocdb](#glogin_default_nocdb)
   - [hostgroup](#hostgroup)
   - [hostgroup_hub](#hostgroup_hub)
   - [hostgroup_leaf](#hostgroup_leaf)
   - [hostinitdaemon](#hostinitdaemon)
-  - [oracle_db_responsefile](#oracle_db_responsefile)
-  - [oracle_directories](#oracle_directories)
   - [oracle_ee_options](#oracle_ee_options)
-  - [oracle_hostname](#oracle_hostname)
-  - [oracle_sw_image_db](#oracle_sw_image_db)
-  - [oracle_sw_source_www](#oracle_sw_source_www)
+  - [oraswdb_install_forcechopt](#oraswdb_install_forcechopt)
   - [ulimit_systemd_mapping](#ulimit_systemd_mapping)
 - [Discovered Tags](#discovered-tags)
 - [Open Tasks](#open-tasks)
@@ -39,19 +32,12 @@ Install Oracle Database Software
 
 ## Default Variables
 
-### _hostinitdaemon_dict
-
-#### Default value
-
-```YAML
-_hostinitdaemon_dict:
-  RedHat:
-    version_highest: 6
-  Suse:
-    version_highest: 11
-```
-
 ### autostartup_service
+
+Force a chopt operation in ORACLE_HOME.
+
+This is needed, when an existing ORACLE_HOME had multiple
+switches between on/off for an option.
 
 #### Default value
 
@@ -59,15 +45,13 @@ _hostinitdaemon_dict:
 autostartup_service: false
 ```
 
-### choptcheck
-
-#### Default value
-
-```YAML
-choptcheck: '{% if forcechopt | bool %}dochopt{% endif %}'
-```
-
 ### configure_oracle_profile
+
+Create .profile_-environment scripts for databases
+in `oracle_databases`.
+
+Mandatory when `listener_installed` is defined and
+`autostartup_service: true`. Otherwise the listener will not start!
 
 #### Default value
 
@@ -75,15 +59,9 @@ choptcheck: '{% if forcechopt | bool %}dochopt{% endif %}'
 configure_oracle_profile: true
 ```
 
-### forcechopt
-
-#### Default value
-
-```YAML
-forcechopt: false
-```
-
 ### glogin_default_cdb
+
+content of glogin.sql for CDB/PDB databases
 
 #### Default value
 
@@ -138,47 +116,14 @@ hostgroup_leaf: '{{ hostgroup }}-leaf'
 
 ### hostinitdaemon
 
-#### Default value
+The start daemon of the OS.
 
-```YAML
-hostinitdaemon: "{% if ansible_distribution_major_version is version(_hostinitdaemon_dict[ansible_os_family]['version_highest'],\
-  \ '<=') %}init{% else %}systemd{% endif %}"
-```
-
-### oracle_db_responsefile
+Usually no need to change this value!
 
 #### Default value
 
 ```YAML
-oracle_db_responsefile: '{{ dbh.home }}_{{ ansible_hostname }}.rsp'
-```
-
-### oracle_directories
-
-#### Default value
-
-```YAML
-oracle_directories:
-  - {name: '{{ oracle_stage }}', owner: '{{ oracle_user }}', group: '{{ oracle_group
-      }}', mode: 775}
-  - {name: '{{ oracle_rsp_stage }}', owner: '{{ oracle_user }}', group: '{{ oracle_group
-      }}', mode: 775}
-  - {name: '{{ oracle_base }}', owner: '{{ oracle_user }}', group: '{{ oracle_group
-      }}', mode: 775}
-  - {name: '{{ oracle_base }}/cfgtoollogs', owner: '{{ oracle_user }}', group: '{{
-      oracle_group }}', mode: 775}
-  - {name: '{{ oracle_base }}/admin', owner: '{{ oracle_user }}', group: '{{ oracle_group
-      }}', mode: 775}
-  - {name: '{{ oracle_base }}/audit', owner: '{{ oracle_user }}', group: '{{ oracle_group
-      }}', mode: 775}
-  - {name: '{{ oracle_base }}/cfgtoollogs/dbca', owner: '{{ oracle_user }}', group: '{{
-      oracle_group }}', mode: 775}
-  - {name: '{{ oracle_base }}/cfgtoollogs/sqlpatch', owner: '{{ oracle_user }}', group: '{{
-      oracle_group }}', mode: 775}
-  - {name: '{{ oracle_base }}/cfgtoollogs/netca', owner: '{{ oracle_user }}', group: '{{
-      oracle_group }}', mode: 775}
-  - {name: '{{ oracle_user_home }}/.Scripts', owner: '{{ oracle_user }}', group: '{{
-      oracle_group }}', mode: 775}
+hostinitdaemon: '{{ ansible_service_mgr }}'
 ```
 
 ### oracle_ee_options
@@ -190,45 +135,17 @@ oracle_ee_options: "{{ _oracle_ee_opiton_dict[db_homes_config[dbh.home]['version
   \ }}"
 ```
 
-### oracle_hostname
+### oraswdb_install_forcechopt
 
 #### Default value
 
 ```YAML
-oracle_hostname: '{{ ansible_fqdn }}'
-```
-
-### oracle_sw_image_db
-
-#### Default value
-
-```YAML
-oracle_sw_image_db:
-  - {filename: LINUX.X64_213000_db_home.zip, version: 21.3.0.0, creates: install/.img.bin}
-  - {filename: LINUX.X64_193000_db_home.zip, version: 19.3.0.0, creates: install/.img.bin}
-  - {filename: LINUX.X64_180000_db_home.zip, version: 18.3.0.0, creates: install/.img.bin}
-  - {filename: linuxx64_12201_database.zip, version: 12.2.0.1, creates: database/runInstaller}
-  - {filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2, creates: database/stage/sizes/oracle.server.Custom.sizes.properties}
-  - {filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2, creates: database/install/.oui}
-  - {filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1, creates: database/runInstaller}
-  - {filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1, creates: database/runInstaller}
-  - {filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4, creates: database/install/resource/cons_zh_TW.nls}
-  - {filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4, creates: database/stage/Components/oracle.db/11.2.0.4.0/1/DataFiles/filegroup18.jar}
-  - {filename: p10404530_112030_Linux-x86-64_1of7.zip, version: 11.2.0.3, creates: database/readme.html}
-  - filename: p10404530_112030_Linux-x86-64_2of7.zip
-    version: 11.2.0.3
-    creates: database/stage/Components/oracle.sysman.console.db/11.2.0.3.0/1/DataFiles/filegroup2.jar
-```
-
-### oracle_sw_source_www
-
-#### Default value
-
-```YAML
-oracle_sw_source_www: ''
+oraswdb_install_forcechopt: false
 ```
 
 ### ulimit_systemd_mapping
+
+Addional limits for systemd.
 
 #### Default value
 
@@ -284,7 +201,6 @@ ulimit_systemd_mapping:
 
 ## Open Tasks
 
-- (bug): oracle_hostname really needed? Maybe as hostname for all the oradb-manage-* roles as extension?
 - (information): hostgroup, hostgroup_hub, hostgroup_leaf needs some more tests
 
 ## Dependencies
