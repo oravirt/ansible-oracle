@@ -6,7 +6,7 @@
     copy: false
     creates: "{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates }}"
   with_nested:
-    - "{{ oracle_sw_image_db }}"
+    - "{{ _oraswdb_install_oracle_sw_image_db }}"
     - ""  # dummy to force item.0 instead of item.
   become: true
   become_user: "{{ oracle_user }}"
@@ -25,7 +25,7 @@
     copy: false
     creates: "{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates }}"
   with_nested:
-    - "{{ oracle_sw_image_db }}"
+    - "{{ _oraswdb_install_oracle_sw_image_db }}"
     - ""  # dummy to force item.0 instead of item.
   become: true
   become_user: "{{ oracle_user }}"
@@ -38,7 +38,7 @@
     - oradbswunpack
 
 - name: install_home_db | Install Oracle Database Server
-  ansible.builtin.shell: "{{ oracle_stage_install }}/{{ db_homes_config[dbh.home]['version'] }}/database/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_db_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent -waitforcompletion"
+  ansible.builtin.shell: "{{ oracle_stage_install }}/{{ db_homes_config[dbh.home]['version'] }}/database/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ _oraswdb_install_db_responsefile }} -ignorePrereq -ignoreSysPrereqs -silent -waitforcompletion"
   # noqa yaml command-instead-of-shell no-changed-when
   become: true
   become_user: "{{ oracle_user }}"

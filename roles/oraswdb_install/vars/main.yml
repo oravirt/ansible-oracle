@@ -1,0 +1,36 @@
+---
+
+# internal use only
+_oraswdb_install_db_responsefile: "{{ dbh.home }}_{{ ansible_hostname }}.rsp"
+
+# Mapping for installation media for Oracle
+_oraswdb_install_oracle_sw_image_db:
+  - {filename: LINUX.X64_213000_db_home.zip, version: 21.3.0.0, creates: 'install/.img.bin'}
+  - {filename: LINUX.X64_193000_db_home.zip, version: 19.3.0.0, creates: 'install/.img.bin'}
+  - {filename: LINUX.X64_180000_db_home.zip, version: 18.3.0.0, creates: 'install/.img.bin'}
+  - {filename: linuxx64_12201_database.zip, version: 12.2.0.1, creates: 'database/runInstaller'}
+  - {filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2, creates: 'database/stage/sizes/oracle.server.Custom.sizes.properties'}
+  - {filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2, creates: 'database/install/.oui'}
+  - {filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1, creates: 'database/runInstaller'}
+  - {filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1, creates: 'database/runInstaller'}
+  - {filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4, creates: 'database/install/resource/cons_zh_TW.nls'}
+  - {filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4, creates: 'database/stage/Components/oracle.db/11.2.0.4.0/1/DataFiles/filegroup18.jar'}
+  - {filename: p10404530_112030_Linux-x86-64_1of7.zip, version: 11.2.0.3, creates: 'database/readme.html'}
+  - filename: p10404530_112030_Linux-x86-64_2of7.zip
+    version: 11.2.0.3
+    creates: 'database/stage/Components/oracle.sysman.console.db/11.2.0.3.0/1/DataFiles/filegroup2.jar'
+
+_oraswdb_install_oracle_directories:
+  - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_rsp_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/admin", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/audit", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs/dbca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs/sqlpatch", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs/netca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_user_home }}/.Scripts", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+
+# choptcheck is a dummy for 'creates' during chopt-task to force an execution
+_oraswdb_install_choptcheck: "{% if oraswdb_install_forcechopt | bool %}dochopt{% endif %}"

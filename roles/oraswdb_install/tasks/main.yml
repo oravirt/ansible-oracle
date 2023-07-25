@@ -26,6 +26,12 @@
   tags:
     - always
     - assert
+  vars:
+    _hostinitdaemon_dict:
+      RedHat:
+        version_highest: 6
+      Suse:
+        version_highest: 11
 
 - name: install_home_db | Mount nfs share with installation media
   ansible.builtin.include_role:
@@ -52,7 +58,7 @@
     owner: "{{ item.owner }}"
     group: "{{ item.group }}"
     state: directory
-  with_items: "{{ oracle_directories }}"
+  with_items: "{{ _oraswdb_install_oracle_directories }}"
   tags:
     - directoriesdb
 
@@ -86,7 +92,7 @@
   tags:
     - directoriesdb
 
-- ansible.builtin.include_tasks: "{{ www_download_bin }}.yml"  # noqa name[missing]
+- ansible.builtin.include_tasks: "{{ _www_download_bin }}.yml"  # noqa name[missing]
   when:
     - not is_sw_source_local
     - oracle_sw_copy
@@ -98,7 +104,7 @@
     mode: 0775
     force: false
   with_nested:
-    - "{{ oracle_sw_image_db }}"
+    - "{{ _oraswdb_install_oracle_sw_image_db }}"
     - "{{ db_homes_installed }}"
   become: true
   become_user: "{{ oracle_user }}"

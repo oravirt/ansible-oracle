@@ -33,7 +33,7 @@
 - name: install_home_db | Setup response file for install (DB)
   ansible.builtin.template:
     src: "db-install.rsp.{{ db_version }}.j2"
-    dest: "{{ oracle_rsp_stage }}/{{ oracle_db_responsefile }}"
+    dest: "{{ oracle_rsp_stage }}/{{ _oraswdb_install_db_responsefile }}"
     owner: "{{ oracle_user }}"
     group: "{{ oracle_group }}"
     mode: 0600
@@ -53,7 +53,7 @@
         copy: false
         creates: "{{ oracle_home_db }}/{{ item[0].creates }}"
       with_nested:
-        - "{{ oracle_sw_image_db }}"
+        - "{{ _oraswdb_install_oracle_sw_image_db }}"
         - ""  # dummy to force item.0 instead of item.
       become: true
       become_user: "{{ oracle_user }}"
@@ -73,7 +73,7 @@
         copy: false
         creates: "{{ oracle_home_db }}/{{ item[0].creates }}"
       with_nested:
-        - "{{ oracle_sw_image_db }}"
+        - "{{ _oraswdb_install_oracle_sw_image_db }}"
         - ""  # dummy to force item.0 instead of item.
       become: true
       become_user: "{{ oracle_user }}"
@@ -110,7 +110,7 @@
     {{ oracle_home_db }}/bin/chopt {{ item.state | replace(true, 'enable') | replace(false, 'disable') }} {{ item.option }} \
     && touch {{ oracle_home_db }}/install/chopt_{{ item.option }}_{{ item.state }}.state
   args:
-    creates: "{{ oracle_home_db }}/install/chopt_{{ item.option }}_{{ item.state }}.state{{ choptcheck }}"
+    creates: "{{ oracle_home_db }}/install/chopt_{{ item.option }}_{{ item.state }}.state{{ _oraswdb_install_choptcheck }}"
   with_items:
     - "{{ oracle_ee_options }}"
   become: true
@@ -122,7 +122,10 @@
     - oracle_ee_options is defined
     - disable_ee_options
   loop_control:
-    label: "{{ oracle_home_db }} {{ item.state | replace(true, 'enable') | replace(false, 'disable') }} {{ item.option }}"
+    label: >-
+      {{ oracle_home_db }}
+      {{ item.state | replace(true, 'enable') | replace(false, 'disable') }}
+      {{ item.option }}
   tags:
     - dbchopt
 
