@@ -1,30 +1,37 @@
 ---
+# @todo bug: Module oracle_services does not support 'as sysdba'. Connect User system is hard coded for the moment...
+# @todo bug: Role require Oracle Restart/GI at the moment
+
 - name: Create services (db/cdb)
   opitzconsulting.ansible_oracle.oracle_services:
-    name: "{{ item.1.name }}"
-    database_name: "{{ item.0.oracle_db_name }}"
-    pi: "{{ item.1.pi | default(omit) }}"
-    ai: "{{ item.1.ai | default(omit) }}"
-    role: "{{ item.1.role | default(omit) }}"
-    pdb: "{{ item.0.name | default(omit) }}"
+    name: "{{ odb.1.name }}"
+    database_name: "{{ odb.0.oracle_db_name }}"
+    preferred_instances: "{{ odb.1.pi | default(omit) }}"
+    available_instances: "{{ odb.1.ai | default(omit) }}"
+    role: "{{ odb.1.role | default(omit) }}"
     state: present
     host: "{{ ansible_hostname }}"
-    port: "{{ listener_port_template }}"
-    un: "{{ db_user }}"
-    pw: "{{ db_password_cdb }}"
-    sn: "{{ db_service_name }}"
-  environment: "{{ oracle_env }}"
+    port: "{{ _listener_port_cdb }}"
+    username: system
+    password: "{{ _db_password_cdb }}"
+    service_name: "{{ _db_service_name }}"
+  environment: "{{ _oracle_env }}"
   run_once: "{{ configure_cluster }}"
   with_subelements:
     - "{{ oracle_databases }}"
     - services
     - flags:
       skip_missing: true
+  loop_control:
+    loop_var: odb
+    label: >-
+      database_name {{ odb.0.oracle_db_name | default('') }}
+      name {{ odb.1.name | default('') }}
   when:
     - oracle_databases is defined
-    - item.0.state | lower == 'present'
-    - item.1 is defined
-    - (item.1.state | upper == 'PRESENT' or item.1.state | upper == 'STARTED')
+    - odb.0.state == 'present'
+    - odb.1 is defined
+    - (odb.1.state == 'present' or odb.1.state == 'started')
   become_user: "{{ oracle_user }}"
   tags: create_service,services
 
@@ -40,7 +47,7 @@
     host: "{{ ansible_hostname }}"
     port: "{{ listener_port_template }}"
     un: "{{ db_user }}"
-    pw: "{{ db_password_pdb }}"
+    pw: "{{ _db_password_pdb }}"
     sn: "{{ item.0.pdb_name }}"
   environment: "{{ oracle_env }}"
   run_once: "{{ configure_cluster }}"
@@ -51,9 +58,9 @@
       skip_missing: true
   when:
     - oracle_pdbs is defined
-    - item.0.state | lower == 'present'
+    - item.0.state == 'present'
     - item.1 is defined
-    - (item.1.state | upper == 'PRESENT' or item.1.state|upper == 'STARTED')
+    - (item.1.state == 'present' or item.1.state == 'started')
   become_user: "{{ oracle_user }}"
   tags: create_service,services
 
@@ -66,7 +73,7 @@
     host: "{{ ansible_hostname }}"
     port: "{{ listener_port_template }}"
     un: "{{ db_user }}"
-    pw: "{{ db_password_cdb }}"
+    pw: "{{ _db_password_cdb }}"
     sn: "{{ db_service_name }}"
   environment: "{{ oracle_env }}"
   run_once: "{{ configure_cluster }}"
@@ -79,7 +86,7 @@
     - oracle_databases is defined
     - item.0.state | lower == 'present'
     - item.1 is defined
-    - item.1.state | upper == 'STARTED'
+    - item.1.state == 'started'
   become_user: "{{ oracle_user }}"
   tags: start_service,services
 
@@ -92,7 +99,7 @@
     host: "{{ ansible_hostname }}"
     port: "{{ listener_port_template }}"
     un: "{{ db_user }}"
-    pw: "{{ db_password_pdb }}"
+    pw: "{{ _db_password_pdb }}"
     sn: "{{ item.0.pdb_name }}"
   environment: "{{ oracle_env }}"
   run_once: "{{ configure_cluster }}"
@@ -103,8 +110,8 @@
       skip_missing: true
   when:
     - oracle_pdbs is defined
-    - item.0.state | lower == 'present'
-    - item.1 is defined and item.1.state | upper == 'STARTED'
+    - item.0.state == 'present'
+    - item.1 is defined and item.1.state == 'started'
   become_user: "{{ oracle_user }}"
   tags: start_service,services
 
@@ -117,7 +124,7 @@
     host: "{{ ansible_hostname }}"
     port: "{{ listener_port_template }}"
     un: "{{ db_user }}"
-    pw: "{{ db_password_cdb }}"
+    pw: "{{ _db_password_cdb }}"
     sn: "{{ db_service_name }}"
   environment: "{{ oracle_env }}"
   run_once: "{{ configure_cluster }}"
@@ -129,7 +136,8 @@
   when:
     - oracle_databases is defined
     - item.0.state | lower == 'present'
-    - item.1 is defined and item.1.state | upper == 'STOPPED' or item.1.state | upper == 'ABSENT'
+    - item.1 is defined
+    - item.1.state == 'stopped' or item.1.state == 'absent'
   become_user: "{{ oracle_user }}"
   tags: start_service,services
 
@@ -142,7 +150,7 @@
     host: "{{ ansible_hostname }}"
     port: "{{ listener_port_template }}"
     un: "{{ db_user }}"
-    pw: "{{ db_password_pdb }}"
+    pw: "{{ _db_password_pdb }}"
     sn: "{{ item.0.pdb_name }}"
   environment: "{{ oracle_env }}"
   run_once: "{{ configure_cluster }}"
@@ -155,7 +163,7 @@
     - oracle_pdbs is defined
     - item.0.state | lower == 'present'
     - item.1 is defined
-    - item.1.state | upper == 'STOPPED' or item.1.state | upper == 'ABSENT'
+    - item.1.state == 'stopped' or item.1.state == 'absent'
   become_user: "{{ oracle_user }}"
   tags: start_service,services
 
@@ -168,7 +176,7 @@
     host: "{{ ansible_hostname }}"
     port: "{{ listener_port_template }}"
     un: "{{ db_user }}"
-    pw: "{{ db_password_cdb }}"
+    pw: "{{ _db_password_cdb }}"
     sn: "{{ db_service_name }}"
   environment: "{{ oracle_env }}"
   run_once: "{{ configure_cluster }}"
@@ -181,7 +189,7 @@
     - oracle_databases is defined
     - item.0.state | lower == 'present'
     - item.1 is defined
-    - item.1.state | upper == 'ABSENT'
+    - item.1.state == 'absent'
   become_user: "{{ oracle_user }}"
   tags: start_service,services
 
@@ -194,7 +202,7 @@
     host: "{{ ansible_hostname }}"
     port: "{{ listener_port_template }}"
     un: "{{ db_user }}"
-    pw: "{{ db_password_pdb }}"
+    pw: "{{ _db_password_pdb }}"
     sn: "{{ item.0.pdb_name }}"
   environment: "{{ oracle_env }}"
   run_once: "{{ configure_cluster }}"
@@ -205,8 +213,8 @@
       skip_missing: true
   when:
     - oracle_pdbs is defined
-    - item.0.state | lower == 'present'
+    - item.0.state == 'present'
     - item.1 is defined
-    - item.1.state | upper == 'ABSENT'
+    - item.1.state == 'absent'
   become_user: "{{ oracle_user }}"
   tags: start_service,services
