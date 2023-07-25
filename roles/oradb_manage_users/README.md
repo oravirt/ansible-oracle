@@ -5,9 +5,6 @@ Manage Users in Oracle
 ## Table of content
 
 - [Requirements](#requirements)
-- [Default Variables](#default-variables)
-  - [__user_cdb_password](#__user_cdb_password)
-  - [__user_pdb_password](#__user_pdb_password)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -19,32 +16,6 @@ Manage Users in Oracle
 
 - Minimum Ansible version: `2.9.0`
 
-
-## Default Variables
-
-### __user_cdb_password
-
-The variable is internal used only.
-
-Do not set it in inventory!
-
-#### Default value
-
-```YAML
-__user_cdb_password: _internal_used_
-```
-
-### __user_pdb_password
-
-The variable is internal used only.
-
-Do not set it in inventory!
-
-#### Default value
-
-```YAML
-__user_pdb_password: _internal_used_
-```
 
 ## Discovered Tags
 
