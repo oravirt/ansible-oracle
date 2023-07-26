@@ -5,6 +5,23 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.10.0
+=======
+
+Minor Changes
+-------------
+
+- oracle_sqldba: refactoring code, make it usable for ansible-doc, Python3 usable only (oravirt#361)
+- oradb_manage_db: create _DGMGRL SID in listener.ora for EE only (oravirt#359)
+
+Bugfixes
+--------
+
+- Bugfix for missing Listener autostart and readonly Homes in systemd (oravirt#358)
+- oracle_sqldba: Bugfix for Python3 (oravirt#361)
+- oraswdb_install: shellchecker for manage_oracle_rdbms_procs.sh (oravirt#358)
+- pre-commit: Bugfix for known issue from ansible-oracle 3.8.0 (oravirt#383)
+
 v3.9.0
 ======
 
