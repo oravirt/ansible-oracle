@@ -12,7 +12,7 @@
     - name: manage tablespaces (db/cdb)
       opitzconsulting.ansible_oracle.oracle_tablespace:
         hostname: "{{ ansible_hostname }}"
-        port: "{{ listener_port_template }}"
+        port: "{{ _listener_port_cdb }}"
         service_name: "{{ _db_service_name }}"
         user: "{{ db_user }}"
         password: "{{ _db_password_cdb }}"
@@ -37,7 +37,7 @@
       loop_control:
         loop_var: odb
         label: >-
-          service: {{ _db_service_name }}:{{ listener_port_template }}
+          service: {{ _db_service_name }}:{{ _listener_port_cdb }}
           tablespace: {{ odb.1.name }}
           content: {{ odb.1.content | default(omit) }}
           state: {{ odb.1.state | default('present') }}
@@ -49,7 +49,7 @@
     - name: manage tablespaces (pdb)
       opitzconsulting.ansible_oracle.oracle_tablespace:
         hostname: "{{ ansible_hostname }}"
-        port: "{{ _listener_port }}"
+        port: "{{ _listener_port_pdb }}"
         service_name: "{{ _db_service_pdb }}"
         user: "{{ db_user }}"
         password: "{{ _db_password_pdb }}"
@@ -64,7 +64,7 @@
         maxsize: "{{ opdb.1.maxsize | default(omit) }}"
         content: "{{ opdb.1.content | default(omit) }}"
         state: "{{ opdb.1.state | default('present') }}"
-      environment: "{{ _oracle_env }}"
+      environment: "{{ _oracle_env_pdb }}"
       run_once: "{{ configure_cluster }}"
       with_subelements:
         - "{{ oracle_pdbs }}"
@@ -74,11 +74,11 @@
       when:
         - oracle_pdbs is defined
         - opdb.1 is defined
-        - opdb.0.state | upper == 'PRESENT'
+        - opdb.0.state == 'present'
       loop_control:
         loop_var: opdb
         label: >-
-          pdb: {{ opdb.0.pdb_name }}:{{ _listener_port }}
+          pdb: {{ opdb.0.pdb_name }}:{{ _listener_port_pdb }}
           tablespace: {{ opdb.1.name }}
           content: {{ opdb.1.content | default(omit) }}
           state: {{ opdb.1.state | default('present') }}
