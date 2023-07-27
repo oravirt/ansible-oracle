@@ -104,7 +104,7 @@
     directory_privs: "{{ item.1.directory_privs | default(omit) }}"
     hostname: "{{ ansible_hostname }}"
     port: "{{ listener_port_template }}"
-    service_name: "{{ item.0.pdb_name }}"
+    service_name: "{{ _db_service_pdb }}"
     user: "{{ db_user }}"
     password: "{{ db_password_pdb }}"
     mode: "{{ db_mode }}"
@@ -122,6 +122,8 @@
   run_once: "{{ configure_cluster }}"
   become_user: "{{ oracle_user }}"
   loop_control:
-    label: "port: {{ listener_port_template }}, service: {{ item.0.pdb_name }}, schema: {{ item.1.schema | default('none') }}, grants: {{ item.1.grants | default(omit) }}, state: {{ item.1.state }}"
+    label: "port: {{ listener_port_template }}, service: {{ _db_service_pdb }}, schema: {{ item.1.schema | default('none') }}, grants: {{ item.1.grants | default(omit) }}, state: {{ item.1.state }}"
     # noqa yaml
   tags: users,grants
+  vars:
+    opdb: "{{ item }}"
