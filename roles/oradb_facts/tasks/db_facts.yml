@@ -3,13 +3,17 @@
 - name: Gather Facts from Database
   opitzconsulting.ansible_oracle.oracle_facts:
     hostname: "{{ ansible_hostname }}"
-    port: "{{ _listener_port }}"
+    port: "{{ _listener_port_cdb }}"
     service_name: "{{ _db_service_name }}"
     user: "{{ db_user }}"
     password: "{{ _db_password_cdb }}"
     mode: sysdba
   environment: "{{ _oracle_env }}"
   register: dbfactsreg
+  vars:
+    # set db_user for _db_password_cdb
+    db_user: "{{ oradb_facts_db_user }}"
+
 
 # 2nd execution of oracle_factswill overwrite data of last execution.
 # => Store facts from oracle_facts in structure

@@ -4,7 +4,7 @@
 - name: Manage parameters (db/cdb)
   opitzconsulting.ansible_oracle.oracle_parameter:
     hostname: "{{ ansible_hostname }}"
-    port: "{{ _listener_port }}"
+    port: "{{ _listener_port_cdb }}"
     service_name: "{{ _db_service_name }}"
     user: "{{ db_user }}"
     password: "{{ _db_password_cdb }}"
@@ -28,7 +28,7 @@
   loop_control:
     loop_var: odb
     label: >-
-      port: {{ _listener_port }}
+      port: {{ _listener_port_cdb }}
       service: {{ _db_service_name }}
       name: {{ odb.1.name }}
       value: {{ odb.1.value }}

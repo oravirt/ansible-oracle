@@ -5,6 +5,8 @@ Gather Ansible Facts from database
 ## Table of content
 
 - [Requirements](#requirements)
+- [Default Variables](#default-variables)
+  - [oradb_facts_db_user](#oradb_facts_db_user)
 - [Discovered Tags](#discovered-tags)
 - [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
@@ -17,6 +19,18 @@ Gather Ansible Facts from database
 
 - Minimum Ansible version: `2.9.0`
 
+
+## Default Variables
+
+### oradb_facts_db_user
+
+The dbuser for connection to database.
+
+#### Default value
+
+```YAML
+oradb_facts_db_user: sys
+```
 
 ## Discovered Tags
 
