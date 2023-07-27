@@ -125,15 +125,6 @@ _oracle_db_instance_name: >-
     {%- endfor -%}
   {%- endif -%}
 
-# @var _listener_port:description: >
-# The variable is internal used only.
-#
-# Do not set it in inventory!
-# @end
-# @var _listener_port: $ "_internal_used_"
-_listener_port: "{{ _opdb_loop_helper.listener_port | \
-                    default(listener_port) }}"
-
 # @var _listener_port_cdb:description: >
 # The variable is internal used only.
 #
@@ -207,10 +198,6 @@ ocm_response_file: "{{ oracle_patch_stage }}/{{ db_version }}/ocm.rsp"
 # @end
 oracle_stage_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
 
-# @todo bug: grid_install_user is wrong here.
-grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
-
-
 configure_cluster: false
 
 oracle_sw_copy: "{% if install_from_nfs %}false{% else %}true{% endif %}"
@@ -224,14 +211,6 @@ oracle_sw_extract_path: "{%- if '18' in db_version -%}\
 
 db_user: sys
 db_mode: sysdba
-
-
-db_password_pdb: "{% if dbpasswords is defined \
-                        and dbpasswords[item.0.cdb] is defined \
-                        and dbpasswords[item.0.cdb][db_user] is defined -%}\
-                    {{ dbpasswords[item.0.cdb][db_user] }}
-                  {%- else %}{{ default_dbpass }}
-                  {%- endif %}"
 
 db_password: "{% if dbpasswords is defined\
                     and dbpasswords[item.oracle_db_name] is defined \
@@ -376,31 +355,6 @@ db_version: "{%- if dbh is defined and db_homes_config[dbh.home] is defined -%}
                       {{ db_homes_config[item.home]['version'] }}
                  {%- endif -%}
              {%- endif -%}"
-
-# @var oracle_db_instance_name:description: >
-# This is an internal variable in `ansible-oracle`.
-#
-# _IMPORTANT_
-#
-# Do not set this variable in inventory, set_fact ...!
-# @end
-# @var oracle_db_instance_name: $ "_unset_"
-oracle_db_instance_name: "{%- if pdb.0.cdb is defined -%}
-                            {%- for db in oracle_databases -%}
-                              {%- if db.oracle_db_name == pdb.0.cdb -%}
-                              {{ db.oracle_db_instance_name | default(db.oracle_db_unique_name | default(db.oracle_db_name)) }}
-                              {%- endif -%}
-                            {%- endfor -%}
-                          {%- endif -%}"
-
-
-# @var oracle_profile_name:description: >
-# Variable is only used for old .profile script from `ansible-oracle`.
-# No real need to change the default.
-#
-# `item.oracle_db_name` is `oracle_db_name` from oracle_databases.
-# @end
-oracle_profile_name: ".profile_{{ item.oracle_db_name }}"
 
 # @var oracle_home_gi:description: >
 # Custom setting for CRS_HOME.
