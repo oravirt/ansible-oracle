@@ -1,0 +1,25 @@
+---
+_oraswgi_install_giignoreprereqparam: "{% if gi_ignoreprereq | bool %}-ignorePrereq{% endif %}"
+
+_oraswgi_install_init_dg_exists: "{% for dg in asm_diskgroups if oracle_asm_init_dg == dg.diskgroup %}true{% endfor %}"
+
+_oraswgi_install_oracle_grid_responsefile: "grid-{{ oracle_cluster_name }}.rsp"
+
+_oraswgi_manage_patches_oracle_directories:
+  - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_rsp_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_inventory_loc }}", owner: "{{ _grid_install_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/admin", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/audit", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs/dbca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs/sqlpatch", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_base }}/cfgtoollogs/netca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+
+_oraswgi_install_oracle_gi_image: "{%- if oracle_sw_copy %}{{ oracle_stage }}\
+                {%- else %}{{ oracle_stage_remote }}\
+                {%- endif %}\
+                {%- if oracle_install_image_gi is defined %}/{{ oracle_install_image_gi }}\
+                {%- else %}//{{ item.filename }}\
+                {%- endif %}"

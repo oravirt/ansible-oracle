@@ -1,98 +1,108 @@
 ---
-
-cluster_master: "{{ play_hosts[0] }}"
-role_separation: false
-hostgroup: "{{ group_names[0] }}"
-hostgroup_hub: "{{ hostgroup }}-hub"
-hostgroup_leaf: "{{ hostgroup }}-leaf"
-
-
-# do not ignore failed runcluvfy.sh
+#
+# @var gi_ignoreprereq:description: >
+# false => Do not ignore failed runcluvfy.sh
+# true => Ignore  failed runcluvfy.sh
+# @end
 gi_ignoreprereq: false
 
-giignoreprereqparam: "{% if gi_ignoreprereq | bool %}-ignorePrereq{% endif %}"
-
-
-init_dg_exists: "{% for dg in asm_diskgroups if oracle_asm_init_dg == dg.diskgroup %}true{% endfor %}"
-oracle_directories:
-  - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_rsp_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_base }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_inventory_loc }}", owner: "{{ grid_install_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_base }}/cfgtoollogs", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_base }}/admin", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_base }}/audit", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_base }}/cfgtoollogs/dbca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_base }}/cfgtoollogs/sqlpatch", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_base }}/cfgtoollogs/netca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-
-oracle_env:
-  ORACLE_HOME: "{{ oracle_home_gi }}"
-
-oracle_profile_name_gi: ".profile_grid"    # .profile that sets up the environment for Grid Infrastructure (Cluster or Single node)
-oracle_grid_responsefile: "grid-{{ oracle_cluster_name }}.rsp"   # Name of responsefile-name used when installing Grid oInfrastructure
-
-# GI
-
-# The check for the old passwords are there for backwards compatibility and only temporary, will be removed
-default_gipass: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif %}"
-
-# The check for the old passwords are there for backwards compatibility and only temporary, will be removed
-sysasmpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif %}"
-
-# The check for the old passwords are there for backwards compatibility and only temporary, will be removed
-asmmonitorpassword: "{% if oracle_password is defined %}{{ oracle_password }}{% else %}Oracle123{% endif %}"
-# DB
+# @var default_gipass:description: >
+# Default password for Grid-Infrastructure.
+#
+# @end
+default_gipass: "{{ oracle_password | default('') }}"
 
 # The check for the old passwords are there for  backwards compatibility and only temporary, will be removed
 default_dbpass: "{% if item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd }}{% else %}Oracle123{% endif %}"
 
-# oracle_password: Oracle123                                       # Password used for all Grid Infrastructure related resources (e.g ASM)
-oracle_scan: your.scan.address                                   # Scan address for Clustered Grid Infrastructure
-oracle_vip: -vip                                                 # Suffix for the host VIP-addresses (e.g orarac01-vip)
-oracle_scan_port: 1521                                           # Listener port for scan-listener
+# @var oracle_scan:description: >
+# SCAN DNS-Name
+# @end
+# oracle_scan:
 
-# Picks the last octet from the public ip to use for cluster-interconnect ip (e.g 3.3.3.51)
+# @todo bug: oracle_vip is not flexible enough.
+# @var oracle_vip:description: >
+# suffix added to hostnames for VIPs.
+#
+# hostnamea{{ oracle_vip }}
+# @end
+oracle_vip: -vip
+
+# @var endoracle_scan_port:description: >
+# Port for SCAN-Listener
+# @end
+oracle_scan_port: 1521
+
+# @todo bug: oracle_ic_net will be removed in the future
+# @var oracle_ic_net:description: >
+# Do not use - is replaced in the future!
+# Reason why RAC support has been disabled...
+# @end
 oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }}
 
+# @var oracle_asm_init_dg:description: >
+# Do not use - is replaced in the future!
+# Reason why RAC support has been disabled...
+# @end
 oracle_asm_init_dg: crs
-device_persistence: asmlib
-oracle_asm_disk_string: ORCL:*
-cvuqdisk_rpm: "{%- if oracle_install_version_gi > '12.1.0.2' -%}cvuqdisk-1.0.10-1.rpm\
-               {%- else -%}cvuqdisk-1.0.9-1.rpm\
-               {%- endif -%}"
 
-oracle_cluster_name: "{{ hostgroup }}"      # Name of the cluster when setting up Clustered Grid Infrastructure
-oracle_hostname: "{{ ansible_fqdn }}"                            # Full (FQDN) name of the host
-oracle_gi_nic_pub: eth0                        # Default interface for 'public' traffic. Only used in RAC
-oracle_gi_nic_priv: eth1                       # Default interface for interconnect traffic. Only used in RAC
 
+# @var cvuqdisk_rpm:description: >
+# Name of RPM for cvuqdisk.
+#
+# RPM is installed from {{ oracle_home_gi }}/cv/rpm/
+# @end
+cvuqdisk_rpm: cvuqdisk-1.0.10-1.rpm
+
+# @var oracle_cluster_name:description: >
+# Name of Grid-Infrastructure Cluster.
+# @end
+oracle_cluster_name: "{{ hostgroup }}"
+
+# @var oracle_gi_nic_pub:description: >
+# Name of public network interface.
+# @end
+oracle_gi_nic_pub: eth0
+
+# @var oracle_gi_nic_priv:description: >
+# Name of private network interface.
+# @end
+oracle_gi_nic_priv: eth1
+
+# @var run_configtoolallcommand:description: >
+# Run configtoolcommand during installation.
+#
+# Do not disable this!
+# @end
 run_configtoolallcommand: true
-oracle_cluster_mgmdb: true
-oracle_gi_cluster_type: STANDARD              # STANDARD | FLEX | STANDALONE (12.2 specific)
-oracle_install_option_gi: "{% if configure_cluster %}CRS_CONFIG{% else %}HA_CONFIG{% endif %}"
-oracle_install_version_gi: 12.2.0.1
-patch_before_rootsh: true
-apply_patches_gi: false
 
+# @var oracle_cluster_mgmdb:description: >
+# Create _MGMTBD on cluster.
+# @end
+oracle_cluster_mgmdb: false
+
+# @var oracle_gi_cluster_type:description: >
+# Define clusterware type.
+# @end
+oracle_gi_cluster_type: STANDARD
+
+# @var oracle_asm_storage_option:description: >
+# @end
 oracle_asm_storage_option: "{% if oracle_install_version_gi is version('12.2', '>=') %}FLEX_ASM_STORAGE{% else %}LOCAL_ASM_STORAGE{% endif %}"
 
-oracle_gi_gns_subdomain: a.b.c
-oracle_gi_gns_vip: gnsvip.a.b.c
+# @var oracle_gi_gns_subdomain:description: >
+# Define ths GNS subdomain for Cluster
+# @end
+# oracle_gi_gns_subdomain:
 
+# @var oracle_gi_gns_vip:description: >
+# Define GNS VIP for Clusterware.
+# @end
+oracle_gi_gns_vip:
 
-opatcharchive: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/
-                {%- for opatchfile in oracle_opatch_patch if opatchfile['version']==oracle_install_version_gi -%}{{ opatchfile['filename'] }}
-                {%- endfor -%}"
-
-oracle_gi_image: "{%- if oracle_sw_copy %}{{ oracle_stage }}\
-                {%- else %}{{ oracle_stage_remote }}\
-                {%- endif %}\
-                {%- if oracle_install_image_gi is defined %}/{{ oracle_install_image_gi }}\
-                {%- else %}//{{ item.filename }}\
-                {%- endif %}"
-
-oracle_sw_image_gi:                                              # Files containing the installation media for Grid Infrastructure
+# @var oracle_sw_image_gi:description: >
+# @end
+oracle_sw_image_gi:
   - {filename: LINUX.X64_213000_grid_home.zip, version: 21.3.0.0, creates: 'install/.img.bin'}
   - {filename: LINUX.X64_193000_grid_home.zip, version: 19.3.0.0, creates: 'install/.img.bin'}
   - {filename: LINUX.X64_180000_grid_home.zip, version: 18.3.0.0, creates: 'install/.img.bin'}
@@ -101,5 +111,3 @@ oracle_sw_image_gi:                                              # Files contain
   - {filename: linuxamd64_12102_grid_2of2.zip, version: 12.1.0.2, creates: 'grid/install/.oui'}
   - {filename: linuxamd64_12c_grid_1of2.zip, version: 12.1.0.1}
   - {filename: linuxamd64_12c_grid_2of2.zip, version: 12.1.0.1}
-  - {filename: p13390677_112040_Linux-x86-64_3of7.zip, version: 11.2.0.4, creates: 'grid/welcome.html'}
-  - {filename: p10404530_112030_Linux-x86-64_3of7.zip, version: 11.2.0.3, creates: 'grid/stage/properties/userPaths.properties'}
