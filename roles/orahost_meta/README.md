@@ -310,7 +310,7 @@ role_separation: false
 
 ## Dependencies
 
-None.
+- oraswgi_meta
 
 ## License
 
