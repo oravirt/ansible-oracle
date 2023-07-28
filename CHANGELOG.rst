@@ -5,6 +5,15 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.10.1
+=======
+
+Bugfixes
+--------
+
+- oradb_facts: Bugfix for missing default variable definitions (oravirt#366)
+- oradb_manage_grant: Bugfix for broken grant on pdb with db_domain (oravirt#365)
+
 v3.10.0
 =======
 
