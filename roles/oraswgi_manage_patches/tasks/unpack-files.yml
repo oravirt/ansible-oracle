@@ -7,7 +7,7 @@
     creates: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item[0].creates | default(omit) }}"
     copy: false
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   with_nested:
     - "{{ oracle_sw_patches }}"
     - "{{ gi_patches[oracle_install_version_gi]['opatchauto'] }}"
@@ -28,7 +28,7 @@
     creates: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item[0].creates | default(omit) }}"
     copy: false
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   with_nested:
     - "{{ oracle_sw_patches }}"
     - "{{ gi_patches[oracle_install_version_gi]['opatchauto'] }}"
