@@ -1,0 +1,65 @@
+---
+# @var _grid_install_user:description: >
+# This is an internal variable of `ansible-oracle`.
+#
+# Do not change it!
+# @end
+_grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}"
+
+# @var sysasmpassword:description: >
+# SYSASM Password for ASM.
+# @end
+sysasmpassword: "{{ oracle_password }}"
+
+# @var oracle_hostname:description: >
+# ASMSNMP Password for ASM.
+# @end
+asmmonitorpassword: "{{ oracle_password }}"
+
+# @var oracle_hostname:description: >
+# Grid-Infrastructure nodename.
+# @end
+oracle_hostname: "{{ ansible_fqdn }}"
+
+# @var patch_before_rootsh:description: >
+# Patch Grid-Infrastructure during installation befor executing
+# root.sh
+# @end
+patch_before_rootsh: true
+
+# @var apply_patches_gi:description: >
+# Apply patches to Grid-Infrastructure/Restart?
+#
+# Do not disable this!
+# @end
+apply_patches_gi: true
+
+# @var gi_patches:description: >
+# Dictionary of lists for opatch and opatchauto patches for
+# Grid-Infrastructure/Restart.
+#
+# @end
+# @var gi_patches:example: >
+# gi_patches_config:
+#   19.16.0.0.220719:
+#     19.3.0.0:  # Base Release
+#       opatch_minversion: 12.2.0.1.30
+#       opatchauto:
+#         - patchid: 34130714
+#           patchversion: 19.16.0.0.220719
+#           state: present
+#           path: ./19.16.0.0.220719/gi/34130714/34130714
+#           subpatches:
+#             - 34160635  # OCW Release Update 19.16.0.0.220719
+#             - 33575402  # DBWLM Release Update
+#             - 34139601  # ACFS Release Update 19.16.0.0.220719
+#             - 34318175  # TOMCAT RELEASE UPDATE 19.0.0.0.0
+#             - 34133642  # Database Release Update 19.16.0.0.220719
+#       opatch:
+#           # Oracle JavaVM Component Release Update (OJVM RU) 19.16.0.0.220719
+#           stop_processes: true
+#           state: present
+#           path: 19.16.0.0.220719/ojvm/p34086870_190000_Linux-x86-64.zip
+#           # Oracle Database 19c Important Recommended One-off Patches (Doc ID 555.1)
+# @end
+gi_patches: {}
