@@ -14,7 +14,7 @@
     - oracle_sw_copy
     - not is_sw_source_local
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   tags:
     - oragridpatchget
 
@@ -29,7 +29,7 @@
     - "{{ gi_patches[oracle_install_version_gi]['opatchauto'] }}"
   when: apply_patches_gi and item[1].patchid == item[0].patchid and item[1].state == 'present' and oracle_sw_copy and is_sw_source_local
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   tags:
     - oragridpatchpush
 
@@ -42,7 +42,7 @@
   with_items: "{{ oracle_opatch_patch }}"
   when: apply_patches_gi and item.version == oracle_install_version_gi and oracle_sw_copy and not is_sw_source_local
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   tags:
     - oragridopatchget
 
@@ -55,6 +55,6 @@
   with_items: "{{ oracle_opatch_patch }}"
   when: apply_patches_gi and item.version == oracle_install_version_gi and oracle_sw_copy and is_sw_source_local
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   tags:
     - oragridpatchpush

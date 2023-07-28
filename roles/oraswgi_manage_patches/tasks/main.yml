@@ -13,7 +13,7 @@
   ansible.builtin.file:
     dest: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}"
     mode: "0775"
-    owner: "{{ grid_install_user }}"
+    owner: "{{ _grid_install_user }}"
     group: "{{ oracle_group }}"
     state: directory
   tags:
@@ -39,26 +39,30 @@
   tags: current_opatch_version
 
 - name: gi_opatch | Configure ocm.rsp (1)
-  ansible.builtin.template:
-    src: ocmrsp.expect.j2
-    dest: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect"
-    mode: "0777"
-    force: true
-  when: apply_patches_gi and current_opatch_version is defined and current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
-  become: true
-  become_user: "{{ grid_install_user }}"
-  tags:
-    - ocmconfig
+  when:
+    - apply_patches_gi
+    - current_opatch_version is defined
+    - current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
+  block:
+    - name: gi_opatch | Configure ocm.rsp (1)
+      ansible.builtin.template:
+        src: ocmrsp.expect.j2
+        dest: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect"
+        mode: "0777"
+        force: true
+      become: true
+      become_user: "{{ _grid_install_user }}"
+      tags:
+        - ocmconfig
 
-- name: gi_opatch | Configure ocm.rsp (2)
-  ansible.builtin.shell: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect"
-  # noqa command-instead-of-shell
-  when: apply_patches_gi and current_opatch_version is defined and current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
-  become: true
-  become_user: "{{ grid_install_user }}"
-  changed_when: false
-  tags:
-    - ocmconfig
+    - name: gi_opatch | Configure ocm.rsp (2)
+      ansible.builtin.shell: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect"
+      # noqa command-instead-of-shell
+      become: true
+      become_user: "{{ _grid_install_user }}"
+      changed_when: false
+      tags:
+        - ocmconfig
 
 - name: gi_opatch | Manage opatchauto patches for GI (after software only install)
   opitzconsulting.ansible_oracle.oracle_opatch:
@@ -68,7 +72,7 @@
     patch_version: "{{ item.1.patchversion | default(omit) }}"
     opatchauto: false
     conflict_check: true
-    ocm_response_file: "{{ ocm_response_file | default(omit) }}"
+    ocm_response_file: "{{ _oraswgi_manage_patches_ocm_response_file | default(omit) }}"
     output: verbose
     state: "{{ item.0.state }}"
   with_subelements:
@@ -76,7 +80,7 @@
     - subpatches
   # run_once: "{{ configure_cluster }}"
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   tags:
     - apply_psu_grid
   when:
@@ -97,7 +101,7 @@
     opatchauto: true
     rolling: "{{ item.rolling | default(True) }}"
     conflict_check: true
-    ocm_response_file: "{{ ocm_response_file | default(omit) }}"
+    ocm_response_file: "{{ _oraswgi_manage_patches_ocm_response_file | default(omit) }}"
     output: verbose
     state: "{{ item.state }}"
   with_items:
@@ -122,105 +126,21 @@
     patch_version: "{{ item.patchversion | default(omit) }}"
     opatchauto: false
     conflict_check: true
-    ocm_response_file: "{{ ocm_response_file | default(omit) }}"
+    ocm_response_file: "{{ _oraswgi_manage_patches_ocm_response_file | default(omit) }}"
     output: verbose
     state: "{{ item.state }}"
   with_items:
     - "{{ gi_patches[oracle_install_version_gi]['opatch'] }}"
   # run_once: "{{ configure_cluster }}"
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   tags:
     - apply_psu_grid
   when:
-    - apply_patches_gi
+    - apply_patches_gi | bool
     - gi_patches is defined
     - gi_patches[oracle_install_version_gi] is defined
     - gi_patches[oracle_install_version_gi]['opatch'] is defined
     - patch_before_rootsh
     - not olrloc.stat.exists
   register: psuapplym
-#
-#
-# - name: Apply PSU to GI (v11.2) (Master node)
-#   shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
-#   with_together:
-#   - "{{oracle_sw_patches}}"
-#   - "{{gi_applied_patches.results}}"
-#   run_once: "{{ configure_cluster}}"
-#   tags: apply_psu_grid
-#   when: apply_patches_gi and '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
-#   register: psuapplym
-#
-# - debug: var=psuapplym.stdout_lines
-#   run_once: "{{ configure_cluster}}"
-#   when: apply_patches_gi
-#   tags:
-#     - psuapplym
-#
-# - name: Check if stuff is running
-#   shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
-#   run_once: "{{ configure_cluster}}"
-#   tags:
-#    - crsctl
-#   register: crsctl
-#   when: apply_patches_gi #and not {{ item.1.stdout }} != 0
-#
-# - debug: var=crsctl.stdout_lines
-#   tags:
-#    - crsctl
-#   run_once: "{{ configure_cluster}}"
-#   #when: master_node
-#
-# - name: Apply PSU to GI (v12.1) (other nodes)
-#   shell: "{{ oracle_home_gi }}/OPatch/opatchauto apply {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
-#   with_together:
-#   - "{{oracle_sw_patches}}"
-#   - "{{gi_applied_patches.results}}"
-#   tags:
-#     - apply_psu_grid
-#   #when: not master_node and apply_patches_gi and  '12.1' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
-#   when: configure_cluster and inventory_hostname != cluster_master and apply_patches_gi and  '12.1' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
-#   register: psuapplyo
-#
-# - name: Apply PSU to GI (v11.2) (other nodes)
-#   shell: "{{ oracle_home_gi }}/OPatch/opatch auto {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ item.0.patchid }} -oh {{ oracle_home_gi }} -ocmrf {{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocm.rsp "
-#   with_together:
-#   - "{{oracle_sw_patches}}"
-#   - "{{gi_applied_patches.results}}"
-#   tags: apply_psu_grid
-#   #when: not master_node and apply_patches_gi and '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
-#   when: configure_cluster and inventory_hostname != cluster_master and apply_patches_gi and  '11.2' in oracle_install_version_gi and item.0.version == oracle_install_version_gi and not item.1.stdout != 0
-#   register: psuapplyo
-#
-# - debug: var=psuapplyo.stdout_lines
-#   when: configure_cluster and inventory_hostname != cluster_master and apply_patches_gi and psuapplyo is defined
-#   tags:
-#     - psuapplyo
-#
-# - name: gi_opatch | Check if stuff is running
-#   shell: "{{ oracle_home_gi }}/bin/crsctl stat res -t"
-#   tags:
-#    - crsctl-opatch
-#   register: crsctl
-#   when: apply_patches_gi
-#
-# - debug: var=crsctl.stdout_lines
-#   tags:
-#    - crsctl-opatch
-#   when: apply_patches_gi
-#
-# - name: gi_opatch | Check opatch lspatches
-#   shell: "{{ oracle_home_gi }}/OPatch/opatch lsinventory"
-#   become: yes
-#   become_user: "{{ grid_install_user }}"
-#   register: opatchls
-#   when: apply_patches_gi
-#
-#   tags:
-#    - opatchls
-#
-# - debug: var=opatchls.stdout_lines
-#   when: apply_patches_gi
-#   tags:
-#    - opatchls
