@@ -3,7 +3,7 @@
   # need to run it once on cluster
   # => unzip was executed on 1st node only.
   # => hopefully the setup is the same on all nodes...
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   tags: runcluvfy
   block:
 
@@ -11,7 +11,7 @@
         msg: "install_home_gi | Sttart Execute runcluvfy.sh for Grid-Infrastructure"
       run_once: true
       when:
-        - configure_cluster
+        - _oraswgi_meta_configure_cluster
 
     # GI < 19.11 + OL8 is not supported by Oracle!
     # ansible-oracle supports no preinstall patching at the moment
@@ -42,7 +42,7 @@
       become_user: "{{ _grid_install_user }}"
       run_once: true
       when:
-        - configure_cluster
+        - _oraswgi_meta_configure_cluster
 
     - ansible.builtin.debug:  # noqa name[missing]
         var: cmdruncluvfygi.stdout_lines
@@ -72,7 +72,7 @@
       become: true
       become_user: "{{ _grid_install_user }}"
       when:
-        - not configure_cluster
+        - not _oraswgi_meta_configure_cluster
 
     - ansible.builtin.debug:  # noqa name[missing]
         var: cmdruncluvfy.stdout_lines

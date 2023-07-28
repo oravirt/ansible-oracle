@@ -115,14 +115,14 @@
   tags:
     - crsctl
   register: crsctl
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when: oracle_home_gi not in checkgiinstall.stdout
 
 - ansible.builtin.debug:  # noqa name[missing]
     var: crsctl.stdout_lines
   tags:
     - crsctl
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when: oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Update Nodelist, set CRS=TRUE
@@ -130,7 +130,7 @@
   # noqa command-instead-of-shell no-changed-when ignore-errors
   become: true
   become_user: "{{ _grid_install_user }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when: oracle_home_gi not in checkgiinstall.stdout
   ignore_errors: true
   tags:

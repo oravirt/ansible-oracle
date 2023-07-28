@@ -79,8 +79,8 @@ oracle_cleanup_days: 14
 #### Default value
 
 ```YAML
-oracle_home_gi: '{% if configure_cluster %}{{ oracle_home_gi_cl }}{% else %}{{ oracle_home_gi_so
-  }}{% endif %}'
+oracle_home_gi: '{% if _oraswgi_meta_configure_cluster %}{{ oracle_home_gi_cl }}{%
+  else %}{{ oracle_home_gi_so }}{% endif %}'
 ```
 
 ### oracle_home_gi_cl

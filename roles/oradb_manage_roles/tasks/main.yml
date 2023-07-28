@@ -27,7 +27,7 @@
       service {{ _db_service_name }}
       role {{ odb.1.name }}
       state {{ odb.1.state }}
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become_user: "{{ oracle_user }}"
   tags: users,grants
 
@@ -59,6 +59,6 @@
       service: {{ _db_service_pdb }},
       role: {{ opdb.1.name }},
       state: {{ opdb.1.state }}
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become_user: "{{ oracle_user }}"
   tags: users,grants

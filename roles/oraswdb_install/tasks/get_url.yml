@@ -10,7 +10,7 @@
     - "{{ db_homes_installed }}"
   become: true
   become_user: "{{ oracle_user }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when:
     - item[0].version == db_homes_config[item[1].home]['version']
     - item[1].state|lower == 'present'

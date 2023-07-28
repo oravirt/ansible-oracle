@@ -186,9 +186,9 @@ SID = {{ dbh.oracle_db_instance_name | default(dbh.oracle_db_name) }}
 # Mandatory     : No (Yes for RAC database-centric database )
 #-----------------------------------------------------------------------------
 
-{% if configure_cluster and dbh.oracle_db_type|upper != "SI" and dbh.oracle_db_type|upper != "SIFO"  and oracle_gi_cluster_type |upper == 'FLEX' %}
+{% if _oraswgi_meta_configure_cluster and dbh.oracle_db_type|upper != "SI" and dbh.oracle_db_type|upper != "SIFO"  and oracle_gi_cluster_type |upper == 'FLEX' %}
 NODELIST={% for host in groups[hostgroup_hub] -%} {{host.split('.')[0]}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
-{% elif configure_cluster and dbh.oracle_db_type|upper != "SI" and dbh.oracle_db_type|upper != "SIFO" and oracle_gi_cluster_type |upper != 'FLEX' %}
+{% elif _oraswgi_meta_configure_cluster and dbh.oracle_db_type|upper != "SI" and dbh.oracle_db_type|upper != "SIFO" and oracle_gi_cluster_type |upper != 'FLEX' %}
 NODELIST={% for host in groups[hostgroup] -%} {{host.split('.')[0]}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% else %}
 #NODELIST=

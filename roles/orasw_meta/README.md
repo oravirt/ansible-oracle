@@ -847,7 +847,7 @@ shell_ps1: "'[$LOGNAME'@'$ORACLE_SID `basename $PWD`]$'"
 - (bug): add assert for install_from_nfs, nfs_server_sw, nfs_server_sw_path
 - (bug): why do we need oracle_stage_remote?
 - (bug): is_sw_source_local really needed with default or as dependency from other vars?
-- (bug): Open Issue with changed behavior for `configure_cluster`
+- (bug): Open Issue with changed behavior for `_oraswgi_meta_configure_cluster`
 - (bug): Variable hosgroup needs a refactoring
 - (bug): Change default from autostartup_service for Single Instance
 - (bug): Check if shell_ps1 is used for oracle and grid

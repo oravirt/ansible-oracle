@@ -27,9 +27,7 @@ This will create issues and problems in `ansible-oracle` and is not supported.
   - [_oracle_env_pdb](#_oracle_env_pdb)
   - [_oracle_home_db](#_oracle_home_db)
   - [_oracle_home_db_pdb](#_oracle_home_db_pdb)
-  - [_orasw_meta_internal_configure_cluster](#_orasw_meta_internal_configure_cluster)
   - [cluster_master](#cluster_master)
-  - [configure_cluster](#configure_cluster)
   - [db_mode](#db_mode)
   - [db_password](#db_password)
   - [db_service_name](#db_service_name)
@@ -279,32 +277,12 @@ _oracle_home_db: _internal_used_
 _oracle_home_db_pdb: "{{ db_homes_config[_opdb_home]['oracle_home'] }}"
 ```
 
-### _orasw_meta_internal_configure_cluster
-
-Defines, if a Node is part of a cluster or not.
-
-Do not set it in inventory!
-
-#### Default value
-
-```YAML
-_orasw_meta_internal_configure_cluster: false
-```
-
 ### cluster_master
 
 #### Default value
 
 ```YAML
 cluster_master: '{{ play_hosts[0] }}'
-```
-
-### configure_cluster
-
-#### Default value
-
-```YAML
-configure_cluster: false
 ```
 
 ### db_mode
@@ -458,12 +436,12 @@ oracle_home_db: _unset_
 
 Custom setting for CRS_HOME.
 
-The default value depends on `configure_cluster` and `oracle_home_gi_cl` or `oracle_home_gi_so`.
+The default value depends on `_oraswgi_meta_configure_cluster` and `oracle_home_gi_cl` or `oracle_home_gi_so`.
 
 #### Default value
 
 ```YAML
-oracle_home_gi: '{% if oracle_install_version_gi is defined -%}{%- if configure_cluster
+oracle_home_gi: '{% if oracle_install_version_gi is defined -%}{%- if _oraswgi_meta_configure_cluster
   -%}{{ oracle_home_gi_cl }}{%- else -%}{{ oracle_home_gi_so }}{%- endif -%}{%- endif
   %}'
 ```

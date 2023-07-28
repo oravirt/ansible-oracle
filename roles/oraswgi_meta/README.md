@@ -16,12 +16,14 @@ There are a lot of variables who are used by `orasw_meta`
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [_grid_install_user](#_grid_install_user)
+  - [_oraswgi_meta_configure_cluster](#_oraswgi_meta_configure_cluster)
   - [apply_patches_gi](#apply_patches_gi)
   - [asmmonitorpassword](#asmmonitorpassword)
   - [gi_patches](#gi_patches)
   - [oracle_hostname](#oracle_hostname)
   - [patch_before_rootsh](#patch_before_rootsh)
   - [sysasmpassword](#sysasmpassword)
+- [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
 - [License](#license)
 - [Author](#author)
@@ -46,6 +48,18 @@ Do not change it!
 ```YAML
 _grid_install_user: '{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user
   }}{% endif %}'
+```
+
+### _oraswgi_meta_configure_cluster
+
+This is an internal variable of `ansible-oracle`.
+
+Do not change it!
+
+#### Default value
+
+```YAML
+_oraswgi_meta_configure_cluster: false
 ```
 
 ### apply_patches_gi
@@ -137,6 +151,9 @@ sysasmpassword: '{{ oracle_password }}'
 ```
 
 
+## Open Tasks
+
+- (bug): `ansible-oracle` does not support RAC at the moment.
 
 ## Dependencies
 

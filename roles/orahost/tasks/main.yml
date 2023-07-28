@@ -217,10 +217,10 @@
 - name: ssh-keys | Generate SSH keys
   local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys  # noqa yaml no-handler deprecated-local-action ignore-errors no-changed-when fqcn[action-core]
   ignore_errors: true
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when:
     - configure_ssh
-    - configure_cluster
+    - _oraswgi_meta_configure_cluster
     - old_ssh_config
   become: false
   tags:
@@ -236,7 +236,7 @@
     mode: "0600"
   when:
     - configure_ssh
-    - configure_cluster
+    - _oraswgi_meta_configure_cluster
     - old_ssh_config
   with_nested:
     - "{{ oracle_users }}"
@@ -254,7 +254,7 @@
     mode: 0600
   when:
     - configure_ssh
-    - configure_cluster
+    - _oraswgi_meta_configure_cluster
     - role_separation
     - old_ssh_config
   with_nested:
@@ -270,7 +270,7 @@
   become: false
   when:
     - configure_ssh
-    - configure_cluster
+    - _oraswgi_meta_configure_cluster
     - old_ssh_config
   tags:
     - sshkeys
@@ -282,7 +282,7 @@
   become: false
   when:
     - configure_ssh
-    - configure_cluster
+    - _oraswgi_meta_configure_cluster
     - old_ssh_config
   tags:
     - sshkeys
@@ -294,7 +294,7 @@
   become: false
   when:
     - configure_ssh
-    - configure_cluster
+    - _oraswgi_meta_configure_cluster
     - old_ssh_config
   tags:
     - sshkeys
@@ -309,7 +309,7 @@
   with_items: "{{ oracle_users }}"
   when:
     - configure_ssh
-    - configure_cluster
+    - _oraswgi_meta_configure_cluster
     - old_ssh_config
   tags:
     - sshkeys
@@ -324,7 +324,7 @@
   with_items: "{{ grid_users }}"
   when:
     - configure_ssh
-    - configure_cluster
+    - _oraswgi_meta_configure_cluster
     - role_separation
     - old_ssh_config
   tags:
@@ -336,10 +336,10 @@
   with_items:
     - "{{ ssh_keys }}"
     - "{{ keyfile }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when:
     - configure_ssh
-    - configure_cluster
+    - _oraswgi_meta_configure_cluster
     - old_ssh_config
   ignore_errors: true
   become: false
@@ -556,7 +556,7 @@
     mode: "0644"
   when:
     - configure_interconnect
-    - configure_cluster
+    - _oraswgi_meta_configure_cluster
     - ansible_os_family == 'RedHat'
   tags:
     - eth1
@@ -568,7 +568,7 @@
     state: restarted
   when:
     - configure_interconnect
-    - configure_cluster
+    - _oraswgi_meta_configure_cluster
     - ic.changed
     - ansible_os_family == 'RedHat'
   tags:

@@ -43,7 +43,7 @@
 - name: state
   ansible.builtin.debug:
     msg: "Maintaining DB - {{ odb.oracle_db_name }}, ORACLE_HOME - {{ _oracle_home_db }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when: odb.state == 'present'
 
 # dbca_copy_template is for special situations, when using DBCA-templates
@@ -78,7 +78,7 @@
     # loop_var dbh was replaced by odb in outer loop
     # => no need to change all dbca-templates...
     dbh: "{{ odb }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when: odb.state == 'present'
   tags: create_db,dbcatemplate
 
@@ -103,7 +103,7 @@
     initparams: "{{ _oradb_manage_db_init_params_list | default(omit) }}"
     output: verbose
     state: "{{ odb.state }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become_user: "{{ oracle_user }}"
   when: odb.state == 'present'
   register: dbca_create
@@ -128,7 +128,7 @@
 
 - ansible.builtin.debug:
     msg: "Removing DB - {{ odb.oracle_db_name }}, ORACLE_HOME - {{ _oracle_home_db }}"  # noqa name[missing]
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when: odb.state == 'absent'
 
 - name: manage_db | remove database
@@ -140,7 +140,7 @@
     db_name: "{{ odb.oracle_db_name }}"
     output: verbose
     state: "{{ odb.state }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become_user: "{{ oracle_user }}"
   when: odb.state == 'absent'
   register: dbca_remove

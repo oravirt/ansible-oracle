@@ -119,7 +119,7 @@ oracle.install.asm.OSASM={{ asmadmin_group }}
 # Specify the type of SCAN configuration for the cluster
 # Allowed values : LOCAL_SCAN and SHARED_SCAN
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.scanType={% if configure_cluster %}LOCAL_SCAN{% else %}{% endif %}
+oracle.install.crs.config.scanType={% if _oraswgi_meta_configure_cluster %}LOCAL_SCAN{% else %}{% endif %}
 
 #-------------------------------------------------------------------------------
 # Applicable only if SHARED_SCAN is being configured for cluster
@@ -132,13 +132,13 @@ oracle.install.crs.config.SCANClientDataFile=
 # Applicable if LOCAL_SCAN is being configured for the cluster
 # If you choose to configure the cluster with GNS with Auto assigned Node VIPs(DHCP),then the scanName should be specified in the format of 'SCAN name.Cluster name.GNS sub-domain'
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.gpnp.scanName={% if configure_cluster %}{{ oracle_scan }}{% else %}{% endif %}
+oracle.install.crs.config.gpnp.scanName={% if _oraswgi_meta_configure_cluster %}{{ oracle_scan }}{% else %}{% endif %}
 
 #-------------------------------------------------------------------------------
 # Specify a unused port number for SCAN service
 #-------------------------------------------------------------------------------
 
-oracle.install.crs.config.gpnp.scanPort={% if configure_cluster %}{{ oracle_scan_port }}{% else %}{% endif %}
+oracle.install.crs.config.gpnp.scanPort={% if _oraswgi_meta_configure_cluster %}{{ oracle_scan_port }}{% else %}{% endif %}
 
 ################################################################################
 #                                                                              #
@@ -258,7 +258,7 @@ oracle.install.crs.config.sites=
 #
 #-------------------------------------------------------------------------------
 oracle.install.crs.config.clusterNodes=
-{%- if configure_cluster -%}
+{%- if _oraswgi_meta_configure_cluster -%}
   {%- for host in groups[hostgroup] -%} {{ hostvars[host].ansible_fqdn }}:
     {%- if hostvars[host].oracle_node_vip is defined -%}
       {{ hostvars[host].oracle_node_vip }}
@@ -290,7 +290,7 @@ oracle.install.crs.config.clusterNodes=
 # For example: eth0:140.87.24.0:1,eth1:10.2.1.0:2,eth2:140.87.52.0:3
 #
 #-------------------------------------------------------------------------------
-{%  if configure_cluster %}
+{%  if _oraswgi_meta_configure_cluster %}
 {% if oracle_gi_cluster_type|upper  == "FLEX" or oracle_gi_cluster_type|upper == 'STANDALONE'   %}
 oracle.install.crs.config.networkInterfaceList={{ oracle_gi_nic_pub }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_pub].ipv4.network }}:1,{{ oracle_gi_nic_priv }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_priv].ipv4.network }}:5
 {%  elif oracle_gi_cluster_type|upper  == "STANDARD" %}

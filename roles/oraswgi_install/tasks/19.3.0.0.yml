@@ -7,7 +7,7 @@
   block:
     - ansible.builtin.debug:  # noqa name[missing]
         msg: "install_home_gi | Start Extract files to ORACLE_HOME (gi)"
-      run_once: "{{ configure_cluster }}"
+      run_once: "{{ _oraswgi_meta_configure_cluster }}"
 
     - name: install_home_gi | Extract files to ORACLE_HOME (gi)
       ansible.builtin.unarchive:
@@ -21,7 +21,7 @@
         creates: "{{ oracle_home_gi }}/root.sh"
       become: true
       become_user: "{{ _grid_install_user }}"
-      run_once: "{{ configure_cluster }}"
+      run_once: "{{ _oraswgi_meta_configure_cluster }}"
       when:
         - oracle_install_version_gi == item.version
 
@@ -31,13 +31,13 @@
   ansible.builtin.stat:
     path: "{{ oracle_home_gi }}/gridSetup.sh"
   register: stat_gridsetup_result
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
 
 - name: install_home_gi | State of GridSetup.sh
   ansible.builtin.assert:
     that: "stat_gridsetup_result.stat.exists == True"
     msg: "Cannot find {{ oracle_home_gi }}/gridSetup.sh }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
 
 - name: check for existing cvuqdisk_rpm
   ansible.builtin.stat:
@@ -48,11 +48,11 @@
 
 # Oracle Restart + ASMFD
 # => cvuqdisk is mandatory
-- name: When configure_cluster
+- name: When _oraswgi_meta_configure_cluster
   when:
-    - (configure_cluster and hostvars[cluster_master]['statcvuqdisk']['stat']['exists'])
+    - (_oraswgi_meta_configure_cluster and hostvars[cluster_master]['statcvuqdisk']['stat']['exists'])
       or
-      (not configure_cluster and device_persistence == 'asmfd')
+      (not _oraswgi_meta_configure_cluster and device_persistence == 'asmfd')
   tags: cvuqdisk
   block:
 
@@ -92,7 +92,7 @@
     mode: "0600"
     backup: true
   with_items: "{{ asm_diskgroups }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   loop_control:
     label: "{{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }}"
   tags:
@@ -132,7 +132,7 @@
           - "{{ _oraswgi_install_giignoreprereqparam | default(omit) }}"
       become: true
       become_user: "{{ _grid_install_user }}"
-      run_once: "{{ configure_cluster }}"
+      run_once: "{{ _oraswgi_meta_configure_cluster }}"
       tags:
         - oragridinstall
       register: giinstall
@@ -140,7 +140,7 @@
 
     - ansible.builtin.debug:  # noqa name[missing]
         var: giinstall.stdout_lines
-      run_once: "{{ configure_cluster }}"
+      run_once: "{{ _oraswgi_meta_configure_cluster }}"
       when: giinstall.stdout_lines is defined
 
 - name: install_home_gi | include role oraswgi_manage_patches
@@ -167,14 +167,14 @@
       ansible.builtin.command: "{{ oracle_home_gi }}/root.sh"
       # noqa no-changed-when
       become: true
-      run_once: "{{ configure_cluster }}"
+      run_once: "{{ _oraswgi_meta_configure_cluster }}"
       register: rootmaster
       tags:
         - runroot
 
     - ansible.builtin.debug:  # noqa name[missing]
         var: rootmaster.stdout_lines
-      run_once: "{{ configure_cluster }}"
+      run_once: "{{ _oraswgi_meta_configure_cluster }}"
       when: rootmaster.stdout_lines is defined
 
     - ansible.builtin.debug:  # noqa name[missing]
@@ -195,7 +195,7 @@
       tags:
         - runroot
       when:
-        - configure_cluster
+        - _oraswgi_meta_configure_cluster
         - inventory_hostname != cluster_master
         - inventory_hostname == item.1
       register: rootother
@@ -209,7 +209,7 @@
       # noqa no-changed-when
       become: true
       become_user: "{{ _grid_install_user }}"
-      run_once: "{{ configure_cluster }}"
+      run_once: "{{ _oraswgi_meta_configure_cluster }}"
       tags:
         - runconfigtool
       when:
