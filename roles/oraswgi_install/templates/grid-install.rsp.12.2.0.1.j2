@@ -115,13 +115,13 @@ oracle.install.asm.OSASM={{ asmadmin_group }}
 #-------------------------------------------------------------------------------
 # Specify a name for SCAN
 #-------------------------------------------------------------------------------
-oracle.install.crs.config.gpnp.scanName={% if configure_cluster %}{{ oracle_scan }}{% else %}{% endif %}
+oracle.install.crs.config.gpnp.scanName={% if _oraswgi_meta_configure_cluster %}{{ oracle_scan }}{% else %}{% endif %}
 
 #-------------------------------------------------------------------------------
 # Specify a unused port number for SCAN service
 #-------------------------------------------------------------------------------
 
-oracle.install.crs.config.gpnp.scanPort={% if configure_cluster %}{{ oracle_scan_port }}{% else %}{% endif %}
+oracle.install.crs.config.gpnp.scanPort={% if _oraswgi_meta_configure_cluster %}{{ oracle_scan_port }}{% else %}{% endif %}
 
 
 ################################################################################
@@ -246,7 +246,7 @@ oracle.install.crs.config.sites=
 #
 #-------------------------------------------------------------------------------
 oracle.install.crs.config.clusterNodes=
-{%- if configure_cluster -%}
+{%- if _oraswgi_meta_configure_cluster -%}
   {%- for host in groups[hostgroup] -%} {{ hostvars[host].ansible_fqdn }}:
     {%- if hostvars[host].oracle_node_vip is defined -%}
       {{ hostvars[host].oracle_node_vip }}
@@ -278,7 +278,7 @@ oracle.install.crs.config.clusterNodes=
 # For example: eth0:140.87.24.0:1,eth1:10.2.1.0:2,eth2:140.87.52.0:3
 #
 #-------------------------------------------------------------------------------
-{%  if configure_cluster %}
+{%  if _oraswgi_meta_configure_cluster %}
 {% if oracle_gi_cluster_type|upper  == "FLEX" or oracle_gi_cluster_type|upper == 'STANDALONE'   %}
 oracle.install.crs.config.networkInterfaceList={{ oracle_gi_nic_pub }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_pub].ipv4.network }}:1,{{ oracle_gi_nic_priv }}:{{ hostvars[inventory_hostname]["ansible_" + oracle_gi_nic_priv].ipv4.network }}:5
 {%  elif oracle_gi_cluster_type|upper  == "STANDARD" %}

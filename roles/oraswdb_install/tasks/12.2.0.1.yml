@@ -4,7 +4,7 @@
   # noqa yaml command-instead-of-shell no-changed-when
   become: true
   become_user: "{{ oracle_user }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when: oracle_home_db not in existing_dbhome.stdout_lines
   tags:
     - oradbinstall
@@ -12,7 +12,7 @@
 
 - ansible.builtin.debug:  # noqa name[missing] ignore-errors
     var: oradbinstall.stdout_lines
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when: oracle_home_db not in existing_dbhome.stdout_lines and oradbinstall.changed
   tags:
     - oradbinstall

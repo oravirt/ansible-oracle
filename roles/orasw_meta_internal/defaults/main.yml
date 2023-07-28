@@ -1,11 +1,4 @@
 ---
-# @var _orasw_meta_internal_configure_cluster:description: >
-# Defines, if a Node is part of a cluster or not.
-#
-# Do not set it in inventory!
-# @end
-_orasw_meta_internal_configure_cluster: false
-
 # @var _db_password_cdb:description: >
 # The variable is internal used only.
 #
@@ -198,8 +191,6 @@ ocm_response_file: "{{ oracle_patch_stage }}/{{ db_version }}/ocm.rsp"
 # @end
 oracle_stage_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
 
-configure_cluster: false
-
 oracle_sw_copy: "{% if install_from_nfs %}false{% else %}true{% endif %}"
 oracle_sw_unpack: "{% if install_from_nfs %}false{% else %}true{% endif %}"
 oracle_sw_extract_path: "{%- if '18' in db_version -%}\
@@ -359,10 +350,10 @@ db_version: "{%- if dbh is defined and db_homes_config[dbh.home] is defined -%}
 # @var oracle_home_gi:description: >
 # Custom setting for CRS_HOME.
 #
-# The default value depends on `configure_cluster` and `oracle_home_gi_cl` or `oracle_home_gi_so`.
+# The default value depends on `_oraswgi_meta_configure_cluster` and `oracle_home_gi_cl` or `oracle_home_gi_so`.
 # @end
 oracle_home_gi: "{% if oracle_install_version_gi is defined -%}\
-                    {%- if configure_cluster -%}{{ oracle_home_gi_cl }}\
+                    {%- if _oraswgi_meta_configure_cluster -%}{{ oracle_home_gi_cl }}\
                     {%- else -%}{{ oracle_home_gi_so }}\
                     {%- endif -%}\
                  {%- endif %}"

@@ -17,7 +17,7 @@
         - disk
       loop_control:
         label: "asmdisk={{ item.1.asmlabel | default('') }} device={{ item.1.device | default('') }}{{ partition_suffix | default('') }}"
-      run_once: "{{ configure_cluster }}"
+      run_once: "{{ _oraswgi_meta_configure_cluster }}"
 
     - name: ASMlib | Rescan ASM disks
       ansible.builtin.shell: "{{ asmlib_binary }} scandisks"

@@ -10,7 +10,7 @@
     creates: "{{ oracle_home_gi }}/root.sh"
   become: true
   become_user: "{{ _grid_install_user }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   tags:
     - oragridswunpack
   when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and oracle_sw_copy and oracle_sw_unpack
@@ -25,7 +25,7 @@
     creates: "{{ oracle_home_gi }}/root.sh"
   become: true
   become_user: "{{ _grid_install_user }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   tags:
     - oragridswunpack
   when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and not oracle_sw_copy
@@ -36,13 +36,13 @@
   ansible.builtin.stat:
     path: "{{ oracle_home_gi }}/gridSetup.sh"
   register: stat_gridsetup_result
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
 
 - name: install_home_gi | State of GridSetup.sh
   ansible.builtin.assert:
     that: "stat_gridsetup_result.stat.exists == True"
     msg: "Cannot find {{ oracle_home_gi }}/gridSetup.sh }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   # when: master_node
 
 - name: install_home_gi | Install cvuqdisk rpm
@@ -50,7 +50,7 @@
     name: "{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}"
     state: present
   # noqa ignore-errors
-  when: configure_cluster
+  when: _oraswgi_meta_configure_cluster
   tags: cvuqdisk
   ignore_errors: true
 
@@ -58,7 +58,7 @@
   ansible.builtin.file:
     name: "{{ oracle_home_gi }}"
     state: absent
-  when: configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
+  when: _oraswgi_meta_configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Recreate ORACLE_HOME (gi) on other nodes
   ansible.builtin.file:
@@ -67,7 +67,7 @@
     owner: "{{ oracle_user }}"
     group: "{{ oracle_group }}"
     state: directory
-  when: configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
+  when: _oraswgi_meta_configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Setup response file for install (GI)
   ansible.builtin.template:
@@ -78,7 +78,7 @@
     mode: "0600"
     backup: true
   with_items: "{{ asm_diskgroups }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   tags:
     - responsefilegi
   when: oracle_home_gi not in checkgiinstall.stdout and item.diskgroup == oracle_asm_init_dg
@@ -107,7 +107,7 @@
   # noqa command-instead-of-shell no-changed-when
   become: true
   become_user: "{{ _grid_install_user }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   tags:
     - oragridinstall
   when: oracle_home_gi not in checkgiinstall.stdout  # and oracle_sw_unpack
@@ -116,7 +116,7 @@
 
 - ansible.builtin.debug:  # noqa name[missing]
     var: giinstall.stdout_lines
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when: oracle_home_gi not in checkgiinstall.stdout and giinstall.changed
 
 - ansible.builtin.include_role:
@@ -136,7 +136,7 @@
   ansible.builtin.shell: "{{ oracle_home_gi }}/root.sh"
   # noqa command-instead-of-shell no-changed-when
   become: true
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   tags:
     - runroot
   when: oracle_home_gi not in checkgiinstall.stdout
@@ -144,7 +144,7 @@
 
 - ansible.builtin.debug:  # noqa name[missing]
     var: rootmaster.stdout_lines
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when: oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Run root script after installation (Other Nodes)
@@ -155,13 +155,13 @@
   tags:
     - runroot
   # when: not master_node and oracle_home_gi not in checkgiinstall.stdout and inventory_hostname == item.1
-  when: configure_cluster and inventory_hostname != cluster_master and inventory_hostname == item.1 and oracle_home_gi not in checkgiinstall.stdout
+  when: _oraswgi_meta_configure_cluster and inventory_hostname != cluster_master and inventory_hostname == item.1 and oracle_home_gi not in checkgiinstall.stdout
   register: rootother
 
 - ansible.builtin.debug:  # noqa name[missing] ignore-errors
     var: rootother.stdout_lines
   # when: not master_node and oracle_home_gi not in checkgiinstall.stdout
-  when: configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
+  when: _oraswgi_meta_configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
   ignore_errors: true
 
 - name: install_home_gi | Execute ConfigTools
@@ -169,7 +169,7 @@
   # noqa command-instead-of-shell no-changed-when
   become: true
   become_user: "{{ _grid_install_user }}"
-  run_once: "{{ configure_cluster }}"
+  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   tags:
     - runconfigtool
   when: run_configtoolallcommand and oracle_home_gi not in checkgiinstall.stdout

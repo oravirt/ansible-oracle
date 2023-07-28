@@ -85,7 +85,7 @@
     - subpatches
     - flags:
       skip_missing: true
-  # run_once: "{{ configure_cluster}}"
+  # run_once: "{{ _oraswgi_meta_configure_cluster}}"
   become: true
   become_user: "{{ oracle_user }}"
   tags:
@@ -106,7 +106,7 @@
     state: "{{ item.state }}"
   with_items:
     - "{{ db_homes_config[dbh.home]['opatchauto'] }}"
-  # run_once: "{{ configure_cluster}}"
+  # run_once: "{{ _oraswgi_meta_configure_cluster}}"
   become: true
   tags:
     - apply_patch_db
@@ -128,7 +128,7 @@
     state: "{{ item.state }}"
   with_items:
     - "{{ db_homes_config[dbh.home]['opatch'] }}"
-  # run_once: "{{ configure_cluster }}"
+  # run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become: true
   become_user: "{{ oracle_user }}"
   tags:

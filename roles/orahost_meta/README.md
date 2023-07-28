@@ -10,7 +10,6 @@ Meta role used by other roles to share variable defaults.
   - [asmadmin_group](#asmadmin_group)
   - [asmdba_group](#asmdba_group)
   - [asmoper_group](#asmoper_group)
-  - [configure_cluster](#configure_cluster)
   - [configure_host_disks](#configure_host_disks)
   - [dba_group](#dba_group)
   - [device_persistence](#device_persistence)
@@ -109,16 +108,6 @@ The os-group for asmoper role in Oracle ASM.
 
 ```YAML
 asmoper_group: asmoper
-```
-
-### configure_cluster
-
-Configure Grid-Infrastructure or Oracle Restart?
-
-#### Default value
-
-```YAML
-configure_cluster: false
 ```
 
 ### configure_host_disks
