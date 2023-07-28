@@ -7,7 +7,7 @@
     copy: false
   with_items: "{{ oracle_sw_image_gi }}"
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   tags:
     - oragridswunpack
   when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and oracle_sw_copy and oracle_sw_unpack
@@ -19,7 +19,7 @@
     copy: false
   with_items: "{{ oracle_sw_image_gi }}"
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   tags:
     - oragridswunpack
   when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and not oracle_sw_copy and oracle_sw_unpack
@@ -36,8 +36,8 @@
 - name: install_home_gi | Setup response file for install (GI)
   ansible.builtin.template:
     src: "grid-install.rsp.{{ oracle_install_version_gi }}.j2"
-    dest: "{{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }}"
-    owner: "{{ grid_install_user }}"
+    dest: "{{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }}"
+    owner: "{{ _grid_install_user }}"
     group: "{{ oracle_group }}"
     mode: "0600"
     backup: true
@@ -48,10 +48,10 @@
   when: oracle_home_gi not in checkgiinstall.stdout and item.diskgroup == oracle_asm_init_dg
 
 - name: install_home_gi | Install Grid Infrastructure
-  ansible.builtin.shell: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -ignoreSysPrereqs -showProgress -silent"
+  ansible.builtin.shell: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/grid/runInstaller -responseFile {{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -ignoreSysPrereqs -showProgress -silent"
   # noqa yaml command-instead-of-shell no-changed-when
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   run_once: "{{ configure_cluster }}"
   tags:
     - oragridinstall
@@ -112,7 +112,7 @@
   ansible.builtin.template:
     src: "configtoolallcommands.rsp.{{ oracle_install_version_gi }}.j2"
     dest: "{{ oracle_rsp_stage }}/configtoolallcommands.rsp"
-    owner: "{{ grid_install_user }}"
+    owner: "{{ _grid_install_user }}"
     group: "{{ oracle_group }}"
     mode: "0755"
     backup: true
@@ -125,7 +125,7 @@
   ansible.builtin.shell: "{{ oracle_home_gi }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_rsp_stage }}/configtoolallcommands.rsp"
   # noqa command-instead-of-shell no-changed-when
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   run_once: "{{ configure_cluster }}"
   tags:
     - runconfigtool

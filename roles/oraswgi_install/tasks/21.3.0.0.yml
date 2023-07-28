@@ -11,16 +11,16 @@
 
     - name: install_home_gi | Extract files to ORACLE_HOME (gi)
       ansible.builtin.unarchive:
-        src: "{{ oracle_gi_image }}"
+        src: "{{ _oraswgi_install_oracle_gi_image }}"
         dest: "{{ oracle_home_gi }}"
         copy: false
       with_items: "{{ oracle_sw_image_gi }}"
       loop_control:
-        label: "{{ oracle_gi_image | default('') }}"
+        label: "{{ _oraswgi_install_oracle_gi_image | default('') }}"
       args:
         creates: "{{ oracle_home_gi }}/root.sh"
       become: true
-      become_user: "{{ grid_install_user }}"
+      become_user: "{{ _grid_install_user }}"
       run_once: "{{ configure_cluster }}"
       when:
         - oracle_install_version_gi == item.version
@@ -86,15 +86,15 @@
 - name: install_home_gi | Setup response file for install (GI)
   ansible.builtin.template:
     src: "grid-install.rsp.{{ oracle_install_version_gi }}.j2"
-    dest: "{{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }}"
-    owner: "{{ grid_install_user }}"
+    dest: "{{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }}"
+    owner: "{{ _grid_install_user }}"
     group: "{{ oracle_group }}"
     mode: "0600"
     backup: true
   with_items: "{{ asm_diskgroups }}"
   run_once: "{{ configure_cluster }}"
   loop_control:
-    label: "{{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }}"
+    label: "{{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }}"
   tags:
     - responsefilegi
   when:
@@ -126,12 +126,12 @@
         argv:
           - "{{ oracle_home_gi }}/gridSetup.sh"
           - -responseFile
-          - "{{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }}"
+          - "{{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }}"
           - -waitforcompletion
           - -silent
-          - "{{ giignoreprereqparam | default(omit) }}"
+          - "{{ _oraswgi_install_giignoreprereqparam | default(omit) }}"
       become: true
-      become_user: "{{ grid_install_user }}"
+      become_user: "{{ _grid_install_user }}"
       run_once: "{{ configure_cluster }}"
       tags:
         - oragridinstall
@@ -205,10 +205,10 @@
       when: rootother.stdout_lines is defined
 
     - name: install_home_gi | Execute ConfigTools
-      ansible.builtin.command: "{{ oracle_home_gi }}/gridSetup.sh -executeConfigTools -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -silent"
+      ansible.builtin.command: "{{ oracle_home_gi }}/gridSetup.sh -executeConfigTools -responseFile {{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }} -silent"
       # noqa no-changed-when
       become: true
-      become_user: "{{ grid_install_user }}"
+      become_user: "{{ _grid_install_user }}"
       run_once: "{{ configure_cluster }}"
       tags:
         - runconfigtool

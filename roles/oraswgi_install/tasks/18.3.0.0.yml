@@ -9,7 +9,7 @@
   args:
     creates: "{{ oracle_home_gi }}/root.sh"
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   run_once: "{{ configure_cluster }}"
   tags:
     - oragridswunpack
@@ -24,7 +24,7 @@
   args:
     creates: "{{ oracle_home_gi }}/root.sh"
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   run_once: "{{ configure_cluster }}"
   tags:
     - oragridswunpack
@@ -44,13 +44,6 @@
     msg: "Cannot find {{ oracle_home_gi }}/gridSetup.sh }}"
   run_once: "{{ configure_cluster }}"
   # when: master_node
-# unarchive didn't worked in some environments. => using unzip directly
-# Overwrite existing files from OPatch due to Note 2321749.1
-# - name: install_home_gi | Distribute latest opatch
-#   shell: unzip -o -d {{oracle_home_gi}} {{opatcharchive}}
-#   become: true
-#   become_user: "{{ grid_install_user }}"
-#   when: oracle_sw_patches is defined and oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Install cvuqdisk rpm
   ansible.builtin.yum:
@@ -79,8 +72,8 @@
 - name: install_home_gi | Setup response file for install (GI)
   ansible.builtin.template:
     src: "grid-install.rsp.{{ oracle_install_version_gi }}.j2"
-    dest: "{{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }}"
-    owner: "{{ grid_install_user }}"
+    dest: "{{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }}"
+    owner: "{{ _grid_install_user }}"
     group: "{{ oracle_group }}"
     mode: "0600"
     backup: true
@@ -94,7 +87,7 @@
 # - name: install_home_gi | Apply Release Update on ORACLE_HOME
 #   shell: "{{oracle_home_gi}}/gridSetup.sh -silent -applyPSU {{ oracle_stage_remote }}/{{ oracle_install_version_gi }}/{{item.patchid}} -waitforcompletion ; exit 0"
 #   become: true
-#   become_user: "{{ grid_install_user }}"
+#   become_user: "{{ _grid_install_user }}"
 #   with_items:
 #     - "{{ oracle_sw_patches }}"
 #   register: command_result
@@ -110,10 +103,10 @@
 #   when: oracle_sw_patches is defined and oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Install Grid Infrastructure
-  ansible.builtin.shell: "{{ oracle_home_gi }}/gridSetup.sh -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -silent"
+  ansible.builtin.shell: "{{ oracle_home_gi }}/gridSetup.sh -responseFile {{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }} -waitforcompletion -ignorePrereq -silent"
   # noqa command-instead-of-shell no-changed-when
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   run_once: "{{ configure_cluster }}"
   tags:
     - oragridinstall
@@ -172,10 +165,10 @@
   ignore_errors: true
 
 - name: install_home_gi | Execute ConfigTools
-  ansible.builtin.shell: "{{ oracle_home_gi }}/gridSetup.sh -executeConfigTools -responseFile {{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }} -silent"
+  ansible.builtin.shell: "{{ oracle_home_gi }}/gridSetup.sh -executeConfigTools -responseFile {{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }} -silent"
   # noqa command-instead-of-shell no-changed-when
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   run_once: "{{ configure_cluster }}"
   tags:
     - runconfigtool

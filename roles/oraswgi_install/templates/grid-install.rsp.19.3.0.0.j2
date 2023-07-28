@@ -215,7 +215,7 @@ oracle.install.crs.config.gpnp.gnsClientDataFile=
 # Specify the GNS subdomain and an unused virtual hostname for GNS service
 #-------------------------------------------------------------------------------
 {%  if oracle_gi_cluster_type|upper  == "FLEX" or oracle_gi_cluster_type|upper  == 'STANDARD' or oracle_gi_cluster_type|upper  == 'STANDALONE' or oracle_gi_cluster_type|upper  == 'DOMAIN' %}
-oracle.install.crs.config.gpnp.gnsSubDomain={{ oracle_gi_gns_subdomain }}
+oracle.install.crs.config.gpnp.gnsSubDomain={{ oracle_gi_gns_subdomain | default('') | default('') }}
 oracle.install.crs.config.gpnp.gnsVIPAddress={{ oracle_gi_gns_vip }}
 {%  else %}
 oracle.install.crs.config.gpnp.gnsSubDomain=

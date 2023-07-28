@@ -34,12 +34,12 @@
           - -pre
           - crsinst
           - -responseFile
-          - "{{ oracle_rsp_stage }}/{{ oracle_grid_responsefile }}"
+          - "{{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }}"
       register: cmdruncluvfygi
       failed_when: cmdruncluvfygi.rc == -1
       changed_when: cmdruncluvfygi.rc == 0
       become: true
-      become_user: "{{ grid_install_user }}"
+      become_user: "{{ _grid_install_user }}"
       run_once: true
       when:
         - configure_cluster
@@ -70,7 +70,7 @@
       failed_when: cmdruncluvfy.rc == -1
       changed_when: cmdruncluvfy.rc == 0
       become: true
-      become_user: "{{ grid_install_user }}"
+      become_user: "{{ _grid_install_user }}"
       when:
         - not configure_cluster
 

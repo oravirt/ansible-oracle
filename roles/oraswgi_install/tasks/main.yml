@@ -1,4 +1,13 @@
 ---
+- name: install_home_gi | Assert
+  ansible.builtin.include_tasks: assert.yml
+  tags: always
+
+- name: install_home_gi | Install ocenv from oradb_manage_db
+  ansible.builtin.import_role:
+    name: oradb_manage_db
+    tasks_from: ocenv.yml
+    allow_duplicates: false
 
 - name: install_home_gi | Check if GI is already installed
   ansible.builtin.shell: cat "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" | grep -w {{ oracle_home_gi }} |awk  '{print $3}' | cut -f2 -d'"'
@@ -21,14 +30,14 @@
       ansible.builtin.assert:
         that:
           - oracle_asm_init_dg is defined
-          - init_dg_exists
+          - _oraswgi_install_init_dg_exists
 
 - name: install_home_gi | set fact for patch_before_rootsh
   ansible.builtin.set_fact:
     patch_before_rootsh: false
   when:
     - olrloc.stat.exists
-    - patch_before_rootsh
+    - patch_before_rootsh | bool
 
 - name: install_home_gi | Mount nfs share with installation media
   ansible.builtin.include_role:
@@ -37,17 +46,6 @@
   tags:
     - nfsmountdb
 
-- name: install_home_gi | Add new dotprofile (GI)
-  ansible.builtin.template:
-    src: dotprofile-gi.j2
-    dest: "{{ grid_user_home }}/{{ oracle_profile_name_gi }}"
-    owner: "{{ grid_install_user }}"
-    group: "{{ oracle_group }}"
-    mode: "0755"
-    backup: true
-  tags:
-    - dotprofilegi
-
 - name: install_home_gi | Create common directories
   ansible.builtin.file:
     dest: "{{ item.name }}"
@@ -55,7 +53,7 @@
     owner: "{{ item.owner }}"
     group: "{{ item.group }}"
     state: directory
-  with_items: "{{ oracle_directories }}"
+  with_items: "{{ _oraswgi_manage_patches_oracle_directories }}"
   tags:
     - directories
 
@@ -75,7 +73,7 @@
 - name: install_home_gi | Create ORACLE_HOME directory (GI)
   ansible.builtin.file:
     dest: "{{ oracle_home_gi }}"
-    owner: "{{ grid_install_user }}"
+    owner: "{{ _grid_install_user }}"
     group: "{{ oracle_group }}"
     state: directory
     mode: "0775"
@@ -95,7 +93,7 @@
     force: false
   with_items: "{{ oracle_sw_image_gi }}"
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   tags:
     - oragridsw
   when:
@@ -131,7 +129,7 @@
   ansible.builtin.shell: "{{ oracle_home_gi }}/oui/bin/runInstaller -updateNodeList ORACLE_HOME={{ oracle_home_gi }} CRS=TRUE"
   # noqa command-instead-of-shell no-changed-when ignore-errors
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   run_once: "{{ configure_cluster }}"
   when: oracle_home_gi not in checkgiinstall.stdout
   ignore_errors: true
@@ -167,8 +165,9 @@
   ansible.builtin.shell: "{{ oracle_home_gi }}/OPatch/opatch lspatches"
   # noqa command-instead-of-shell no-changed-when
   become: true
-  become_user: "{{ grid_install_user }}"
-  environment: "{{ oracle_env }}"
+  become_user: "{{ _grid_install_user }}"
+  environment:
+    ORACLE_HOME: "{{ oracle_home_gi }}"
   register: opatchls
   tags:
     - opatchls
@@ -185,7 +184,7 @@
   ansible.builtin.shell: "{{ oracle_home_gi }}/bin/olsnodes -a -n -s -t"
   # noqa command-instead-of-shell no-changed-when
   become: true
-  become_user: "{{ grid_install_user }}"
+  become_user: "{{ _grid_install_user }}"
   when: oracle_gi_cluster_type | upper == 'FLEX' and '12' in oracle_install_version_gi
   register: olsnodes
   tags:

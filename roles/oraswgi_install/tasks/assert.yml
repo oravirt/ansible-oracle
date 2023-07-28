@@ -1,0 +1,28 @@
+---
+- name: Oraswdb_install | Assert variables
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - oracle_password | length > 0
+      - oracle_install_version_gi is defined
+      - oracle_gi_cluster_type in ('STANDARD', 'STANDALONE')
+  tags: always
+
+# RAC is not supported at the moment!
+- name: Oraswdb_install | Assert oracle_install_option_gi
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - oracle_install_option_gi in ('HA_CONFIG')
+      # - oracle_install_option_gi in ('HA_CONFIG', 'CRS_CONFIG')
+  tags: always
+
+- name: Oraswdb_install | Assert Grid-Infrastructure variables
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - oracle_scan is defined
+      - oracle_vip is defined
+  when:
+    - oracle_install_option_gi == 'CRS_CONFIG'
+  tags: always
