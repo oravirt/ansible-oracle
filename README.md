@@ -8,7 +8,7 @@
 # Documentation
 
 ## Features
-1. Full list of features of ansible-oracle <https://github.com/oravirt/ansible-oracle/blob/master/doc/feauturelist.adoc>
+1. Full list of features of ansible-oracle <https://github.com/oravirt/ansible-oracle/blob/master/doc/featurelist.adoc>
 1. More details <https://github.com/oravirt/ansible-oracle> 
 
 
