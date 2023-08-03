@@ -20,9 +20,13 @@ image::{puml}/guides/beginner.puml[Architecturview]
 
 
 ==== What are we going to do?
-- An Oracle Linux VM will be created 
-- A docker container is setup in this VM
-- Ansible runs in the docker container to configure the Oracle Linux VM and install the Oracle database
+With one command, the following will happen...
+
+- An Oracle Linux VM will be created.
+- A docker container is setup in this Linux VM.
+- Why do we need a docker container? Ansible runs in the docker container to configure the Oracle Linux VM and install the Oracle database. See link:../README-ansible.adoc[Details of Ansible as a Docker Container] for more information
+- The Oracle database installation is started from the docker container. See details below.
+
 
 ==== Defaults
 .Defaults used in this guide
@@ -155,7 +159,7 @@ ansible@ansible-oracle:/git/ansible-oracle/example/beginner/ansible$
 ----
 
 
-IMPORTANT: The collection are installed once and stored on the docker volume.
+IMPORTANT: The collection is installed once and stored on the docker volume.
 
 .Install Collections
 ----
@@ -201,7 +205,7 @@ cd /git/ansible-oracle/example/beginner/ansible
 ansible-playbook -i inventory/ -e hostgroup=dbfs playbooks/single-instance-fs.yml
 ----
 
-The Database creation has been completed. +
+The Database creation is now complete. +
 See the following chapter for details about how to work with the VM.
 
 
@@ -283,9 +287,8 @@ PDBs
 [oracle@beginner-dbfs-151-192-168-56-161] [DB1] [~]
 ----
 
-==== Start SQLPlus
-
-.SQLPlus login
+==== Database Login
+.Start SQLPlus
 ----
 [oracle@beginner-dbfs-151-192-168-56-161] [DB1] [~]
 $ sql
