@@ -89,6 +89,4 @@ vagrant box remove oraclelinux/7
 vagrant box remove oraclelinux/8
 ```
 
-# Open issues
-1. ssh key usage, see https://superuser.com/questions/1783979/is-there-a-way-to-create-disk-partitions-on-vagrant-vm
-1. install oracle DB
+
