@@ -342,7 +342,8 @@
     name: rman_backup_{{ item.0.oracle_db_name }}_{{ item.1.name }}
     cron_file: "{{ rman_cronfile }}"
     user: "{{ oracle_user }}"
-    disabled: "{{ item.1.disabled }}"
+    disabled: "{{ item.1.disabled | default(false) }}"
+    state: "{{ item.1.state | default('present') }}"
     day: "{{ item.1.day }}"
     weekday: "{{ item.1.weekday }}"
     hour: "{{ item.1.hour }}"
@@ -354,10 +355,13 @@
     - rman_jobs
     - skip_missing: true
   loop_control:
-    label: "oracle_db_name {{ item.0.oracle_db_name | default('') }} job {{ item.1.name | default('') }}"
+    label: >-
+      oracle_db_name: {{ item.0.oracle_db_name | default('') }}
+      job: {{ item.1.name | default('') }}
+      disabled: {{ item.1.disabled | default(false) }}
+      state: {{ item.1.state | default('present') }}
   when:
     - item.1 is defined
-    - item.1.disabled is defined
     - item.1.day is defined
     - item.1.weekday is defined
     - item.1.hour is defined
