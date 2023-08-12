@@ -1,0 +1,82 @@
+---
+apply_patches_db: true
+db_homes_config:
+
+  db1919_si_se2: &db1919_si_se2
+    version: 19.3.0.0
+    oracle_home: /u01/app/oracle/product/19/db1919-si-se2
+    edition: SE2
+    opatch_minversion: 12.2.0.1.36
+    state: present
+    opatchauto: []
+    opatch:
+      - patchid: 35042068
+        # Database Release Update 19.19.0.0.230418
+        patchversion: 19.19.0.0.230418
+        stop_processes: true
+        state: present
+      - patchid: 35050341
+        # Oracle JavaVM Component Release Update (OJVM RU) 19.19.0.0.230418
+        stop_processes: true
+        state: present
+      - patchid: 35261302
+        # DATAPUMP BUNDLE PATCH 19.19.0.0.0
+        stop_processes: true
+        state: present
+
+  db1918_si_se2: &db1918_si_se2
+    version: 19.3.0.0
+    oracle_home: /u01/app/oracle/product/19/db1918-si-se2
+    edition: SE2
+    opatch_minversion: 12.2.0.1.36
+    opatch:
+      - patchid: 34765931
+        # Database Release Update 19.18.0.0.230117
+        patchversion: 19.18.0.0.230117
+        stop_processes: true
+        state: present
+        path: 19.18.0.0.230117/dbru/34765931/34765931/
+      - patchid: 34786990
+        # Oracle JavaVM Component Release Update (OJVM RU) 19.18.0.0.230117
+        stop_processes: true
+        state: present
+        path: 19.18.0.0.230117/ojvm/p34786990_190000_Linux-x86-64.zip
+
+  # golden is used for building the golden image only
+  # Current Mapping of ORACLE_HOMEs
+  # use this mapping for fast change between the Release Updates
+  # <<: * => merge values from alias and overwrite oracle_home + home
+  #
+  # => Base for imagename at later stage
+  db19_si_se2_golden:
+    <<: *db1919_si_se2
+    # imagename: db_home_19.18.zip
+    oracle_home: /u01/app/oracle/product/19/db1
+    oracle_home_name: db19_si_se2
+    readonly_home: true
+
+  db19_si_se2:
+    <<: *db1919_si_se2
+    # imagename: db_home_19.19.zip
+    oracle_home: /u01/app/oracle/product/19/db1
+    oracle_home_name: db19_si_se2
+    readonly_home: true
+
+oracle_sw_patches:
+  - filename: p35042068_190000_Linux-x86-64.zip
+    patchid: 35042068
+    version: 19.3.0.0
+    description: DBRU 19.19
+    creates: 35042068/README.txt
+  - filename: p35050341_190000_Linux-x86-64.zip
+    patchid: 35050341
+    version: 19.3.0.0
+    description: OJVM 19.19
+    creates: 35050341/README.txt
+  - filename: p35261302_1919000DBRU_Generic.zip
+    patchid: 35261302
+    version: 19.3.0.0
+    description: DATAPUMP BUNDLE PATCH 19.19.0.0.0
+    creates: 35261302/README.txt
+
+# oracle_sw_patches: []
