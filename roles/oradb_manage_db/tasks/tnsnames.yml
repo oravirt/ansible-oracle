@@ -5,10 +5,10 @@
 
 - name: tnsnames.ora | create IFILE entry in tnsnames.ora
   ansible.builtin.lineinfile:
-    line: "IFILE={{ listener_home }}/network/admin/tnsnames_ansible.ora"
+    line: "IFILE={{ _oradb_manage_db_tns_home }}/network/admin/tnsnames_ansible.ora"
     regexp: "^IFILE=/"
     insertbefore: BOF
-    path: "{{ listener_home_config }}/network/admin/tnsnames.ora"
+    path: "{{ _oradb_manage_db_tns_home }}/network/admin/tnsnames.ora"
     backup: true
     create: true
     group: "{{ oracle_group }}"
@@ -19,7 +19,7 @@
 
 - name: tnsnames.ora | create custom configuration in tnsnames_ansible.ora
   ansible.builtin.blockinfile:
-    path: "{{ listener_home_config }}/network/admin/tnsnames_ansible.ora"
+    path: "{{ _oradb_manage_db_tns_home }}/network/admin/tnsnames_ansible.ora"
     backup: true
     create: true
     group: "{{ oracle_group }}"

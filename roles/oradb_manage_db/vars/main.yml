@@ -1,0 +1,8 @@
+---
+
+_oradb_manage_db_tns_loop_helper: "{{ tnsinst | default(sqlnetinst) | default({}) }}"
+
+_oradb_manage_db_tns_home: |-
+  {%- if db_homes_config[_oradb_manage_db_tns_loop_helper.home]['readonly_home'] | default(false) %}
+  {{ oracle_base }}/homes/{{ db_homes_config[_oradb_manage_db_tns_loop_helper.home]['oracle_home_name'] }}
+  {%- else %}{{ listener_home_config }}{% endif -%}

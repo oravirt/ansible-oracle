@@ -5,10 +5,10 @@
 
 - name: sqlnet.ora | create IFILE entry in sqlnet.ora
   ansible.builtin.lineinfile:
-    line: "IFILE={{ listener_home_config }}/network/admin/sqlnet_ansible.ora"
+    line: "IFILE={{ _oradb_manage_db_tns_home }}/network/admin/sqlnet_ansible.ora"
     regexp: "^IFILE=/"
     insertbefore: BOF
-    path: "{{ listener_home_config }}/network/admin/sqlnet.ora"
+    path: "{{ _oradb_manage_db_tns_home }}/network/admin/sqlnet.ora"
     backup: true
     create: true
     group: "{{ oracle_group }}"
@@ -19,7 +19,7 @@
 
 - name: sqlnet.ora | create custom configuration in sqlnet_ansible.ora
   ansible.builtin.lineinfile:
-    path: "{{ listener_home_config }}/network/admin/sqlnet_ansible.ora"
+    path: "{{ _oradb_manage_db_tns_home }}/network/admin/sqlnet_ansible.ora"
     line: "{{ item.name }}={{ item.value }}"
     regexp: "^{{ item.name }}="
     backup: true
