@@ -5,6 +5,20 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.11.0
+=======
+
+Minor Changes
+-------------
+
+- new vagrantbox example beginner_patching (oravirt#370)
+- oradb_rman: added option state for cronjobs, disabled is optional now (oravirt#369)
+
+Bugfixes
+--------
+
+- oradb_manage_db: bugfix for wrong IFILE path in tnsnames.ora and sqlnet.ora when readonly ORACLE_HOME is used (oravirt#371)
+
 v3.10.1
 =======
 
