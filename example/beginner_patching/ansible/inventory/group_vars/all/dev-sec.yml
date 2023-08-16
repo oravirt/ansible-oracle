@@ -1,0 +1,21 @@
+---
+# Oracle gets problems, when root processes are not visible
+hidepid_option: 0
+
+os_security_kernel_enable_module_loading: true
+
+sysctl_overwrite:
+  network_ipv6_enable: false
+  fs.protected_regular: 0  # needed for opatchauto ...
+  # Needed for Docker on Ansible-host
+  net.ipv4.ip_forward: 1
+
+# ssh settings
+ssh_print_last_log: true
+ssh_allow_agent_forwarding: true
+ssh_permit_tunnel: false
+# tcp_forwarding for VSCode
+ssh_allow_tcp_forwarding: 'yes'
+ssh_max_auth_retries: 3
+
+ssh_allow_users: vagrant

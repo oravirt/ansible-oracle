@@ -15,6 +15,6 @@
     - not is_sw_source_local
     - oracle_sw_copy
   args:
-    creates: "{{ oracle_stage }}/{{ db_homes_config[dbh.home].imagename | default(item[0].filename) }}"
+    creates: "{{ oracle_stage }}/{{ db_homes_config[item[1].home].imagename | default(item[0].filename) }}"
   tags:
     - oradbsw
