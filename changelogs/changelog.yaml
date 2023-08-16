@@ -160,6 +160,45 @@ releases:
     - 282-sles_hugepages.yml
     - 282-sles_packages.yml
     release_date: '2022-10-03'
+  3.10.0:
+    changes:
+      bugfixes:
+      - Bugfix for missing Listener autostart and readonly Homes in systemd (oravirt#358)
+      - 'oracle_sqldba: Bugfix for Python3 (oravirt#361)'
+      - 'oraswdb_install: shellchecker for manage_oracle_rdbms_procs.sh (oravirt#358)'
+      - 'pre-commit: Bugfix for known issue from ansible-oracle 3.8.0 (oravirt#383)'
+      minor_changes:
+      - 'oracle_sqldba: refactoring code, make it usable for ansible-doc, Python3
+        usable only (oravirt#361)'
+      - 'oradb_manage_db: create _DGMGRL SID in listener.ora for EE only (oravirt#359)'
+    fragments:
+    - listener_dgmgrl.yml
+    - manage_oracle_rdbms_procs.yml
+    - oracle_sqldba.yml
+    - pre-commit.yml
+    release_date: '2023-07-26'
+  3.10.1:
+    changes:
+      bugfixes:
+      - 'oradb_facts: Bugfix for missing default variable definitions (oravirt#366)'
+      - 'oradb_manage_grant: Bugfix for broken grant on pdb with db_domain (oravirt#365)'
+    fragments:
+    - db_facts.yml
+    - grant.yml
+    release_date: '2023-07-28'
+  3.11.0:
+    changes:
+      bugfixes:
+      - 'oradb_manage_db: bugfix for wrong IFILE path in tnsnames.ora and sqlnet.ora
+        when readonly ORACLE_HOME is used (oravirt#371)'
+      minor_changes:
+      - new vagrantbox example beginner_patching (oravirt#370)
+      - 'oradb_rman: added option state for cronjobs, disabled is optional now (oravirt#369)'
+    fragments:
+    - beginner_patching.yml
+    - ifile.yml
+    - rman_cron.yml
+    release_date: '2023-08-14'
   3.2.0:
     changes:
       bugfixes:
@@ -338,3 +377,21 @@ releases:
     fragments:
     - oraimage.yml
     release_date: '2023-07-10'
+  3.9.0:
+    changes:
+      bugfixes:
+      - 'oraswdb_install: enable CV_ASSUME_DISTID=OL7 for Golden-Image on OL/RHEL8
+        (oravirt#355)'
+      minor_changes:
+      - Added support for db_domain in init.ora (oravirt#356)
+      - 'oradb_facts: Backported role from dev release (oravirt#356)'
+      - 'oraswdb_install: fixed wrong creates in curl.yml (oravirt#354)'
+      release_summary: This release adds support for db_domain in init.ora for nonCDB
+        and CDB. Read (oravirt#356) for requirements and notes.
+    fragments:
+    - assume_os.yml
+    - curl.yml
+    - db_domain.yml
+    - oradb_facts.yml
+    - release390.yml
+    release_date: '2023-07-16'
