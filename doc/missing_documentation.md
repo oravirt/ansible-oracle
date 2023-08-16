@@ -16,6 +16,22 @@
    -- operations with ansible-oracle
 - explain concepts around ansible collection
 - meaning of files and directories
+- venv, differnt versions of python / ansible
+- ansible controller
+
+
+pre-commit
+ansibler-lint nur dev
+
+
+awx opensource
+ansible tower
+redhat automation p
+
+wheel, allow for ansible
+yum install pythion3-setuptools
+pip install --upgrade pip
+
 
 
 ## logging
@@ -25,7 +41,7 @@
 
 
 ## beginner 
-- explain concepts around 
+- explain concepts/details around the following...
    - hardening
    - perfstat
    - oracle home
@@ -56,7 +72,7 @@ beginner-dbfs-151-192-168-56-161.nip.io : ok=254  changed=119  unreachable=0    
   - operations (Betrieb) of new Oracle, explain rman, perfstat, etc
 - how to configure ansible-orcle with examples
 
-## devloper documentation
+## developer documentation
 - roles documentation is available
 - modules?
 - inventory?
@@ -72,14 +88,23 @@ beginner-dbfs-151-192-168-56-161.nip.io : ok=254  changed=119  unreachable=0    
 
 
 ## FAQ
-- how can I cahnge the version to be installed
+- how can I change the version to be installed
 - how can I install an RU patch?
+    - see MOS 555.1 and 888.1 RU, MRP + 10 patches
+    - db_homes.yml
+       - apply_patches_db: false
 - how can I change the oracle_home?
+    - db-homes.yml?
+    - ocenv
+    - main.yml oracle_base
 - how can I change the IP of the beginner Oracle Linux VM (beginner-dbfs-151-192-168-56-161.nip.io)
 
 
 ## ideas
 - orachk installation and run at the end
+- update sql developer version
+- install dbsat
+- install db diff
 - OL8 not OL7
 - why special randanic linux? why not std OL8?
 
@@ -92,3 +117,21 @@ TASK [opitzconsulting.ansible_oracle.orahost : ansible.builtin.include] ********
 can be disabled by setting deprecation_warnings=False in ansible.cfg.
 included: /ansible/galaxy/ansible_collections/opitzconsulting/ansible_oracle/roles/orahost/tasks/RedHat-7.yml for beginner-dbfs-151-192-168-56-161.nip.io
 
+
+### step-by-step guide to install and use ansible-oracle on a VM, but no docker container
+- how exactly to install, os packages, git commands
+- what to change (home,version, patches, etc.)
+- how to run the playbook
+- how to debug, log files
+- documentation rhel7/8 OL 7/8 SLES12/15
+
+#### inventory
+create a new directory under inventory (e.g. copy the existing "dbfs" directory and rename it)
+- change host.yml to match your host to be installed
+- in directory group_vars 
+1. choose configuration options in host.yml (disk layout, memory usage, etc.)
+1. software_src.yml choose e.g. source directory, local or nfs, unzip (Y/N), etc.
+1. dev_sec.yml choose hardening options
+in directory "has", you can see other possibilities
+1. database.yml, exact sizing of Tablepsaces, memory, etc.
+1. asm.yml (setup ASM disks)
