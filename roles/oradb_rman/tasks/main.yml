@@ -116,6 +116,7 @@
     - "{{ oracle_databases }}"
     - rman_jobs
     - skip_missing: true
+  when: item.1.state | default('present') == 'present'
   loop_control:
     label: "oracle_db_name {{ item.0.oracle_db_name | default('') }} job {{ item.1.name | default('') }}"
   tags:
@@ -308,6 +309,7 @@
   when:
     - item.1.immediate is defined
     - item.1.immediate
+    - item.1.state | default('present') == 'present'
     - "((configure_cluster and inventory_hostname == cluster_master) or not configure_cluster )"
   tags:
     - rmanexecute
@@ -343,7 +345,7 @@
     cron_file: "{{ rman_cronfile }}"
     user: "{{ oracle_user }}"
     disabled: "{{ item.1.disabled | default(false) }}"
-    state: "{{ item.1.state | default('present') }}"
+    state: "present"
     day: "{{ item.1.day }}"
     weekday: "{{ item.1.weekday }}"
     hour: "{{ item.1.hour }}"
@@ -367,6 +369,29 @@
     - item.1.hour is defined
     - item.1.minute is defined
     - item.1.name is defined
+    - item.1.state | default('present') == 'present'
+  tags:
+    - rmancron
+
+- name: Remove crontab entries for RMAN Backup
+  ansible.builtin.cron:
+    name: rman_backup_{{ item.0.oracle_db_name }}_{{ item.1.name }}
+    cron_file: "{{ rman_cronfile }}"
+    user: "{{ oracle_user }}"
+    state: "absent"
+    # noqa yaml
+  with_subelements:
+    - "{{ oracle_databases }}"
+    - rman_jobs
+    - skip_missing: true
+  loop_control:
+    label: >-
+      oracle_db_name: {{ item.0.oracle_db_name | default('') }}
+      state: {{ item.1.state | default('present') }}
+  when:
+    - item.1 is defined
+    - item.1.name is defined
+    - item.1.state | default('present') == 'absent'
   tags:
     - rmancron
 
