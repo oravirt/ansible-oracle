@@ -2,6 +2,48 @@
 apply_patches_db: true
 db_homes_config:
 
+  db1920_si_se2: &db1920_si_se2
+    version: 19.3.0.0
+    oracle_home: /u01/app/oracle/product/19/db1920-si-se2
+    edition: SE2
+    opatch_minversion: 12.2.0.1.37
+    state: present
+    opatchauto: []
+    opatch:
+      - patchid: 35320081
+        # Database Release Update 19.20.0.0.230718
+        patchversion: 19.20.0.0.230718
+        stop_processes: true
+        state: present
+      - patchid: 35354406
+        # Oracle JavaVM Component Release Update (OJVM RU) 19.19.0.0.230418
+        stop_processes: true
+        state: present
+      - patchid: 35656870
+        # MRP 19.20
+        stop_processes: true
+        state: present
+      - patchid: 35336174
+        # JDK patch JDK8u381
+        stop_processes: true
+        state: present
+      - patchid: 29213893
+        # QRY OPTIMIZER-DBMS_STATS Failing With Error Ora-1422 When Gathering Stats for User$ Table
+        stop_processes: true
+        state: present
+      - patchid: 34774667
+        # DB:AQ: Global-buffer-overflow in pga at kwqalockqtwithinfo with ORA-00700 During PURGE_QUEUE_TABLE.
+        stop_processes: true
+        state: present
+      - patchid: 35512813
+        # Data Pump Recommended Proactive Patches For 19.10 and Above (Doc ID 2819284.1)
+        stop_processes: true
+        state: present
+      - patchid: 35372179
+        # VOS-Linux: ORA-800 / Set Priority / DB Performance Merge Patch for 19.20 (Requires Root Access) - 34286265 34318125
+        stop_processes: true
+        state: present
+
   db1919_si_se2: &db1919_si_se2
     version: 19.3.0.0
     oracle_home: /u01/app/oracle/product/19/db1919-si-se2
@@ -49,20 +91,21 @@ db_homes_config:
   #
   # => Base for imagename at later stage
   db19_si_se2_golden:
-    <<: *db1919_si_se2
-    # imagename: db_home_19.18.zip
+    <<: *db1920_si_se2
+    # imagename: db_home_19.20.zip
     oracle_home: /u01/app/oracle/product/19/db1
     oracle_home_name: db19_si_se2
     readonly_home: true
 
   db19_si_se2:
-    <<: *db1919_si_se2
-    # imagename: db_home_19.19.zip
+    <<: *db1920_si_se2
+    # imagename: db_home_19.20.zip
     oracle_home: /u01/app/oracle/product/19/db1
     oracle_home_name: db19_si_se2
     readonly_home: true
 
 oracle_sw_patches:
+##### older 19.19 patches
   - filename: p35042068_190000_Linux-x86-64.zip
     patchid: 35042068
     version: 19.3.0.0
@@ -78,5 +121,46 @@ oracle_sw_patches:
     version: 19.3.0.0
     description: DATAPUMP BUNDLE PATCH 19.19.0.0.0
     creates: 35261302/README.txt
+##### end of older 19.19 patches
+  - filename: p35320081_190000_Linux-x86-64.zip
+    patchid: 35320081
+    version: 19.3.0.0
+    description: 19.20.0 RDBMS RU patch
+    creates: 35320081/README.txt
+  - filename: p35354406_190000_Linux-x86-64.zip
+    patchid: 35354406
+    version: 19.3.0.0
+    description: 19.20.0 OJVM Patch
+    creates: 35354406/README.txt
+  - filename: p35656870_1920000DBRU_Linux-x86-64.zip
+    patchid: 35656870
+    version: 19.3.0.0
+    description: MRP 19.20
+    creates: 35656870/README.txt
+  - filename: p35336174_190000_Linux-x86-64.zip
+    patchid: 35336174
+    version: 19.3.0.0
+    description: JDK patch JDK8u381
+    creates: 35336174/README.txt
+  - filename: p29213893_1920000DBRU_Generic.zip
+    patchid: 29213893
+    version: 19.3.0.0
+    description: QRY OPTIMIZER DBMS_STATS Failing With Error Ora-1422 When Gathering Stats for User$ Table
+    creates: 29213893/README.txt
+  - filename: p34774667_1920000DBRU_Linux-x86-64.zip
+    patchid: 34774667
+    version: 19.3.0.0
+    description: DB_AQ Global-buffer-overflow in pga at kwqalockqtwithinfo with ORA-00700 During PURGE_QUEUE_TABLE.
+    creates: 34774667/README.txt
+  - filename: p35512813_1920000DBRU_Generic.zip
+    patchid: 35512813
+    version: 19.3.0.0
+    description: Data Pump Recommended Proactive Patches For 19.10 and Above (Doc ID 2819284.1)
+    creates: 35512813/README.txt
+  - filename: p35372179_1920000DBRU_Linux-x86-64.zip
+    patchid: 35372179
+    version: 19.3.0.0
+    description: VOS Linux ORA-800 / Set Priority / DB Performance Merge Patch for 19.20 (Requires Root Access) - 34286265 34318125
+    creates: 35372179/README.txt
 
 # oracle_sw_patches: []
