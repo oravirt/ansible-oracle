@@ -18,7 +18,7 @@
 - meaning of files and directories
 - venv, differnt versions of python / ansible
 - ansible controller
-
+- why rendanic Linux, why not standard OL? (security concerns)
 
 pre-commit
 ansibler-lint nur dev
@@ -26,10 +26,11 @@ ansibler-lint nur dev
 
 awx opensource
 ansible tower
-redhat automation p
+redhat automation program
 
-wheel, allow for ansible
-yum install pythion3-setuptools
+# installation notes
+- wheel, allow for ansible in sudoers.conf
+yum install python3-setuptools
 pip install --upgrade pip
 
 
@@ -135,3 +136,59 @@ create a new directory under inventory (e.g. copy the existing "dbfs" directory 
 in directory "has", you can see other possibilities
 1. database.yml, exact sizing of Tablepsaces, memory, etc.
 1. asm.yml (setup ASM disks)
+
+
+
+# Operations with dev-sec enabled
+## su - oracle
+- su is allowed only for root. Simply use...
+sudo su - oracle
+
+# Bugs in ansible-oracle
+- path does not include Oracle binaries for oracle user (source ~/.profile_db19_si_se2 missing in .bash_profile)
+- patch download does not work "Error 401--Unauthorized"
+
+
+# Security
+- dev-sec hardening, source, description
+- SELINUX disabled for installation and permanently disabled
+
+# explain skipped / ignored, etc.
+PLAY RECAP ******************************************************************************************************************************************************************
+beginner-dbfs-patching-151-192-168-56-162.nip.io : ok=171  changed=6    unreachable=0    failed=1    skipped=109  rescued=0    ignored=2
+
+Playbook run took 0 days, 0 hours, 2 minutes, 21 seconds
+
+
+
+
+
+## how to add patches
+D:\ala\ansible-oracle\example\beginner_patching\ansible\inventory\group_vars\all\db-homes.yml
+in section oracle_sw_patches, add a list of all the patches that can be installed....
+  - filename: p35320081_190000_Linux-x86-64.zip
+    patchid: 35320081
+    version: 19.3.0.0
+    description: 19.20.0 RDBMS RU patch
+    creates: 35320081/README.txt
+
+
+now in the 	db_homes_config, add a new home
+  db1920_si_se2: &db1920_si_se2
+    version: 19.3.0.0
+    oracle_home: /u01/app/oracle/product/19/db1920-si-se2
+    edition: SE2
+    opatch_minversion: 12.2.0.1.37
+    state: present
+    opatchauto: []
+    opatch:
+      - patchid: 35320081
+        # Database Release Update 19.20.0.0.230718
+        patchversion: 19.20.0.0.230718
+        stop_processes: true
+        state: present
+
+
+## bugs found
+download patches, not same list as to be installed
+change patches, install home not changed		
