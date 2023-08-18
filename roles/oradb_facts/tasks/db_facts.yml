@@ -22,10 +22,14 @@
     _db_facts:
       - key: "{{ odb[0]['oracle_db_unique_name'] | default(odb[0]['oracle_db_name']) }}"
         value:
+          version: "{{ ansible_facts['version'] }}"
           database: "{{ ansible_facts['database'] }}"
           instance: "{{ ansible_facts['instance'] }}"
+          pdb: "{{ ansible_facts['pdb'] }}"
           parameter: "{{ ansible_facts['parameter'] }}"
           rac: "{{ ansible_facts['rac'] }}"
           redolog: "{{ ansible_facts['redolog'] }}"
           tablespace: "{{ ansible_facts['tablespace'] }}"
+          temp_tablespace: "{{ ansible_facts['temp_tablespace'] }}"
           userenv: "{{ ansible_facts['userenv'] }}"
+          option: "{{ ansible_facts['option'] }}"
