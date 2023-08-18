@@ -20,18 +20,13 @@
 - ansible controller
 - why rendanic Linux, why not standard OL? (security concerns)
 
-pre-commit
-ansibler-lint nur dev
+## should I use ansible-oracle or ansible-oracle-inventory ?
+- ansibler-lint is only meant for development, use the ansible-oracle-inventory to install oracle
 
-
+## Install many oracle DBs
 awx opensource
 ansible tower
 redhat automation program
-
-# installation notes
-- wheel, allow for ansible in sudoers.conf
-yum install python3-setuptools
-pip install --upgrade pip
 
 
 
@@ -219,3 +214,16 @@ now in the 	db_homes_config, add a new home
     default:     stop_processes: true
     default:   msg: Source '/vagrant/p35050341_190000_Linux-x86-64.zip' does not exist
     default: failed: [ansmanual.opitz.int] (item=[{'filename': 'p35261302_1919000DBRU_Generic.zip', 'patchid': 35261302, 'version': '19.3.0.0', 'description': 'DATAPUMP BUNDLE PATCH 19.19.0.0.0', 'creates': '35261302/README.txt'}, {'patchid': 35261302, 'stop_processes': True, 'state': 'present'}]) => changed=false
+
+
+
+# playing with git
+git branch -D oldbranchname
+git branch -b newbranchname
+git cherry-pick
+git cherry-pick --abort
+git rebase
+git switch - (switch to last branch)
+tig rebase
+git stash
+git stash apply
