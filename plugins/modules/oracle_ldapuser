@@ -220,17 +220,17 @@ def main():
             port          = dict(default=1521, type='int'),
             service_name  = dict(required=True),
             user          = dict(required=False),
-            password      = dict(required=False),
+            password      = dict(required=False, no_log=True),
             mode          = dict(default='normal', choices=["normal","sysdba"]),
             user_default_tablespace = dict(default='USERS'),
             user_quota_on_default_tbs_mb = dict(default=None, type='int'), # None is unlimited
             user_temp_tablespace = dict(default='TEMP'),
             user_profile  = dict(default='LDAP_USER'),
-            user_default_password = dict(default=None), # None means EXTERNAL
+            user_default_password = dict(default=None, no_log=True), # None means EXTERNAL
             user_grants   = dict(default=['create session'], type='list'),
             ldap_connect  = dict(required=True),
             ldap_binddn   = dict(required=True),
-            ldap_bindpassword = dict(required=True),
+            ldap_bindpassword = dict(required=True, no_log=True),
             ldap_user_basedn  = dict(required=True),
             ldap_user_subtree = dict(default=True, type='bool'),
             ldap_user_filter  = dict(default='(objectClass=user)'),
