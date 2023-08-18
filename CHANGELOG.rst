@@ -5,6 +5,66 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.11.0
+=======
+
+Minor Changes
+-------------
+
+- new vagrantbox example beginner_patching (oravirt#370)
+- oradb_rman: added option state for cronjobs, disabled is optional now (oravirt#369)
+
+Bugfixes
+--------
+
+- oradb_manage_db: bugfix for wrong IFILE path in tnsnames.ora and sqlnet.ora when readonly ORACLE_HOME is used (oravirt#371)
+
+v3.10.1
+=======
+
+Bugfixes
+--------
+
+- oradb_facts: Bugfix for missing default variable definitions (oravirt#366)
+- oradb_manage_grant: Bugfix for broken grant on pdb with db_domain (oravirt#365)
+
+v3.10.0
+=======
+
+Minor Changes
+-------------
+
+- oracle_sqldba: refactoring code, make it usable for ansible-doc, Python3 usable only (oravirt#361)
+- oradb_manage_db: create _DGMGRL SID in listener.ora for EE only (oravirt#359)
+
+Bugfixes
+--------
+
+- Bugfix for missing Listener autostart and readonly Homes in systemd (oravirt#358)
+- oracle_sqldba: Bugfix for Python3 (oravirt#361)
+- oraswdb_install: shellchecker for manage_oracle_rdbms_procs.sh (oravirt#358)
+- pre-commit: Bugfix for known issue from ansible-oracle 3.8.0 (oravirt#383)
+
+v3.9.0
+======
+
+Release Summary
+---------------
+
+This release adds support for db_domain in init.ora for nonCDB and CDB. Read (oravirt#356) for requirements and notes.
+
+Minor Changes
+-------------
+
+- Added support for db_domain in init.ora (oravirt#356)
+- oradb_facts: Backported role from dev release (oravirt#356)
+- oraswdb_install: fixed wrong creates in curl.yml (oravirt#354)
+
+Bugfixes
+--------
+
+- oraswdb_install: enable CV_ASSUME_DISTID=OL7 for Golden-Image on OL/RHEL8 (oravirt#355)
+
 v3.8.1
 ======
 

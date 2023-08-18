@@ -1,0 +1,30 @@
+---
+__db_user: sys
+
+listener_port: 1521
+
+__listener_port: "{{ odb.0.listener_port | default(listener_port) }}"
+
+_db_password_cdb: >-
+  {% if dbpasswords is defined
+      and dbpasswords[odb.0.oracle_db_name] is defined
+      and dbpasswords[odb.0.oracle_db_name][db_user] is defined -%}
+      {{ dbpasswords[odb.0.oracle_db_name][db_user] }}
+  {%- else %}{{ default_dbpass }}
+  {%- endif %}
+
+__db_service_name: "{% if odb.0 is defined %}
+                    {%- if odb.0.oracle_db_unique_name is defined %}{{ odb.0.oracle_db_unique_name }}
+                    {%- elif odb.0.oracle_db_instance_name is defined %}{{ odb.0.oracle_db_instance_name }}
+                    {%- else %}{{ odb.0.oracle_db_name }}
+                    {%- endif %}
+                  {%- endif %}"
+
+__oracle_env:
+  ORACLE_HOME: "{{ __oracle_home_db }}"
+  LD_LIBRARY_PATH: "{{ __oracle_home_db }}/lib"
+
+__oracle_home_db: >-
+  {%- if odb[0] is defined -%}
+  {%- if db_homes_config[odb[0]['home']]['oracle_home'] is defined -%}
+  {{ db_homes_config[odb[0]['home']]['oracle_home'] }}{%- endif -%}{%- endif -%}
