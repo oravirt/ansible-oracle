@@ -8,22 +8,6 @@
 # Stop immediately if a variable is referenced in this script but not defined 
 set -u
 
-function setup_hosts ()
-{
-# DEFDEV is the default network device (e.g. eth1)
-DEFDEV=$(/sbin/ip route list|grep default|awk 'NR==1 {FS=" "; print $5}')
-# now get the IP address of the default network device
-IPADDR=$( /sbin/ip addr show "${DEFDEV}" |grep inet |grep -v inet6|awk '{print $2}'|awk -F/ 'NR==1 {print $1}')
-
-# if not already in the /etc/hosts, let's add an entry for this machine
-if [ "$(grep -c $(hostname --fqdn) /etc/hosts)" -eq 0 ]; then
-   echo "updating /etc/hosts"
-cat >> /etc/hosts << HOST_EOF
-${IPADDR}   $(hostname --fqdn)   $(hostname -s)
-HOST_EOF
-fi
-}
-
 
 function setup_packages ()
 {
@@ -69,34 +53,6 @@ systemctl restart sshd.service
 }
 
 
-function ansible_sudoers ()
-{
-echo "setup user ${MY_GIT_USER} in /etc/sudoers"
-##### https://gist.github.com/buchireddy/19eb6593f692852d2df7
-# Take a backup of sudoers file and change the backup file.
-rm -f /tmp/sudoers.bak
-cp -f /etc/sudoers /tmp/sudoers.bak
-# allow use of exclamation mark, but not use it for bash history
-set +H
-echo "${MY_GIT_USER} ALL=(ALL) NOPASSWD:ALL
-Defaults:${MY_GIT_USER} !requiretty
-" >> /tmp/sudoers.bak
-unalias cp
-# Check syntax of the backup file to make sure it is correct.
-visudo -cf /tmp/sudoers.bak
-if [ $? -eq 0 ]; then
-  # Replace the sudoers file with the new only if syntax is correct.
-  cp -f /tmp/sudoers.bak /etc/sudoers
-  if [ $? -eq 0 ]; then
-    echo "sudoers file replaced."
-  else
-    echo "Could not modify /etc/sudoers file. Please do this manually."
-  fi
-else
-  echo "Could not modify /etc/sudoers file. Please do this manually."
-fi
-}
-
 
 function ansible_ssh ()
 {
@@ -104,9 +60,6 @@ echo "setup ssh for user ${MY_GIT_USER}"
 mkdir -p /home/${MY_GIT_USER}/.ssh
 chown ${MY_GIT_USER}:${MY_GIT_GROUP} /home/${MY_GIT_USER}/.ssh
 chmod 700 /home/${MY_GIT_USER}/.ssh
-
-
-
 # copy public key to ansible user
     SET_KEY_OK=0
     ssh_public_key=$(find /vagrant/*.pub -printf "%p")
@@ -152,6 +105,36 @@ chmod 600 /home/${MY_GIT_USER}/.ssh/id_rsa
 }
 
 
+
+function ansible_sudoers ()
+{
+echo "setup user ${MY_GIT_USER} in /etc/sudoers"
+##### https://gist.github.com/buchireddy/19eb6593f692852d2df7
+# Take a backup of sudoers file and change the backup file.
+rm -f /tmp/sudoers.bak
+cp -f /etc/sudoers /tmp/sudoers.bak
+# allow use of exclamation mark, but not use it for bash history
+set +H
+echo "${MY_GIT_USER} ALL=(ALL) NOPASSWD:ALL
+Defaults:${MY_GIT_USER} !requiretty
+" >> /tmp/sudoers.bak
+unalias cp
+# Check syntax of the backup file to make sure it is correct.
+visudo -cf /tmp/sudoers.bak
+if [ $? -eq 0 ]; then
+  # Replace the sudoers file with the new only if syntax is correct.
+  cp -f /tmp/sudoers.bak /etc/sudoers
+  if [ $? -eq 0 ]; then
+    echo "sudoers file replaced."
+  else
+    echo "Could not modify /etc/sudoers file. Please do this manually."
+  fi
+else
+  echo "Could not modify /etc/sudoers file. Please do this manually."
+fi
+}
+
+
 function call_ansible_oracle ()
 {
 echo "create script to run as user ${MY_GIT_USER} to setup oracle with ansible-oracle"
@@ -180,8 +163,6 @@ echo "call install_ansible.sh"
 cd ~/git/ansible-oracle/example/beginner_patching/ansible/
 ansible-galaxy collection install -r requirements.yml
 
-
-
 # Download Patches
 cd ~/git/ansible-oracle/example/beginner_patching/ansible/
 ansible-playbook -i inventory/hosts.yml -e hostgroup=all playbooks/patch_download.yml -e mos_login="@{MY_MOS_LOGIN}" -e mos_password="@{MY_MOS_PASSWORD}"
@@ -204,7 +185,6 @@ else
   # exit commented out, otherwise bash shell closes
   # exit 1
 fi
-
 }
 
 ###############################################################################
@@ -224,7 +204,7 @@ export MY_MOS_PASSWORD="xxxxxx"
 # put MOS login & password in separate file
 source /vagrant/scripts/setenv.sh
 
-setup_hosts
+
 setup_packages
 # python_alternatives
 config_sshd
