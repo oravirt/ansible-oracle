@@ -1,0 +1,23 @@
+---
+- name: Cfeate tnsnames.ora entries for rman
+  ansible.builtin.blockinfile:
+    block: "{{ lookup('template', '../../oradb_manage_db/templates/tnsnames' + oracle_tnsnames_config[tnsinst.tnsname]['tnstemplate'] | default('') + '.ora.j2') }}"
+    path: "{{ oradb_rman_tns_admin }}/tnsnames.ora"
+    backup: true
+    create: true
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    state: present
+    mode: 0644
+    insertafter: "EOF"
+    marker: "# {mark} Ansible managed for  {{ tnsinst.tnsname }}"
+  vars:
+    dbh: "{{ odb }}"
+  with_items:
+    - "{{ _tnsnames_installed | unique }}"
+  loop_control:
+    loop_var: tnsinst
+    label: >-
+      oracle_db_name {{ odb.oracle_db_name | default('') }}
+      tnsname {{ tnsinst.tnsname | default('') }}
+  when: _tnsnames_installed is defined

@@ -1,0 +1,28 @@
+---
+# Do not set variables from this file in your inventory.
+#
+_oradb_rman_rman_service_param: "{% if item.1.service is defined %}--service {{ item.1.service }}{% endif %}"
+_oradb_rman_checkmk_mkjob_string: "{% if oradb_rman_cron_mkjob %}/usr/bin/mk-job rman_{{ item.0.oracle_db_name }}_{{ item.1.name }} {% endif %}"
+_oradb_rman_rmanbackuplogdir: "{% if item.0.rman_log_dir is defined %}-l {{ item.0.rman_log_dir }}{% endif %}"
+
+rman_retention_policy: "{{ item.0.rman_retention_policy | default(oradb_rman_retention_policy_default) }}"
+rman_channel_disk: "{{ item.0.rman_channel_disk | default(oradb_rman_channel_disk_default) }}"
+rman_controlfile_autobackup_disk: "{{ item.0.rman_controlfile_autobackup_disk | default(oradb_rman_controlfile_autobackup_disk_default) }}"
+
+_oradb_rman_rmanbackupscriptdir: "{% if item.0.rman_script_dir is defined %}-r {{ item.0.rman_script_dir }}{% else %}{% endif %}"
+
+_oradb_rman_rman_catalog_param: "{% if item.0.rman_wallet is defined and item.0.rman_wallet %}-c /@{{ item.0.rman_tnsalias }}
+                     {%- else %}
+                       {%- if item.0.rman_user is defined %}-c {{ item.0.rman_user }}/{{ dbpasswords[item.0.rman_tnsalias][item.0.rman_user] | default(item.0.rman_password) }}@{{ item.0.rman_tnsalias }}
+                       {%- endif %}
+                     {%- endif %}"
+
+_oradb_rman_password: "{{ dbpasswords[odb.rman_tnsalias][odb.rman_user] | default(odb.rman_password) }}"
+
+rman_register_connect: >-
+  {%- if odb.rman_wallet is defined -%}
+    /@{{ odb.rman_tnsalias }}
+  {%- else -%}
+    {{ odb.rman_user -}}/{{ _oradb_rman_password -}}
+    @{{ odb.rman_tnsalias }}
+  {%- endif -%}
