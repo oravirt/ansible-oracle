@@ -1,51 +1,39 @@
 ---
-
-- name: Default Destinations for RMAN
-  no_log: true
-  ansible.builtin.assert:
-    that:
-      - rman_controlfile_autobackup_disk_default
-      - rman_channel_disk_default
+- name: Assert oradb_rman
+  ansible.builtin.import_tasks:
+    file: assert.yml
   tags:
+    - always
     - assert
 
-- name: Warn if old style password variable is used
-  ansible.builtin.debug:
-    msg: '[WARNING]: do not use rman_password in oracle_databases, use dbpasswords[rman_tnsname][rman_user] instead!'
-  # make warning red, but continue
-  failed_when: true
-  # noqa ignore-errors
-  ignore_errors: true
-  when: item.rman_password is defined
-  with_items:
-    - "{{ oracle_databases }}"
-  loop_control:
-    label: "{{ item.oracle_db_name | default('') }}"
-
-# autofs is configured in a special way to mount the shares with needed parameters
 - name: configure autofs for RMAN
-  ansible.builtin.lineinfile:
-    dest: "/etc/auto.master"
-    regexp: "^{{ rmanautofsmount }} "
-    line: "{{ rmanautofsmount }} /etc/auto.net --timeout=60 rw,hard,rsize=32768,wsize=32768,proto=tcp,nfsvers=3"
-  when: rmanautofs
+  when: oradb_rman_autofs
   tags: autofs
+  block:
+    # autofs is configured in a special way to mount the shares with needed parameters
+    # => no extra configuration file for autofs is needed
+    - name: configure auto.master for RMAN
+      ansible.builtin.lineinfile:
+        dest: "/etc/auto.master"
+        regexp: "^{{ rmanautofsmount }} "
+        line: "{{ rmanautofsmount }} /etc/auto.net --timeout=60 rw,hard,rsize=32768,wsize=32768,proto=tcp,nfsvers=3"
 
-- name: Create Mountpoint
-  ansible.builtin.file:
-    dest: "{{ rmanautofsmount }}"
-    state: directory
-    mode: '0755'
-  when: rmanautofs
-  tags: autofs
+    # IMPORTANT: Do not own the mountpoint by Oracle!
+    # => Prevent writing RMAN backups to wrong mount point
+    # => The target directory is owned by Oracle.
+    - name: Create Mountpoint for autofs
+      ansible.builtin.file:
+        dest: "{{ rmanautofsmount }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
 
-- name: Restart autofs
-  ansible.builtin.service:
-    name: autofs
-    enabled: true
-    state: restarted
-  when: rmanautofs
-  tags: autofs
+    - name: Restart autofs
+      ansible.builtin.service:
+        name: autofs
+        enabled: true
+        state: restarted
 
 - name: Create bin-Directory for rman_backup
   ansible.builtin.file:
@@ -57,7 +45,7 @@
 
 - name: Create log-Directory for cron output
   ansible.builtin.file:
-    path: "{{ rman_cron_logdir }}"
+    path: "{{ oradb_rman_cron_logdir }}"
     state: directory
     mode: '0755'
     owner: "{{ oracle_user }}"
@@ -68,30 +56,30 @@
 # dummy with_together for item.0.db_name in default/main.yml
 - name: Create Directory for rman-scripts
   ansible.builtin.file:
-    path: "{{ rman_script_dir }}"
+    path: "{{ oradb_rman_script_dir }}"
     state: directory
     mode: '0755'
     owner: "{{ oracle_user }}"
-  with_together:
-    - "{{ oracle_databases }}"
-    - ""
+  loop:
+    - "{{ oracle_databases | flatten(1) }}"
   loop_control:
-    label: "oracle_db_name {{ item.0.oracle_db_name | default('') }}"
+    loop_var: odb
+    label: "oracle_db_name {{ odb.0.oracle_db_name | default('') }}"
   tags:
     - rmancopy
 
 # dummy with_together for item.0.db_name in default/main.yml
 - name: Create Directory for rman-logfiles
   ansible.builtin.file:
-    path: "{{ rman_log_dir }}"
+    path: "{{ oradb_rman_log_dir }}"
     state: "directory"
     mode: '0755'
     owner: "{{ oracle_user }}"
-  with_together:
-    - "{{ oracle_databases }}"
-    - ""
+  loop:
+    - "{{ oracle_databases | flatten(1) }}"
   loop_control:
-    label: "oracle_db_name {{ item.0.oracle_db_name | default('') }}"
+    loop_var: odb
+    label: "oracle_db_name {{ odb.0.oracle_db_name | default('') }}"
   tags:
     - rmancopy
 
@@ -104,11 +92,10 @@
   tags:
     - rmancopy
 
-# rman_script_dir: {{oracle_admin_db}}/rman/
 - name: copy RMAN scipts
   ansible.builtin.template:
-    dest: "{{ rman_script_dir }}/{{ item.1.name }}.rman"
-    src: "{{ item.1.name }}.rman.j2"
+    dest: "{{ oradb_rman_script_dir }}/{{ odb.1.name }}.rman"
+    src: "{{ odb.1.name }}.rman.j2"
     backup: true
     mode: '0644'
     owner: "{{ oracle_user }}"
@@ -116,82 +103,104 @@
     - "{{ oracle_databases }}"
     - rman_jobs
     - skip_missing: true
-  when: item.1.state | default('present') == 'present'
+  when: odb.1.state | default('present') == 'present'
   loop_control:
-    label: "oracle_db_name {{ item.0.oracle_db_name | default('') }} job {{ item.1.name | default('') }}"
+    loop_var: odb
+    label: >-
+      oracle_db_name {{ odb.0.oracle_db_name | default('') }}
+      job {{ odb.1.name | default('') }}
   tags:
     - rmancopy
 
 - name: Create directory for TNS_ADMIN
   ansible.builtin.file:
-    dest: "{{ rman_tns_admin }}"
+    dest: "{{ oradb_rman_tns_admin }}"
     state: directory
     owner: "{{ oracle_user }}"
     mode: '0755'
   with_items:
     - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | map(attribute='oracle_db_name') }}"
+  loop_control:
+    loop_var: odb
+    label: "oracle_db_name {{ odb.0.oracle_db_name | default('') }}"
   tags:
     - tns
 
 - name: Template sqlnet.ora for rman catalog wallet
   ansible.builtin.template:
     src: "sqlnet.ora.j2"
-    dest: "{{ rman_tns_admin }}/sqlnet.ora"
+    dest: "{{ oradb_rman_tns_admin }}/sqlnet.ora"
     owner: "{{ oracle_user }}"
     mode: '0644'
   with_items:
     - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_wallet', 'defined') }}"
   loop_control:
-    label: "{{ item.oracle_db_name | default('') }}"
-  when: item.rman_wallet
+    loop_var: odb
+    label: "oracle_db_name {{ odb.oracle_db_name | default('') }}"
+  when: odb.rman_wallet
   tags:
     - tns
 
-- name: Template tnsnames.ora for rman catalog
-  ansible.builtin.blockinfile:
-    block: "{{ lookup('template', '../../oradb_manage_db/templates/tnsnames' + oracle_tnsnames_config[tnsinst.tnsname]['tnstemplate'] | default('') + '.ora.j2') }}"
-    path: "{{ rman_tns_admin }}/tnsnames.ora"
-    backup: true
-    create: true
-    group: "{{ oracle_group }}"
-    owner: "{{ oracle_user }}"
-    state: present
-    mode: 0644
-    insertafter: "EOF"
-    marker: "# {mark} Ansible managed for  {{ tnsinst.tnsname }}"
+- name: Create tnsnames.ora for rman
   vars:
-    dbh: "{{ item.0 }}"
-    tnsinst: "{{ item.1 }}"
-  with_nested:
-    - "{{ oracle_databases }}"
-    - "{{ tnsnames_installed }}"
-  loop_control:
-    label: "{{ dbh.oracle_db_name | default('') }} -> {{ tnsinst.tnsname | default('') }}"
-  when:
-    - dbh.rman_tnsalias is defined
-    - dbh.home == tnsinst.home
-    - tnsinst.tnsname == dbh.rman_tnsalias
+    _rman_tnsnames_installed:
+  block:
+    - name: Create tnsnames.ora for rman
+      ansible.builtin.include_tasks:
+        file: tnsnames_detail.yml
+      vars:
+        tnsnames_installed_rman:  # set single entry for RMAN
+          - home: "{{ odb.home }}"
+            tnsname: "{{ odb.rman_tnsalias }}"
+            state: present
+        _tnsnames_installed: "{{ tnsnames_installed_rman + oradb_rman_tnsnames_installed | default([]) }}"
+      with_items:
+        - "{{ oracle_databases }}"
+      loop_control:
+        loop_var: odb
+        label: >-
+          oracle_db_name {{ odb.oracle_db_name | default('') }}
+          rman_tnsalias {{ odb.rman_tnsalias | default('') }}
+      when:
+        - odb.rman_tnsalias is defined
+      tags:
+        - tns
+        - tnsnames
+
+- name: Create wallet directory
+  ansible.builtin.file:
+    dest: "{{ oradb_rman_wallet_loc }}"
+    state: directory
+    mode: '0700'
+    owner: "{{ oracle_user }}"
   tags:
-    - tns
+    - wallet
+    - wallet_contents
 
 - name: Wallet create
   ansible.builtin.shell:
     cmd: |
       set -eu
       set -o pipefail
-      echo -e "$stdin" | "{{ oracle_home_db }}/bin/mkstore" -create -nologo -wrl "{{ rman_wallet_loc }}"
-    creates: "{{ rman_wallet_loc }}/ewallet.p12"
+      echo -e "$stdin" | "${ORACLE_HOME}/bin/mkstore" -create -nologo -wrl "${oradb_rman_wallet_loc}"
+    creates: "{{ oradb_rman_wallet_loc }}/ewallet.p12"
   become: true
   become_user: "{{ oracle_user }}"
   environment:
-    stdin: "{{ rman_wallet_password }}\n{{ rman_wallet_password }}"
+    stdin: "{{ oradb_rman_wallet_password }}\n{{ oradb_rman_wallet_password }}"
+    oradb_rman_wallet_loc: "{{ oradb_rman_wallet_loc }}"
+    ORACLE_HOME: "{{ _oracle_home_db }}"
   with_items:
     - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_wallet', 'defined') }}"
   loop_control:
-    label: "{{ item.oracle_db_name | default('') }}"
-  when: item.rman_wallet
+    loop_var: odb
+    label: "oracle_db_name {{ odb.oracle_db_name | default('') }}"
+  when:
+    - odb.rman_tnsalias is defined
+    - odb.rman_wallet
   tags:
     - wallet
+    - wallet_contents
   register: wallet_created
 
 - name: List wallet contents
@@ -199,21 +208,24 @@
     cmd: |
       set -eu
       set -o pipefail
-      echo "$stdin" | "{{ oracle_home_db }}/bin/mkstore" -listCredential -nologo -wrl "{{ rman_wallet_loc }}"
+      echo "$stdin" | "{{ _oracle_home_db }}/bin/mkstore" -listCredential -nologo -wrl "{{ oradb_rman_wallet_loc }}"
   become: true
   become_user: "{{ oracle_user }}"
   environment:
-    stdin: "{{ rman_wallet_password }}"
+    stdin: "{{ oradb_rman_wallet_password }}"
   with_items:
     - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_wallet', 'defined') }}"
   when:
-    - item.rman_wallet
+    - odb.rman_tnsalias is defined
+    - odb.rman_wallet
     - not wallet_created.changed
   changed_when: false  # does not change anything in System
   loop_control:
-    label: "{{ item.oracle_db_name | default('') }}"
+    loop_var: odb
+    label: "oracle_db_name {{ odb.oracle_db_name | default('') }}"
   tags:
     - wallet
+    - wallet_contents
   register: wallet_contents
 
 - name: Wallet createCredential
@@ -221,23 +233,26 @@
     cmd: |
       set -eu
       set -o pipefail
-      echo "$stdin" | "{{ oracle_home_db }}/bin/mkstore" -wrl "{{ rman_wallet_loc }}" -nologo -createCredential "$rman_tnsalias" "$rman_user" "$rman_password"
+      echo "$stdin" | "{{ _oracle_home_db }}/bin/mkstore" -wrl "{{ oradb_rman_wallet_loc }}" -nologo -createCredential "$rman_tnsalias" "$rman_user" "$rman_password"
   # noqa no-changed-when
   become: true
   become_user: "{{ oracle_user }}"
   environment:
-    stdin: "{{ rman_wallet_password }}"
-    rman_tnsalias: "{{ item.rman_tnsalias }}"
-    rman_user: "{{ item.rman_user }}"
-    rman_password: "{{ dbpasswords[item.rman_tnsalias][item.rman_user] | default(item.rman_password) }}"
+    stdin: "{{ oradb_rman_wallet_password }}"
+    rman_tnsalias: "{{ odb.rman_tnsalias }}"
+    rman_user: "{{ odb.rman_user }}"
+    rman_password: "{{ dbpasswords[odb.rman_tnsalias][odb.rman_user] | default(odb.rman_password) }}"
   with_items:
     - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_wallet', 'defined') }}"
   when:
-    - item.rman_wallet
-    - "wallet_created.changed or ((': ' + item.rman_tnsalias + ' ' + item.rman_user) not in (wallet_contents.results[loopidx].stdout | default('')))"
+    - odb.rman_wallet
+    - odb.rman_tnsalias is defined
+    - odb.rman_user is defined
+    - "wallet_created.changed or ((': ' + odb.rman_tnsalias + ' ' + odb.rman_user) not in (wallet_contents.results[loopidx].stdout | default('')))"
   loop_control:
-    label: "{{ item.oracle_db_name | default('') }}"
+    label: "oracle_db_name {{ odb.oracle_db_name | default('') }}"
     index_var: loopidx
+    loop_var: odb
   register: wallet_credential_added
   tags:
     - wallet
@@ -247,23 +262,24 @@
     cmd: |
       set -eu
       set -o pipefail
-      echo "$stdin" | "{{ oracle_home_db }}/bin/mkstore" -wrl "{{ rman_wallet_loc }}" -nologo -modifyCredential "$rman_tnsalias" "$rman_user" "$rman_password"
+      echo "$stdin" | "{{ _oracle_home_db }}/bin/mkstore" -wrl "{{ oradb_rman_wallet_loc }}" -nologo -modifyCredential "$rman_tnsalias" "$rman_user" "$rman_password"
   become: true
   become_user: "{{ oracle_user }}"
   changed_when: false  # no simple way to figure out whether this changed the password or not, does not matter.
   environment:
-    stdin: "{{ rman_wallet_password }}"
-    rman_tnsalias: "{{ item.rman_tnsalias }}"
-    rman_user: "{{ item.rman_user }}"
-    rman_password: "{{ dbpasswords[item.rman_tnsalias][item.rman_user] | default(item.rman_password) }}"
+    stdin: "{{ oradb_rman_wallet_password }}"
+    rman_tnsalias: "{{ odb.rman_tnsalias }}"
+    rman_user: "{{ odb.rman_user }}"
+    rman_password: "{{ dbpasswords[odb.rman_tnsalias][odb.rman_user] | default(odb.rman_password) }}"
   with_items:
     - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_wallet', 'defined') }}"
   when:
-    - item.rman_wallet
+    - odb.rman_wallet | default(false)
     - not wallet_created.changed
     - not wallet_credential_added.changed
   loop_control:
-    label: "{{ item.oracle_db_name | default('') }}"
+    label: "oracle_db_name {{ odb.oracle_db_name | default('') }}"
+    loop_var: odb
   tags:
     - wallet
 
@@ -273,14 +289,15 @@
     cmd: "$ORACLE_HOME/bin/rman target / catalog $CONNECTSTRING"
     stdin: "REGISTER DATABASE;\n"
   environment:
-    ORACLE_HOME: "{{ db_homes_config[item.home]['oracle_home'] }}"
-    ORACLE_SID: "{{ item.oracle_db_name }}"
+    ORACLE_HOME: "{{ _oracle_home_db }}"
+    ORACLE_SID: "{{ odb.oracle_db_name }}"
     CONNECTSTRING: "{{ rman_register_connect }}"
-    TNS_ADMIN: "{{ rman_tns_admin }}"
+    TNS_ADMIN: "{{ oradb_rman_tns_admin }}"
   with_items:
     - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') }}"
   loop_control:
-    label: "{{ item.oracle_db_name | default('') }}"
+    label: "oracle_db_name {{ odb.oracle_db_name | default('') }}"
+    loop_var: odb
   register: rman_catalog_register
   failed_when: '"RMAN-" in rman_catalog_register.stdout and "RMAN-20002" not in rman_catalog_register.stdout'
   changed_when: '"RMAN-20002" not in rman_catalog_register.stdout'
@@ -294,7 +311,12 @@
 # no catalog connection, because setting initial parameters with catalog takes much more time
 - name: Execute RMAN-Script at playbook
   # noqa risky-shell-pipe no-changed-when
-  ansible.builtin.shell: "{{ oracle_base }}/bin/rman_backup.sh -a {{ item.1.name }} -s {{ item.0.oracle_db_instance_name | default(item.0.oracle_db_name) }} -r {{ rman_script_dir }} -l {{ rman_log_dir }} | tee -a {{ rman_cron_logdir }}/rman_{{ item.1.name }}.log"
+  ansible.builtin.shell: >-
+    {{ oracle_base }}/bin/rman_backup.sh
+      -a {{ odb.1.name }}
+      -s {{ odb.0.oracle_db_instance_name | default(odb.0.oracle_db_name) }}
+      -r {{ oradb_rman_script_dir }}
+      -l {{ oradb_rman_log_dir }} | tee -a {{ rman_cron_logdir }}/rman_{{ odb.1.name }}.log
   environment:
     PATH: /bin:/usr/bin
   become: true
@@ -305,11 +327,14 @@
     - rman_jobs
     - skip_missing: true
   loop_control:
-    label: "oracle_db_name {{ item.0.oracle_db_name | default('') }} job {{ item.1.name | default('') }}"
+    label: >-
+      oracle_db_name {{ odb.0.oracle_db_name | default('') }}
+      job {{ odb.1.name | default('') }}
+    loop_var: odb
   when:
-    - item.1.immediate is defined
-    - item.1.immediate
-    - item.1.state | default('present') == 'present'
+    - odb.1.immediate is defined
+    - odb.1.immediate
+    - odb.1.state | default('present') == 'present'
     - "((_oraswgi_meta_configure_cluster and inventory_hostname == cluster_master) or not _oraswgi_meta_configure_cluster )"
   tags:
     - rmanexecute
@@ -321,79 +346,93 @@
     - "{{ rmanexecimmediate.results }}"
   when: item.changed
   loop_control:
-    label: "oracle_db_name {{ item.item[0].oracle_db_name | default(' ') }} job {{ item.item[1].name | default('') }}"
+    label: >-
+      oracle_db_name {{ item.item[0].oracle_db_name | default(' ') }}
+      job {{ item.item[1].name | default('') }}
   tags:
     - rmanexecute
 
 - name: Add Environment variables to /etc/cron.d
   ansible.builtin.cron:
-    cron_file: "{{ rman_cronfile }}"
+    cron_file: "{{ oradb_rman_cronfile }}"
     user: "{{ oracle_user }}"
     env: true
     name: "{{ item.name }}"
     value: "{{ item.value }}"
   with_items:
-    - {name: RMANLOGDIR, value: '{{ rman_log_dir }}'}
-    - {name: RMANSCRIPTDIR, value: '{{ rman_script_dir }}'}
-    - {name: RMANTNS_ADMIN, value: '{{ rman_tns_admin }}'}
+    - {name: RMANLOGDIR, value: '{{ oradb_rman_log_dir }}'}
+    - {name: RMANSCRIPTDIR, value: '{{ oradb_rman_script_dir }}'}
+    - {name: RMANTNS_ADMIN, value: '{{ oradb_rman_tns_admin }}'}
   tags:
     - rmancron
+    - notest
 
 - name: Create crontab entries for RMAN Backup
   ansible.builtin.cron:
-    name: rman_backup_{{ item.0.oracle_db_name }}_{{ item.1.name }}
-    cron_file: "{{ rman_cronfile }}"
+    name: rman_backup_{{ odb.0.oracle_db_name }}_{{ odb.1.name }}
+    cron_file: "{{ oradb_rman_cronfile }}"
     user: "{{ oracle_user }}"
-    disabled: "{{ item.1.disabled | default(false) }}"
+    disabled: "{{ odb.1.disabled | default(false) }}"
     state: "present"
-    day: "{{ item.1.day }}"
-    weekday: "{{ item.1.weekday }}"
-    hour: "{{ item.1.hour }}"
-    minute: "{{ item.1.minute }}"
-    job: "{{ check_mk_mkjob }}{{ oracle_base }}/bin/rman_backup.sh -a {{ item.1.name }} -s {{ item.0.oracle_db_instance_name | default(item.0.oracle_db_name) }} {{ rman_service_param }} {{ rman_catalog_param }} {{ rmanbackuplogdir }} {{ rmanbackupscriptdir }}>> {{ rman_cron_logdir }}/rman_{{ item.0.oracle_db_name }}_{{ item.1.name }}.log 2>&1"
-    # noqa yaml
+    day: "{{ odb.1.day }}"
+    weekday: "{{ odb.1.weekday }}"
+    hour: "{{ odb.1.hour }}"
+    minute: "{{ odb.1.minute }}"
+    job: >-
+      {{ _oradb_rman_checkmk_mkjob_string }}
+      {{ oracle_base }}/bin/rman_backup.sh
+      -a {{ odb.1.name }}
+      -s {{ odb.0.oracle_db_instance_name | default(odb.0.oracle_db_name) }}
+      {{ _oradb_rman_rman_service_param }}
+      {{ _oradb_rman_rman_catalog_param }}
+      {{ _oradb_rman_rmanbackuplogdir }}
+      {{ _oradb_rman_rmanbackupscriptdir }}
+      >> {{ oradb_rman_cron_logdir }}/rman_{{ odb.0.oracle_db_name }}_{{ odb.1.name }}.log 2>&1
   with_subelements:
     - "{{ oracle_databases }}"
     - rman_jobs
     - skip_missing: true
   loop_control:
+    loop_var: odb
     label: >-
-      oracle_db_name: {{ item.0.oracle_db_name | default('') }}
-      job: {{ item.1.name | default('') }}
-      disabled: {{ item.1.disabled | default(false) }}
-      state: {{ item.1.state | default('present') }}
+      oracle_db_name: {{ odb.0.oracle_db_name | default('') }}
+      job: {{ odb.1.name | default('') }}
+      disabled: {{ odb.1.disabled | default(false) }}
+      state: {{ odb.1.state | default('present') }}
   when:
-    - item.1 is defined
-    - item.1.day is defined
-    - item.1.weekday is defined
-    - item.1.hour is defined
-    - item.1.minute is defined
-    - item.1.name is defined
-    - item.1.state | default('present') == 'present'
+    - odb.1 is defined
+    - odb.1.day is defined
+    - odb.1.weekday is defined
+    - odb.1.hour is defined
+    - odb.1.minute is defined
+    - odb.1.name is defined
+    - odb.1.state | default('present') == 'present'
   tags:
     - rmancron
+    - notest
 
 - name: Remove crontab entries for RMAN Backup
   ansible.builtin.cron:
-    name: rman_backup_{{ item.0.oracle_db_name }}_{{ item.1.name }}
-    cron_file: "{{ rman_cronfile }}"
+    name: rman_backup_{{ odb.0.oracle_db_name }}_{{ odb.1.name }}
+    cron_file: "{{ oradb_rman_cronfile }}"
     user: "{{ oracle_user }}"
     state: "absent"
-    # noqa yaml
   with_subelements:
     - "{{ oracle_databases }}"
     - rman_jobs
     - skip_missing: true
   loop_control:
+    loop_var: odb
     label: >-
-      oracle_db_name: {{ item.0.oracle_db_name | default('') }}
-      state: {{ item.1.state | default('present') }}
+      oracle_db_name: {{ odb.0.oracle_db_name | default('') }}
+      state: {{ odb.1.state | default('present') }}
   when:
-    - item.1 is defined
-    - item.1.name is defined
-    - item.1.state | default('present') == 'absent'
+    - odb.1 is defined
+    - odb.1.name is defined
+    - odb.1.state | default('present') == 'absent'
   tags:
     - rmancron
+    - notest
 
 - name: Create directory for mk-job
   ansible.builtin.file:
@@ -401,5 +440,5 @@
     state: directory
     owner: "{{ oracle_user }}"
     mode: '0755'
-  when: rman_cron_mkjob
+  when: oradb_rman_cron_mkjob
   tags: rmancron

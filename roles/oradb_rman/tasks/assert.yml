@@ -1,0 +1,53 @@
+---
+- name: Default Destinations for RMAN
+  ansible.builtin.assert:
+    that:
+      - oradb_rman_controlfile_autobackup_disk_default
+      - oradb_rman_channel_disk_default
+
+- name: Warn if old style password variable is used
+  ansible.builtin.debug:
+    msg: '[WARNING]: do not use rman_password in oracle_databases, use dbpasswords[rman_tnsname][rman_user] instead!'
+  # make warning red, but continue
+  failed_when: true
+  # noqa ignore-errors
+  ignore_errors: true
+  when: item.rman_password is defined
+  with_items:
+    - "{{ oracle_databases }}"
+  loop_control:
+    label: "{{ item.oracle_db_name | default('') }}"
+
+- name: assert for wallet
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - oradb_rman_wallet_password is defined
+      - odb.rman_user is defined
+      - odb.rman_tnsalias is defined
+      - (odb.rman_password is defined or dbpasswords[odb.rman_tnsalias][odb.rman_user] is defined)
+  with_items:
+    - "{{ oracle_databases }}"
+  loop_control:
+    loop_var: odb
+    label: "oracle_db_name {{ odb.oracle_db_name }}"
+  when:
+    - odb.rman_wallet | default(false)
+  tags:
+    - assert
+
+# oradb_rman_tns_admin could not point to $ORACLE_HOME/network/admin
+# sqlnet.ora could be configured by oradb_rman and oradb_manage_db.
+# => oradb_rman_tns_admin could not point to $ORACLE_HOME/network/admin
+- name: Assert oradb_rman_tns_admin does not point to $ORACLE_HOME/network/admin
+  ansible.builtin.assert:
+    quiet: true
+    that: (_oracle_home_db + "/network/admin") != oradb_rman_tns_admin
+  with_items:
+    - "{{ oracle_databases }}"
+  loop_control:
+    loop_var: odb
+    label: "oracle_db_name {{ odb.oracle_db_name }}"
+  tags:
+    - assert
+    - assert_rman_tns_admin

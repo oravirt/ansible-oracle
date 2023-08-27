@@ -154,7 +154,7 @@ setenv()
 	SHORTOPTS="ha:s:r:l:t:c:"
 	LONGOPTS="help,action:,ORACLE_SID:,rmanscriptdir:,logdir:,targetconnect:,catalogconnect:,service:"
 
-	if ARGS=$(getopt -s bash --options $SHORTOPTS  --longoptions $LONGOPTS --name "$PROGNAME" -- "$@" ) ; then
+	if ! ARGS=$(getopt -s bash --options $SHORTOPTS  --longoptions $LONGOPTS --name "$PROGNAME" -- "$@" ) ; then
 		exit
 	fi
 
