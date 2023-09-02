@@ -5,6 +5,31 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v3.12.0
+=======
+
+Minor Changes
+-------------
+
+- oradb_facts: add missing attributes collected by oracle_facts module (oravirt#375)
+
+Security Fixes
+--------------
+
+- oracle_awr: added no_log attribute to password fields (oravirt#375)
+- oracle_facts: added no_log attribute to password fields (oravirt#375)
+- oracle_job: added no_log attribute to password fields (oravirt#375)
+- oracle_jobclass: added no_log attribute to password fields (oravirt#375)
+- oracle_jobschedule: added no_log attribute to password fields (oravirt#375)
+- oracle_jobwindow: added no_log attribute to password fields (oravirt#375)
+- oracle_ldapuser: added no_log attribute to password fields (oravirt#375)
+- oracle_rsrc_consgroup: added no_log attribute to password fields (oravirt#375)
+
+Bugfixes
+--------
+
+- oradb_rman: better handle rman_jobs with state: absent (oravirt#374)
+
 v3.11.0
 =======
 
