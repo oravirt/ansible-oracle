@@ -59,13 +59,22 @@ Vagrant.configure("2") do |config|
     fi
 
     # copy public key to vagrant user
+    SET_KEY_OK=0
     ssh_public_key=$(find /vagrant/*.pub -printf "%p")
     if test -f "$ssh_public_key" ; then
       echo "Check if public key $ssh_public_key is valid."
       if ssh-keygen -l -f "$ssh_public_key" ; then
         echo "Add public key to /home/vagrant/.ssh/authorized_keys"
         cat "$ssh_public_key" >> /home/vagrant/.ssh/authorized_keys
+        SET_KEY_OK=1
+      else
+        echo "The SSH Key is in the wrong format, aborting"
+        exit 1
       fi
+    fi
+    if [ ${SET_KEY_OK} -eq 0 ]; then
+       echo "Please copy the ssh key to the same directory as the vagrantfile and the Oracle software"
+       exit 1
     fi
 
     sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config

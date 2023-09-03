@@ -1,0 +1,140 @@
+---
+#
+# db_name anpassen
+# pdb_name anpassen
+#
+# IMPORTANT!!!
+# db_config_home is only vlalid in this file
+#
+db_homes_installed:
+  - home: &db_config_home db19_si_se2
+    apply_patches: true
+    state: present
+
+
+oracle_listeners_config:
+  LISTENER:
+    home: *db_config_home
+    address:
+      - host: "{{ ansible_hostname }}"
+        protocol: TCP
+        port: 1521
+
+listener_installed:
+  - home: *db_config_home
+    listener_name: LISTENER
+    state: present
+
+oracle_databases:
+  - home: *db_config_home
+    oracle_db_name: &oracle_db_name DB1
+    oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
+    is_container: true
+    # characterset:
+    # Example custom DBCA-Template, usable for CDB and nonCDB
+    # dbca_templatename: 19c_custom_dbca.dbt
+    storage_type: FS
+    oracle_db_mem_totalmb: 2048  # this value is only valid during dbca - init.ora-parameters are used afterwards.
+    oracle_database_type: MULTIPURPOSE
+    redolog_size: 50M
+    redolog_groups: 3
+    datafile_dest: /u02/oradata
+    recoveryfile_dest: /u02/fra
+    listener_name: LISTENER
+    listener_port: &cdb_listener_port 1521
+    # *local_listener is used in initparam as an anchor
+    archivelog: false
+    force_logging: true
+    state: present
+    statspack:
+      purgedays: 14
+      snaplevel: 5
+      state: present
+    tablespaces:
+      - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+      - {name: sysaux, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+      - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
+      - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
+      - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
+    init_parameters:
+      - {name: audit_trail, value: 'NONE', scope: spfile, state: present}
+      - {name: processes, value: '800', scope: spfile, state: present, dbca: false}
+      - {name: archive_lag_target, value: '900', scope: both, state: present}
+      - {name: control_management_pack_access, value: 'NONE', scope: both, state: present}
+      - {name: control_file_record_keep_time, value: '30', scope: both, state: present}
+      - {name: db_files, value: '200', scope: spfile, state: present}
+      # - {name: db_domain, value: 'local', scope: both, state: present}
+      - {name: deferred_segment_creation, value: 'false', scope: both, state: present}
+      - {name: filesystemio_options, value: 'setall', scope: spfile, state: present}
+      - {name: job_queue_processes, value: '10', scope: both, state: present}
+      # Disable forcing hugepages on really small systems
+      #  - {name: use_large_pages ,value: 'ONLY', scope: spfile, state: present}
+      - {name: log_archive_dest_1, value: 'location=USE_DB_RECOVERY_FILE_DEST', scope: both, state: present}
+      - {name: log_buffer, value: '64M', scope: spfile, state: present}
+      # - {name: pga_aggregate_target, value: '1024M', scope: both, state: present, dbca: false}
+      - {name: pga_aggregate_target, value: '1G', scope: both, state: present, dbca: false}
+      - {name: sga_target, value: '3096M', scope: spfile, state: present, dbca: false}
+      - {name: recyclebin, value: 'off', scope: spfile, state: present}
+      - {name: streams_pool_size, value: '152M', scope: spfile, state: present}
+      # "_cursor_obsolete_threshold" for 12.2+
+      - {name: "_cursor_obsolete_threshold", value: '1024', scope: spfile, state: present}
+      - {name: max_pdbs, value: '3', scope: both, state: present}
+      - {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
+      - {name: db_create_online_log_dest_1, value: '/u02/oradata', scope: both, state: present}
+      # - {name: db_create_online_log_dest_2, value: '/u02/fra', scope: both, state: present}
+      # file_dest_size in bytes in 12.1.0.2 due to bug in DBCA
+      - {name: db_recovery_file_dest_size, value: '100G', scope: both, state: present, dbca: false}
+      - {name: open_cursors, value: '20000', scope: both, state: present, dbca: false}
+      - {name: diagnostic_dest, value: '/u01/app/oracle', scope: both, state: present}
+
+    profiles:
+      - name: DEFAULT
+        state: present
+        attributes:
+          # - {name: password_life_time, value: "UNLIMITED"}
+          - {name: password_life_time, value: unlimited}
+
+    users:
+      - schema: dbsnmp
+        state: unlocked
+        update_password: always
+
+#    rman_jobs:
+#      - {name: parameter}
+#      - {name: offline_level0, disabled: false, weekday: "0", hour: "01", minute: "10", day: "*"}
+
+oracle_pdbs:
+  - home: *db_config_home
+    listener_port: *cdb_listener_port
+    cdb: *oracle_db_name
+    pdb_name: PDB1
+    state: present
+    profiles: "{{ oracle_default_profiles }}"
+    statspack:
+      purgedays: 14
+      snaplevel: 7
+      state: present
+
+    tablespaces:
+      - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+      - {name: sysaux, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+      - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
+      - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
+      - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 24G, content: permanent, state: present, bigfile: false}
+
+oracle_tnsnames_config: "{{ _tnsnames_config_pdb_helper | items2dict }}"
+
+# creating a temporary dict entry for _tnsnames_config
+# Do not modify this for new databases
+_tnsnames_config_pdb_helper:
+  - key: "{{ oracle_pdbs[0]['pdb_name'] }}"
+    value:
+      connect:
+        service_name: "{{ oracle_pdbs[0]['pdb_name'] }}"
+      address:
+        - host: "{{ ansible_hostname }}"
+
+tnsnames_installed:
+  - tnsname: "{{ oracle_pdbs[0]['pdb_name'] }}"
+    home: *db_config_home
+    state: present
