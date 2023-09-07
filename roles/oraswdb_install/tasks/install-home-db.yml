@@ -53,7 +53,7 @@
         copy: false
         creates: "{{ oracle_home_db }}/{{ item[0].creates }}"
       with_nested:
-        - "{{ _oraswdb_install_oracle_sw_image_db }}"
+        - "{{ _oraswdb_install_oracle_sw_image_db | selectattr('version', 'match', db_homes_config[dbh.home]['version']) }}"
         - ""  # dummy to force item.0 instead of item.
       become: true
       become_user: "{{ oracle_user }}"
@@ -73,7 +73,7 @@
         copy: false
         creates: "{{ oracle_home_db }}/{{ item[0].creates }}"
       with_nested:
-        - "{{ _oraswdb_install_oracle_sw_image_db }}"
+        - "{{ _oraswdb_install_oracle_sw_image_db | selectattr('version', 'match', db_homes_config[dbh.home]['version']) }}"
         - ""  # dummy to force item.0 instead of item.
       become: true
       become_user: "{{ oracle_user }}"
