@@ -99,19 +99,29 @@
 
 - name: install_home_db | Transfer oracle installfiles to server (local)
   ansible.builtin.copy:
-    src: "{{ oracle_sw_source_local }}/{{ db_homes_config[item[1].home].imagename | default(item[0].filename) }}"
+    src: "{{ oracle_sw_source_local }}/{{ _local_oracle_sw_image_db }}"
     dest: "{{ oracle_stage }}"
-    mode: 0775
+    mode: 0664
     force: false
-  with_nested:
-    - "{{ _oraswdb_install_oracle_sw_image_db }}"
+  with_items:
     - "{{ db_homes_installed }}"
+  vars:
+    _local_oracle_sw_image_db: >-
+      {{ db_homes_config[dbh.home].imagename
+          | default((_oraswdb_install_oracle_sw_image_db
+            | selectattr('version', 'match', db_homes_config[dbh.home]['version'])
+            | list)[0]['filename']
+          ) }}
   become: true
   become_user: "{{ oracle_user }}"
   run_once: "{{ _oraswgi_meta_configure_cluster }}"
+  loop_control:
+    loop_var: dbh
+    label: >-
+      home: "{{ dbh.home }}"
+      imgname: "{{ _local_oracle_sw_image_db | default('') }}"
   when:
-    - item[0].version == db_homes_config[item[1].home]['version']
-    - item[1].state|lower == 'present'
+    - dbh.state == 'present'
     - is_sw_source_local
     - oracle_sw_copy
   tags:
