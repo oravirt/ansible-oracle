@@ -203,12 +203,13 @@ oracle_sw_extract_path: "{%- if '18' in db_version -%}\
 db_user: sys
 db_mode: sysdba
 
-db_password: "{% if dbpasswords is defined\
-                    and dbpasswords[item.oracle_db_name] is defined \
-                    and dbpasswords[item.oracle_db_name][db_user] is defined -%} \
-               {{ dbpasswords[item.oracle_db_name][db_user] }} \
-              {%- else %}{{ default_dbpass }} \
-              {%- endif %}"
+db_password: >-
+  {% if dbpasswords is defined
+      and dbpasswords[item.oracle_db_name] is defined
+      and dbpasswords[item.oracle_db_name][db_user] is defined -%}
+    {{- dbpasswords[item.oracle_db_name][db_user] }}
+  {%- else %}{{ default_dbpass }}
+  {%- endif %}
 
 # @var db_service_name:deprecated: true
 # @var db_service_name:deprecated: since v4.0.0

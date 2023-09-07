@@ -20,10 +20,9 @@
     owner: "{{ oracle_user }}"
     group: "{{ oracle_group }}"
   become: true
-  with_items: "{{ oracle_opatch_patch }}"
+  with_items: "{{ oracle_opatch_patch | selectattr('version', 'match', db_version) }}"
   when:
     - apply_patches_db
-    - item.version == db_version
     - oracle_sw_copy
     - db_homes_config[dbh.home]['opatch_minversion'] is defined
     - (current_opatch_version.msg is version_compare(db_homes_config[dbh.home]['opatch_minversion'], '<'))
@@ -38,10 +37,9 @@
     owner: "{{ oracle_user }}"
     group: "{{ oracle_group }}"
   become: true
-  with_items: "{{ oracle_opatch_patch }}"
+  with_items: "{{ oracle_opatch_patch | selectattr('version', 'match', db_version) }}"
   when:
     - apply_patches_db
-    - item.version == db_version
     - not oracle_sw_copy
     - db_homes_config[dbh.home]['opatch_minversion'] is defined
     - (current_opatch_version.msg is version_compare(db_homes_config[dbh.home]['opatch_minversion'], '<'))

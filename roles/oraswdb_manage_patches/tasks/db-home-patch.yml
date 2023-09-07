@@ -1,12 +1,7 @@
 ---
-- ansible.builtin.set_fact:  # noqa name[missing]
-    oracle_home_db: "{%- if db_homes_config[dbh.home]['oracle_home'] is defined -%}\
-                        {{ db_homes_config[dbh.home]['oracle_home'] }}\
-                    {%- else -%}\
-                          {{ oracle_base }}/{{ db_homes_config[dbh.home]['version'] }}/{{ db_homes_config[dbh.home]['home'] }}\
-                    {%- endif -%}"
 
-- ansible.builtin.debug:  # noqa name[missing]
+- name: Output
+  ansible.builtin.debug:
     msg: "Managing patches for {{ oracle_home_db }}"
   when: apply_patches_db
 
@@ -28,7 +23,9 @@
     dest: "={{ oracle_patch_stage }}/{{ db_version }}/ocmrsp.expect"
     mode: "0777"
     force: true
-  when: apply_patches_db and current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
+  when:
+    - apply_patches_db
+    - current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
   become: true
   become_user: "{{ oracle_user }}"
   tags:
@@ -37,7 +34,9 @@
 - name: db_opatch | Configure ocm.rsp (2)
   ansible.builtin.shell: "{{ oracle_patch_stage }}/{{ db_version }}/ocmrsp.expect"
   # noqa command-instead-of-shell
-  when: apply_patches_db and current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
+  when:
+    - apply_patches_db
+    - current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
   become: true
   become_user: "{{ oracle_user }}"
   changed_when: false
@@ -58,7 +57,7 @@
     output: verbose
     state: "{{ item.state }}"
   with_items:
-    - "{{ db_homes_config[dbh.home]['opatch'] }}"
+    - "{{ db_homes_config[dbh.home]['opatch'] | selectattr('state', 'match', 'absent') }}"
   become: true
   become_user: "{{ oracle_user }}"
   tags:
@@ -66,7 +65,6 @@
   when:
     - apply_patches_db | bool
     - db_homes_config[dbh.home]['opatch'] is defined
-    - item.state == "absent"
   register: psuapplym
 
 - name: db_opatch | Manage opatchauto patches for DB (non-gi)
@@ -90,7 +88,11 @@
   become_user: "{{ oracle_user }}"
   tags:
     - apply_patch_db
-  when: apply_patches_db and db_homes_config[dbh.home]['opatchauto'] is defined and item.1 is defined and not olrloc.stat.exists
+  when:
+    - apply_patches_db
+    - db_homes_config[dbh.home]['opatchauto'] is defined
+    - item.1 is defined
+    - not olrloc.stat.exists
   register: psuapplym
 
 - name: db_opatch | Manage opatchauto patches for DB (gi)
@@ -110,9 +112,13 @@
   become: true
   tags:
     - apply_patch_db
-  when: apply_patches_db and db_homes_config[dbh.home]['opatchauto'] is defined and olrloc.stat.exists
+  when:
+    - apply_patches_db and db_homes_config[dbh.home]['opatchauto'] is defined
+    - olrloc.stat.exists
   register: psuapplym
 
+# Do not try to revert patches here
+# => That was done with a previous task!
 - name: db_opatch | Manage patches for DB
   opitzconsulting.ansible_oracle.oracle_opatch:
     oracle_home: "{{ oracle_home_db }}"
@@ -127,13 +133,15 @@
     output: verbose
     state: "{{ item.state }}"
   with_items:
-    - "{{ db_homes_config[dbh.home]['opatch'] }}"
+    - "{{ db_homes_config[dbh.home]['opatch'] | selectattr('state', 'match', 'present') }}"
   # run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become: true
   become_user: "{{ oracle_user }}"
   tags:
     - apply_patch_db
-  when: apply_patches_db and db_homes_config[dbh.home]['opatch'] is defined
+  when:
+    - apply_patches_db
+    - db_homes_config[dbh.home]['opatch'] is defined
   register: psuapplym
 
 - name: db_opatch | Check patches

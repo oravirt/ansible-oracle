@@ -298,9 +298,13 @@ db_mode: sysdba
 #### Default value
 
 ```YAML
-db_password: '{% if dbpasswords is definedand dbpasswords[item.oracle_db_name] is
-  defined and dbpasswords[item.oracle_db_name][db_user] is defined -%} {{ dbpasswords[item.oracle_db_name][db_user]
-  }} {%- else %}{{ default_dbpass }} {%- endif %}'
+db_password: >-
+  {% if dbpasswords is defined
+      and dbpasswords[item.oracle_db_name] is defined
+      and dbpasswords[item.oracle_db_name][db_user] is defined -%}
+    {{- dbpasswords[item.oracle_db_name][db_user] }}
+  {%- else %}{{ default_dbpass }}
+  {%- endif %}
 ```
 
 ### db_service_name
