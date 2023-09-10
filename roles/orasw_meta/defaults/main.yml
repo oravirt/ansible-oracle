@@ -78,7 +78,7 @@ oracle_base: /u01/app/oracle
 #
 # oracle_install_option_gi: HA_CONFIG
 # @end
-oracle_install_option_gi: "{% if _oraswgi_meta_configure_cluster %}CRS_CONFIG{% else %}HA_CONFIG{% endif %}"
+oracle_install_option_gi: ''
 
 # @var oracle_install_version_gi:description: >
 # Define the version for Grid-Infrastructure or Oracle Restart.
@@ -526,22 +526,33 @@ oracle_ee_options_213:
 
 
 # @todo information: variable description is missing
-oracle_pdbs:
-  - home: 19300-base
-    listener_port: 1521
-    cdb: orcl
-    pdb_name: ORCLPDB
-    state: present
-    statspack:
-      purgedays: 14
-      snaplevel: 7
-      state: present
-    tablespaces:
-      - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
-      - {name: sysaux, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
-      - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
-      - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
-      - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+# @var oracle_pdbs:description: >
+# Define the list of PDBs in CDB.
+#
+# Important!
+#
+# For each listelement in `oracle_pdbs` an element in `oracle_databases` with `cdb = oracle_db_name` must exists..
+#
+# Otherwise the assert for `oracle_pdbs` will fail!
+# @end
+# @var oracle_pdbs:example: >
+# oracle_pdbs:
+#   - home: 19300-base
+#     listener_port: 1521
+#     cdb: orcl
+#     pdb_name: ORCLPDB
+#     state: present
+#     statspack:
+#       purgedays: 14
+#       snaplevel: 7
+#       state: present
+#     tablespaces:
+#       - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+#       - {name: sysaux, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+#       - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
+#       - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
+#       - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+# @end
 
 # @todo information: variable description is missing
 default_dbpass: "{% if item is defined and item.oracle_db_passwd is defined %}{{ item.oracle_db_passwd }}\

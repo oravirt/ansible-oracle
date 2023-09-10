@@ -70,9 +70,9 @@
       when:
         - db_homes_installed is defined
 
-    - name: assert oracle_databases minimal
+    - name: assert oracle_databases
       block:
-        - name: assert oracle_databases minimal
+        - name: assert oracle_databases
           ansible.builtin.assert:
             quiet: true
             that:
@@ -86,6 +86,15 @@
                     and ass_odb.is_container is defined
                     and ass_odb.is_container
                   )
+              - ass_odb.init_parameters | default([]) | type_debug == 'list'
+              - ass_odb.profiles | default([]) | type_debug == 'list'
+              - ass_odb.rman_jobs | default([]) | type_debug == 'list'
+              - ass_odb.services | default([]) | type_debug == 'list'
+              - ass_odb.statspack | default({}) | type_debug == 'dict'
+              - ass_odb.tablespaces | default([]) | type_debug == 'list'
+              - ass_odb.users | default([]) | type_debug == 'list'
+              - ass_odb.oracle_db_type | default('SI2') in ('SI', 'RAC', 'RACONENODE')
+              - ass_odb.storage_type | default('FS') in ('FS', 'ASM')
           with_items:
             - "{{ oracle_databases }}"
           loop_control:

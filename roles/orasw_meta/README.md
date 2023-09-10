@@ -680,7 +680,15 @@ oracle_opatch_patch:
 
 ### oracle_pdbs
 
-#### Default value
+Define the list of PDBs in CDB.
+
+Important!
+
+For each listelement in `oracle_pdbs` an element in `oracle_databases` with `cdb = oracle_db_name` must exists..
+
+Otherwise the assert for `oracle_pdbs` will fail!
+
+#### Example usage
 
 ```YAML
 oracle_pdbs:
@@ -694,16 +702,11 @@ oracle_pdbs:
       snaplevel: 7
       state: present
     tablespaces:
-      - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent,
-        state: present, bigfile: false}
-      - {name: sysaux, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent,
-        state: present, bigfile: false}
-      - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent,
-        state: present, bigfile: false}
-      - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent,
-        state: present, bigfile: false}
-      - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent,
-        state: present, bigfile: false}
+      - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+      - {name: sysaux, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+      - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
+      - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
+      - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
 ```
 
 ### oracle_profile_template

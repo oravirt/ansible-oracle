@@ -1,0 +1,56 @@
+---
+- name: assert ansible-oracle variables
+  tags:
+    - always
+    - assert_ansible_oracle
+  block:
+    - name: assert oracle_sw_patches
+      block:
+        - name: assert oracle_sw_patches
+          ansible.builtin.assert:
+            quiet: true
+            fail_msg: Missing attributes or duplicate patchids/unique_patchid found
+            that:
+              - osp_loop.patchid is defined
+              - osp_loop.version is defined
+              - osp_loop.filename is defined
+              - >-
+                  oracle_sw_patches
+                    | selectattr('unique_patchid', 'defined')
+                    | selectattr('unique_patchid', 'equalto', osp_loop.unique_patchid | default(0))
+                    | list | length <= 1
+              - >-
+                  oracle_sw_patches
+                    | selectattr('unique_patchid', 'undefined')
+                    | selectattr('patchid', 'equalto', osp_loop.patchid)
+                    | list | length <= 1
+          with_items:
+            - "{{ oracle_sw_patches }}"
+          loop_control:
+            label: >-
+              version: {{ osp_loop.version | default('') }}
+              patchid: {{ osp_loop.patchid | default('') }}
+              unique_patchid: {{ osp_loop.unique_patchid | default('') }}
+              filename: {{ osp_loop.filename | default('') }}
+            loop_var: osp_loop
+          when:
+            - oracle_sw_patches is defined
+          register: assertoracle_sw_patches
+
+      rescue:
+
+        - name: assert failed assertoracle_sw_patches
+          ansible.builtin.debug:
+            msg: "{{ item.assertion }}"
+          with_items:
+            - "{{ assertoracle_sw_patches['results'] }}"
+          loop_control:
+            label: "{{ item['osp_loop']['key'] | default('') }}"
+          when:
+            - assertoracle_sw_patches.results is defined
+            - item.failed is defined
+            - item.failed | bool
+
+        - name: fail assertoracle_sw_patches
+          ansible.builtin.fail:
+            msg: "See previous debug task for assertation failure"

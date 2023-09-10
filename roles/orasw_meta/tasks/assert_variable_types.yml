@@ -1,0 +1,12 @@
+---
+- name: Assert variable types from inventory
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - db_homes_config | default({}) | type_debug == 'dict'
+      - db_homes_installed | default([]) | type_debug == 'list'
+      - oracle_databases | default([]) | type_debug == 'list'
+      - oracle_pdbs | default([]) | type_debug == 'list'
+      - oracle_tnsnames_config | default({}) | type_debug == 'dict'
+      - sqlnet_installed | default([]) | type_debug == 'list'
+    fail_msg: "Variable has wrong type!"
