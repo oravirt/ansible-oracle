@@ -10,7 +10,7 @@
     available_instances: "{{ odb.1.ai | default(omit) }}"
     role: "{{ odb.1.role | default(omit) }}"
     state: present
-    host: "{{ ansible_hostname }}"
+    host: "{{ oracle_hostname }}"
     port: "{{ _listener_port_cdb }}"
     username: system
     password: "{{ _db_password_cdb }}"
@@ -44,7 +44,7 @@
     pdb: "{{ item.0.pdb_name | default(omit) }}"
     role: "{{ item.1.role | default(omit) }}"
     state: present
-    host: "{{ ansible_hostname }}"
+    host: "{{ oracle_hostname }}"
     port: "{{ listener_port_template }}"
     un: "{{ db_user }}"
     pw: "{{ _db_password_pdb }}"
@@ -70,7 +70,7 @@
     database_name: "{{ item.0.oracle_db_name }}"
     pdb: "{{ item.0.pdb_name | default(omit) }}"
     state: started
-    host: "{{ ansible_hostname }}"
+    host: "{{ oracle_hostname }}"
     port: "{{ listener_port_template }}"
     un: "{{ db_user }}"
     pw: "{{ _db_password_cdb }}"
@@ -96,7 +96,7 @@
     database_name: "{{ item.0.cdb }}"
     pdb: "{{ item.0.pdb_name | default(omit) }}"
     state: started
-    host: "{{ ansible_hostname }}"
+    host: "{{ oracle_hostname }}"
     port: "{{ listener_port_template }}"
     un: "{{ db_user }}"
     pw: "{{ _db_password_pdb }}"
@@ -121,7 +121,7 @@
     database_name: "{{ item.0.oracle_db_name }}"
     pdb: "{{ item.0.pdb_name | default(omit) }}"
     state: stopped
-    host: "{{ ansible_hostname }}"
+    host: "{{ oracle_hostname }}"
     port: "{{ listener_port_template }}"
     un: "{{ db_user }}"
     pw: "{{ _db_password_cdb }}"
@@ -147,7 +147,7 @@
     database_name: "{{ item.0.cdb }}"
     pdb: "{{ item.0.pdb_name | default(omit) }}"
     state: stopped
-    host: "{{ ansible_hostname }}"
+    host: "{{ oracle_hostname }}"
     port: "{{ listener_port_template }}"
     un: "{{ db_user }}"
     pw: "{{ _db_password_pdb }}"
@@ -173,7 +173,7 @@
     database_name: "{{ item.0.oracle_db_name }}"
     pdb: "{{ item.0.pdb_name | default(omit) }}"
     state: absent
-    host: "{{ ansible_hostname }}"
+    host: "{{ oracle_hostname }}"
     port: "{{ listener_port_template }}"
     un: "{{ db_user }}"
     pw: "{{ _db_password_cdb }}"
@@ -199,7 +199,7 @@
     database_name: "{{ item.0.cdb }}"
     pdb: "{{ item.0.pdb_name | default(omit) }}"
     state: absent
-    host: "{{ ansible_hostname }}"
+    host: "{{ oracle_hostname }}"
     port: "{{ listener_port_template }}"
     un: "{{ db_user }}"
     pw: "{{ _db_password_pdb }}"

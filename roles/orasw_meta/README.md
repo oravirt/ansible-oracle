@@ -46,6 +46,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [oracle_ee_options_213](#oracle_ee_options_213)
   - [oracle_home_gi_cl](#oracle_home_gi_cl)
   - [oracle_home_gi_so](#oracle_home_gi_so)
+  - [oracle_hostname](#oracle_hostname)
   - [oracle_install_option_gi](#oracle_install_option_gi)
   - [oracle_install_version_gi](#oracle_install_version_gi)
   - [oracle_opatch_patch](#oracle_opatch_patch)
@@ -585,6 +586,18 @@ The variable is used as a default for the internal variable `oracle_home_gi`.
 
 ```YAML
 oracle_home_gi_so: '{{ oracle_base }}/{{ oracle_install_version_gi }}/grid'
+```
+
+### oracle_hostname
+
+Grid-Infrastructure nodename.
+
+Used as hostname for all oradb_manage_-connections and as hostname in RDBMS installation.
+
+#### Default value
+
+```YAML
+oracle_hostname: '{{ ansible_fqdn }}'
 ```
 
 ### oracle_install_option_gi
