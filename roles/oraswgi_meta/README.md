@@ -22,6 +22,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [gi_patches](#gi_patches)
   - [patch_before_rootsh](#patch_before_rootsh)
   - [sysasmpassword](#sysasmpassword)
+- [Discovered Tags](#discovered-tags)
 - [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -141,6 +142,11 @@ SYSASM Password for ASM.
 sysasmpassword: '{{ oracle_password }}'
 ```
 
+## Discovered Tags
+
+**_always_**
+
+**_assert_ansible_oracle_**
 
 ## Open Tasks
 
