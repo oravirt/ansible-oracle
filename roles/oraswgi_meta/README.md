@@ -20,7 +20,6 @@ There are a lot of variables who are used by `orasw_meta`
   - [apply_patches_gi](#apply_patches_gi)
   - [asmmonitorpassword](#asmmonitorpassword)
   - [gi_patches](#gi_patches)
-  - [oracle_hostname](#oracle_hostname)
   - [patch_before_rootsh](#patch_before_rootsh)
   - [sysasmpassword](#sysasmpassword)
 - [Open Tasks](#open-tasks)
@@ -76,6 +75,8 @@ apply_patches_gi: true
 
 ### asmmonitorpassword
 
+ASMSNMP Password for ASM.
+
 #### Default value
 
 ```YAML
@@ -117,16 +118,6 @@ gi_patches_config:
           state: present
           path: 19.16.0.0.220719/ojvm/p34086870_190000_Linux-x86-64.zip
           # Oracle Database 19c Important Recommended One-off Patches (Doc ID 555.1)
-```
-
-### oracle_hostname
-
-Grid-Infrastructure nodename.
-
-#### Default value
-
-```YAML
-oracle_hostname: '{{ ansible_fqdn }}'
 ```
 
 ### patch_before_rootsh
