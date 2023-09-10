@@ -1,0 +1,75 @@
+---
+- name: Assert variable types from inventory
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - db_homes_config | default({}) | type_debug == 'dict'
+    fail_msg: "Variable has wrong type!"
+
+- name: assert ansible-oracle variables
+  when:
+    - oracle_install_option_gi is defined
+    - oracle_install_option_gi | length > 1
+
+  tags:
+    - always
+    - assert_ansible_oracle
+  vars:
+    __supported_versions_gi:
+      - 21.3.0.0
+      - 19.3.0.0
+      - 18.3.0.0
+      - 12.2.0.1
+      - 12.1.0.2
+      - 12.1.0.1
+  block:
+
+    - name: Assert Variables for Restart/Grid Infrastructure Setup
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - oracle_install_version_gi | default('19.3.0.0') in __supported_versions_gi
+          - oracle_asm_init_dg is defined
+          - asm_diskgroups is defined
+          - asm_diskgroups | type_debug == 'list'
+          - oracle_asm_init_dg in asm_diskgroups | map(attribute='diskgroup')
+          - oracle_install_option_gi | default('') in ('HA_CONFIG')
+          # - oracle_install_option_gi | default('') in ('CRS_CONFIG', 'HA_CONFIG')
+          - device_persistence in ('asmfd', 'asmlib')
+
+    - name: assert gi_patches
+      block:
+        - name: assert gi_patches
+          ansible.builtin.assert:
+            quiet: true
+            that:
+              - gip.key in __supported_versions_gi
+              - gip.value.opatch_minversion is defined
+              - gip.value.opatch | default([]) | type_debug == 'list'
+              - gip.value.opatchauto | default([]) | type_debug == 'list'
+          with_dict:
+            - "{{ gi_patches }}"
+          loop_control:
+            label: "{{ gip.key | default('') }}"
+            loop_var: gip
+          when:
+            - gi_patches is defined
+          register: assertgi_patches
+
+      rescue:
+
+        - name: assert failed assertgi_patches
+          ansible.builtin.debug:
+            msg: "{{ item.assertion }}"
+          with_items:
+            - "{{ assertgi_patches['results'] }}"
+          loop_control:
+            label: "{{ item['gip']['key'] | default('') }}"
+          when:
+            - assertgi_patches.results is defined
+            - item.failed is defined
+            - item.failed | bool
+
+        - name: fail assertgi_patches
+          ansible.builtin.fail:
+            msg: "See previous debug task for assertation failure"
