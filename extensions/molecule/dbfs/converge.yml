@@ -1,0 +1,18 @@
+---
+- name: Converge os
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.os
+
+- name: Converge swdb
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swdb
+  vars:
+    # install it directly from remote in this test
+    # => Do not copy the installation media into container
+    oracle_sw_copy: false
+    is_sw_source_local: true
+    oracle_stage_remote: /vagrant
+
+- name: Converge sql_zauberkastern
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.sql_zauberkastern
+
+- name: Converge manage_db
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db

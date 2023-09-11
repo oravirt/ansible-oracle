@@ -1,0 +1,25 @@
+---
+- name: Converge
+  hosts: all
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+    - name: "Import common"
+      ansible.builtin.import_role:
+        name: opitzconsulting.ansible_oracle.common
+
+    - name: "Import orahost"
+      ansible.builtin.import_role:
+        name: "opitzconsulting.ansible_oracle.orahost"
+
+    - name: "Import orahost_storage"
+      ansible.builtin.import_role:
+        name: "opitzconsulting.ansible_oracle.orahost_storage"
+
+    - name: "Import cxoracle"
+      ansible.builtin.import_role:
+        name: "opitzconsulting.ansible_oracle.cxoracle"
+
+    - name: "Import orahost_logrotate"
+      ansible.builtin.import_role:
+        name: "opitzconsulting.ansible_oracle.orahost_logrotate"
