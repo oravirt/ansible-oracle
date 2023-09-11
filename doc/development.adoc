@@ -202,3 +202,22 @@ vagrant cloud provider create ${boxname} virtualbox "$vagrantversion"
 vagrant cloud provider upload ${boxname} virtualbox "$vagrantversion" ../../builds/oracle-7.9.virtualbox.box
 vagrant cloud publish --release ${boxname} "$vagrantversion" virtualbox
 ----
+
+== ansible molecule
+
+.Docker pull Oracle XE
+
+Normal SSO-Login from Oracle is needed for login to docker registry.
+
+----
+docker login container-registry.oracle.com
+docker pull container-registry.oracle.com/database/express:21.3.0-xe
+----
+
+.Start Oracle Container for test
+----
+docker run -d --name oracle-xe \
+  -e ORACLE_PWD=Oracle_123 \
+  -p 1521:1521 \
+  container-registry.oracle.com/database/express:21.3.0-xe
+----

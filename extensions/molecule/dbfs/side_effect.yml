@@ -1,0 +1,116 @@
+---
+# This playbook is a special step in molecule.
+- name: Side-Effect - DB-Patching 19.20
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.opatch
+  vars:
+    is_sw_source_local: true
+    oracle_sw_patches:
+      - filename: p29213893_1915000DBRU_Generic.zip
+        patchid: 29213893
+        unique_patchid: 24722761
+        version: 19.3.0.0
+        description: "DBMS_STATS FAILING WITH ERROR ORA-01422"
+      - filename: p35320081_190000_Linux-x86-64.zip
+        patchid: 35320081
+        version: 19.3.0.0
+        description: Database Release Update 19.20.0.0.230718
+      - filename: p35354406_190000_Linux-x86-64.zip
+        patchid: 35354406
+        version: 19.3.0.0
+        description: OJVM RELEASE UPDATE 19.20.0.0.0
+        creates: 35354406/README.txt
+      - filename: p35512813_1920000DBRU_Generic.zip
+        patchid: 35512813
+        version: 19.3.0.0
+        description: DATAPUMP BUNDLE PATCH 19.20.0.0.0
+      - filename: p29213893_1920000DBRU_Generic.zip
+        patchid: 29213893
+        unique_patchid: 25224952
+        version: 19.3.0.0
+        description: "DBMS_STATS FAILING WITH ERROR ORA-01422"
+
+    db_homes_installed:
+      - home: db19-si-ee
+        state: present
+        apply_patches: true
+
+    db_homes_config:
+      db19-si-ee:
+        version: 19.3.0.0
+        oracle_home: /u01/app/oracle/product/19/db19-si-ee
+        edition: EE
+        opatch_minversion: 12.2.0.1.36
+        # imagename: db_home_19.15.zip
+        opatch:
+          - {patchid: 29213893, state: absent, excludeUPI: 25224952, stop_processes: true}  # 19.3
+          - {patchid: 29213893, state: absent, excludeUPI: 24722761, stop_processes: true}  # 19.15
+          - patchid: 35320081
+            # Database Release Update 19.20.0.0.230718
+            patchversion: 19.20.0.0.230718
+            stop_processes: true
+            state: present
+          - patchid: 35354406
+            # Oracle JavaVM Component Release Update (OJVM RU) 19.20.0.0.230718
+            stop_processes: true
+            state: present
+          - patchid: 35512813
+            # DATAPUMP BUNDLE PATCH 19.20.0.0.0
+            stop_processes: false
+            state: present
+          - patchid: 29213893
+            # DBMS_STATS FAILING WITH ERROR ORA-01422"
+            stop_processes: true
+            state: present
+            excludeUPI: 25224952
+
+- name: Side-Effect - DB-Patching 19.20
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.opatch
+  vars:
+    db_homes_installed:
+      - home: db19-si-ee
+        state: present
+        apply_patches: true
+
+- name: Side-Effect - Manage-DB
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db
+  vars:
+    restart_spparameter_changed: true
+    oracle_databases:
+      - home: db19-si-ee
+        oracle_db_name: &oracle_db_name DB1
+        oracle_db_type: SI
+        is_container: true
+        storage_type: FS
+        oracle_database_type: MULTIPURPOSE
+        redolog_size: 50M
+        redolog_groups: 3
+        listener_name: LISTENER
+        listener_port: &cdb_listener_port 1521
+        archivelog: false
+        flashback: false
+        force_logging: true
+        state: present
+        tablespaces:
+          - name: SYSTEM
+            size: 10M
+            autoextend: true
+            next: 50M
+            maxsize: 4G
+            content: permanent
+            state: present
+          - name: TEMP
+            size: 10M
+            autoextend: true
+            next: 50M
+            maxsize: 4G
+            content: temp
+            state: present
+          - name: UNDOTBS1
+            size: 10M
+            autoextend: true
+            next: 50M
+            maxsize: 4G
+            content: undo
+            state: present
+        init_parameters:
+          - {name: recyclebin, value: 'off', scope: spfile, state: present}
