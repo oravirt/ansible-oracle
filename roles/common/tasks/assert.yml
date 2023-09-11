@@ -1,0 +1,20 @@
+---
+- name: Assert Distribution
+  ansible.builtin.assert:
+    quiet: true
+    fail_msg: "Wrong Distribution found: {{ ansible_os_family }} {{ ansible_distribution_major_version }}"
+    that:
+      - (
+          ansible_os_family == 'RedHat'
+          and ansible_distribution_major_version is version('6', '>=')
+          and ansible_distribution_major_version is version('8', '<=')
+        )
+        or
+          (ansible_os_family == 'Suse')
+
+- name: Assert variables
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - ntp_type in ('chrony', 'ntp')
+      - configure_public_yum_repo | type_debug == 'bool'

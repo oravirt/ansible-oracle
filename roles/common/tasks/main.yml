@@ -1,73 +1,12 @@
 # Common playbook - sets up the host generic stuff
 ---
-
-- name: Check for correct Ansible Version (>= 2.9)
-  ansible.builtin.assert:
-    that:
-      - "ansible_version.full is version('2.9', '>=')"
-
-- name: Install EPEL Repo
-  when:
-    - configure_epel_repo
-    - ansible_os_family == 'RedHat'
+- name: Assert
+  ansible.builtin.include_tasks: assert.yml
   tags:
-    - epelrepo
-  block:
-    - name: Install GPG Key for EPEL
-      ansible.builtin.rpm_key:
-        state: present
-        key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_distribution_major_version }}
+    - common_assert
 
-    - name: Add EPEL Repo
-      ansible.builtin.yum:
-        name: "{{ _common_epel_rpm }}"
-        state: installed
-
-# Do not use the old public-yum.repo on OL7 after January 2019 anymore
-# Check for /usr/bin/ol_yum_configure.sh in newer systems
-- name: Check for ol_yum_configure.sh
-  ansible.builtin.stat:
-    path: /usr/bin/ol_yum_configure.sh
-  register: olyumconfigfile
-  when:
-    - configure_public_yum_repo
-    - ansible_distribution == 'OracleLinux'
-  tags:
-    - olrepo
-
-# Update public-yum.repo only on old versions of OL7
-- name: Get newest repo-file for OL (public-yum)
-  ansible.builtin.get_url:
-    dest: "{{ _common_repo_dir }}/{{ _common_ol_repo_file }}"
-    url: "http://public-yum.oracle.com/{{ _common_ol_repo_file }}"
-    backup: true
-    mode: 0644
-  when:
-    - not olyumconfigfile.stat.exists | default(false)
-    - configure_public_yum_repo
-    - ansible_distribution == 'OracleLinux'
-  tags:
-    - olrepo
-
-- name: Install common packages OL/RHEL
-  ansible.builtin.yum:
-    name: "{{ common_packages }}"
-    state: installed
-  when:
-    - install_os_packages
-    - ansible_os_family == 'RedHat'
-  tags:
-    - commonpackages
-
-- name: Install common packages SLES12
-  community.general.zypper:
-    name: "{{ common_packages_sles }}"
-    state: installed
-  when:
-    - install_os_packages
-    - ansible_os_family == 'Suse'
-  tags:
-    - commonpackages
+- name: Include distribution specified tasks
+  ansible.builtin.include_tasks: "{{ ansible_os_family }}.yml"
 
 - name: Start and enable ntp or chrony
   ansible.builtin.service:

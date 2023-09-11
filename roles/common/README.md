@@ -342,6 +342,8 @@ ol7_repo_file: public-yum-ol7.repo
 
 ## Discovered Tags
 
+**_common_assert_**
+
 **_commonpackages_**
 
 **_epelrepo_**
