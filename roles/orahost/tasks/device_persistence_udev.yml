@@ -1,0 +1,9 @@
+---
+- name: udev | Create udev stage directory
+  ansible.builtin.file:
+    dest: "{{ oracle_stage }}/udev"
+    mode: "0775"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    state: directory
+  when: device_persistence == 'udev'

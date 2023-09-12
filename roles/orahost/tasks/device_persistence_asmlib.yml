@@ -1,0 +1,47 @@
+---
+- name: Asmlib | Add configuration
+  ansible.builtin.template:
+    src: oracleasm.j2
+    dest: /etc/sysconfig/oracleasm-_dev_oracleasm
+    mode: "0644"
+  register: asmlibconfig
+  when:
+    - device_persistence | lower == 'asmlib'
+    - asm_diskgroups is defined
+  tags:
+    - asmlibconfig
+
+- name: Asmlib | Add configuration (link)
+  ansible.builtin.file:
+    src: /etc/sysconfig/oracleasm-_dev_oracleasm
+    dest: /etc/sysconfig/oracleasm
+    state: link
+    force: true
+  register: asmlibconfig
+  when:
+    - device_persistence | lower == 'asmlib'
+    - asm_diskgroups is defined
+  tags:
+    - asmlibconfig
+
+- name: Asmlib | Enable and start Oracle Asmlib
+  ansible.builtin.service:
+    name: oracleasm
+    state: started
+    enabled: true
+  when:
+    - device_persistence == 'asmlib'
+    - asm_diskgroups is defined
+  tags:
+    - asmlibconfig
+
+- name: Asmlib | Restart Asmlib  # noqa no-handler
+  ansible.builtin.service:
+    name: oracleasm
+    state: restarted
+  when:
+    - asm_diskgroups is defined
+    - device_persistence == 'asmlib'
+    - asmlibconfig.changed
+  tags:
+    - asmlibconfig

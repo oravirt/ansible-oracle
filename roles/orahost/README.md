@@ -747,6 +747,8 @@ transparent_hugepage_disable:
 
 ## Discovered Tags
 
+**_always_**
+
 **_asmlibconfig_**
 
 **_etchosts_**
@@ -757,9 +759,15 @@ transparent_hugepage_disable:
 
 **_hostfs_**
 
+**_hugepages_**
+
 **_iptables,firewalld_**
 
+**_molecule-idempotence-notest_**
+
 **_nozeroconf_**
+
+**_orahost_assert_**
 
 **_os_packages, oscheck_**
 
@@ -783,11 +791,15 @@ transparent_hugepage_disable:
 
 **_sysctl,hugepages_**
 
-**_thpnuma_**
+**_sysctl,hugepages,molecule-idempotence-notest_**
+
+**_sysctl,molecule-idempotence-notest_**
 
 **_timezone_**
 
 **_tphnuma_**
+
+**_tphnuma,molecule-idempotence-notest_**
 
 **_user_**
 

@@ -1,0 +1,53 @@
+---
+- name: Install custom packages required by Oracle on SLES (oracle_packages_sles)
+  community.general.zypper:
+    name: "{{ oracle_packages_sles }}"
+    state: installed
+  when:
+    - oracle_packages_sles is defined
+    - install_os_packages
+    - ansible_os_family == 'Suse'
+  tags: os_packages, oscheck
+
+- name: Install default packages required by Oracle on SLES (version dependant)
+  community.general.zypper:
+    name: "{{ item.packages }}"
+    state: installed
+  with_items:
+    - "{{ oracle_packages_sles_multi }}"
+  loop_control:
+    label: "{{ item.name | default('') }}"
+  when:
+    - not oracle_packages_sles is defined
+    - install_os_packages
+    - ansible_os_family == 'Suse'
+    - item.condition | default(false)
+  tags: os_packages, oscheck
+
+- name: Install packages required by Oracle for ASMlib on SLES
+  community.general.zypper:
+    name: "{{ oracle_asm_packages_sles }}"
+    state: installed
+  when:
+    - install_os_packages
+    - device_persistence == 'asmlib'
+    - asm_diskgroups is defined
+  tags: os_packages, oscheck, asm1
+
+- name: Disable Transparent Hugepages (runtime)
+  ansible.builtin.shell: |
+    [ -f /sys/kernel/mm/transparent_hugepage/enabled ] && echo never > /sys/kernel/mm/transparent_hugepage/enabled && echo changed
+    [ -f /sys/kernel/mm/transparent_hugepage/defrag ] && echo never > /sys/kernel/mm/transparent_hugepage/defrag && echo changed
+  register: tphnuma_result
+  changed_when: "'changed' in tphnuma_result.stdout"
+  tags: tphnuma
+
+- name: Oracle-recommended security limits on SLES  # noqa args[module]
+  community.general.pam_limits:
+    domain: oracle
+    limit_type: "{{ item.name.split(' ')[0] }}"
+    limit_item: "{{ item.name.split(' ')[1] }}"
+    value: "{{ item.value }}"
+  with_items: "{{ oracle_seclimits }}"
+  when: ansible_os_family == 'Suse'
+  tags: seclimit
