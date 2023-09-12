@@ -1,0 +1,108 @@
+---
+# OL8/RHEL8 has all needed RPMs in orahost role!
+- name: Install packages required by Oracle on OL/RHEL version 6 and 7
+  ansible.builtin.yum:
+    name: "{{ oracle_packages }}"
+    state: installed
+    enablerepo: "{{ extrarepos_enabled | default(omit, True) }}"
+    disablerepo: "{{ extrarepos_disabled | default(omit, True) }}"
+  when:
+    - install_os_packages
+    - ansible_distribution_major_version is version('7', '<=')
+  tags: os_packages, oscheck
+
+- name: Install packages required by Oracle for ASMlib on OL/RHEL
+  ansible.builtin.yum:
+    name: "{{ oracle_asm_packages }}"
+    state: installed
+    enablerepo: "{{ extrarepos_enabled | default(omit, True) }}"
+    disablerepo: "{{ extrarepos_disabled | default(omit, True) }}"
+  when:
+    - install_os_packages | bool
+    - device_persistence == 'asmlib'
+    - asm_diskgroups is defined
+  tags: os_packages, oscheck
+
+- name: Disable Firewall
+  when:
+    - disable_firewall
+  block:
+    - name: Check if firewall is installed
+      ansible.builtin.yum:
+        list: "{{ firewall_service }}"
+        disablerepo: "*"
+      tags: iptables,firewalld
+      register: firewall
+
+    - name: Disable firewall
+      ansible.builtin.service:
+        name: "{{ firewall_service }}"
+        state: stopped
+        enabled: false
+      when:
+        - firewall.results
+      tags: iptables,firewalld
+      register: iptables
+
+- name: Disable selinux
+  when:
+    - disable_selinux
+  tags: selinux
+  block:
+    - name: Disable selinux (permanently)
+      ansible.posix.selinux:
+        state: disabled
+      register: selinux
+
+    - name: Disable selinux (runtime)  # noqa command-instead-of-shell
+      ansible.builtin.shell: setenforce 0
+      changed_when: disable_selinux_runtime.rc == 0
+      failed_when: disable_selinux_runtime.rc > 0 and "SELinux is disabled" not in disable_selinux_runtime.stderr
+      register: disable_selinux_runtime
+
+- name: Oracle-recommended security limits
+  ansible.builtin.template:
+    src: oracle-seclimits.conf.j2
+    dest: /etc/security/limits.d/99-oracle-limits.conf
+    backup: true
+    mode: "0644"
+  when:
+    - configure_limits
+  tags: seclimit
+
+# RHEL/OL6 use a different way to disable transparent hugepages
+# => RHEL/OL6 is end of life. no more changes and development in ansible-oracle for it.
+# Keep old code...
+- name: Execute Distribution tasks for RHEL/OL6
+  ansible.builtin.include_tasks: "{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"
+  when:
+    - ansible_os_family == 'RedHat'
+    - ansible_distribution_major_version is version('6', '=')
+
+- name: Transparent Hugepages for RHLE/OL7+
+  when:
+    - ansible_distribution_major_version is version('7', '>=')
+  block:
+    - name: Disable Transparent Hugepages (runtime)
+      ansible.builtin.shell: if test -f {{ item.path }}; then {{ item.disable }} {{ item.path }}; fi;
+      # noqa no-changed-when
+      with_items:
+        - "{{ transparent_hugepage_disable }}"
+      tags: tphnuma,molecule-idempotence-notest
+
+    - name: Disable Transparent Hugepages (permanently)
+      ansible.builtin.lineinfile:
+        dest: "{{ item.rclocal }}"
+        line: "{{ item.disable }} {{ item.path }}"
+        state: present
+      with_items:
+        - "{{ transparent_hugepage_disable }}"
+      tags: tphnuma,molecule-idempotence-notest
+
+    - name: Fix permissions on /etc/rc.d/rc.local
+      ansible.builtin.file:
+        path: "{{ item.rclocal }}"
+        mode: "0755"
+      with_items:
+        - "{{ transparent_hugepage_disable }}"
+      tags: tphnuma

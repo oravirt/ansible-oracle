@@ -1,40 +1,10 @@
 ---
-
-- name: Count number of kernel lines that needs to be changed (numa=off transparent_hugepage=never)
-  ansible.builtin.shell: cat /etc/grub.conf | grep title |wc -l
-  # noqa risky-shell-pipe no-changed-when
-  register: count
-  tags: thpnuma
-
-- name: Disable Transparent Hugepages (in grub.conf)
-  ansible.builtin.lineinfile:
-    dest: /boot/grub/grub.conf
-    backup: true
-    backrefs: true
-    state: present
-    regexp: '(^\s+kernel(\s+(?!transparent_hugepage=never)[\w=/\-\.]+)*)\s*$'
-    line: '\1 transparent_hugepage=never'
-  with_sequence: start=0 end={{ count.stdout }}
-  tags: thpnuma
-
-- name: Disable Numa (in grub.conf)
-  ansible.builtin.lineinfile:
-    dest: /boot/grub/grub.conf
-    backup: true
-    backrefs: true
-    state: present
-    regexp: '(^\s+kernel(\s+(?!numa=off)[\w=/\-\.]+)*)\s*$'
-    line: '\1 numa=off'
-  with_sequence: start=0 end={{ count.stdout }}
-  tags: thpnuma
-  when: disable_numa_boot
-
 - name: Disable Transparent Hugepages (runtime)
   ansible.builtin.shell: if test -f {{ item.path }}; then {{ item.disable }} {{ item.path }}; fi;
   # noqa no-changed-when
   with_items:
     - "{{ transparent_hugepage_disable }}"
-  tags: tphnuma
+  tags: tphnuma,molecule-idempotence-notest
 
 - name: Disable Transparent Hugepages (permanently)
   ansible.builtin.lineinfile:
@@ -43,7 +13,7 @@
     state: present
   with_items:
     - "{{ transparent_hugepage_disable }}"
-  tags: tphnuma
+  tags: tphnuma,molecule-idempotence-notest
 
 - name: Fix permissions on /etc/rc.d/rc.local
   ansible.builtin.file:

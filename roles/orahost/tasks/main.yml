@@ -1,114 +1,14 @@
 # orahost playbook
 ---
-
-- name: Check for correct OS family & min version
-  ansible.builtin.assert:
-    that:
-      - "ansible_os_family == '{{ os_family_supported }}'"
-      - "ansible_facts['distribution_version'] is version('{{ os_min_supported_version }}', '>=')"
+- name: Assert
+  ansible.builtin.include_tasks: assert.yml
   tags:
-    - oscheck
+    - orahost_assert
 
-# OL8/RHEL8 has all needed RPMs in orahost role!
-- name: Install packages required by Oracle on OL/RHEL version 6 and 7
-  ansible.builtin.yum:
-    name: "{{ oracle_packages }}"
-    state: installed
-    enablerepo: "{{ extrarepos_enabled | default(omit, True) }}"
-    disablerepo: "{{ extrarepos_disabled | default(omit, True) }}"
-  when:
-    - install_os_packages
-    - ansible_os_family == 'RedHat'
-    - ansible_distribution_major_version is version('7', '<=')
-  tags: os_packages, oscheck
-
-- name: Install custom packages required by Oracle on SLES (oracle_packages_sles)
-  community.general.zypper:
-    name: "{{ oracle_packages_sles }}"
-    state: installed
-  when:
-    - oracle_packages_sles is defined
-    - install_os_packages
-    - ansible_os_family == 'Suse'
-  tags: os_packages, oscheck
-
-- name: Install default packages required by Oracle on SLES (version dependant)
-  community.general.zypper:
-    name: "{{ item.packages }}"
-    state: installed
-  with_items:
-    - "{{ oracle_packages_sles_multi }}"
-  loop_control:
-    label: "{{ item.name | default('') }}"
-  when:
-    - not oracle_packages_sles is defined
-    - install_os_packages
-    - ansible_os_family == 'Suse'
-    - item.condition | default(false)
-  tags: os_packages, oscheck
-
-- name: Install packages required by Oracle for ASMlib on OL/RHEL
-  ansible.builtin.yum:
-    name: "{{ oracle_asm_packages }}"
-    state: installed
-    enablerepo: "{{ extrarepos_enabled | default(omit, True) }}"
-    disablerepo: "{{ extrarepos_disabled | default(omit, True) }}"
-  when:
-    - install_os_packages | bool
-    - ansible_os_family == 'RedHat'
-    - device_persistence == 'asmlib'
-    - asm_diskgroups is defined
-  tags: os_packages, oscheck
-
-- name: Install packages required by Oracle for ASMlib on SLES
-  community.general.zypper:
-    name: "{{ oracle_asm_packages_sles }}"
-    state: installed
-  when:
-    - install_os_packages
-    - device_persistence == 'asmlib'
-    - ansible_os_family == 'Suse'
-    - asm_diskgroups is defined
-  tags: os_packages, oscheck, asm1
-
-- name: Check if firewall is installed
-  ansible.builtin.yum:
-    list: "{{ firewall_service }}"
-    disablerepo: "*"
-  when:
-    - disable_firewall
-    - ansible_os_family == 'RedHat'
-  tags: iptables,firewalld
-  register: firewall
-
-- name: Disable firewall
-  ansible.builtin.service:
-    name: "{{ firewall_service }}"
-    state: stopped
-    enabled: false
-  when:
-    - disable_firewall
-    - ansible_os_family == 'RedHat'
-    - firewall.results
-  tags: iptables,firewalld
-  register: iptables
-
-- name: Disable selinux (permanently)
-  ansible.posix.selinux:
-    state: disabled
-  when:
-    - disable_selinux
-    - ansible_os_family == 'RedHat'
-  tags: selinux
-  register: selinux
-
-- name: Disable selinux (runtime)  # noqa command-instead-of-shell
-  ansible.builtin.shell: setenforce 0
-  when: disable_selinux and ansible_os_family == 'RedHat'
-  changed_when: disable_selinux_runtime.rc == 0
-  failed_when: disable_selinux_runtime.rc > 0 and "SELinux is disabled" not in disable_selinux_runtime.stderr
-  register: disable_selinux_runtime
-  tags: selinux
+- name: Include distribution specified tasks
+  ansible.builtin.include_tasks: "{{ ansible_os_family }}.yml"
+  tags:
+    - always
 
 - name: Timezone
   when: os_timezone is defined
@@ -142,7 +42,7 @@
     regexp: '.*{{ ansible_fqdn }}$'
     line: "{{ etc_hosts_ip }} {{ ansible_hostname }} {{ ansible_fqdn }}"
     state: present
-  when: "ns.rc != 0 or configure_etc_hosts"
+  when: configure_etc_hosts
   tags: etchosts
 
 #  - name: Add local node's ip & hostname to /etc/hosts
@@ -465,7 +365,7 @@
     reload: true
     ignoreerrors: true
   with_items: "{{ oracle_sysctl }}"
-  tags: sysctl
+  tags: sysctl,molecule-idempotence-notest
 
 - name: Oracle hugepages
   ansible.posix.sysctl:
@@ -476,7 +376,7 @@
     ignoreerrors: true
   with_items: "{{ oracle_hugepages }}"
   register: systclcmd
-  tags: sysctl,hugepages
+  tags: sysctl,hugepages,molecule-idempotence-notest
 
 # There is no safe way to allocate Hugepages in a running system.
 # => A reboot should be done after changing the configuration
@@ -493,7 +393,7 @@
     - name: Flush Buffer Cache when hugepages have been changed
       ansible.builtin.command: echo 2 > /proc/sys/vm/drop_caches
       # noqa no-changed-when
-      tags: sysctl,hugepages
+      tags: sysctl,hugepages,molecule-idempotence-notest
 
     - name: Try sysctl again
       ansible.posix.sysctl:
@@ -502,7 +402,10 @@
         state: present
         reload: true
       with_items: "{{ oracle_hugepages }}"
-      tags: sysctl,hugepages
+      tags:
+        - sysctl
+        - hugepages
+        - molecule-idempotence-notest
 
 - name: Oracle-recommended PAM config
   ansible.builtin.lineinfile:
@@ -513,32 +416,6 @@
   when:
     - configure_limits_pam
     - configure_limits
-
-- name: Oracle-recommended security limits
-  ansible.builtin.template:
-    src: oracle-seclimits.conf.j2
-    dest: /etc/security/limits.d/99-oracle-limits.conf
-    backup: true
-    mode: "0644"
-  when:
-    - configure_limits
-    - ansible_os_family == 'RedHat'
-  tags: seclimit
-
-- name: Oracle-recommended security limits on SLES  # noqa args[module]
-  community.general.pam_limits:
-    domain: oracle
-    limit_type: "{{ item.name.split(' ')[0] }}"
-    limit_item: "{{ item.name.split(' ')[1] }}"
-    value: "{{ item.value }}"
-  with_items: "{{ oracle_seclimits }}"
-  when: ansible_os_family == 'Suse'
-  tags: seclimit
-
-- name: Execute Distribution tasks
-  ansible.builtin.include_tasks: "{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"
-  tags: tphnuma
-  # when: ansible_os_family == 'RedHat'
 
 - name: Network | Configure NOZEROCONF
   ansible.builtin.lineinfile:
@@ -592,58 +469,8 @@
     state: directory
   tags: stagedir
 
-- name: udev | Create udev stage directory
-  ansible.builtin.file:
-    dest: "{{ oracle_stage }}/udev"
-    mode: "0775"
-    owner: "{{ oracle_user }}"
-    group: "{{ oracle_group }}"
-    state: directory
-  when: device_persistence == 'udev'
-
-- name: Asmlib | Add configuration
-  ansible.builtin.template:
-    src: oracleasm.j2
-    dest: /etc/sysconfig/oracleasm-_dev_oracleasm
-    mode: "0644"
-  register: asmlibconfig
-  when:
-    - device_persistence | lower == 'asmlib'
-    - asm_diskgroups is defined
+- name: Include Tasks depending on device_persistence variable
+  ansible.builtin.include_tasks: "device_persistence_{{ device_persistence }}.yml"
+  when: device_persistence in ('asmlib', 'udev')
   tags:
-    - asmlibconfig
-
-- name: Asmlib | Add configuration (link)
-  ansible.builtin.file:
-    src: /etc/sysconfig/oracleasm-_dev_oracleasm
-    dest: /etc/sysconfig/oracleasm
-    state: link
-    force: true
-  register: asmlibconfig
-  when:
-    - device_persistence | lower == 'asmlib'
-    - asm_diskgroups is defined
-  tags:
-    - asmlibconfig
-
-- name: Asmlib | Enable and start Oracle Asmlib
-  ansible.builtin.service:
-    name: oracleasm
-    state: started
-    enabled: true
-  when:
-    - device_persistence == 'asmlib'
-    - asm_diskgroups is defined
-  tags:
-    - asmlibconfig
-
-- name: Asmlib | Restart Asmlib  # noqa no-handler
-  ansible.builtin.service:
-    name: oracleasm
-    state: restarted
-  when:
-    - asm_diskgroups is defined
-    - device_persistence == 'asmlib'
-    - asmlibconfig.changed
-  tags:
-    - asmlibconfig
+    - always
