@@ -12,8 +12,8 @@ snaplevel: 7
 
 db_user: system
 db_password_cdb: "{% if dbpasswords is defined and dbpasswords[dbh.oracle_db_name] is defined and dbpasswords[dbh.oracle_db_name][db_user] is defined %}{{ dbpasswords[dbh.oracle_db_name][db_user] }}{% else %}{{ default_dbpass }}{% endif %}"
-db_password_pdb: "{%- if dbpasswords is defined and dbpasswords[opdb.0.cdb] is defined and dbpasswords[opdb.0.cdb][db_user] is defined -%}\
-                   {{ dbpasswords[opdb.0.cdb][db_user] }}\
+db_password_pdb: "{%- if dbpasswords is defined and dbpasswords[opdb.cdb] is defined and dbpasswords[opdb.cdb][db_user] is defined -%}\
+                   {{ dbpasswords[opdb.cdb][db_user] }}\
                   {%- else -%}\
                     {{ default_dbpass }}\
                   {%- endif -%}"
@@ -24,3 +24,40 @@ db_service_name: "{% if dbh is defined %}\
                     {%- else %}{{ dbh.oracle_db_name }}\
                     {%- endif %}\
                   {%- endif %}"
+
+oracle_home_db: "{%- if dbh is defined -%}
+                    {%- if db_homes_config[dbh.home]['oracle_home'] is defined  -%}
+                         {{ db_homes_config[dbh.home]['oracle_home'] }}
+                    {%- else -%}
+                         {{ oracle_base }}/{{ db_homes_config[dbh.home]['version'] }}/{{ db_homes_config[dbh.home]['home'] }}
+                    {%- endif -%}
+                 {%- elif opdb.home is defined %}
+                    {%- if db_homes_config[opdb.home]['oracle_home'] is defined  -%}
+                         {{ db_homes_config[opdb.home]['oracle_home'] }}
+                    {%- else -%}
+                         {{ oracle_base }}/{{ db_homes_config[opdb.home]['version'] }}/{{ db_homes_config[opdb.home]['home'] }}
+                    {%- endif -%}
+                 {%- endif -%}"
+
+oracle_db_instance_name: "{%- if opdb.cdb is defined -%}
+                            {%- for db in oracle_databases -%}
+                              {%- if db.oracle_db_name == opdb.cdb -%}
+                              {{ db.oracle_db_instance_name | default(db.oracle_db_unique_name | default(db.oracle_db_name)) }}
+                              {%- endif -%}
+                            {%- endfor -%}
+                          {%- endif -%}"
+
+_meta_helper_pdb: "{{ opdb | default(item | default({})) }}"
+
+# get db_unique_name from CDB for current pdb
+# get db_name when db_unique_name is missing
+_db_unique_name_for_pdb: >-
+  {{ (oracle_databases
+    | selectattr('oracle_db_name', 'match', _meta_helper_pdb.cdb)
+    | map(attribute='oracle_db_unique_name', default=_meta_helper_pdb.cdb))[0]
+  }}
+
+_db_service_pdb: >-
+  {%- set __db_domain_pdb = oracledb_facts[_db_unique_name_for_pdb]['parameter']['db_domain']['value'] -%}
+  {%- if __db_domain_pdb is defined and __db_domain_pdb is string and __db_domain_pdb | length > 0 -%}{{ _meta_helper_pdb.pdb_name }}.{{ __db_domain_pdb }}{%- else -%}
+  {{ _meta_helper_pdb.pdb_name }}{% endif %}
