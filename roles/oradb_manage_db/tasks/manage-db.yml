@@ -87,6 +87,7 @@
   ansible.builtin.debug:
     msg: "Executing ansible_oracle.oracle_db. This takes some time..."
   when: odb.state == 'present'
+  tags: molecule-idempotence-notest
 
 - name: manage_db | create/manage database
   opitzconsulting.ansible_oracle.oracle_db:
@@ -104,6 +105,7 @@
     output: verbose
     state: "{{ odb.state }}"
   run_once: "{{ _oraswgi_meta_configure_cluster }}"
+  become: true
   become_user: "{{ oracle_user }}"
   when: odb.state == 'present'
   register: dbca_create

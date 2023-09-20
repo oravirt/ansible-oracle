@@ -4,14 +4,33 @@
   ansible.builtin.assert:
     quiet: true
     that:
-      - dbh.oracle_db_name is defined
-      - dbh.home in db_homes_config
-      - dbh.storage_type is defined
-      - db_version != ""
-      - dbh.oracle_db_type is defined
+      - odb.oracle_db_name is defined
+      - odb.home in db_homes_config
+      - odb.state is defined
+      - odb.storage_type is defined
+      - odb.oracle_db_type is defined
   with_items: "{{ oracle_databases }}"
   register: assert1
   loop_control:
-    loop_var: dbh
-    label: "{{ dbh.oracle_db_name | default('') }}"
-  tags: dbh_assert
+    loop_var: odb
+    label: "{{ odb.oracle_db_name | default('') }}"
+  tags: odb_assert
+
+# a configured listener_namein oracle_databases
+# needs a configured listener in inventory!
+- name: assert oracle_databases listener configuration
+  ansible.builtin.assert:
+    quiet: true
+    fail_msg: "Missing element with listener_name in listener_installed!"
+    that:
+      - listener_installed | default([])
+          | selectattr('listener_name', 'match', odb.listener_name)
+          | list | length == 1
+  with_items: "{{ oracle_databases | selectattr('listener_name', 'defined') }}"
+  register: assert2
+  loop_control:
+    loop_var: odb
+    label: >-
+      oracle_db_name: {{ odb.oracle_db_name | default('') }}
+      listener_name: {{ odb.listener_name | default('') }}
+  tags: odb_assert

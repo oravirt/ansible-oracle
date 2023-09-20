@@ -79,13 +79,15 @@ oracle_gi_cluster_type: STANDARD
 
 **_dbcatemplate_**
 
-**_dbh_assert_**
-
 **_listener_**
 
 **_listener2_**
 
 **_listener_install_**
+
+**_molecule-idempotence-notest_**
+
+**_odb_assert_**
 
 **_psout_**
 

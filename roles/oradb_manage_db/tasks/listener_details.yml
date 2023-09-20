@@ -24,11 +24,15 @@
   # noqa no-changed-when
   environment: "{{ oracle_env_lsnrctl }}"
   become_user: "{{ oracle_user }}"
-  tags: listener2
+  tags:
+    - listener2
+    - molecule-idempotence-notest
 
 - name: listener | Reload Listener
   ansible.builtin.shell: "export PATH=${ORACLE_HOME}/bin:${PATH}; lsnrctl reload {{ lsnrinst.listener_name }}"
   # noqa no-changed-when
   environment: "{{ oracle_env_lsnrctl }}"
   become_user: "{{ oracle_user }}"
-  tags: listener2
+  tags:
+    - listener2
+    - molecule-idempotence-notest
