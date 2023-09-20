@@ -34,3 +34,15 @@ _oraswdb_install_oracle_directories:
 
 # choptcheck is a dummy for 'creates' during chopt-task to force an execution
 _oraswdb_install_choptcheck: "{% if oraswdb_install_forcechopt | bool %}dochopt{% endif %}"
+
+_oraswdb_install_dbh_stat: >-
+  {{ stat_dbh_installed.results
+      | selectattr('invocation.module_args.path', 'match', db_homes_config[dbh.home]['oracle_home'])
+      | first }}
+
+_local_oracle_sw_image_db: >-
+  {{ db_homes_config[dbh.home].imagename
+      | default((_oraswdb_install_oracle_sw_image_db
+        | selectattr('version', 'match', db_homes_config[dbh.home]['version'])
+        | list)[0]['filename']
+      ) }}

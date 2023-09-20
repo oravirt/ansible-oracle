@@ -74,7 +74,7 @@
   run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when:
     - db_homes_installed is defined
-    - item.state|lower == 'present'
+    - item.state | lower == 'present'
   tags:
     - directoriesdb
 
@@ -92,10 +92,18 @@
   tags:
     - directoriesdb
 
-- ansible.builtin.include_tasks: "{{ _www_download_bin }}.yml"  # noqa name[missing]
-  when:
-    - not is_sw_source_local
-    - oracle_sw_copy
+- name: Check for existing ORACLE_HOME
+  ansible.builtin.stat:
+    path: "{{ oracle_home_db }}/root.sh"
+  become: true
+  become_user: "{{ oracle_user }}"
+  with_items:
+    - "{{ db_homes_installed }}"
+  loop_control:
+    loop_var: dbh
+    label: >-
+      name: {{ dbh.name | default('') }}
+  register: stat_dbh_installed
 
 - name: install_home_db | Transfer oracle installfiles to server (local)
   ansible.builtin.copy:
@@ -105,13 +113,6 @@
     force: false
   with_items:
     - "{{ db_homes_installed }}"
-  vars:
-    _local_oracle_sw_image_db: >-
-      {{ db_homes_config[dbh.home].imagename
-          | default((_oraswdb_install_oracle_sw_image_db
-            | selectattr('version', 'match', db_homes_config[dbh.home]['version'])
-            | list)[0]['filename']
-          ) }}
   become: true
   become_user: "{{ oracle_user }}"
   run_once: "{{ _oraswgi_meta_configure_cluster }}"
@@ -124,10 +125,35 @@
     - dbh.state == 'present'
     - is_sw_source_local
     - oracle_sw_copy
+    - not _oraswdb_install_dbh_stat.stat.exists
   tags:
     - oradbsw
 
-- ansible.builtin.include_tasks: install-home-db.yml  # noqa name[missing]
+- name: install_home_db | Transfer oracle installfiles to server (www)
+  ansible.builtin.get_url:
+    url: "{{ oracle_sw_source_www }}/{{ _local_oracle_sw_image_db }}"
+    dest: "{{ oracle_stage }}"
+    mode: 0644
+    force: false
+  with_items:
+    - "{{ db_homes_installed }}"
+  become: true
+  become_user: "{{ oracle_user }}"
+  loop_control:
+    loop_var: dbh
+    label: >-
+      home: "{{ dbh.home }}"
+      imgname: "{{ _local_oracle_sw_image_db | default('') }}"
+  when:
+    - dbh.state == 'present'
+    - not is_sw_source_local
+    - oracle_sw_copy
+    - not _oraswdb_install_dbh_stat.stat.exists
+  tags:
+    - oradbsw
+
+- name: Include install-home-db.yml
+  ansible.builtin.include_tasks: install-home-db.yml
   with_items:
     - "{{ db_homes_installed }}"
   loop_control:
@@ -136,6 +162,37 @@
     - db_homes_installed is defined
     - dbh.state | lower == 'present'
   tags: oradbinstall,dbchopt
+
+- name: Check for existing ORACLE_HOME
+  ansible.builtin.stat:
+    path: "{{ oracle_home_db }}/root.sh"
+  become: true
+  become_user: "{{ oracle_user }}"
+  with_items:
+    - "{{ db_homes_installed }}"
+  loop_control:
+    loop_var: dbh
+    label: >-
+      name: {{ dbh.name | default('') }}
+  register: stat_dbh_installed
+
+# Remove installation media from server after installation
+# => cleanup unused files!
+- name: install_home_db | Remove installfiles from local server
+  ansible.builtin.file:
+    path: "{{ oracle_stage }}/{{ _local_oracle_sw_image_db }}"
+    state: absent
+  with_items:
+    - "{{ db_homes_installed }}"
+  loop_control:
+    loop_var: dbh
+    label: >-
+      path: {{ oracle_stage }}/{{ _local_oracle_sw_image_db }}
+  become: true
+  when:
+    - dbh.state == 'present'
+    - oracle_sw_copy
+    - oraswdb_install_remove_install_images
 
 - name: install_home_db | Unmount nfs share with installation media
   ansible.builtin.include_role:
