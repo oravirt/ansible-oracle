@@ -67,15 +67,15 @@ oracle_gi_cluster_type: STANDARD
 
 **_create_cdb,dotprofile_db_**
 
-**_create_db,dbca,customdbcatemplate,dotprofile_db,listener2_**
+**_create_db_**
 
-**_create_db,dbcatemplate_**
+**_create_db,dbca,customdbcatemplate,dotprofile_db,listener2_**
 
 **_create_db,dotprofile_db_**
 
-**_create_db,manage_db,dbca_**
-
 **_customdbcatemplate_**
+
+**_dbca_**
 
 **_dbcatemplate_**
 
@@ -84,6 +84,8 @@ oracle_gi_cluster_type: STANDARD
 **_listener2_**
 
 **_listener_install_**
+
+**_manage_db_**
 
 **_molecule-idempotence-notest_**
 
