@@ -1,4 +1,22 @@
 ---
+# Used nested loop for patching:
+# - loop_db-home-patch.yml with loop over db_homes_installed
+#   - loop_patchid.yml with loop over db_homes_config['opatch'] and  db_homes_config['opatchauto']
+#     - loop_opatch_apply.yml with loop over oracle_sw_patches for unique_patchid
+#
+# In short:
+# db_homes_installed => db_home_config['opatch'] => oracle_sw_patches (optional)
+
+- name: db_opatch | assert oracle_sw_patches
+  ansible.builtin.import_role:
+    name: orasw_meta
+    tasks_from: assert_oracle_sw_patches.yml
+    allow_duplicates: false
+  when:
+    - oracle_sw_patches | default([]) | length > 0
+  tags:
+    - always
+
 - name: db_opatch | check if GI is installed
   ansible.builtin.stat:
     path: /etc/oracle/olr.loc
@@ -22,17 +40,40 @@
     - "{{ db_homes_installed }}"
   tags:
     - directories
+    - molecule-idempotence-notest
   when:
     - apply_patches_db
     - item.apply_patches | default(false)
 
-- ansible.builtin.include_tasks: db-home-patch.yml  # noqa name[missing]
+- name: Include loop_db-home-patch.yml
+  ansible.builtin.include_tasks: loop_db-home-patch.yml
   with_items:
     - "{{ db_homes_installed }}"
   loop_control:
     loop_var: dbh
-  when: db_homes_installed is defined and dbh.state == 'present' and dbh.apply_patches |default (False) and apply_patches_db
+  when:
+    - db_homes_installed is defined
+    - dbh.state == 'present'
+    - dbh.apply_patches | default(false)
+    - apply_patches_db
   tags: autopatch
+
+# cleanup stage is only done in oraswdb_manage_patches
+# => This role is called after oraswgi_manage_patches
+# => No Cleanup in oraswgi_manage_patches due to mixed usage of patches in gi and db
+- name: Cleanup stage area after patching
+  when:
+    - oracle_sw_copy
+    - oraswdb_manage_patches_cleanup_staging
+  block:
+    - name: Remove staging directory
+      ansible.builtin.file:
+        path: "{{ oracle_stage }}/patches"
+        state: absent
+      become: true
+      become_user: "{{ oracle_user }}"
+      tags:
+        - molecule-idempotence-notest
 
 - name: db_opatch | Unmount nfs share with installation media
   ansible.builtin.include_role:

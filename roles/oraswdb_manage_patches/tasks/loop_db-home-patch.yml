@@ -5,23 +5,25 @@
     msg: "Managing patches for {{ oracle_home_db }}"
   when: apply_patches_db
 
-- name: Transfer files
-  ansible.builtin.include_tasks: transfer-files.yml
-  when: oracle_sw_copy
-
-- name: Unpack uploaded files
-  ansible.builtin.include_tasks: unpack-files.yml
-  when: oracle_sw_unpack and apply_patches_db
-
 - name: Upgrade OPatch
   ansible.builtin.include_tasks: opatch-upgrade.yml
-  when: apply_patches_db
 
-- name: db_opatch | Configure ocm.rsp (1)
+- name: Get list of current installed patches
+  ansible.builtin.command: "{{ oracle_home_db }}/OPatch/opatch lspatches -oh {{ oracle_home_db }}"
+  become: true
+  become_user: "{{ oracle_user }}"
+  changed_when: false
+  register: dbhome_patches
+
+- name: List of current installed patches
+  ansible.builtin.debug:
+    var: dbhome_patches.stdout_lines
+
+- name: Configure ocm.rsp (1)
   ansible.builtin.template:
     src: ocmrsp.expect.j2
     dest: "={{ oracle_patch_stage }}/{{ db_version }}/ocmrsp.expect"
-    mode: "0777"
+    mode: "0644"
     force: true
   when:
     - apply_patches_db
@@ -31,9 +33,8 @@
   tags:
     - ocmconfig
 
-- name: db_opatch | Configure ocm.rsp (2)
-  ansible.builtin.shell: "{{ oracle_patch_stage }}/{{ db_version }}/ocmrsp.expect"
-  # noqa command-instead-of-shell
+- name: Configure ocm.rsp (2)
+  ansible.builtin.command: "{{ oracle_patch_stage }}/{{ db_version }}/ocmrsp.expect"
   when:
     - apply_patches_db
     - current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
@@ -43,7 +44,7 @@
   tags:
     - ocmconfig
 
-- name: db_opatch | Remove unwanted patches from DB
+- name: Remove unwanted patches from DB
   opitzconsulting.ansible_oracle.oracle_opatch:
     oracle_home: "{{ oracle_home_db }}"
     patch_base: "{{ oracle_patch_install }}/{{ db_version }}/{{ item.path | default(item.patchid) }}/"
@@ -65,9 +66,10 @@
   when:
     - apply_patches_db | bool
     - db_homes_config[dbh.home]['opatch'] is defined
+    - dbhome_patches.stdout_lines | select('match', item.patchid | string) | length > 0
   register: psuapplym
 
-- name: db_opatch | Manage opatchauto patches for DB (non-gi)
+- name: Manage opatchauto patches for DB (non-gi)
   opitzconsulting.ansible_oracle.oracle_opatch:
     oracle_home: "{{ oracle_home_db }}"
     patch_base: "{{ oracle_patch_install }}/{{ db_version }}/{{ item.0.path | default (item.0.patchid) }}/{{ item.1 }}"
@@ -95,63 +97,48 @@
     - not olrloc.stat.exists
   register: psuapplym
 
-- name: db_opatch | Manage opatchauto patches for DB (gi)
-  opitzconsulting.ansible_oracle.oracle_opatch:
-    oracle_home: "{{ oracle_home_db }}"
-    patch_base: "{{ oracle_patch_install }}/{{ db_version }}/{{ item.path | default(item.patchid) }}/"
-    patch_id: "{{ item.patchid }}"
-    patch_version: "{{ item.patchversion | default(omit) }}"
-    opatchauto: true
-    conflict_check: true
-    ocm_response_file: "{{ ocm_response_file | default(omit) }}"
-    output: verbose
-    state: "{{ item.state }}"
+- name: Manage Patch from db_home_config with opatchauto
+  ansible.builtin.include_tasks: loop_patchid.yml
   with_items:
     - "{{ db_homes_config[dbh.home]['opatchauto'] }}"
-  # run_once: "{{ _oraswgi_meta_configure_cluster}}"
-  become: true
-  tags:
-    - apply_patch_db
+  loop_control:
+    loop_var: dhc_opatch
+    label: >-
+      home: {{ dbh.home | default('') }}
+      patchid: {{ dhc_opatch.patchid | default('') }}
+      state: {{ dhc_opatch.state | default('') }}
+      excludeUPI: {{ dhc_opatch.excludeUPI | default('') }}
   when:
-    - apply_patches_db and db_homes_config[dbh.home]['opatchauto'] is defined
-    - olrloc.stat.exists
-  register: psuapplym
+    - db_homes_config[dbh.home]['opatchauto'] is defined
+    - dhc_opatch.state | default('') == 'present'
+  vars:
+    __opatchauto_patchtype: true  # opatch opatchauto
 
-# Do not try to revert patches here
-# => That was done with a previous task!
-- name: db_opatch | Manage patches for DB
-  opitzconsulting.ansible_oracle.oracle_opatch:
-    oracle_home: "{{ oracle_home_db }}"
-    patch_base: "{{ oracle_patch_install }}/{{ db_version }}/{{ item.path | default(item.patchid) }}/"
-    patch_id: "{{ item.patchid }}"
-    patch_version: "{{ item.patchversion | default(omit) }}"
-    exclude_upi: "{{ item.excludeUPI | default(omit) }}"
-    opatchauto: false
-    conflict_check: true
-    stop_processes: "{{ item.stop_processes | default(False) }}"
-    ocm_response_file: "{{ ocm_response_file | default(omit) }}"
-    output: verbose
-    state: "{{ item.state }}"
+# manage-patch does everything for 1 patch in a loop
+- name: Manage Patch from db_home_config with opatch
+  ansible.builtin.include_tasks: loop_patchid.yml
   with_items:
-    - "{{ db_homes_config[dbh.home]['opatch'] | selectattr('state', 'match', 'present') }}"
-  # run_once: "{{ _oraswgi_meta_configure_cluster }}"
-  become: true
-  become_user: "{{ oracle_user }}"
-  tags:
-    - apply_patch_db
+    - "{{ db_homes_config[dbh.home]['opatch'] }}"
+  loop_control:
+    loop_var: dhc_opatch
+    label: >-
+      home: {{ dbh.home | default('') }}
+      patchid: {{ dhc_opatch.patchid | default('') }}
+      state: {{ dhc_opatch.state | default('') }}
+      excludeUPI: {{ dhc_opatch.excludeUPI | default('') }}
   when:
-    - apply_patches_db
     - db_homes_config[dbh.home]['opatch'] is defined
-  register: psuapplym
+    - dhc_opatch.state | default('') == 'present'
+  vars:
+    __opatchauto_patchtype: false  # opatch apply
 
-- name: db_opatch | Check patches
-  ansible.builtin.shell: "{{ oracle_home_db }}/OPatch/opatch lspatches -oh {{ oracle_home_db }}"
-  # noqa command-instead-of-shell
+- name: Check patches
+  ansible.builtin.command: "{{ oracle_home_db }}/OPatch/opatch lspatches -oh {{ oracle_home_db }}"
   become: true
   become_user: "{{ oracle_user }}"
   changed_when: false
   register: dbhome_patches
 
-- name: db_opatch | Check patches
+- name: Check patches
   ansible.builtin.debug:
     var: dbhome_patches.stdout_lines
