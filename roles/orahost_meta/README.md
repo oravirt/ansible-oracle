@@ -136,10 +136,16 @@ dba_group: dba
 
 Defines the device persistency in ansible-oracle.
 
+Values:
+
+- asmlib
+- asmfd
+- '' - no special device configuration
+
 #### Default value
 
 ```YAML
-device_persistence: asmlib
+device_persistence: ''
 ```
 
 #### Example usage
