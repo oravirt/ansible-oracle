@@ -1,0 +1,14 @@
+---
+
+- name: Install SQL-Zauberkasten
+  hosts: "{{ hostgroup | default('all') }}"
+  become: true
+  become_user: root
+  any_errors_fatal: true
+  tasks:
+    - name: git clone
+      ansible.builtin.git:
+        repo: https://github.com/Rendanic/SQL-Zauberkasten.git
+        dest: /usr/local/SQL-Zauberkasten
+        track_submodules: true
+        version: master
