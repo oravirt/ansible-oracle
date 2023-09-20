@@ -7,54 +7,112 @@
   tags: current_opatch_version
   when: db_homes_config[dbh.home]['opatch_minversion'] is defined
 
-- ansible.builtin.debug:  # noqa name[missing] no-handler
+- name: Output
+  ansible.builtin.debug:  # noqa: no-handler
     var: current_opatch_version.msg
   tags: current_opatch_version
   when: current_opatch_version.changed
 
-- name: db_opatch | Extract OPatch to DB Home
-  ansible.builtin.unarchive:
-    src: "{{ oracle_stage }}/{{ item.filename }}"
-    dest: "{{ oracle_home_db }}"
-    copy: false
-    owner: "{{ oracle_user }}"
-    group: "{{ oracle_group }}"
-  become: true
-  with_items: "{{ oracle_opatch_patch | selectattr('version', 'match', db_version) }}"
+- name: db_opatch | Upgrade Opatch block
   when:
     - apply_patches_db
-    - oracle_sw_copy
     - db_homes_config[dbh.home]['opatch_minversion'] is defined
     - (current_opatch_version.msg is version_compare(db_homes_config[dbh.home]['opatch_minversion'], '<'))
-  tags:
-    - oragridpatchunpack
+  block:
+    - name: db_opatch | Copy oracle opatch to server (www)
+      ansible.builtin.get_url:
+        url: "{{ oracle_sw_source_www }}/{{ oop_loop.filename }}"
+        dest: "{{ oracle_stage }}"
+        mode: "0644"
+        force: true
+      with_items: "{{ oracle_opatch_patch | selectattr('version', 'match', db_version) }}"
+      loop_control:
+        loop_var: oop_loop
+        label: >-
+          filename: {{ oop_loop.filename | default('') }}
+      when:
+        - apply_patches_db
+        - oracle_sw_copy
+        - not is_sw_source_local
+      become: true
+      become_user: "{{ oracle_user }}"
+      tags:
+        - oragridopatchget
 
-- name: db_opatch | Extract OPatch to DB Home (from remote location)
-  ansible.builtin.unarchive:
-    src: "{{ oracle_stage_remote }}/{{ item.filename }}"
-    dest: "{{ oracle_home_db }}"
-    copy: false
-    owner: "{{ oracle_user }}"
-    group: "{{ oracle_group }}"
-  become: true
-  with_items: "{{ oracle_opatch_patch | selectattr('version', 'match', db_version) }}"
-  when:
-    - apply_patches_db
-    - not oracle_sw_copy
-    - db_homes_config[dbh.home]['opatch_minversion'] is defined
-    - (current_opatch_version.msg is version_compare(db_homes_config[dbh.home]['opatch_minversion'], '<'))
-  tags:
-    - oragridpatchunpack
+    - name: db_opatch | Copy oracle opatch to server (local)
+      ansible.builtin.copy:
+        src: "{{ oracle_sw_source_local }}/{{ item.filename }}"
+        dest: "{{ oracle_stage }}"
+        mode: "0644"
+        force: true
+      with_items: "{{ oracle_opatch_patch | selectattr('version', 'match', db_version) }}"
+      when:
+        - oracle_sw_copy
+        - is_sw_source_local
+      become: true
+      become_user: "{{ oracle_user }}"
+      tags:
+        - oragridpatchpush
 
-- name: db_opatch | Check current opatch version
-  opitzconsulting.ansible_oracle.oracle_opatch:
-    oracle_home: "{{ oracle_home_db }}"
-    state: opatchversion
-  register: current_opatch_version
-  tags: current_opatch_version
-  when: db_homes_config[dbh.home]['opatch_minversion'] is defined
+    # - name: db_opatch | Copy oracle opatch to server (www)
+    #   ansible.builtin.get_url:
+    #     url: "{{ oracle_sw_source_www }}/{{ osp_loop.filename }}"
+    #     dest: "{{ oracle_stage }}"
+    #     mode: "0644"
+    #     force: true
+    #   with_items: "{{ oracle_opatch_patch | selectattr('version', 'match', db_version) }}"
+    #   loop_control:
+    #     loop_var: oop_loop
+    #     label: >-
+    #       filename: {{ oop_loop.filename | default('') }}
+    #   when:
+    #     - oracle_sw_copy
+    #     - not is_sw_source_local
+    #   become: true
+    #   become_user: "{{ oracle_user }}"
+    #   tags:
+    #     - oragridpatchpush
 
-- ansible.builtin.debug:  # noqa name[missing] no-handler
-    var: current_opatch_version.msg
-  tags: current_opatch_version
-  when: current_opatch_version.changed
+    - name: db_opatch | Extract OPatch to DB Home
+      ansible.builtin.unarchive:
+        src: "{{ oracle_stage }}/{{ item.filename }}"
+        dest: "{{ oracle_home_db }}"
+        copy: false
+        owner: "{{ oracle_user }}"
+        group: "{{ oracle_group }}"
+      become: true
+      with_items: "{{ oracle_opatch_patch | selectattr('version', 'match', db_version) }}"
+      when:
+        - oracle_sw_copy
+      tags:
+        - oragridpatchunpack
+
+    - name: db_opatch | Extract OPatch to DB Home (from remote location)
+      ansible.builtin.unarchive:
+        src: "{{ oracle_stage_remote }}/{{ item.filename }}"
+        dest: "{{ oracle_home_db }}"
+        copy: false
+        owner: "{{ oracle_user }}"
+        group: "{{ oracle_group }}"
+      become: true
+      with_items: "{{ oracle_opatch_patch | selectattr('version', 'match', db_version) }}"
+      when:
+        - not oracle_sw_copy
+      tags:
+        - oragridpatchunpack
+
+    - name: db_opatch | Check current opatch version 2
+      when: db_homes_config[dbh.home]['opatch_minversion'] is defined
+      block:
+        - name: db_opatch | Check current opatch version 2
+          opitzconsulting.ansible_oracle.oracle_opatch:
+            oracle_home: "{{ oracle_home_db }}"
+            state: opatchversion
+          register: current_opatch_version2
+          tags: current_opatch_version
+
+        - name: Output
+          ansible.builtin.debug:  # noqa: no-handler
+            var: current_opatch_version2.msg
+          tags: current_opatch_version
+          when: current_opatch_version2.changed
