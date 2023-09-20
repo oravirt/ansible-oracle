@@ -16,6 +16,7 @@ Install Oracle Database Software
   - [hostinitdaemon](#hostinitdaemon)
   - [oracle_ee_options](#oracle_ee_options)
   - [oraswdb_install_forcechopt](#oraswdb_install_forcechopt)
+  - [oraswdb_install_remove_install_images](#oraswdb_install_remove_install_images)
   - [ulimit_systemd_mapping](#ulimit_systemd_mapping)
 - [Discovered Tags](#discovered-tags)
 - [Open Tasks](#open-tasks)
@@ -141,6 +142,16 @@ oracle_ee_options: "{{ _oracle_ee_opiton_dict[db_homes_config[dbh.home]['version
 
 ```YAML
 oraswdb_install_forcechopt: false
+```
+
+### oraswdb_install_remove_install_images
+
+Remove installation media from staging after installation when `oracle_sw_copy: true`.
+
+#### Default value
+
+```YAML
+oraswdb_install_remove_install_images: true
 ```
 
 ### ulimit_systemd_mapping
