@@ -80,14 +80,16 @@
     dbh: "{{ odb }}"
   run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when: odb.state == 'present'
-  tags: create_db,dbcatemplate
+  tags:
+    - create_db
+    - dbcatemplate
+    - molecule-idempotence-notest
 
 # show debug task for environments with display_skipped_hosts = false
 - name: manage_db | Start create/manage database
   ansible.builtin.debug:
     msg: "Executing ansible_oracle.oracle_db. This takes some time..."
   when: odb.state == 'present'
-  tags: molecule-idempotence-notest
 
 - name: manage_db | create/manage database
   opitzconsulting.ansible_oracle.oracle_db:
@@ -109,7 +111,11 @@
   become_user: "{{ oracle_user }}"
   when: odb.state == 'present'
   register: dbca_create
-  tags: create_db,manage_db,dbca
+  tags:
+    - molecule-idempotence-notest
+    - create_db
+    - manage_db
+    - dbca
 
 - name: manage_db | Customize oratab for autostart
   ansible.builtin.lineinfile:
