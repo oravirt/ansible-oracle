@@ -1,5 +1,9 @@
 # ansible-oracle
 
+_IMPORTANT_
+
+*This an a beta release of `ansible-oracle`.* Use Version 3.x for production instead of this version.
+
 Read documentation at <https://github.com/oravirt/ansible-oracle> for more details.
 
 * Installs Oracle RAC, RAC One Node and normal single instances.
