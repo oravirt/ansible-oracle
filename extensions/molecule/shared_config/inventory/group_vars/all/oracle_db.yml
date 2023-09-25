@@ -1,0 +1,140 @@
+---
+# special test with copy patches via www
+# is_sw_source_local: false
+# oracle_sw_source_www: http://10.0.2.15:8080
+
+oracle_sw_source_local: /vagrant
+
+apply_patches_db: true
+
+oracle_sw_patches:
+  - filename: p35320081_190000_Linux-x86-64.zip
+    patchid: 35320081
+    version: 19.3.0.0
+    description: Database Release Update 19.20.0.0.230718
+  - filename: p35354406_190000_Linux-x86-64.zip
+    patchid: 35354406
+    version: 19.3.0.0
+    description: OJVM RELEASE UPDATE 19.20.0.0.0
+    creates: 35354406/README.txt
+  - filename: p35512813_1920000DBRU_Generic.zip
+    patchid: 35512813
+    version: 19.3.0.0
+    description: DATAPUMP BUNDLE PATCH 19.20.0.0.0
+  - filename: p29213893_1920000DBRU_Generic.zip
+    patchid: 29213893
+    unique_patchid: 25224952
+    version: 19.3.0.0
+    description: "DBMS_STATS FAILING WITH ERROR ORA-01422"
+
+# Important!
+# The converge.yml disables the installation of patches.
+# That is tested in side-effect.yml with installation of OneOff 29213893 for 19.3.
+# The OneOff is removed before the installation of RU 19.20 and then reinstalled with the
+db_homes_installed:
+  - home: db19-si-ee
+    state: present
+    apply_patches: false  # patching is done in side-effect.yml!
+
+db_homes_config:
+  db19-si-ee:
+    version: 19.3.0.0
+    oracle_home: /u01/app/oracle/product/19/db19-si-ee
+    edition: EE
+    opatch_minversion: 12.2.0.1.36
+    # imagename: db_home_19.15.zip
+    opatch:
+      - {patchid: 29213893, state: absent, excludeUPI: 25224952, stop_processes: true}  # 19.3
+      - {patchid: 29213893, state: absent, excludeUPI: 24722761, stop_processes: true}  # 19.15
+      - patchid: 35320081
+        # Database Release Update 19.20.0.0.230718
+        patchversion: 19.20.0.0.230718
+        stop_processes: true
+        state: present
+      - patchid: 35354406
+        # Oracle JavaVM Component Release Update (OJVM RU) 19.20.0.0.230718
+        stop_processes: true
+        state: present
+      - patchid: 35512813
+        # DATAPUMP BUNDLE PATCH 19.20.0.0.0
+        stop_processes: false
+        state: present
+      - patchid: 29213893
+        # DBMS_STATS FAILING WITH ERROR ORA-01422"
+        stop_processes: true
+        state: present
+        excludeUPI: 25224952
+
+oracle_listeners_config:
+  LISTENER:
+    home: db19-si-ee
+    address:
+      - host: "{{ ansible_hostname }}"
+        protocol: TCP
+        port: 1521
+
+listener_installed:
+  - home: db19-si-ee
+    listener_name: LISTENER
+    state: present
+
+oracle_databases:
+  - home: db19-si-ee
+    oracle_db_name: &oracle_db_name DB1
+    oracle_db_type: SI
+    is_container: true
+    storage_type: FS
+    oracle_db_mem_totalmb: 1024
+    oracle_database_type: MULTIPURPOSE
+    redolog_size: 50M
+    redolog_groups: 3
+    datafile_dest: /u01/app/oracle/oradata
+    recoveryfile_dest: /u01/app/oracle//fra
+    listener_name: LISTENER
+    listener_port: &cdb_listener_port 1521
+    # *local_listener is used in initparam as an achor
+    local_listener: &local_listener "{{ ansible_hostname }}:1521"
+    archivelog: false
+    flashback: false
+    force_logging: true
+    state: present
+    statspack:
+      purgedays: 14
+      snaplevel: 7
+      tablespace: PERFSTAT
+      state: present
+    tablespaces:
+      - name: PERFSTAT
+        size: 10M
+        autoextend: true
+        next: 50M
+        maxsize: 4G
+        content: permanent
+        state: present
+    init_parameters:
+      - {name: db_create_file_dest, value: '/u01/app/oracle/oradata', scope: both, state: present}
+      - {name: db_create_online_log_dest_1, value: '/u01/app/oracle/oradata', scope: both, state: present}
+      - {name: recyclebin, value: 'off', scope: spfile, state: present}
+      - {name: pga_aggregate_target, value: '128M', scope: both, state: present}
+      - {name: sga_target, value: '1808M', scope: spfile, state: present, dbca: false}
+
+oracle_pdbs:
+  - cdb: DB1
+    home: db19-si-ee
+    pdb_name: ORCLPDB
+    listener_port: 1521
+    state: present
+    datafile_dest: /u01/app/oracle/oradata
+    statspack:
+      purgedays: 14
+      snaplevel: 7
+      tablespace: PERFSTAT
+      state: present
+    tablespaces:
+      - name: PERFSTAT
+        size: 10M
+        autoextend: true
+        next: 50M
+        maxsize: 4G
+        content: permanent
+        state: present
