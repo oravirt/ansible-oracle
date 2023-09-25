@@ -205,6 +205,71 @@ vagrant cloud publish --release ${boxname} "$vagrantversion" virtualbox
 
 == ansible molecule
 
+WARNING: The timeout for pulling docker Container in `molecule` is 15s at the moment. +
+There is no parameter to increase the timeout. Pull container manually before starting the szenario. The image url is defined in `molecule.yml`.
+
+The following szenarios are existing in the `ansible-oracle profect.
+
+[options="header" cols="1,4" valign="top"]
+|=======================
+|Stage |Description
+| dbfs | Full stage for installation of RDBMS 19c + Patching and create database. Requires installation media in /vagrant on local host.
+| default | Stage for testing common and orahost roles with different Distributions.
+| download | Download Patches from support.oracle.com for dbfs stage.
+|=======================
+
+=== Test OS roles
+
+IMPORTANT: This szenario is used, when changes at OS roles should be tested against different OS Distribuitions. +
+Most of the tests are included in the `dbfs` szenario!
+
+The execution time is ~10m for a full test.
+
+The `default` szenario requires no parameter `-s`!
+
+.Start download
+----
+cd extensions
+molecule test
+----
+
+=== Download Patches for `dbfs` stage
+
+IMPORTANT: Make sure that /vagrant has enough free space for installation media and patches.
+
+.set environment variables for support.oracle.com login
+----
+export MOS_LOGIN=Username
+export MOS_PASSWORD=verySecret
+----
+
+.Start download
+----
+cd extensions
+molecule test -s download
+----
+
+`molecule test` does the full test of the szenario.
+
+=== Test Single Instance in Filesystem with szenario `dbfs`
+
+IMPORTANT: Make sure that the installation media and patches are placed in `/vagrant` before starting `molecule`. +
+Use the szenario `download` for downloading the Patches from support.oracle.com.
+
+
+The execution time is ~2h for a full test.
+
+.Start download
+----
+cd extensions
+molecule test -s dbfs
+----
+
+=== Oracle XE (not used at the moment!)
+
+IMPORTANT: This chapter was designed for testing the `oradb_managed_`-Roles. +
+It is not clear if this will be added or not.
+
 .Docker pull Oracle XE
 
 Normal SSO-Login from Oracle is needed for login to docker registry.

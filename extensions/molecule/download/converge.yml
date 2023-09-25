@@ -1,0 +1,21 @@
+---
+- name: Converge
+  hosts: all
+  gather_facts: true
+  any_errors_fatal: true
+  vars:
+    mos_login: "{{ lookup('ansible.builtin.env', 'MOS_LOGIN', default=Undefined) }}"
+    mos_password: "{{ lookup('ansible.builtin.env', 'MOS_PASSWORD', default=Undefined) }}"
+  tasks:
+    # - debug: var=oracle_sw_patches
+    - name: Assert credentials
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - mos_login is defined
+          - mos_password is defined
+        fail_msg: "Set MOS_LOGIN and MOS_PASSWORD in shell environment and restart converge again."
+
+    - name: "Import orasw_download_patches"
+      ansible.builtin.import_role:
+        name: opitzconsulting.ansible_oracle.orasw_download_patches
