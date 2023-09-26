@@ -3,13 +3,29 @@
   ansible.builtin.assert:
     that:
       - golden_image_dest is defined
+  tags:
+    - always
 
 - name: Golden-Image
   become: true
   become_user: "{{ oracle_user }}"
+  tags:
+    - golden_image_db
   when:
     - db_homes_installed is defined
+    - oraswdb_golen_image_create | bool
   block:
+
+    - name: Assert Oracle RDBMS version for Golden-Image creation
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - "db_version is version('18', '>=')"
+      with_items:
+        - "{{ db_homes_installed | list | unique }}"
+      loop_control:
+        label: "{{ golden_image_dest }}/{{ dbh.home | default('') }}"
+        loop_var: dbh
 
     - name: Create destination directory for Golden-Image
       ansible.builtin.file:
@@ -21,8 +37,31 @@
       loop_control:
         label: "{{ golden_image_dest }}/{{ dbh.home | default('') }}"
         loop_var: dbh
-      when:
-        - "db_version is version('18', '>=')"
+
+    - name: Search for existing Images
+      ansible.builtin.find:
+        path: "{{ golden_image_dest }}"
+        pattern: "db_{{ dbh.home }}.zip"
+      with_items:
+        - "{{ db_homes_installed | list | unique }}"
+      loop_control:
+        label: "{{ golden_image_dest }}/{{ dbh.home | default('') }}"
+        loop_var: dbh
+      register: __oraswdb_golden_find_images
+
+    - name: Assert for existing Images
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - __oraswdb_golden_find_images['results'][loop_idx]['matched'] == 0
+        fail_msg: Please remove existing image before restarting role.
+      with_items:
+        - "{{ db_homes_installed | list | unique }}"
+      loop_control:
+        label: "{{ golden_image_dest }}/db_{{ dbh.home | default('') }}.zip"
+        loop_var: dbh
+        index_var: loop_idx
+      when: __oraswdb_golden_find_images.results is defined
 
     - name: Create Golden-Image
       ansible.builtin.command: "{{ oracle_home_db }}/runInstaller -silent -createGoldImage -destinationLocation {{ golden_image_dest }}/{{ dbh.home }}"
@@ -32,15 +71,49 @@
       loop_control:
         label: "{{ oracle_home_db | default('') }}"
         loop_var: dbh
-      when:
-        - "db_version is version('18', '>=')"
-      register: createimage
+      register: __createimage
 
-    - name: test
+    - name: Output
       ansible.builtin.debug:
         msg: "{{ item.stdout_lines }}"
       with_items:
-        - "{{ createimage.results }}"
+        - "{{ __createimage.results }}"
       loop_control:
         label: ""
-      when: createimage.results is defined
+      when: __createimage.results is defined
+
+    # extract filename from stdout_lines:
+    #   "Gold Image location: /u01/golden/db19-si-ee/db_home_2023-09-26_06-25-34AM.zip"
+    - name: Set facts for Image rename
+      ansible.builtin.set_fact:
+        __oraswdb_golden_image_filename: >-
+          {{ __oraswdb_golden_image_filename | default({})
+              | combine(__filenamelist | items2dict)
+          }}
+      when: __createimage.results is defined
+      with_items:
+        - "{{ db_homes_installed | list | unique }}"
+      loop_control:
+        label: "{{ golden_image_dest }}/{{ dbh.home | default('') }}"
+        loop_var: dbh
+        index_var: loop_idx
+      vars:
+        __filenamelist:
+          - key: "{{ dbh.home }}"
+            value: "{{ __filename }}"
+        __filename: >-
+          {{ __createimage.results[loop_idx]['stdout_lines']
+            | select('search', 'Gold Image location: .*') | first
+            | replace(' ', '') | split(':') | last }}
+
+    - name: Rename created image  # noqa no-changed-when
+      ansible.builtin.command: >-
+        mv
+        {{ item.value }}
+        {{ golden_image_dest }}/db_{{ item.key }}.zip
+      with_dict: "{{ __oraswdb_golden_image_filename }}"
+      loop_control:
+        label: >-
+          {{ item.value | default('') }}
+          {{ golden_image_dest }}/{{ item.key }}/db_{{ item.key }}.zip
+      when: __oraswdb_golden_image_filename is defined

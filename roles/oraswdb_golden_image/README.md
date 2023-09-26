@@ -7,6 +7,8 @@ Create Golden-Images from Oracle Database Homes and Oracle Grid-Infrastructure/R
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [golden_image_dest](#golden_image_dest)
+  - [oraswdb_golen_image_create](#oraswdb_golen_image_create)
+- [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
 - [Author](#author)
@@ -26,6 +28,21 @@ Set destination directory for Golden-Image extraction.
 
 Variable has no default value.
 
+### oraswdb_golen_image_create
+
+Crfeate Golden-Image for Database Home.
+
+#### Default value
+
+```YAML
+oraswdb_golen_image_create: false
+```
+
+## Discovered Tags
+
+**_always_**
+
+**_golden_image_db_**
 
 
 ## Dependencies
