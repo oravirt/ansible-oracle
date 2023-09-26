@@ -1,0 +1,24 @@
+---
+- name: Converge os
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.os
+
+- name: Converge swdb
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swdb
+  vars:
+    # install it directly from remote in this test
+    # => Do not copy the installation media into container
+    oracle_sw_copy: false
+    is_sw_source_local: true
+    oracle_stage_remote: /vagrant
+
+- name: Converge - DB-Patching
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.opatch
+  vars:
+    # the shared inventory has configured databases.
+    # => Datapatch will try to start a database in this playbook
+    # => Remove them in this scenario, because we do not need any database
+    oracle_databases: []
+    oracle_pdbs: []
+
+- name: Converge oraswdb_golden_image
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.golden_images
