@@ -4,3 +4,15 @@
 #
 # Variable has no default value.
 # @end
+
+# @var oraswgi_golen_image_create:description: >
+# Crfeate Golden-Image for Grid-Infrastructure/Restart.
+# @end
+oraswgi_golen_image_create: false
+
+# @var oraswgi_golden_image_filename:description: >
+# Filename of created Image archive.
+# @end
+oraswgi_golden_image_filename: >-
+  {% if oracle_install_option_gi == 'CRS_CONFIG' -%}
+  gi_{% else %}restart_{% endif %}{{ oracle_install_version_gi | split('.') | first }}.zip
