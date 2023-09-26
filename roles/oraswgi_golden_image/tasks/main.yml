@@ -2,6 +2,8 @@
 - name: Assert
   ansible.builtin.assert:
     that: golden_image_dest is defined
+  tags:
+    - always
 
 # Creating Oracle Restart Golden-Image requires a running stack under 19c
 - name: Golden-Image
@@ -9,6 +11,9 @@
   become_user: "{{ oracle_user }}"
   when:
     - oracle_home_gi is defined
+    - oraswgi_golen_image_create | bool
+  tags:
+    - golden_image_gi
   block:
     - name: Check for running Oracle Restart when installed
       ansible.builtin.command: "{{ oracle_home_gi }}/bin/crsctl status server"
@@ -26,6 +31,19 @@
         state: directory
         mode: '0755'
 
+    - name: Search for existing Images
+      ansible.builtin.find:
+        path: "{{ golden_image_dest }}"
+        pattern: "{{ oraswgi_golden_image_filename }}"
+      register: __oraswgi_golden_find_image
+
+    - name: Assert for existing Images
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - __oraswgi_golden_find_image['matched'] == 0
+        fail_msg: Please remove existing image before restarting role.
+
     - name: Create Golden-Image
       ansible.builtin.command: "{{ oracle_home_gi }}/gridSetup.sh -silent -createGoldImage -destinationLocation {{ golden_image_dest }}"
       # noqa no-changed-when
@@ -35,3 +53,13 @@
       ansible.builtin.debug:
         msg: "{{ createimage.stdout_lines }}"
       when: createimage.stdout_lines is defined
+
+    - name: Rename created image to {{ oraswgi_golden_image_filename }}  # noqa no-changed-when
+      ansible.builtin.command: >-
+        mv
+        "{{ __gridsetup_filename }}"
+        "{{ golden_image_dest }}/{{ oraswgi_golden_image_filename }}"
+      vars:
+        __gridsetup_filename: >-
+          {{ createimage.stdout_lines | select('search', 'Gold Image location: .*')
+          | first | replace(' ', '') | split(':') | last }}
