@@ -12,6 +12,7 @@
       ORACLE_HOME: {{ listener_home }}
   when:
     - listener_installed is defined
+    - listener_installed | length > 0
     - lsnrinst.state | lower == 'present'
 
 - name: oradb_datapatch | Start database
@@ -30,6 +31,7 @@
       db_name: {{ odb.oracle_db_name }}
   when:
     - oracle_databases is defined
+    - oracle_databases | list | length > 0
   tags: startdb
 
 # @todo bug: Do we really need db-connection here?
@@ -53,9 +55,10 @@
   loop_control:
     loop_var: odb
     label: >-
-      home: {{ odb.0.home }}
-      db_name: {{ odb.0.oracle_db_name }}"
+      home: {{ odb.0.home | default('') }}
+      db_name: {{ odb.0.oracle_db_name | default('') }}"
   when:
     - oracle_databases is defined
+    - oracle_databases | list | length > 0
     - odb.0.state == 'present'
   tags: datapatch
