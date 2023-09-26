@@ -1,0 +1,27 @@
+---
+dependency:
+  name: galaxy
+  enabled: true
+
+driver:
+  name: docker
+platforms:
+  - name: ol
+    image: "quay.io/rendanic/docker-${MOLECULE_DISTRO:-ol8}-ansible:latest"
+    pre_build_image: true
+    # The following 4 lines are needed only for making systemd work
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - /vagrant:/vagrant:ro
+    cgroupns_mode: host
+    privileged: true
+
+verifier:
+  name: ansible
+
+provisioner:
+  name: ansible
+  inventory:
+    links:
+      group_vars: ../shared_config/inventory/group_vars/

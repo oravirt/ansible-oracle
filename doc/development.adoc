@@ -216,6 +216,7 @@ The following szenarios are existing in the `ansible-oracle profect.
 | dbfs | Full stage for installation of RDBMS 19c + Patching and create database. Requires installation media in /vagrant on local host.
 | default | Stage for testing common and orahost roles with different Distributions.
 | download | Download Patches from support.oracle.com for dbfs stage.
+| golden | Create Golden-Image for installation from dbfs.
 |=======================
 
 === Test OS roles
@@ -263,6 +264,18 @@ The execution time is ~2h for a full test.
 ----
 cd extensions
 molecule test -s dbfs
+----
+
+=== Create Golden-Images from `dbfs` installation
+
+IMPORTANT: Make sure that all requirements for scenario `dbfs` are met. +
+Executing a full test with `molicule test -s golden` will destroy an existing installation from `molecule converge -s dbfs`!
+
+
+.Start Golden-Image creation
+----
+cd extensions
+molecule test -s golden
 ----
 
 === Oracle XE (not used at the moment!)
