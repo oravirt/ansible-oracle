@@ -1,0 +1,33 @@
+---
+# We are in gridSetup.sh -applyRU
+# => variable gihome_patches from 'opatch lspatches' must be empty!
+- name: Pre_install_patch | Set empty list of installed patches in preapply mode
+  ansible.builtin.set_fact:
+    gihome_patches: "{{ __gihome_patches }}"
+  vars:
+    __gihome_patches:
+      stdout_lines: []
+
+# This is only used, when prepatching before root.sh is enabled
+# => opatch opatchauto is not working in this situation!
+- name: Pre_install_patch | Patch before configure Grid-Infrastructure/Restart (after software only install)
+  when:
+    - gi_patches[oracle_install_version_gi] is defined
+    - gi_patches[oracle_install_version_gi]['opatchauto'] is defined
+  block:
+    - name: Pre_install_patch | Manage Patch from gi_patches with opatchauto before root.sh
+      ansible.builtin.include_tasks: loop_patchid.yml
+      with_subelements:
+        - "{{ gi_patches[oracle_install_version_gi]['opatchauto'] }}"
+        - subpatches
+      loop_control:
+        loop_var: gip_opatch
+        label: >-
+          patchid: {{ gip_opatch.0.patchid | default('') }}
+          state: {{ gip_opatch.0.state | default('') }}
+      when:
+        - gi_patches[oracle_install_version_gi]['opatchauto'] is defined
+        - gip_opatch.0.state | default('') == 'present'
+      vars:
+        __opatchauto_patchtype: false  # opatch apply in patch_before_rootsh
+        __execute_opatch: false

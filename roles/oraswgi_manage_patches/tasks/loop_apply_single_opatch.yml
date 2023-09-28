@@ -1,0 +1,27 @@
+---
+# loop for GI opatch apply of OneOff Patches
+- name: loop_apply_single_opatch | include_tasks roothas_prepatch.yml
+  ansible.builtin.include_tasks: roothas_prepatch.yml
+
+- name: loop_apply_single_opatch | Manage non opatchauto patches for GI
+  opitzconsulting.ansible_oracle.oracle_opatch:
+    oracle_home: "{{ oracle_home_gi }}"
+    patch_base: "{{ oracle_patch_install }}/{{ oracle_install_version_gi }}/{{ item.path | default(item.patchid) }}/"
+    patch_id: "{{ item.patchid }}"
+    patch_version: "{{ item.patchversion | default(omit) }}"
+    opatchauto: false
+    conflict_check: true
+    ocm_response_file: "{{ _oraswgi_manage_patches_ocm_response_file | default(omit) }}"
+    output: verbose
+    state: "{{ item.state }}"
+  notify: roothas_postpatch
+  vars:
+    __opatchauto_patchtype: false  # opatch apply
+  become: true
+  become_user: "{{ _grid_install_user }}"
+
+- name: loop_apply_single_opatch | Manage non opatchauto patches for GI
+  ansible.builtin.set_fact:
+    _oraswgi_manage_patches_oneoff_removed: true
+  when:
+    - not _oraswgi_manage_patches_oneoff_removed | default(false)

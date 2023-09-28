@@ -19,7 +19,7 @@ Install/Remove Patches from Oracle Database Homes
 
 ## Discovered Tags
 
-**_apply_psu_grid_**
+**_always_**
 
 **_current_opatch_version_**
 
@@ -27,17 +27,9 @@ Install/Remove Patches from Oracle Database Homes
 
 **_ocmconfig_**
 
-**_oragridopatchget_**
-
-**_oragridpatchget_**
-
-**_oragridpatchpush_**
-
 **_oragridpatchunpack_**
 
-**_oragridpsuunpack1_**
-
-**_oragridpsuunpack2_**
+**_oraswdbpsuunpack1_**
 
 
 ## Dependencies
@@ -52,4 +44,6 @@ license (MIT)
 
 ## Author
 
-Mikael Sandström
+- Mikael Sandström
+
+- Thorsten Bruhns

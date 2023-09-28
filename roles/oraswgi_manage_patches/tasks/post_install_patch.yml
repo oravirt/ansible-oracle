@@ -1,0 +1,126 @@
+---
+- name: post_install_patch | Get list of current installed patches
+  ansible.builtin.command: "{{ oracle_home_gi }}/OPatch/opatch lspatches -oh {{ oracle_home_gi }}"
+  become: true
+  become_user: "{{ grid_user }}"
+  changed_when: false
+  register: gihome_patches
+
+- name: post_install_patch | List of current installed patches
+  ansible.builtin.debug:
+    var: gihome_patches.stdout_lines
+
+- name: post_install_patch | Remove opatch apply patches from GI 19c+
+  ansible.builtin.include_tasks: loop_remove_single_opatch.yml
+  with_items:
+    - "{{ gi_patches[oracle_install_version_gi]['opatch'] | selectattr('state', 'match', 'absent') }}"
+  loop_control:
+    loop_var: gip_opatch
+    label: >-
+      patchid: {{ gip_opatch.patchid | default('') }}
+      excludeUPI: {{ gip_opatch.excludeUPI | default('') }}
+      stop_processes: {{ gip_opatch.stop_processes | default('') }}
+  when:
+    - gi_patches is defined
+    - gi_patches[oracle_install_version_gi] is defined
+    - gi_patches[oracle_install_version_gi]['opatch'] is defined
+    - olrloc.stat.exists
+    - gihome_patches.stdout_lines | select('match', gip_opatch.patchid | string) | length > 0
+    - oracle_install_version_gi is version('19', '>=')
+
+# opatch opatchauto rollback needs all subpatch ids from previous installation as list!
+# check for installed patches is done against 1st subpatch
+- name: post_install_patch | Remove opatchauto patches from GI
+  opitzconsulting.ansible_oracle.oracle_opatch:
+    oracle_home: "{{ oracle_home_gi }}"
+    patch_id: "{{ gip_opatch['subpatches'] | join(',') }}"
+    patch_version: "{{ gip_opatch.patchversion | default(omit) }}"
+    opatchauto: true
+    rolling: "{{ gip_opatch.rolling | default(True) }}"
+    conflict_check: true
+    ocm_response_file: "{{ _oraswgi_manage_patches_ocm_response_file | default(omit) }}"
+    output: verbose
+    state: absent
+  with_items:
+    - "{{ gi_patches[oracle_install_version_gi]['opatchauto'] | selectattr('state', 'match', 'absent') }}"
+  loop_control:
+    loop_var: gip_opatch
+    label: >-
+      patchid: {{ gip_opatch.patchid | default('') }}
+      subpatches: {{ gip_opatch['subpatches'] | join(',') | default('') }}
+  become: true
+  become_user: root
+  when:
+    - gi_patches[oracle_install_version_gi] is defined
+    - gi_patches[oracle_install_version_gi]['opatchauto'] is defined
+    - olrloc.stat.exists
+    - gihome_patches.stdout_lines | select('match', gip_opatch.subpatches | first | string) | length > 0
+
+- name: post_install_patch | Manage Patch from gi_patches with opatchauto
+  ansible.builtin.include_tasks: loop_patchid.yml
+  with_subelements:
+    - "{{ gi_patches[oracle_install_version_gi]['opatchauto'] }}"
+    - subpatches
+  loop_control:
+    loop_var: gip_opatch
+    label: >-
+      patchid: {{ gip_opatch.0.patchid | default('') }}
+      state: {{ gip_opatch.0.state | default('') }}
+  when:
+    - gi_patches[oracle_install_version_gi]['opatchauto'] is defined
+    - gip_opatch.0.state | default('') == 'present'
+    - not gihome_patches.stdout_lines | select('match', gip_opatch.1 | string) | length > 0
+  vars:
+    __opatchauto_patchtype: true  # opatch opatchauto
+    __execute_opatch: true
+
+- name: post_install_patch | Manage Patch from gi_patches in stage for opath apply
+  ansible.builtin.include_tasks: loop_patchid.yml
+  with_items:
+    - >-
+      gi_patches[oracle_install_version_gi]['opatch']
+        | select('state', 'match', 'present')
+    - ""  # loop with dummy list due to needed structure for autopatch
+  loop_control:
+    loop_var: gip_opatch
+    label: >-
+      patchid: {{ gip_opatch.0.patchid | default('') }}
+      state: {{ gip_opatch.0.state | default('') }}
+      excludeUPI: {{ gip_opatch.0.excludeUPI | default('') }}
+  when:
+    - gi_patches[oracle_install_version_gi]['opatch'] is defined
+    - gip_opatch.0.state is defined
+    - not gihome_patches.stdout_lines | select('match', gip_opatch.0.patchid | string) | length > 0
+
+# roothas.sh -prepatch and roothas.sh -postpatch are only availible in GI from 18c.
+# It has been added to oraswgi_manage_patches after end of support for 18c and will
+# only tested against 19c+
+- name: post_install_patch | Manage opatch apply patches for GI 19c+
+  ansible.builtin.include_tasks: loop_apply_single_opatch.yml
+  with_items:
+    - "{{ gi_patches[oracle_install_version_gi]['opatch'] | selectattr('state', 'match', 'present') }}"
+  # run_once: "{{ _oraswgi_meta_configure_cluster }}"
+  loop_control:
+    label: >-
+      patchid: {{ item.patchid | default('') }}
+  when:
+    - apply_patches_gi | bool
+    - gi_patches is defined
+    - gi_patches[oracle_install_version_gi] is defined
+    - gi_patches[oracle_install_version_gi]['opatch'] is defined
+    - item.patchid is defined
+    - olrloc.stat.exists
+    - not gihome_patches.stdout_lines | select('match', item.patchid | string) | length > 0
+    - oracle_install_version_gi is version('19', '>=')
+
+- name: post_install_patch | Get new list of current installed patches
+  ansible.builtin.command: "{{ oracle_home_gi }}/OPatch/opatch lspatches -oh {{ oracle_home_gi }}"
+  become: true
+  become_user: "{{ oracle_user }}"
+  changed_when: false
+  register: dbhome_patches
+  when:
+    - _oraswgi_manage_patches_oneoff_removed | default(false)
+
+- name: post_install_patch | Start Cluster Stack
+  ansible.builtin.include_tasks: roothas_postpatch.yml

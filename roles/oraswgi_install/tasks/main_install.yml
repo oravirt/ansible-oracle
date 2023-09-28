@@ -1,0 +1,38 @@
+---
+- name: install_home_gi | Create ORACLE_HOME directory (GI)
+  ansible.builtin.file:
+    dest: "{{ oracle_home_gi }}"
+    owner: "{{ _grid_install_user }}"
+    group: "{{ oracle_group }}"
+    state: directory
+    mode: "0775"
+  become: true
+  tags:
+    - directories
+  when: oracle_home_gi not in checkgiinstall.stdout
+
+- name: Download oracle installfiles to server (GI) (www)
+  ansible.builtin.include_tasks: "{{ www_download_bin }}.yml"  # noqa name[missing]
+  when:
+    - not is_sw_source_local
+    - oracle_sw_copy
+
+- name: install_home_gi | Copy oracle installfiles to server (GI) (local)
+  ansible.builtin.copy:
+    src: "{{ oracle_sw_source_local }}/{{ item.filename }}"
+    dest: "{{ oracle_stage }}"
+    mode: "0775"
+    force: false
+  with_items: "{{ oracle_sw_image_gi | selectattr('version', 'match', oracle_install_version_gi) }}"
+  become: true
+  become_user: "{{ _grid_install_user }}"
+  tags:
+    - oragridsw
+  when:
+    - oracle_home_gi not in checkgiinstall.stdout
+    - is_sw_source_local
+    - oracle_sw_copy
+
+- name: include_tasks {{ oracle_install_version_gi }}
+  ansible.builtin.include_tasks: "{{ oracle_install_version_gi }}.yml"
+  tags: always

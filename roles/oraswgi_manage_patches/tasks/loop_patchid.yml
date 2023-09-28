@@ -1,0 +1,65 @@
+---
+- name: Work on Patch {{ gip_opatch.0.patchid }}
+  ansible.builtin.debug:
+    msg:
+      - >-
+          patchid: {{ gip_opatch.0.patchid }}
+          subpatch: {{ gip_opatch.1 }}
+          state: {{ gip_opatch.0.state }}
+      - >-
+          opatch os user: {{ __opatchauto_patchtype | ternary('root', grid_user) }}
+          opatchauto: {{ __opatchauto_patchtype }}
+      - >-
+          patchsubdir: {{ __oraswdb_manage_patches_patchsubdir | default('') }}
+
+- name: Work on oracle_sw_patches
+  ansible.builtin.include_tasks: loop_stage_patch.yml
+  vars:
+    __sw_patches_filename_creates: "{{ osp_loop.0.creates | default((gip_opatch.0.patchid | string) + '/README.txt') }}"
+    __patch_unarchive_dir: "{{ oracle_patch_stage }}/{{ db_version }}/{{ __patch_upisubdir }}/"
+    __patch_upisubdir: >-
+      {%- if osp_loop.0.unique_patchid is defined -%}
+      upi_{{ osp_loop.0.unique_patchid -}}/{% endif -%}
+  with_items:
+    - "{{ oracle_sw_patches | selectattr('patchid', 'equalto', gip_opatch.0.patchid) }}"
+  loop_control:
+    loop_var: osp_loop
+    label: >-
+      patchid: {{ osp_loop.0.patchid }}
+      filename: {{ osp_loop.0.filename }}
+      unique_patchid: {{ osp_loop.0.unique_patchid | default('') }}
+  when:
+    - apply_patches_db
+    - gip_opatch.0.state == 'present'
+    - not gihome_patches.stdout_lines | select('match', osp_loop.patchid | string) | length > 0
+    # - osp_loop.unique_patchid | default(0) == gip_opatch.excludeUPI | default(0)
+
+
+- name: Info
+  ansible.builtin.debug:
+    msg: Starting opatch apply. This could take some time to complete...
+
+# opatchauto needs root user for execution
+- name: Manage patch with opatch (opatchauto / apply)
+  opitzconsulting.ansible_oracle.oracle_opatch:
+    oracle_home: "{{ oracle_home_gi }}"
+    patch_base: |-
+      {{ oracle_patch_install }}/{{ oracle_install_version_gi }}/
+      {{- gip_opatch.0.path | default(__patch_upisubdir + (gip_opatch.0.patchid | string)) }}/
+    patch_id: "{{ gip_opatch.0.patchid }}"
+    patch_version: "{{ gip_opatch.0.patchversion | default(omit) }}"
+    exclude_upi: "{{ gip_opatch.0.excludeUPI | default(omit) }}"
+    opatchauto: "{{ __opatchauto_patchtype }}"
+    conflict_check: true
+    stop_processes: "{{ gip_opatch.0.stop_processes | default(False) }}"
+    ocm_response_file: "{{ ocm_response_file | default(omit) }}"
+    output: verbose
+    state: "{{ gip_opatch.0.state }}"
+  become: true
+  become_user: "{{ __opatchauto_patchtype | ternary('root', grid_user) }}"
+  vars:
+    __patch_upisubdir: >-
+      {%- if gip_opatch.0.excludeUPI is defined -%}
+      upi_{{ gip_opatch.0.excludeUPI -}}/{% endif -%}
+  when:
+    - __execute_opatch | bool
