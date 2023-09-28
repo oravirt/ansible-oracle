@@ -119,13 +119,30 @@ def get_version(module, msg, oracle_home):
     Returns the DB server version
     '''
 
-    command = '%s/bin/sqlplus -V' % (oracle_home)
-    (rc, stdout, stderr) = module.run_command(command)
-    if rc != 0:
-        msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
-        module.fail_json(msg=msg, changed=False)
+    def loc_exec_command(command):
+        (rc, stdout, stderr) = module.run_command(command)
+        if rc != 0:
+            msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (
+                stdout,
+                stderr,
+                command,
+            )
+            module.fail_json(msg=msg, changed=False)
+        return rc, stdout
+
+    # 18c+ has a simpel way to detect the RDBMS Release
+    # We need this for gridSetup.sh -applyRU, because sqlplus
+    # is not executable at this stage!
+    oscommand = '%s/bin/oraversion' % (oracle_home)
+    if os.path.exists(oscommand):
+        (rc, stdout) = loc_exec_command('%s -baseVersion' % (oscommand))
+        if rc == 0:
+            return stdout[0:4]
     else:
-        return stdout.split(' ')[2][0:4]
+        # Oracle < 18c do not have oraversion command!
+        (rc, stdout) = loc_exec_command('%s/bin/sqlplus -V' % (oracle_home))
+        if rc == 0:
+            return stdout.split(' ')[2][0:4]
 
 
 def get_opatch_version(module, msg, oracle_home):
