@@ -1,0 +1,36 @@
+---
+- name: loop_remove_single_opatch | Get unique_patch_id from installed patch
+  ansible.builtin.command: "{{ oracle_home_gi }}/OPatch/opatch lspatches -oh {{ oracle_home_gi }} -id {{ gip_opatch.patchid }}"
+  become: true
+  become_user: "{{ oracle_user }}"
+  changed_when: false
+  register: gihome_oneoff_res
+
+- name: loop_remove_single_opatch | Remove OneOff Patch
+  when:
+    - gip_opatch.excludeUPI | default(1) != gihome_oneoff_res_upi | int
+  vars:
+    gihome_oneoff_res_upi: >-
+      {{ gihome_oneoff_res.stdout_lines | select('match', 'unique_patch_id:')
+          | first | split(':') | last }}
+  block:
+
+    # Stop Stack when unique_patch_id <> excludeUPI
+    # => Remove of Patch needs stop of Stack
+    - name: loop_remove_single_opatch | Stop Cluster Stack
+      ansible.builtin.include_tasks: roothas_prepatch.yml
+
+    - name: loop_remove_single_opatch | Remove opatch apply patch from GI
+      opitzconsulting.ansible_oracle.oracle_opatch:
+        oracle_home: "{{ oracle_home_gi }}"
+        patch_base: "{{ oracle_patch_install }}/{{ oracle_install_version_gi }}/{{ gip_opatch.path | default(gip_opatch.patchid) }}/"
+        patch_id: "{{ gip_opatch.patchid }}"
+        patch_version: "{{ gip_opatch.patchversion | default(omit) }}"
+        opatchauto: false
+        rolling: "{{ gip_opatch.rolling | default(True) }}"
+        conflict_check: true
+        ocm_response_file: "{{ _oraswgi_manage_patches_ocm_response_file | default(omit) }}"
+        output: verbose
+        state: "{{ gip_opatch.state }}"
+      become: true
+      become_user: "{{ oracle_user }}"

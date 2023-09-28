@@ -22,12 +22,17 @@
     path: /etc/oracle/olr.loc
   register: olrloc
 
+- name: install_home_gi | State of current installation
+  ansible.builtin.debug:
+    msg: "GI/Restart installed? {{ olrloc.stat.exists }}"
+
 - name: Assert inventory
   when:
     - not olrloc.stat.exists
   block:
     - name: assert oracle_asm_init_dg in asm_diskgroups
       ansible.builtin.assert:
+        quiet: true
         that:
           - oracle_asm_init_dg is defined
           - _oraswgi_install_init_dg_exists
@@ -65,45 +70,14 @@
     group: "{{ oracle_group }}"
     state: directory
   become: true
-  with_items: "{{ oracle_sw_image_gi }}"
-  when: oracle_install_version_gi == item.version
+  with_items: "{{ oracle_sw_image_gi | selectattr('version', 'match', oracle_install_version_gi) }}"
   tags:
     - directories
 
-- name: install_home_gi | Create ORACLE_HOME directory (GI)
-  ansible.builtin.file:
-    dest: "{{ oracle_home_gi }}"
-    owner: "{{ _grid_install_user }}"
-    group: "{{ oracle_group }}"
-    state: directory
-    mode: "0775"
-  become: true
-  tags:
-    - directories
-  when: oracle_home_gi not in checkgiinstall.stdout
-
-- ansible.builtin.include_tasks: "{{ www_download_bin }}.yml"  # noqa name[missing]
-  when: not is_sw_source_local and oracle_sw_copy
-
-- name: install_home_gi | Copy oracle installfiles to server (GI) (local)
-  ansible.builtin.copy:
-    src: "{{ oracle_sw_source_local }}/{{ item.filename }}"
-    dest: "{{ oracle_stage }}"
-    mode: "0775"
-    force: false
-  with_items: "{{ oracle_sw_image_gi }}"
-  become: true
-  become_user: "{{ _grid_install_user }}"
-  tags:
-    - oragridsw
+- name: install_home_gi | Install Grid Infrastructure/Restart include main_install
+  ansible.builtin.include_tasks: main_install.yml
   when:
-    - oracle_home_gi not in checkgiinstall.stdout
-    - is_sw_source_local and oracle_install_version_gi == item.version
-    - oracle_sw_copy
-
-- name: include_tasks {{ oracle_install_version_gi }}
-  ansible.builtin.include_tasks: "{{ oracle_install_version_gi }}.yml"
-  tags: always
+    - not olrloc.stat.exists
 
 - name: include_tasks asmcmd_dsset.yml
   ansible.builtin.include_tasks: asmcmd_dsset.yml

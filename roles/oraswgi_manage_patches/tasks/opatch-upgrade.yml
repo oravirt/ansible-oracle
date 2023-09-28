@@ -1,18 +1,25 @@
 ---
-- name: gi_opatch | Check current opatch version
+- name: Opatch-upgrade | Check current opatch version
   opitzconsulting.ansible_oracle.oracle_opatch:
     oracle_home: "{{ oracle_home_gi }}"
     state: opatchversion
   register: current_opatch_version
   tags: current_opatch_version
   when: gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined
+  become: true
 
-- ansible.builtin.debug:  # noqa name[missing]
-    var: current_opatch_version.msg
+- name: Opatch-upgrade | Info
+  ansible.builtin.debug:  # noqa name[missing]
+    msg:
+      - "current: {{ current_opatch_version.msg }}"
+      - "needed:  {{ gi_patches[oracle_install_version_gi]['opatch_minversion'] }}"
   tags: current_opatch_version
-  when: gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined
+  when:
+    - gi_patches is defined
+    - gi_patches[oracle_install_version_gi] is defined
+    - gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined
 
-- name: gi_opatch | Extract OPatch to GI Home
+- name: Opatch-upgrade | Extract OPatch to GI Home
   ansible.builtin.unarchive:
     src: "{{ oracle_stage }}/{{ item.filename }}"
     dest: "{{ oracle_home_gi }}"
@@ -20,10 +27,9 @@
     owner: "{{ _grid_install_user }}"
     group: "{{ oracle_group }}"
   become: true
-  with_items: "{{ oracle_opatch_patch }}"
+  with_items: "{{ oracle_opatch_patch | selectattr('version', 'match', oracle_install_version_gi) }}"
   when:
     - apply_patches_gi
-    - item.version == oracle_install_version_gi
     - oracle_sw_copy
     - gi_patches is defined
     - gi_patches[oracle_install_version_gi] is defined
@@ -32,7 +38,7 @@
   tags:
     - oragridpatchunpack
 
-- name: gi_opatch | Extract OPatch to GI Home (from remote location)
+- name: Opatch-upgrade | Extract OPatch to GI Home (from remote location)
   ansible.builtin.unarchive:
     src: "{{ oracle_stage_remote }}/{{ item.filename }}"
     dest: "{{ oracle_home_gi }}"
@@ -40,7 +46,7 @@
     owner: "{{ _grid_install_user }}"
     group: "{{ oracle_group }}"
   become: true
-  with_items: "{{ oracle_opatch_patch }}"
+  with_items: "{{ oracle_opatch_patch | selectattr('version', 'match', oracle_install_version_gi) }}"
   when:
     - apply_patches_gi
     - item.version == oracle_install_version_gi
@@ -52,7 +58,7 @@
   tags:
     - oragridpatchunpack
 
-- name: gi_opatch | Check current opatch version
+- name: Opatch-upgrade | Check current opatch version
   opitzconsulting.ansible_oracle.oracle_opatch:
     oracle_home: "{{ oracle_home_gi }}"
     state: opatchversion
@@ -62,8 +68,11 @@
     - gi_patches is defined
     - gi_patches[oracle_install_version_gi] is defined
     - gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined
+  become: true
+  become_user: "{{ _grid_install_user }}"
 
-- ansible.builtin.debug:  # noqa name[missing] no-handler
+- name: Opatch-upgrade | Info
+  ansible.builtin.debug:
     var: current_opatch_version.msg
   tags: current_opatch_version
-  when: current_opatch_version.changed
+  when: current_opatch_version.changed  # noqa: no-handler
