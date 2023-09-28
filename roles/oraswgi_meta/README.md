@@ -123,8 +123,7 @@ gi_patches_config:
 
 ### patch_before_rootsh
 
-Patch Grid-Infrastructure during installation befor executing
-root.sh
+Patch Grid-Infrastructure during gridSetup.sh
 
 #### Default value
 
