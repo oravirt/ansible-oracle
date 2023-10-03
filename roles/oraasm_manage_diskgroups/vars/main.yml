@@ -1,21 +1,34 @@
 ---
-# @var _oraasm_manage_diskgroups_asmdevice_list: $ "internal use only"
-_oraasm_manage_diskgroups_asmdevice_list: "{% if device_persistence | lower == 'asmlib' %}\
-                   {%- for disk in item.disk -%}{{ oracle_asm_disk_prefix }}{{ disk.asmlabel | upper }}\
-                     {%- if not loop.last -%},{%- endif -%}\
-                   {%- endfor %}\
-                 {%- elif device_persistence | lower == 'asmfd' %}\
-                   {%- for disk in item.disk -%}AFD:{{ disk.asmlabel | upper }}\
-                     {%- if not loop.last -%},{%- endif -%}\
-                   {%- endfor %}\
-                 {%- elif device_persistence | lower == 'udev' %}\
-                   {%- for disk in item.disk -%}{{ oracle_asm_disk_prefix }}{{ disk.asmlabel }}\
-                     {%- if not loop.last -%},{%- endif -%}\
-                   {%- endfor %}\
-                 {%- endif %}"
+_oraasm_manage_diskgroups_asmdevice_list: |-
+  {% if device_persistence == 'asmlib' %}
+  {%- for disk in ad_loop.disk %}{{ _oracle_asm_disk_prefix }}{{ disk.asmlabel | upper }}
+  {%- if not loop.last -%},{%- endif %}
+  {%- endfor %}
+  {%- elif device_persistence == 'asmfd' %}
+  {%- for disk in ad_loop.disk -%}AFD:{{ disk.asmlabel | upper }}
+  {%- if not loop.last -%},{%- endif -%}
+  {%- endfor %}
+  {%- elif device_persistence == 'udev' %}
+  {%- for disk in ad_loop.disk -%}{{ _oracle_asm_disk_prefix }}{{ disk.asmlabel }}
+  {%- if not loop.last -%},{%- endif -%}
+  {%- endfor %}
+  {%- endif %}
 
-# @var _oraasm_manage_diskgroups_attr_name: $ "internal use only"
-_oraasm_manage_diskgroups_attr_name: "{% if item.attributes is defined %}{{ item.attributes | default(omit) | map(attribute='name') | list }}{% else %}None{% endif %}"
+_oraasm_manage_diskgroups_attr_name: |-
+  {% if ad_loop.attributes is defined %}
+  {{- ad_loop.attributes | default(omit) | map(attribute='name') | list }}
+  {%- else %}None{% endif %}
 
-# @var _oraasm_manage_diskgroups_attr_value: $ "internal use only"
-_oraasm_manage_diskgroups_attr_value: "{% if item.attributes is defined %}{{ item.attributes | default(omit) | map(attribute='value') | list }}{% else %}None{% endif %}"
+_oraasm_manage_diskgroups_attr_value: |-
+  {% if ad_loop.attributes is defined %}
+  {{- ad_loop.attributes | default(omit) | map(attribute='value') | list }}
+  {%- else %}None{% endif %}
+
+_oracle_asm_disk_prefix: |-
+  {%- if device_persistence == 'asmlib' %}
+  {%- if oracle_asm_disk_string.endswith('*') %}{{ oracle_asm_disk_string[:-1] }}
+  {%- else %}{{ oracle_asm_disk_string }}
+  {%- endif %}
+  {%- elif device_persistence == 'udev' %}{{ oracle_asm_disk_string }}
+  {%- else %}
+  {%- endif %}

@@ -1,21 +1,26 @@
 ---
-# @todo bug: missing loop_control
-
-- name: oraasm_manage_diskgroups | Manage diskgroups
+- name: Manage diskgroups
   opitzconsulting.ansible_oracle.oracle_asmdg:
     un: sys
     pw: "{{ sysasmpassword }}"
     sn: +ASM
     host: "{{ oracle_hostname }}"
     oh: "{{ oracle_home_gi }}"
-    name: "{{ item.diskgroup }}"
+    name: "{{ ad_loop.diskgroup }}"
     disks: "{{ _oraasm_manage_diskgroups_asmdevice_list }}"
-    redundancy: "{{ item.redundancy | default(omit) }}"
+    redundancy: "{{ ad_loop.properties | map(attribute='redundancy') | first | default(omit) }}"
     attribute_name: "{{ _oraasm_manage_diskgroups_attr_name | default(omit) }}"
     attribute_value: "{{ _oraasm_manage_diskgroups_attr_value | default(omit) }}"
-    state: "{{ item.state }}"
+    state: "{{ ad_loop.state }}"
   environment: "{{ _grid_env }}"
   run_once: "{{ _oraswgi_meta_configure_cluster }}"
+  become: true
   become_user: "{{ _grid_install_user }}"
   with_items: "{{ asm_diskgroups }}"
+  loop_control:
+    loop_var: ad_loop
+    label: >-
+      diskgroup: {{ ad_loop.diskgroup | default('') }}
+      redundancy: {{ ad_loop.properties | map(attribute='redundancy') | first | default('') }}
+      state: {{ ad_loop.state | default('') }}
   tags: diskgroup
