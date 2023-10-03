@@ -10,12 +10,7 @@ Do not set them in inventory!
 ## Table of content
 
 - [Requirements](#requirements)
-- [Default Variables](#default-variables)
-  - [_oraasm_manage_diskgroups_asmdevice_list](#_oraasm_manage_diskgroups_asmdevice_list)
-  - [_oraasm_manage_diskgroups_attr_name](#_oraasm_manage_diskgroups_attr_name)
-  - [_oraasm_manage_diskgroups_attr_value](#_oraasm_manage_diskgroups_attr_value)
 - [Discovered Tags](#discovered-tags)
-- [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
 - [License](#license)
 - [Author](#author)
@@ -27,39 +22,10 @@ Do not set them in inventory!
 - Minimum Ansible version: `2.9.0`
 
 
-## Default Variables
-
-### _oraasm_manage_diskgroups_asmdevice_list
-
-#### Default value
-
-```YAML
-_oraasm_manage_diskgroups_asmdevice_list: internal use only
-```
-
-### _oraasm_manage_diskgroups_attr_name
-
-#### Default value
-
-```YAML
-_oraasm_manage_diskgroups_attr_name: internal use only
-```
-
-### _oraasm_manage_diskgroups_attr_value
-
-#### Default value
-
-```YAML
-_oraasm_manage_diskgroups_attr_value: internal use only
-```
-
 ## Discovered Tags
 
 **_diskgroup_**
 
-## Open Tasks
-
-- (bug): missing loop_control
 
 ## Dependencies
 
