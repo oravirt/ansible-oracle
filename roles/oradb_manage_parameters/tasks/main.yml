@@ -24,6 +24,7 @@
     - oracle_databases is defined
     - odb.0.state == 'present'
     - odb.1 is defined
+  become: true
   become_user: "{{ oracle_user }}"
   loop_control:
     loop_var: odb
@@ -63,6 +64,7 @@
     - oracle_pdbs is defined
     - opdb.0.state == 'present'
     - opdb.1 is defined
+  become: true
   become_user: "{{ oracle_user }}"
   loop_control:
     loop_var: opdb
@@ -100,6 +102,7 @@
     label: >-
       dbname: {{ odb.0.oracle_db_name | d('') }}
       - {{ param_change_reboot.msg | default('restart_spparameter_changed is false') }}"
+  become: true
   become_user: "{{ oracle_user }}"
   register: param_change_reboot
   tags: spfile_bounce

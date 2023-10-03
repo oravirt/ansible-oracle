@@ -8,6 +8,7 @@
     scope: pdbs
     pdb_list: "CDB$ROOT PDB$SEED"
   become_user: "{{ oracle_user }}"
+  become: true
 
 - name: oradb_tzupgrade | Upgrade timezone for CDB$ROOT and PDB$SEED
   opitzconsulting.ansible_oracle.oracle_sqldba:
@@ -18,6 +19,7 @@
     scope: pdbs
     pdb_list: "CDB$ROOT PDB$SEED"
   become_user: "{{ oracle_user }}"
+  become: true
 
 - name: oradb_tzupgrade | Get all open PDBs
   opitzconsulting.ansible_oracle.oracle_sqldba:
@@ -28,6 +30,7 @@
     oracle_home: "{{ _oracle_home_db }}"
     oracle_db_name: "{{ _oracle_db_instance_name }}"
   become_user: "{{ oracle_user }}"
+  become: true
   register: pdbs_info
 
 - name: oradb_tzupgrade | Set facts for pdbs_info
@@ -51,6 +54,7 @@
         pdb_list: "{{ _oradb_tzupgrade_candidate_pdbs }}"
         oracle_db_name: "{{ _oracle_db_instance_name }}"
       become_user: "{{ oracle_user }}"
+      become: true
 
     - name: oradb_tzupgrade | Upgrade timezone for the candidate PDBs
       opitzconsulting.ansible_oracle.oracle_sqldba:
@@ -61,6 +65,7 @@
         pdb_list: "{{ _oradb_tzupgrade_candidate_pdbs }}"
         oracle_db_name: "{{ _oracle_db_instance_name }}"
       become_user: "{{ oracle_user }}"
+      become: true
 
 - name: oradb_tzupgrade | Get post upgrade timezone status info
   opitzconsulting.ansible_oracle.oracle_sqldba:
@@ -82,6 +87,7 @@
     oracle_home: "{{ _oracle_home_db }}"
     oracle_db_name: "{{ _oracle_db_instance_name }}"
   become_user: "{{ oracle_user }}"
+  become: true
   changed_when: false
   register: post_status_info
 

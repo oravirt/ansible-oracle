@@ -3,6 +3,7 @@
   ansible.builtin.shell: "export PATH=${ORACLE_HOME}/bin:${PATH}; lsnrctl start {{ lsnrinst.listener_name }} /dev/null; exit 0"
   # noqa no-changed-when
   environment: "{{ oracle_env_lsnrctl }}"
+  become: true
   become_user: "{{ oracle_user }}"
   with_items: "{{ listener_installed }}"
   loop_control:
@@ -22,6 +23,7 @@
     db_unique_name: "{{ odb.oracle_db_unique_name | default(omit) }}"
     sid: "{{ odb.oracle_db_instance_name | default(omit) }}"
     state: started
+  become: true
   become_user: "{{ oracle_user }}"
   with_items: "{{ oracle_databases | selectattr('state', 'match', 'present') }}"
   loop_control:

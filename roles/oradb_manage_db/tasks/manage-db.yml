@@ -149,6 +149,7 @@
     output: verbose
     state: "{{ odb.state }}"
   run_once: "{{ _oraswgi_meta_configure_cluster }}"
+  become: true
   become_user: "{{ oracle_user }}"
   when: odb.state == 'absent'
   register: dbca_remove

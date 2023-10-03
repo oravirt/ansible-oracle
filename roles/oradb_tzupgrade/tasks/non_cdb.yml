@@ -5,6 +5,7 @@
     creates_sql: "{{ _oradb_tzupgrade_tz_check_query }}"
     oracle_home: "{{ _oracle_home_db }}"
     oracle_db_name: "{{ _oracle_db_instance_name }}"
+  become: true
   become_user: "{{ oracle_user }}"
 
 - name: oradb_tzupgrade | Apply the timezone upgrade for the non-CDB database
@@ -13,6 +14,7 @@
     creates_sql: "{{ _oradb_tzupgrade_tz_check_query }}"
     oracle_home: "{{ _oracle_home_db }}"
     oracle_db_name: "{{ _oracle_db_instance_name }}"
+  become: true
   become_user: "{{ oracle_user }}"
 
 - name: oradb_tzupgrade | Get post upgrade timezone status info
@@ -28,6 +30,7 @@
         FROM database_properties WHERE property_name LIKE 'DST_PRIMARY_TT_VERSION';
     oracle_home: "{{ _oracle_home_db }}"
     oracle_db_name: "{{ _oracle_db_instance_name }}"
+  become: true
   become_user: "{{ oracle_user }}"
   changed_when: false
   register: post_status_info
