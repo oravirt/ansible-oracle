@@ -422,7 +422,9 @@
     path: /etc/sysconfig/network
     regexp: "^NOZEROCONF="
     line: "NOZEROCONF=yes"
-  when: netnozeroconf | default(true) | bool
+  when:
+    - netnozeroconf | default(true) | bool
+    - ansible_os_family == 'RedHat'
   tags: nozeroconf
 
 - name: Network | Setup ip-address for RAC Interconnect
