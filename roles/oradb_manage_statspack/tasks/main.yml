@@ -262,6 +262,9 @@
         - opdb.0.state == 'present'
         - opdb.0.statspack is defined
         - opdb.0.statspack.state == 'present'
+        - >-
+          oracle_databases | selectattr('oracle_db_name', 'match', opdb.0.cdb)
+          | map(attribute='state') | list | first == 'present'
 
     - name: Output
       ansible.builtin.debug:
@@ -305,6 +308,9 @@
     - opdb.0.state == 'present'
     - opdb.0.statspack is defined
     - opdb.0.statspack.state == 'present'
+    - >-
+      oracle_databases | selectattr('oracle_db_name', 'match', opdb.0.cdb)
+      | map(attribute='state') | list | first == 'present'
   become: true
   become_user: "{{ oracle_user }}"
   tags:
@@ -341,6 +347,9 @@
     - opdb.0.state == 'present'
     - opdb.0.statspack is defined
     - opdb.0.statspack.state == 'present'
+    - >-
+      oracle_databases | selectattr('oracle_db_name', 'match', opdb.0.cdb)
+      | map(attribute='state') | list | first == 'present'
   become: true
   become_user: "{{ oracle_user }}"
   tags:
