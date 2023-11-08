@@ -551,3 +551,42 @@ releases:
     - playbooks.yml
     - shellcheck.yml
     release_date: '2023-09-24'
+  4.1.0:
+    changes:
+      breaking_changes:
+      - 'oraswdb_golen_image: New variable oraswdb_golen_image_create: false (oravirt#383)'
+      - 'oraswgi_golen_image: New variable oraswgi_golen_image_create: false (oravirt#383)'
+      bugfixes:
+      - Bugfix for state=absent in oracle_databases with CDB (oravirt#383)
+      - 'molecule: Use shared inventory with download scenario (oravirt#383)'
+      - 'oracle_opatch: fix wrong rolling parameter definition, fix broken opatch
+        opatchauto rollback (oravirt#383)'
+      - 'oradb_datapatch: allow execution of role with empty oracle_databases and
+        oracle_pdbs (oravirt#383)'
+      - 'oradb_manage_db: Regather oradb_facts after database change (oravirt#383)'
+      - 'oradb_manage_statspack: Bugfix for nonCDB setups (oravirt#383)'
+      - 'orahost: Do not set NOZEROCONF on SuSE platform (oravirt#383)'
+      minor_changes:
+      - ansible-lint V6.20.3 (oravirt#383)
+      - 'molecule: new stage download to prepare dbfs stage (oravirt#383)'
+      - 'molecule: new stage golden to create golden images (oravirt#383)'
+      - 'oiraswgi: Added Support for gridSetup.sh -applyRU for 19c and 21c (oravirt#383)'
+      - 'oraasm_manage_diskgroups: Refactoring and bugfixes for 4.0 (oravirt#383)'
+      - 'oracle_opatch: replace sqlplus -V with oraversion for newer releases (oravirt#383)'
+      - 'oraswdb_golen_image: Rename created archive to fixed name (oravirt#383)'
+      - 'oraswgi_golen_image: Rename created archive to fixed name (oravirt#383)'
+      release_summary: This is a BETA Release of ansible-oracle. Do not use it in
+        production environments!
+    fragments:
+    - ansible-lint.yml
+    - assert.yml
+    - diskgroup.yml
+    - golden.yml
+    - manage_db.yml
+    - molecule1.yml
+    - nozeroconf.yml
+    - oracle_opatch.yml
+    - oraswgi.yml
+    - release_410.yml
+    - statspack.yml
+    release_date: '2023-11-08'
