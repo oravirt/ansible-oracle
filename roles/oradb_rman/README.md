@@ -32,7 +32,7 @@ All other role variables from `oradb_rman` are deprecated and will be removed in
 
 ## Requirements
 
-- Minimum Ansible version: `2.9.0`
+- Minimum Ansible version: `2.14.0`
 
 
 ## Default Variables

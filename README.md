@@ -12,7 +12,7 @@ configured RAC Cluster.
 
 ## Pre-requisites
 
-* Ansible >= 2.9
+* Ansible >= 2.14
 
   2.12 is recommended
 * Oracle Linux (or any RHEL-based Linux System) >= 7

@@ -32,7 +32,7 @@ There are a lot of variables who are used by `orasw_meta`
 
 ## Requirements
 
-- Minimum Ansible version: `2.9.0`
+- Minimum Ansible version: `2.14.0`
 
 
 ## Default Variables
