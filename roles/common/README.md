@@ -10,6 +10,7 @@ sets up the host generic stuff
   - [common_packages_el6](#common_packages_el6)
   - [common_packages_el7](#common_packages_el7)
   - [common_packages_el8](#common_packages_el8)
+  - [common_packages_el9](#common_packages_el9)
   - [common_packages_sles](#common_packages_sles)
   - [configure_epel_repo](#configure_epel_repo)
   - [configure_motd](#configure_motd)
@@ -18,6 +19,7 @@ sets up the host generic stuff
   - [epel6_rpm](#epel6_rpm)
   - [epel7_rpm](#epel7_rpm)
   - [epel8_rpm](#epel8_rpm)
+  - [epel9_rpm](#epel9_rpm)
   - [install_os_packages](#install_os_packages)
   - [motd_template](#motd_template)
   - [ntp_type](#ntp_type)
@@ -202,6 +204,59 @@ common_packages_el8:
   - python3-pip
 ```
 
+### common_packages_el9
+
+#### Default value
+
+```YAML
+common_packages_el9:
+  - screen
+  - facter
+  - lsof
+  - nc
+  - rlwrap
+  - expect
+  - git
+  - lvm2
+  - xfsprogs
+  - autofs
+  - parted
+  - mlocate
+  - lvm2
+  - python3
+  - python3-pip
+  - bind-utils
+  - binutils
+  - ethtool
+  - glibc
+  - glibc-devel
+  - initscripts
+  - ksh
+  - libaio
+  - libaio-devel
+  - libgcc
+  - libnsl
+  - libstdc++
+  - libstdc++-devel
+  - make
+  - module-init-tools
+  - net-tools
+  - nfs-utils
+  - openssh-clients
+  - pam
+  - policycoreutils
+  - policycoreutils-python-utils
+  - procps
+  - psmisc
+  - smartmontools
+  - sysstat
+  - tar
+  - unzip
+  - util-linux-ng
+  - xorg-x11-utils
+  - xorg-x11-xauth
+```
+
 ### common_packages_sles
 
 List of RPMs for SuSE Linux Enterprise Server
@@ -290,6 +345,16 @@ Url for epel-release-latest-8.noarch.rpm
 
 ```YAML
 epel8_rpm: https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+```
+
+### epel9_rpm
+
+Url for epel-release-latest-8.noarch.rpm
+
+#### Default value
+
+```YAML
+epel9_rpm: oracle-epel-release-el9
 ```
 
 ### install_os_packages

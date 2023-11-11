@@ -1,5 +1,9 @@
 # Lab playbook - sets up the host specific shit
 ---
+# @var epel9_rpm:description: Url for epel-release-latest-8.noarch.rpm
+# epel9_rpm: https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+epel9_rpm: oracle-epel-release-el9
+
 # @var epel8_rpm:description: Url for epel-release-latest-8.noarch.rpm
 epel8_rpm: https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
 
@@ -45,6 +49,7 @@ ntp_type: "{% if ansible_distribution_major_version | int >= 8 %}chrony\
 common_packages: "{% if ansible_distribution_major_version | int == 6 %}{{ common_packages_el6 }}\
                   {%- elif ansible_distribution_major_version | int == 7 %}{{ common_packages_el7 }}\
                   {%- elif ansible_distribution_major_version | int == 8 %}{{ common_packages_el8 }}\
+                  {%- elif ansible_distribution_major_version | int == 9 %}{{ common_packages_el9 }}\
                   {%- else %}None\
                   {%- endif %}"
 
@@ -184,6 +189,55 @@ common_packages_el8:
   - psmisc
   - python3
   - python3-pip
+
+# @var common_packages_el8:description: >
+# List of RPMs for RHEL8 or OL8
+common_packages_el9:
+  - screen
+  - facter
+  - lsof
+  - nc
+  - rlwrap
+  - expect
+  - git
+  - lvm2
+  - xfsprogs
+  - autofs
+  - parted
+  - mlocate
+  - lvm2
+  - python3
+  - python3-pip
+  - bind-utils
+  - binutils
+  - ethtool
+  - glibc
+  - glibc-devel
+  - initscripts
+  - ksh
+  - libaio
+  - libaio-devel
+  - libgcc
+  - libnsl
+  - libstdc++
+  - libstdc++-devel
+  - make
+  - module-init-tools
+  - net-tools
+  - nfs-utils
+  - openssh-clients
+  - pam
+  - policycoreutils
+  - policycoreutils-python-utils
+  - procps
+  - psmisc
+  - smartmontools
+  - sysstat
+  - tar
+  - unzip
+  - util-linux-ng
+  - xorg-x11-utils
+  - xorg-x11-xauth
 
 # @var common_packages_sles:description: >
 # List of RPMs for SuSE Linux Enterprise Server

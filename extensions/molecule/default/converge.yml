@@ -4,6 +4,12 @@
   gather_facts: true
   any_errors_fatal: true
   tasks:
+    # install missing cron on rhel9 container
+    - name: Install cron on RHEL/OL9
+      ansible.builtin.package:
+        name: cronie
+      when: ansible_distribution_major_version | int == 9
+
     - name: "Import common"
       ansible.builtin.import_role:
         name: opitzconsulting.ansible_oracle.common
