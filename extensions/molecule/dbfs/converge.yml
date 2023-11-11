@@ -1,4 +1,15 @@
 ---
+- name: Converge
+  hosts: all
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+    # install missing cron on rhel9 container
+    - name: Install cron on RHEL/OL9
+      ansible.builtin.package:
+        name: cronie
+      when: ansible_distribution_major_version | int == 9
+
 - name: Converge os
   ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.os
 
