@@ -3,7 +3,7 @@ FROM docker.io/library/python:3.10-slim-buster
 ARG ansible_version
 ARG ansible_lint_version
 
-ENV ansible_version=5.8.0
+ENV ansible_version=8.6.1
 ENV ansible_lint_version=6.6.1
 
 ENV LC_ALL=C.UTF-8

@@ -1,10 +1,13 @@
 ---
 # @tag assert_ansible:description: Assert version of Ansible Core
-- name: assert ansible version
+- name: Assert ansible version
   ansible.builtin.assert:
     quiet: true
     that:
-      - "ansible_version.full is version('2.9', '>=')"
+      - "ansible_version.full is version('{{ _ao_ansible_executable_min_version }}', '>=')"
+    fail_msg: "Found version {{ ansible_version.full }} expected {{ _ao_ansible_executable_min_version }} or newer"
+  vars:
+    _ao_ansible_executable_min_version: 2.14
   tags:
     - always
     - assert_ansible

@@ -38,7 +38,7 @@ This role has a dependency to `orahost_meta` and `orasw_meta` for default parame
 
 ## Requirements
 
-- Minimum Ansible version: `2.9.0`
+- Minimum Ansible version: `2.14.0`
 
 
 ## Default Variables

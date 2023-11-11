@@ -14,7 +14,7 @@ Manage grants for users in Oracle Databases
 
 ## Requirements
 
-- Minimum Ansible version: `2.9.0`
+- Minimum Ansible version: `2.14.0`
 
 
 ## Discovered Tags
