@@ -11,22 +11,23 @@ oracle_sw_source_local: /vagrant
 apply_patches_db: true
 
 oracle_sw_patches:
-  - filename: p35320081_190000_Linux-x86-64.zip
-    patchid: 35320081
+  - filename: p35643107_190000_Linux-x86-64.zip
+    patchid: 35643107
     version: 19.3.0.0
-    description: Database Release Update 19.20.0.0.230718
-  - filename: p35354406_190000_Linux-x86-64.zip
-    patchid: 35354406
+    description: Database Release Update 19.21.0.0.231017
+  - filename: p35648110_190000_Linux-x86-64.zip
+    patchid: 35648110
     version: 19.3.0.0
-    description: OJVM RELEASE UPDATE 19.20.0.0.0
+    description: OJVM RELEASE UPDATE 19.21.0.0
     creates: 35354406/README.txt
-  - filename: p35512813_1920000DBRU_Generic.zip
-    patchid: 35512813
+  - filename: p35787077_1921000DBRU_Generic.zip
+    patchid: 35787077
+    unique_patchid: 25410019
     version: 19.3.0.0
-    description: DATAPUMP BUNDLE PATCH 19.20.0.0.0
-  - filename: p29213893_1920000DBRU_Generic.zip
+    description: DATAPUMP BUNDLE PATCH 19.21.0.0.0
+  - filename: p29213893_1921000DBRU_Generic.zip
     patchid: 29213893
-    unique_patchid: 25224952
+    unique_patchid: 25362849
     version: 19.3.0.0
     description: "DBMS_STATS FAILING WITH ERROR ORA-01422"
 
@@ -45,28 +46,29 @@ db_homes_config:
     oracle_home: /u01/app/oracle/product/19/db19-si-ee
     edition: EE
     opatch_minversion: 12.2.0.1.36
-    # imagename: db_home_19.15.zip
+    # imagename: db_home_19_ol9.21.zip
     opatch:
-      - {patchid: 29213893, state: absent, excludeUPI: 25224952, stop_processes: true}  # 19.3
-      - {patchid: 29213893, state: absent, excludeUPI: 24722761, stop_processes: true}  # 19.15
-      - patchid: 35320081
-        # Database Release Update 19.20.0.0.230718
-        patchversion: 19.20.0.0.230718
+      # - {patchid: 29213893, state: absent, excludeUPI: 25224952, stop_processes: true}  # 19.3
+      # - {patchid: 29213893, state: absent, excludeUPI: 24722761, stop_processes: true}  # 19.15
+      - patchid: 35643107
+        # Database Release Update 19.21.0.0.231017
+        patchversion: 19.21.0.0.231017
         stop_processes: true
         state: present
-      - patchid: 35354406
-        # Oracle JavaVM Component Release Update (OJVM RU) 19.20.0.0.230718
+      - patchid: 35648110
+        # Oracle JavaVM Component Release Update (OJVM RU) 19.21.0.0.0.0.231017
         stop_processes: true
         state: present
-      - patchid: 35512813
-        # DATAPUMP BUNDLE PATCH 19.20.0.0.0
+      - patchid: 35787077
+        # DATAPUMP BUNDLE PATCH 19.21.0.0.0
         stop_processes: false
         state: present
+        excludeUPI: 25410019
       - patchid: 29213893
         # DBMS_STATS FAILING WITH ERROR ORA-01422"
         stop_processes: true
         state: present
-        excludeUPI: 25224952
+        excludeUPI: 25362849
 
 oracle_listeners_config:
   LISTENER:
