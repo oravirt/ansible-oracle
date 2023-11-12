@@ -12,6 +12,20 @@
           - oracle_sw_source_local is defined
         quiet: true
 
+    - name: Check attributes in oracle_sw_patches
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - osp.filename is defined
+          - osp.patchid is defined
+          - osp.version is defined
+          - osp.description is defined
+      with_items:
+        - "{{ oracle_sw_patches }}"
+      loop_control:
+        loop_var: osp
+        label: "{{ osp.filename | default('') }}"
+
     - name: Ensure destination directory exists
       ansible.builtin.file:
         path: "{{ oracle_patch_download_dir }}"
