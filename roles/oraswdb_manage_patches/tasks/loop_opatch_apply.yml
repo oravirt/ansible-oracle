@@ -3,7 +3,7 @@
 # See main.yml for loop decriptions
 #
 
-- name: State data for loop_opatch_apply.yml
+- name: loop_opatch_apply | State data for loop_opatch_apply.yml
   ansible.builtin.debug:
     msg:
       - >-
@@ -17,7 +17,7 @@
           creates: {{ __sw_patches_filename_creates }}
           patch_unarchive_dir: {{ __patch_unarchive_dir }}
 
-- name: Become User to oracle
+- name: loop_opatch_apply | Become User to oracle
   become: true
   become_user: "{{ oracle_user }}"
   block:
@@ -27,14 +27,14 @@
         - dhc_opatch.state == 'present'
       block:
 
-        - name: db_opatch | Check for unarchived patch archive
+        - name: loop_opatch_apply | Check for unarchived patch archive
           ansible.builtin.stat:
             path: "{{ __patch_unarchive_dir }}/{{ __sw_patches_filename_creates }}"
           register: checkpatcharchiveres
           vars:
             __sw_patches_filename_creates: "{{ osp_loop.creates | default((dhc_opatch.patchid | string) + '/README.txt') }}"
 
-        - name: db_opatch | Copy oracle DB patch (opatch) to server (local)
+        - name: loop_opatch_apply | Copy oracle DB patch (opatch) to server (local)
           ansible.builtin.copy:
             src: "{{ oracle_sw_source_local }}/{{ osp_loop.filename }}"
             dest: "{{ oracle_stage }}/{{ osp_loop.filename }}"
@@ -44,7 +44,7 @@
             - is_sw_source_local | bool
             - not checkpatcharchiveres.stat.exists
 
-        - name: db_opatch | Copy oracle DB patch (opatch) to server (www)
+        - name: loop_opatch_apply | Copy oracle DB patch (opatch) to server (www)
           ansible.builtin.get_url:
             url: "{{ oracle_sw_source_www }}/{{ osp_loop.filename }}"
             dest: "{{ oracle_stage }}/{{ osp_loop.filename }}"
@@ -54,7 +54,7 @@
             - not is_sw_source_local | bool
             - not checkpatcharchiveres.stat.exists | bool
 
-    - name: db_opatch | Extract one-off patch files to patch base
+    - name: loop_opatch_apply | Extract one-off patch files to patch base
       when:
         - oracle_sw_copy | bool
         - oracle_sw_unpack | bool
@@ -62,20 +62,20 @@
       tags:
         - oraswdbpsuunpack1
       block:
-        - name: db_opatch | Create destination folder for unarchive
+        - name: loop_opatch_apply | Create destination folder for unarchive
           ansible.builtin.file:
             dest: "{{ __patch_unarchive_dir }}"
             mode: 0755
             state: directory
 
-        - name: db_opatch | Extract one-off patch files to patch base
+        - name: loop_opatch_apply | Extract one-off patch files to patch base
           ansible.builtin.unarchive:
             src: "{{ oracle_stage }}/{{ osp_loop.filename }}"
             dest: "{{ __patch_unarchive_dir }}"
             creates: "{{ __patch_unarchive_dir }}/{{ __sw_patches_filename_creates }}"
             copy: false
 
-        - name: db_opatch | Remove patch archive from stage
+        - name: loop_opatch_apply | Remove patch archive from stage
           ansible.builtin.file:
             path: "{{ oracle_stage }}/{{ osp_loop.filename }}"
             state: absent

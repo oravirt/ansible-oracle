@@ -1,5 +1,5 @@
 ---
-- name: Work on Patch {{ dhc_opatch.patchid }}
+- name: loop_Patchid | Work on Patch {{ dhc_opatch.patchid }}
   ansible.builtin.debug:
     msg:
       - >-
@@ -14,16 +14,26 @@
           opatchauto: {{ __opatchauto_patchtype }}
       - >-
           excludeUPI: {{ dhc_opatch.excludeUPI | default('') }}
-          patchsubdir: {{ __oraswdb_manage_patches_patchsubdir | default('') }}
+      - >-
+          oracle_patch_stage: {{ oracle_patch_stage }}
+          oracle_sw_copy: {{ oracle_sw_copy | bool }}
+          is_sw_source_local: {{ is_sw_source_local | bool }}
 
-- name: Work on oracle_sw_patches
+# - name: loop_Patchid | debug data
+#   ansible.builtin.debug:
+#     msg:
+#       - "{{ oracle_sw_patches | selectattr('patchid', 'equalto', dhc_opatch.patchid) }}"
+#       - "{{ dhc_opatch.patchid }}"
+
+- name: loop_Patchid | Work on oracle_sw_patches
   ansible.builtin.include_tasks: loop_opatch_apply.yml
   vars:
     __sw_patches_filename_creates: "{{ osp_loop.creates | default((dhc_opatch.patchid | string) + '/README.txt') }}"
     __patch_unarchive_dir: "{{ oracle_patch_stage }}/{{ db_version }}/{{ __patch_upisubdir }}/"
     __patch_upisubdir: >-
-      {%- if osp_loop.unique_patchid is defined -%}
-      upi_{{ osp_loop.unique_patchid -}}/{% endif -%}
+      {{ osp_loop.unique_patchid is defined
+          | ternary(osp_loop.unique_patchid,
+                    osp_loop.patchid) }}/
   with_items:
     - "{{ oracle_sw_patches | selectattr('patchid', 'equalto', dhc_opatch.patchid) }}"
   loop_control:
@@ -38,16 +48,16 @@
     - not dbhome_patches.stdout_lines | select('match', osp_loop.patchid | string) | length > 0
     - osp_loop.unique_patchid | default(0) == dhc_opatch.excludeUPI | default(0)
 
-- name: Info
+- name: loop_Patchid | Info
   ansible.builtin.debug:
     msg: Starting opatch apply. This could take some time to complete...
 
 # opatchauto needs root user for execution
-- name: Manage patch for DB
+- name: loop_Patchid | Manage patch for DB
   opitzconsulting.ansible_oracle.oracle_opatch:
     oracle_home: "{{ oracle_home_db }}"
     patch_base: >-
-      {{ oracle_patch_install }}/{{ db_version }}/{{ dhc_opatch.path | default(__patch_upisubdir + (dhc_opatch.patchid | string)) }}
+      {{ oracle_patch_install }}/{{ db_version }}/{{ dhc_opatch.path | default(__patch_localsubdir) }}
     patch_id: "{{ dhc_opatch.patchid }}"
     patch_version: "{{ dhc_opatch.patchversion | default(omit) }}"
     exclude_upi: "{{ dhc_opatch.excludeUPI | default(omit) }}"
@@ -60,6 +70,5 @@
   become: true
   become_user: "{{ __opatchauto_patchtype | ternary('root', oracle_user) }}"
   vars:
-    __patch_upisubdir: >-
-      {%- if dhc_opatch.excludeUPI is defined -%}
-      upi_{{ dhc_opatch.excludeUPI -}}/{% endif -%}
+    __patch_localsubdir: >-
+      {{ dhc_opatch.excludeUPI | default(dhc_opatch.patchid) }}/{{ dhc_opatch.patchid | string }}
