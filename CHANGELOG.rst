@@ -5,6 +5,38 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v4.2.0
+======
+
+Release Summary
+---------------
+
+This is a BETA Release of ansible-oracle. Do not use it in production environments!
+
+Major Changes
+-------------
+
+- Ansible 7 (2.14) is new minimal version in ansible-oracle 4.x (oravirt#384)
+
+Minor Changes
+-------------
+
+- example: added oracle_listeners_config and listener_installed due to new asserts in 4.0 (oravirt#384)
+- experimental support for OracleLinux 9 (oravirt#384)
+- molecule: Switch to RU 19.21 (oravirt#384)
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- Ansible 7 (2.14) is new minimal version in ansible-oracle 4.x (oravirt#384)
+- oraswdb_golden_image: Fixed wrong varible names oraswdb_golen_* to oraswdb_golden_* from breaking change oravirt#383 (oravirt#384)
+- oraswgi_golden_image: Fixed wrong varible names oraswgi_golen_* to oraswgi_golden_* from breaking change oravirt#383 (oravirt#384)
+
+Bugfixes
+--------
+
+- oraswdb_manage_patches: bugfix for wrong stage directory when oracle_sw_copy=true (oravirt#384)
+
 v4.1.0
 ======
 
