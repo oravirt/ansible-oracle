@@ -143,3 +143,18 @@ oracle_pdbs:
         maxsize: 4G
         content: permanent
         state: present
+
+_tnsnames_config_pdb_helper:
+  - key: "{{ oracle_pdbs[0]['pdb_name'] }}"
+    value:
+      connect:
+        service_name: "{{ oracle_pdbs[0]['pdb_name'] }}"
+      address:
+        - host: "{{ ansible_hostname }}"
+
+oracle_tnsnames_config: "{{ _tnsnames_config_pdb_helper | items2dict }}"
+
+tnsnames_installed:
+  - tnsname: "{{ oracle_pdbs[0]['pdb_name'] }}"
+    home: db19-si-ee
+    state: present
