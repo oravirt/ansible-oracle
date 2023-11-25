@@ -21,6 +21,8 @@
   ansible.builtin.set_fact:
     cacheable: true
     oracledb_facts: "{{ oracledb_facts | default({}) | combine(_db_facts | items2dict) }}"
+  when:
+    - ansible_facts['version'] is defined
   vars:
     _db_facts:
       - key: "{{ odb[0]['oracle_db_unique_name'] | default(odb[0]['oracle_db_name']) }}"
