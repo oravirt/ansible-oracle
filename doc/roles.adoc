@@ -1,33 +1,38 @@
 :toc:
 :toc-placement!:
+:toclevels: 4
 toc::[]
+
+:sectnums:
+:sectnumlevels: 4
 
 == Roles
 
 === common
 
-This will configure stuff common to all machines
+These roles are used to configure settings common to all machines
 
 * Install some generic packages
 * Configure ntp
 
 === orahost
 
-This will configure the host specific Oracle stuff:
+Configures the host-specific Oracle settings:
 
 * Add a user & group
 * Create directory structures
 * Handle filesystem storage (partition devices, creates vg/lv and a
-filesystem (ext4, xfs, btrfs) etc). If you want to create your database
+filesystem (ext4, xfs, btrfs) etc). +
+If you want to create your database
 on a filesystem (instead of ASM) this is where you define the layout.
-* Install required packages
+* Install required OS packages
 * Change kernel paramemeters
 * Set up pam.d/limits config
 * Configures Hugepages (as a percentage of total RAM)
 * Disables transparent hugepages
 * Disables NUMA (if needed)
 * Configures the interconnect network (if needed)
-* Configures Oracle ASMLib
+* Configures Oracle ASMLib (if needed)
 
 === orahost-ssh
 
@@ -38,14 +43,14 @@ Configures passwordless ssh between clusternodes if setting up RAC
 
 === orahost-storage
 
-This role configures storage that shoud be used by ASM.
+This role configures storage to be used by ASM.
 
 * Partitions devices (using parted)
-* Create ASMlib labels or sets up udev-rules for device name persistence
+* Create ASMlib labels or sets up udev-rules for device-name persistence
 
 === oraswgi-install
 
-This role will install and configure Oracle Grid Infrastructure (RAC/SI)
+This role installs and configures Oracle Grid Infrastructure (RAC/SI)
 
 * Adds a .profile_grid to the oracle user
 * Sets up directory structures
@@ -55,7 +60,7 @@ location (e.g nfs share)
 
 === oraasm-manage-diskgroups
 
-This role will statefully manage the lifecycle of an ASM diskgroup
+This role statefully manages the lifecycle of an ASM diskgroup
 
 * Uses the *oracle_asmdg* module
 * Create/delete diskgroup.
@@ -64,7 +69,7 @@ This role will statefully manage the lifecycle of an ASM diskgroup
 
 === oraswdb-install
 
-This role will install the oracle database server(s). It is possible to
+This role installs the oracle database server(s). It is possible to
 run more than 1 database from each home. It performs both Single
 Instance/RAC installations.
 
@@ -96,14 +101,16 @@ Statefully manage patches in a DB environment
 
 === cxoracle
 
-Installs cx_Oracle in preparation for using
+* Installs cx_Oracle in preparation for using
 https://github.com/oravirt/ansible-oracle-modules[ansible-oracle-modules]
+See https://oracle.github.io/python-cx_Oracle/
 
 === orahost-cron
 
-Configures cron schedules if needed
+* Configures cron schedules if needed
 
 === orahost-logrotate
+Logs grow. Log rotation solves the problem of always-growing logs.
 
 === oradb-manage-<*>
 
@@ -118,6 +125,3 @@ https://github.com/oravirt/ansible-oracle-modules[ansible-oracle-modules]
 * *oradb-manage-grants*
 * *oradb-manage-redo*
 * *oradb-manage-services*
-:toc:
-:toc-placement!:
-toc::[]
