@@ -3,8 +3,8 @@
   ansible.builtin.assert:
     quiet: true
     that:
-      - "ansible_os_family == '{{ os_family_supported }}'"
-      - "ansible_facts['distribution_version'] is version('{{ os_min_supported_version }}', '>=')"
+      - ansible_os_family == os_family_supported
+      - ansible_facts['distribution_version'] is version(os_min_supported_version, '>=')
   tags:
     - oscheck
 
