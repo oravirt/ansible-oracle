@@ -62,6 +62,7 @@ common_packages_el6:
   - procps
   - module-init-tools
   - ethtool
+  - lsof
   - bc
   - nc
   - bind-utils
@@ -110,6 +111,7 @@ common_packages_el7:
   - procps
   - module-init-tools
   - ethtool
+  - lsof
   - bc
   - nc
   - bind-utils
