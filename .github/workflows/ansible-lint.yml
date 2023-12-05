@@ -13,16 +13,9 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
-      # Important: This sets up your GITHUB_WORKSPACE environment variable
-      - uses: actions/checkout@v2
-
-      - name: Lint roles
-        uses: ansible/ansible-lint@v6.20.3
-        with:
-          targets: |
-            inventory/*
-            playbooks/*
-            roles/*
+      - uses: actions/checkout@v4
+      - name: Run ansible-lint
+        uses: ansible/ansible-lint@v6.22.1
