@@ -5,6 +5,28 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v4.3.0
+======
+
+Release Summary
+---------------
+
+This is a BETA Release of ansible-oracle. Do not use it in production environments!
+
+Minor Changes
+-------------
+
+- ansible-lint v6.22.1 (oravirt#392)
+- molecule: add tnsname configuration to shared inventory (oravirt#388)
+- oradb_facts: Skip oracledb_facts when db not reachable (oravirt#387)
+
+Bugfixes
+--------
+
+- common: install lsof for all RHEL/OL distributions (oravirt#391)
+- oradb_manage_db: Bugfix for undefined variable listener_home_config (oravirt#386)
+- orahost: Fix warning conditional statements should not include jinja2 templating (oravirt#391)
+
 v4.2.0
 ======
 
