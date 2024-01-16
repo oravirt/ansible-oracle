@@ -19,7 +19,6 @@ Create Golden-Images from Oracle Database Homes and Oracle Grid-Infrastructure/R
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### golden_image_dest

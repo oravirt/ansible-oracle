@@ -19,7 +19,6 @@ Gather Ansible Facts from database
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### oradb_facts_db_user

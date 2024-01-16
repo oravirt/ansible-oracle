@@ -40,7 +40,6 @@ This role has a dependency to `orahost_meta` and `orasw_meta` for default parame
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### cvuqdisk_rpm
@@ -105,8 +104,8 @@ oracle_asm_init_dg: crs
 #### Default value
 
 ```YAML
-oracle_asm_storage_option: "{% if oracle_install_version_gi is version('12.2', '>=')\
-  \ %}FLEX_ASM_STORAGE{% else %}LOCAL_ASM_STORAGE{% endif %}"
+oracle_asm_storage_option: "{% if oracle_install_version_gi is version('12.2', '>=')
+  %}FLEX_ASM_STORAGE{% else %}LOCAL_ASM_STORAGE{% endif %}"
 ```
 
 ### oracle_cluster_mgmdb
@@ -237,6 +236,8 @@ run_configtoolallcommand: true
 ```
 
 ## Discovered Tags
+
+**_always_**
 
 **_asmfd_**
 

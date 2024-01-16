@@ -59,7 +59,6 @@ This will create issues and problems in `ansible-oracle` and is not supported.
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### _db_password_cdb
@@ -184,8 +183,8 @@ _odb_loop_helper: _internal_used_
 #### Default value
 
 ```YAML
-_opdb_home: "{{ (oracle_databases | selectattr('oracle_db_name', 'match', opdb[0]['cdb']))[0]['home']\
-  \ }}"
+_opdb_home: "{{ (oracle_databases | selectattr('oracle_db_name', 'match', opdb[0]['cdb']))[0]['home']
+  }}"
 ```
 
 ### _opdb_loop_helper
@@ -309,6 +308,8 @@ db_password: >-
 
 ### db_service_name
 
+**_Deprecated:_** since v4.0.0<br />
+
 #### Default value
 
 ```YAML
@@ -334,6 +335,8 @@ _IMPORTANT_
 
 Do not set this variable in inventory, set_fact ...!
 
+**_Deprecated:_** since v4.0.0<br />
+
 #### Default value
 
 ```YAML
@@ -346,6 +349,8 @@ The variable is used for shell, command tasks to set environment Variables.
 
 Do not set it in inventory!
 
+**_Deprecated:_** since v4.0.0<br />
+
 #### Default value
 
 ```YAML
@@ -356,16 +361,20 @@ grid_env:
 
 ### listener_home
 
+**_Deprecated:_** since v4.0.0<br />
+
 #### Default value
 
 ```YAML
-listener_home: "{%- if lsnrinst is defined -%}{%- if db_homes_config[lsnrinst.home]['oracle_home']\
-  \ is defined -%}{{ db_homes_config[lsnrinst.home]['oracle_home'] }}{%- else -%}{{\
-  \ oracle_base }}/{{ db_homes_config[lsnrinst.home]['version'] }}/{{ db_homes_config[lsnrinst.home]['home']\
-  \ }}{%- endif -%}{%- endif -%}"
+listener_home: "{%- if lsnrinst is defined -%}{%- if db_homes_config[lsnrinst.home]['oracle_home']
+  is defined -%}{{ db_homes_config[lsnrinst.home]['oracle_home'] }}{%- else -%}{{
+  oracle_base }}/{{ db_homes_config[lsnrinst.home]['version'] }}/{{ db_homes_config[lsnrinst.home]['home']
+  }}{%- endif -%}{%- endif -%}"
 ```
 
 ### listener_port_template
+
+**_Deprecated:_** since v4.0.0<br />
 
 #### Default value
 
@@ -375,6 +384,8 @@ listener_port_template: '{% if item.listener_port is defined %}{{ item.listener_
 ```
 
 ### listener_protocols
+
+**_Deprecated:_** since v4.0.0<br />
 
 #### Default value
 
@@ -396,6 +407,8 @@ The variable is used for shell, command tasks to set environment Variables.
 
 Do not set it in inventory!
 
+**_Deprecated:_** since v4.0.0<br />
+
 #### Default value
 
 ```YAML
@@ -409,6 +422,8 @@ oracle_env:
 The variable is used for shell, command tasks to set environment Variables.
 
 Do not set it in inventory!
+
+**_Deprecated:_** since v4.0.0<br />
 
 #### Default value
 
@@ -429,6 +444,8 @@ The variable is deprecated and removed in a future version.
 _IMPORTANT_
 
 Do not set this variable in inventory, set_fact ...!
+
+**_Deprecated:_** since v4.0.0<br />
 
 #### Default value
 
@@ -499,8 +516,8 @@ oracle_sw_copy: '{% if install_from_nfs %}false{% else %}true{% endif %}'
 #### Default value
 
 ```YAML
-oracle_sw_extract_path: "{%- if '18' in db_version -%}{{ oracle_home_db }}{%- else\
-  \ -%}{{ oracle_stage }}/{{ item[0].version }}{%- endif -%}"
+oracle_sw_extract_path: "{%- if '18' in db_version -%}{{ oracle_home_db }}{%- else
+  -%}{{ oracle_stage }}/{{ item[0].version }}{%- endif -%}"
 ```
 
 ### oracle_sw_unpack

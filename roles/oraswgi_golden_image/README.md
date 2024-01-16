@@ -20,7 +20,6 @@ Create Golden-Images from Oracle Grid-Infrastructure/Restart
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### golden_image_dest

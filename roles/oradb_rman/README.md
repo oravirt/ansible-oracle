@@ -34,7 +34,6 @@ All other role variables from `oradb_rman` are deprecated and will be removed in
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### oradb_rman_autofs
@@ -79,8 +78,8 @@ Lgofiledirectory for output of cronjobs.
 #### Default value
 
 ```YAML
-oradb_rman_cron_logdir: "{{ rman_cron_logdir | default('/var/log/oracle/rman/log')\
-  \ }}"
+oradb_rman_cron_logdir: "{{ rman_cron_logdir | default('/var/log/oracle/rman/log')
+  }}"
 ```
 
 ### oradb_rman_cron_mkjob
@@ -112,8 +111,8 @@ Lgofiledirectory for `rman_wrapper.sh`.
 #### Default value
 
 ```YAML
-oradb_rman_log_dir: "{{ rman_log_dir | default(odb.0.rman_log_dir | default(oracle_base\
-  \ + '/rman/log')) }}"
+oradb_rman_log_dir: "{{ rman_log_dir | default(odb.0.rman_log_dir | default(oracle_base
+  + '/rman/log')) }}"
 ```
 
 ### oradb_rman_retention_policy_default
@@ -123,8 +122,8 @@ Defines the policy for the RMAN-Templates from role.
 #### Default value
 
 ```YAML
-oradb_rman_retention_policy_default: "{{ rman_retention_policy_default | default('RECOVERY\
-  \ WINDOW OF 14 DAYS') }}"
+oradb_rman_retention_policy_default: "{{ rman_retention_policy_default | default('RECOVERY
+  WINDOW OF 14 DAYS') }}"
 ```
 
 ### oradb_rman_script_dir
@@ -134,8 +133,8 @@ Directory for `*.rman`-Files.
 #### Default value
 
 ```YAML
-oradb_rman_script_dir: "{{ rman_script_dir | default(odb.0.rman_script_dir | default(oracle_base\
-  \ + '/rman')) }}"
+oradb_rman_script_dir: "{{ rman_script_dir | default(odb.0.rman_script_dir | default(oracle_base
+  + '/rman')) }}"
 ```
 
 ### oradb_rman_tns_admin
@@ -146,8 +145,8 @@ This is needed for RMAN-Catalogconnections.
 #### Default value
 
 ```YAML
-oradb_rman_tns_admin: "{{ rman_tns_admin | default(oracle_base + '/rman/network/admin')\
-  \ }}"
+oradb_rman_tns_admin: "{{ rman_tns_admin | default(oracle_base + '/rman/network/admin')
+  }}"
 ```
 
 ### oradb_rman_tnsnames_installed
@@ -172,8 +171,8 @@ Directory for Oracle wallet.
 #### Default value
 
 ```YAML
-oradb_rman_wallet_loc: "{{ rman_wallet_loc | default(oracle_base + '/rman/network/wallet')\
-  \ }}"
+oradb_rman_wallet_loc: "{{ rman_wallet_loc | default(oracle_base + '/rman/network/wallet')
+  }}"
 ```
 
 ### oradb_rman_wallet_password
@@ -207,8 +206,6 @@ oradb_rman_wallet_password: "{{ rman_wallet_password | default('oracleWallet1') 
 **_rmanregister_**
 
 **_tns_**
-
-**_tnsnames_**
 
 **_wallet_**
 

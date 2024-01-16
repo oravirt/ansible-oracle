@@ -22,7 +22,6 @@ Create, modify and remove Oracle Databases
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### dbca_templatename

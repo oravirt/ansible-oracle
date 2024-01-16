@@ -30,7 +30,6 @@ Install Oracle Database Software
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### autostartup_service
@@ -132,8 +131,8 @@ hostinitdaemon: '{{ ansible_service_mgr }}'
 #### Default value
 
 ```YAML
-oracle_ee_options: "{{ _oracle_ee_opiton_dict[db_homes_config[dbh.home]['version']]\
-  \ }}"
+oracle_ee_options: "{{ _oracle_ee_opiton_dict[db_homes_config[dbh.home]['version']]
+  }}"
 ```
 
 ### oraswdb_install_forcechopt

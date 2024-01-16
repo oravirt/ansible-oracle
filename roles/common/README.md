@@ -36,7 +36,6 @@ sets up the host generic stuff
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### common_packages

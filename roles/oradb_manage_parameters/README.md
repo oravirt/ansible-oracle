@@ -18,7 +18,6 @@ Manage Oracle Database Parameters
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### restart_spparameter_changed
