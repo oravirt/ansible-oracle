@@ -18,7 +18,6 @@ Configure cronjobs for ansible-oracle
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### cron_config

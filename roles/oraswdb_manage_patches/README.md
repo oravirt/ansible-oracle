@@ -18,7 +18,6 @@ Manage Patch Installation in Database ORACLE_HOMEs.
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### oraswdb_manage_patches_cleanup_staging
@@ -52,14 +51,6 @@ oraswdb_manage_patches_cleanup_staging: true
 **_nfsumountdb_**
 
 **_ocmconfig_**
-
-**_oragridopatchget_**
-
-**_oragridpatchpush_**
-
-**_oragridpatchunpack_**
-
-**_oraswdbpsuunpack1_**
 
 
 ## Dependencies

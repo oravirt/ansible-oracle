@@ -24,7 +24,6 @@ This role needs a complete refactoring in the future!
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### grid_user
@@ -70,8 +69,6 @@ oracle_users:
 ```
 
 ## Discovered Tags
-
-**_sshkeys_**
 
 **_sshkeys,known_hosts_**
 

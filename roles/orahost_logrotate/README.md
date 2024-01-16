@@ -24,7 +24,6 @@ Configure logrotate for ansible-oracle
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### logrotate_config
@@ -53,8 +52,8 @@ logrotate_config:
       - dateext
       - compress
   - name: oracle_rman
-    file: "{{ rman_cron_logdir | default('/var/log/oracle/rman/log') }}/*.log {{ oracle_base\
-      \ }}/admin/*/rman/*.log {{ oracle_base }}/admin/*/rman/log/*.log"
+    file: "{{ rman_cron_logdir | default('/var/log/oracle/rman/log') }}/*.log {{ oracle_base
+      }}/admin/*/rman/*.log {{ oracle_base }}/admin/*/rman/log/*.log"
     options:
       - missingok
       - notifempty

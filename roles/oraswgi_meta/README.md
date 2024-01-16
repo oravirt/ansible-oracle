@@ -34,7 +34,6 @@ There are a lot of variables who are used by `orasw_meta`
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### _grid_install_user

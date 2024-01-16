@@ -23,7 +23,6 @@ Not RAC aware at the moment.
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### purgedays

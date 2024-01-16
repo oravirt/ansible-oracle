@@ -19,7 +19,6 @@ Manage datapatch for Oracle Database
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### oradb_datapatch_fail_on_db_not_exist

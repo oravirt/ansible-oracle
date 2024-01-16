@@ -35,7 +35,6 @@ Meta role used by other roles to share variable defaults.
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### asm_diskgroups

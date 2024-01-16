@@ -24,7 +24,6 @@ Role to configure the storage for oracle.
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### asmlib_binary

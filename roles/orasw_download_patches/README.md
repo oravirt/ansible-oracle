@@ -27,7 +27,6 @@ Download all patches from Oracle
 
 - Minimum Ansible version: `2.14.0`
 
-
 ## Default Variables
 
 ### http_proxy
