@@ -3,6 +3,8 @@
 # Install the ansible-oracle collection from current source
 #
 set -eu
+
+# shellcheck disable=SC2086
 WORKTDIR="$(dirname ${BASH_SOURCE[0]})/../.."
 COLLECTION_OUTDIR=/tmp/ansible-oracle-collection
 
@@ -10,7 +12,7 @@ cd "${WORKTDIR}"
 echo "Working in $(pwd)"
 test -s "${COLLECTION_OUTDIR}" || mkdir "${COLLECTION_OUTDIR}"
 
-COLLECTION_VERSION=$(cat galaxy.yml | grep "^version: " | cut -d" " -f2)
+COLLECTION_VERSION=$(grep "^version: " galaxy.yml | cut -d" " -f2)
 COLLECTION_ARCHIVE="${COLLECTION_OUTDIR}/opitzconsulting-ansible_oracle-${COLLECTION_VERSION}.tar.gz"
 echo "COLLECTION_ARCHIVE: ${COLLECTION_ARCHIVE}"
 

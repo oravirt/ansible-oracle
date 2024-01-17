@@ -75,7 +75,7 @@ Vagrant.configure("2") do |config|
 
     set -e
     # configure local Nexus-Server when running
-    # 
+    #
     os_release=$(grep '^VERSION_ID' /etc/os-release | awk -F'=' ' gsub(/"/,"") { print $2}' | cut -b1)
     if curl -f -s -q -m 3 http://192.168.56.12:8081/repository/ol${os_release}os-yum-group/ > /dev/null ; then
       echo "Local Nexus3 Server for yum proxy found!"
