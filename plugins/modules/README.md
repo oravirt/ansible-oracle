@@ -190,5 +190,3 @@ pre-rec: cx_Oracle
 
 - Create/remove databases (cdb/non-cdb)
 - Can be created by passing in a responsefile or just by using parameters
-
-

@@ -47,7 +47,7 @@ listener_installed:
         listener_name: LISTENER1523
         state: present
 
-oracle_databases: 
+oracle_databases:
       - home: 18300-base
         oracle_db_name: cdb183
         listener_name: LISTENER

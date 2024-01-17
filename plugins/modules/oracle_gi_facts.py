@@ -53,7 +53,7 @@ try:
 except ImportError:  # pragma: no cover
     # python 2.6 doesn't include check_output
     # monkey patch it in!
-    import subprocess
+    # import subprocess
 
     STDOUT = subprocess.STDOUT
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 ansible orarac02 -a "/u01/app/12.1.0.2/grid/crs/install/rootcrs.pl -deconfig -force" -u root
 ansible orarac01 -a "/u01/app/12.1.0.2/grid/crs/install/rootcrs.pl -deconfig -force -lastnode" -u root
 ansible orarac02 -a "/u01/app/12.1.0.1/grid/crs/install/rootcrs.pl -deconfig -force" -u root

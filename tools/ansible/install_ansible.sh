@@ -30,7 +30,7 @@ setup_venv()
 setup_ansible()
 {
   echo "Install Ansible with pip3"
-  echo $workdir
+  echo "$workdir"
   pip3 install -r "$workdir/requirements_ansible.txt"
 }
 
