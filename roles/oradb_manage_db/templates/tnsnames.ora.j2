@@ -16,7 +16,11 @@ SALES=
 
 # do not edit the configuration manually.
 # The execution of ansible-oracle automatically replace all manual changes!
-{{ tnsinst.tnsname | upper }} =
+{% if oracle_tnsnames_config[tnsinst.tnsname]['alias'] is defined -%}
+{{ tnsinst.tnsname | upper }}, {{ oracle_tnsnames_config[tnsinst.tnsname]['alias'] | join(', ') | upper }}
+{%- else %}
+{{ tnsinst.tnsname | upper }}
+{%- endif %} =
  (DESCRIPTION =
    (FAILOVER={{ oracle_tnsnames_config[tnsinst.tnsname]['failover'] | default('yes')}})
    (CONNECT_TIMEOUT={{ oracle_tnsnames_config[tnsinst.tnsname]['connect_timeout'] | default('5')}})
