@@ -5,6 +5,19 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v4.4.1
+======
+
+Release Summary
+---------------
+
+This is a BETA Release of ansible-oracle. Do not use it in production environments!
+
+Bugfixes
+--------
+
+- oradb_manage_wallet: fixed wrong dbpassword assignment, added debug option for password (oravirt#404)
+
 v4.4.0
 ======
 
