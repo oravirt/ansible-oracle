@@ -5,6 +5,31 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v4.4.0
+======
+
+Release Summary
+---------------
+
+This is a BETA Release of ansible-oracle. Do not use it in production environments!
+
+Minor Changes
+-------------
+
+- ansible-doctor: Update to 4.0.1 (oravirt#397)
+- oradb_manage_db: Added support for aliasnames for Oracle Wallet (oravirt#400)
+- oradb_manage_db: allow multiline values for keys in sqlnet_ansible.ora (oravirt#400)
+- oradb_manage_wallet: New role for managing Oracle Wallets (oravirt#400)
+- pre-commit: Update multiple hooks (oravirt#397)
+
+Security Fixes
+--------------
+
+- dependabo: Update ansible-core in dev-tools (oravirt#398)
+- dependabo: bump ansible from 6.7.0 to 8.5.0 in /tools/ansible (oravirt#395)
+- dependabo: bump tj-actions/changed-files from 31 to 41 in /.github/workflows (oravirt#396)
+- oradb_manage_db: Remove visible password for sys, system and dbsnmp from dbca responsefile for 12.2+ (oravirt#401)
+
 v4.3.0
 ======
 
