@@ -1,0 +1,49 @@
+---
+- name: assert | assert wallet
+  when:
+    - oracle_wallet_config is defined
+  block:
+    - name: assert | assert oracle_wallet_config
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - owc.state is defined
+          - owc.state in ('present', 'absent')
+          - owc.name is defined
+          - owc.path is defined
+          - owc.home is defined
+          - db_homes_config[owc.home] is defined
+          - oracle_wallet_password[owc.name] is defined
+      with_items:
+        - "{{ oracle_wallet_config }}"
+      loop_control:
+        label: >-
+          {{ owc.name | default('') }}
+          {{ owc.path | default('') }}
+          {{ owc.state | default('') }}
+        loop_var: owc
+
+    # owc_dbc due to with_subelements instead of dbc_d!
+    - name: assert | assert dbcredential in oracle_wallet_config
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - owc_dbc.1.tns_name is defined
+          - owc_dbc.1.db_name is defined
+          - owc_dbc.1.db_user is defined
+          - owc_dbc.1.state in ('present', 'absent')
+        fail_msg: attribute missing or duplicate tns_name in wallet
+      with_subelements:
+        - "{{ oracle_wallet_config }}"
+        - dbcredentials
+        - flags:
+          skip_missing: true
+      loop_control:
+        label: >-
+          {{ owc_dbc.0.name | default('') }}
+          {{ owc_dbc.1.tns_name | default('') }}
+          {{ owc_dbc.1.state | default('') }}
+        loop_var: owc_dbc
+      when:
+        - owc_dbc.0.state == 'present'
+        - owc_dbc.1 is defined

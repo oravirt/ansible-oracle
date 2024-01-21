@@ -1,0 +1,22 @@
+---
+# tasks file for manage_db
+- name: oradb_manage_wallet | assert
+  ansible.builtin.include_tasks: assert.yml
+  tags:
+    always
+
+- name: oradb_manage_wallet | Loop over oracle_wallet_config
+  ansible.builtin.include_tasks: wallet_config.yml
+  with_items:
+    - "{{ oracle_wallet_config }}"
+  loop_control:
+    label: >-
+      {{ owc.name | default('') }}
+      {{ owc.path | default('') }}
+      {{ owc.state | default('present') }}
+    loop_var: owc
+  vars:
+    # set odb loop_var for usage of _oracle_home_db
+    odb: "{{ owc }}"
+  tags:
+    always
