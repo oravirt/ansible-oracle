@@ -33,6 +33,8 @@
     loop_var: sqlnetinst
   when: sqlnet_installed is defined
   tags: sqlnet2
+  vars:
+    _sqlnet_ansible_file: "{{ _oradb_manage_db_tns_home }}/network/admin/sqlnet_ansible.ora"
 
 - name: manage_db | include listener_details.yml
   ansible.builtin.include_tasks: listener_details.yml

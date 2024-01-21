@@ -100,6 +100,8 @@ oracle_gi_cluster_type: STANDARD
 
 **_sql_script_**
 
+**_sqlnet_**
+
 **_sqlnet2_**
 
 **_tnsnames_**
