@@ -1,0 +1,8 @@
+---
+_oradb_manage_wallet_password: a123_pokl131K
+
+_oradb_manage_wallet_dbpassword_loopvar: >-
+  {{ owc_dbc.1 | default(owc_d) }}
+
+_oradb_manage_wallet_dbpassword: >-
+  {{ dbpasswords[_oradb_manage_wallet_password_loopvar.db_name][_oradb_manage_wallet_password_loopvar.db_user] | default(default_dbpass) }}

@@ -160,3 +160,32 @@ tnsnames_installed:
   - tnsname: "{{ oracle_pdbs[0]['pdb_name'] }}"
     home: db19-si-ee
     state: present
+
+sqlnet_config:
+  sqlnetalias1:
+    - {name: "ADR_BASE", value: "/u01/app/oracle/"}
+    - {name: "SQLNET.ALLOWED_LOGON_VERSION_CLIENT", value: 12}
+    - {name: "SQLNET.WALLET_OVERRIDE", value: 'TRUE'}
+    - name: WALLET_LOCATION
+      value: |-
+        (
+          SOURCE =
+            (METHOD = FILE)(METHOD_DATA = (DIRECTORY=/u01/app/oracle/wallet))
+          )
+
+sqlnet_installed:
+  - home: db19-si-ee
+    sqlnet: sqlnetalias1
+    state: present
+
+oracle_wallet_config:
+  - name: wallet1
+    home: db19-si-ee
+    path: /u01/app/oracle/wallet
+    state: present
+    # mode: g+rx
+    dbcredentials:
+      - tns_name: oracle_pdbs[0]['pdb_name']
+        db_name: oracle_pdbs[0]['pdb_name']
+        db_user: system
+        state: present

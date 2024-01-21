@@ -1,0 +1,38 @@
+---
+- name: wallet_config | Wallet present
+  when:
+    - owc.state | default('present') == 'present'
+  block:
+    - name: wallet_config | Wallet create
+      ansible.builtin.shell:
+        cmd: |
+          set -eu
+          set -o pipefail
+          echo -e "$stdin" | "${ORACLE_HOME}/bin/mkstore" -create -nologo -wrl "${wrl}"
+        creates: "{{ owc.path }}/ewallet.p12"
+      become: true
+      become_user: "{{ osc.owner | default(oracle_user) }}"
+      environment:
+        stdin: "{{ _oradb_manage_wallet_password }}\n{{ _oradb_manage_wallet_password }}"
+        wrl: "{{ owc.path }}"
+        ORACLE_HOME: "{{ _oracle_home_db }}"
+
+    - name: wallet_config | include wallet_manage_dbcredential.yml
+      ansible.builtin.include_tasks: wallet_manage_dbcredential.yml
+
+    - name: wallet_config | chmod over wallet directory
+      ansible.builtin.file:
+        path: "{{ owc.path }}"
+        group: "{{ owc.group | default(omit) }}"
+        mode: "{{ owc.mode | default(omit) }}"
+        recurse: true
+
+- name: wallet_config | Remove wallet
+  when:
+    - owc.state | default('present') == 'absent'
+  ansible.builtin.file:
+    path: "{{ owc.path }}"
+    state: absent
+    recurse: true
+  become: true
+  become_user: "{{ osc.owner | default(oracle_user) }}"
