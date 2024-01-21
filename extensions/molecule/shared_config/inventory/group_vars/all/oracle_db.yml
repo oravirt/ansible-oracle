@@ -148,6 +148,7 @@ _tnsnames_config_pdb_helper:
   - key: "{{ oracle_pdbs[0]['pdb_name'] }}"
     alias:
       - "{{ oracle_pdbs[0]['pdb_name'] }}_SYSTEM"
+      - "{{ oracle_pdbs[0]['pdb_name'] }}_PERFSTAT"
     value:
       connect:
         service_name: "{{ oracle_pdbs[0]['pdb_name'] }}"
@@ -185,7 +186,11 @@ oracle_wallet_config:
     state: present
     # mode: g+rx
     dbcredentials:
-      - tns_name: oracle_pdbs[0]['pdb_name']
-        db_name: oracle_pdbs[0]['pdb_name']
+      - tns_name: "{{ oracle_pdbs[0]['pdb_name'] }}_SYSTEM"
+        db_name: "{{ oracle_pdbs[0]['pdb_name'] }}"
         db_user: system
+        state: present
+      - tns_name: "{{ oracle_pdbs[0]['pdb_name'] }}_PERFSTAT"
+        db_name: "{{ oracle_pdbs[0]['pdb_name'] }}"
+        db_user: perfstat
         state: present

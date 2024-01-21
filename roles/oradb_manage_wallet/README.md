@@ -11,6 +11,7 @@ Define a password for the wallet in `oracle_wallet_password`.
 - [Default Variables](#default-variables)
   - [oracle_wallet_config](#oracle_wallet_config)
   - [oracle_wallet_password](#oracle_wallet_password)
+  - [oracle_wallet_show_password](#oracle_wallet_show_password)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -61,6 +62,16 @@ oracle_wallet_password: {}
 oracle_wallet_password:
   wallet1: <password>
   wallet2: <password>
+```
+
+### oracle_wallet_show_password
+
+Show password during execution in loop label.
+
+#### Default value
+
+```YAML
+oracle_wallet_show_password: false
 ```
 
 ## Discovered Tags
