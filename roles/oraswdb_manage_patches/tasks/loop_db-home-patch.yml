@@ -8,16 +8,8 @@
 - name: Upgrade OPatch
   ansible.builtin.include_tasks: opatch-upgrade.yml
 
-- name: Get list of current installed patches
-  ansible.builtin.command: "{{ oracle_home_db }}/OPatch/opatch lspatches -oh {{ oracle_home_db }}"
-  become: true
-  become_user: "{{ oracle_user }}"
-  changed_when: false
-  register: dbhome_patches
-
-- name: List of current installed patches
-  ansible.builtin.debug:
-    var: dbhome_patches.stdout_lines
+- name: opatch lspatches
+  ansible.builtin.include_tasks: opatch_lsinv.yml
 
 - name: Configure ocm.rsp (1)
   ansible.builtin.template:
@@ -132,13 +124,5 @@
   vars:
     __opatchauto_patchtype: false  # opatch apply
 
-- name: Check patches
-  ansible.builtin.command: "{{ oracle_home_db }}/OPatch/opatch lspatches -oh {{ oracle_home_db }}"
-  become: true
-  become_user: "{{ oracle_user }}"
-  changed_when: false
-  register: dbhome_patches
-
-- name: Check patches
-  ansible.builtin.debug:
-    var: dbhome_patches.stdout_lines
+- name: opatch lspatches
+  ansible.builtin.include_tasks: opatch_lsinv.yml
