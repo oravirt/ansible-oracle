@@ -25,6 +25,20 @@
 #       - "{{ oracle_sw_patches | selectattr('patchid', 'equalto', dhc_opatch.patchid) }}"
 #       - "{{ dhc_opatch.patchid }}"
 
+# Refresh opatch inventory in ansible before next apply
+# but after a rollback in loop before
+- name: Refresh opatch inventory after opatch rollback
+  when:
+    - dhc_opatch.state == 'present'
+    - _refresh_opatch_inv_before_apply | default(false)
+  ansible.builtin.include_tasks: opatch_lsinv.yml
+
+- name: Set state for opatch inventory refresh before next apply
+  ansible.builtin.set_fact:
+    _refresh_opatch_inv_before_apply: true
+  when:
+    - dhc_opatch.state == 'absent'
+
 - name: loop_Patchid | Work on oracle_sw_patches
   ansible.builtin.include_tasks: loop_opatch_apply.yml
   vars:
@@ -69,6 +83,27 @@
     state: "{{ dhc_opatch.state }}"
   become: true
   become_user: "{{ __opatchauto_patchtype | ternary('root', oracle_user) }}"
+  register: _oracle_opatch_res
   vars:
     __patch_localsubdir: >-
       {{ dhc_opatch.excludeUPI | default(dhc_opatch.patchid) }}/{{ dhc_opatch.patchid | string }}
+  when:
+    - (
+        dhc_opatch.state == 'absent'
+      or
+        (
+          dhc_opatch.state == 'present'
+          and not dbhome_patches.stdout_lines | select('match', dhc_opatch.patchid | string) | length > 0
+        )
+      )
+
+# opatch rollback + opatch apply with same patchid but different unique_id possible
+# => we need to refresh our inventory in ansible to reflect the changed situation in opathch inventory
+# => Refresh only after 'absent' when next loop item is 'present'
+#    Prevent lots of refreshes, when multiple patches are removed!
+- name: Set state for opatch inventory refresh before next apply
+  ansible.builtin.set_fact:
+    _refresh_opatch_inv_before_apply: true
+  when:
+    - dhc_opatch.state == 'absent'
+    - _oracle_opatch_res.changed

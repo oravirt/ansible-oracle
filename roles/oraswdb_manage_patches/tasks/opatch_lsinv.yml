@@ -1,0 +1,17 @@
+---
+- name: Get list of current installed patches
+  ansible.builtin.command: "{{ oracle_home_db }}/OPatch/opatch lspatches -oh {{ oracle_home_db }}"
+  become: true
+  become_user: "{{ oracle_user }}"
+  changed_when: false
+  register: dbhome_patches
+
+- name: List of current installed patches
+  ansible.builtin.debug:
+    var: dbhome_patches.stdout_lines
+
+- name: reset state for opatch inventory refresh
+  ansible.builtin.set_fact:
+    _refresh_opatch_inv_before_apply: false
+  when:
+    - _refresh_opatch_inv_before_apply | default(true)
