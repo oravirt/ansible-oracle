@@ -5,6 +5,21 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v4.4.2
+======
+
+Release Summary
+---------------
+
+This is a BETA Release of ansible-oracle. Do not use it in production environments!
+
+Bugfixes
+--------
+
+- oradb_manage_wallet: bugfix for broken Remove DB-Credentials (oravirt#406)
+- oradb_manage_wallet: bugfix for broken oracle_wallet_password (oravirt#406)
+- oraswdb_manage_patches: refresh opatch lsinv after opatch rollback (oravirt#405)
+
 v4.4.1
 ======
 
