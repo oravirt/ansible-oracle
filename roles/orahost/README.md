@@ -337,8 +337,6 @@ grid_users:
     primgroup: '{{ oracle_group }}'
     othergroups: '{{ asmadmin_group }},{{ asmdba_group }},{{ asmoper_group }},{{ dba_group
       }}'
-    passwd: 
-      $6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0
 ```
 
 ### host_fs_layout
@@ -670,8 +668,6 @@ oracle_users:
     primgroup: '{{ oracle_group }}'
     othergroups: '{{ dba_group }},{{ asmadmin_group }},{{ asmdba_group }},{{ asmoper_group
       }},backupdba,dgdba,kmdba,{{ oper_group }}'
-    passwd: 
-      $6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0
 ```
 
 ### os_family_supported
@@ -804,8 +800,6 @@ transparent_hugepage_disable:
 ## Open Tasks
 
 - (improvement): SSH-Setup needs a rework...
-- (security): remove fixed password from oracle OS-Users
-- (security): remove fixed password from grid OS-Users
 
 ## Dependencies
 
