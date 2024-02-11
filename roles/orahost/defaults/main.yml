@@ -107,23 +107,19 @@ oracle_groups:
   - {group: dgdba, gid: 54325}
   - {group: kmdba, gid: 54326}
 
-# @todo security: remove fixed password from oracle OS-Users
 # @var oracle_users:description: oracle OS-User
 oracle_users:         # Passwd :Oracle123
   - username: oracle
     uid: 54321
     primgroup: "{{ oracle_group }}"
     othergroups: "{{ dba_group }},{{ asmadmin_group }},{{ asmdba_group }},{{ asmoper_group }},backupdba,dgdba,kmdba,{{ oper_group }}"
-    passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0"
 
-# @todo security: remove fixed password from grid OS-Users
 # @var grid_users:description: grid OS-User
 grid_users:
   - username: grid
     uid: 54320
     primgroup: "{{ oracle_group }}"
     othergroups: "{{ asmadmin_group }},{{ asmdba_group }},{{ asmoper_group }},{{ dba_group }}"
-    passwd: "$6$0xHoAXXF$K75HKb64Hcb/CEcr3YEj2LGERi/U2moJgsCK.ztGxLsKoaXc4UBiNZPL0hlxB5ng6GL.gyipfQOOXplzcdgvD0"
 
 # @var firewall_service:description: >
 # Used firewall service in OS. Value depends on used Distribution and version.
