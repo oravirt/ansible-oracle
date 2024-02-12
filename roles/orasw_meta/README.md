@@ -172,25 +172,66 @@ dbenvdir: '{{ oracle_user_home }}/dbenv'
 
 ### dbpasswords
 
+Define the passwords for DB-Users in nonCDB, CDB and PDBs.
+
 #### Default value
 
 ```YAML
+dbpasswords: {}
+```
+
+#### Example usage
+
+```YAML
+
+nonCDB with db_name: orcl
+
+dbpasswords:
+  <db_name>:
+    <db_user>: <db_password>
+
 dbpasswords:
   orcl:
-    sys: Oracle_456
-    system: Oracle_456
-    dbsnmp: Oracle_456
-    pdbadmin: Oracle_456
+    SYS: Oracle_456
+    SYSTEM: Oracle_456
+    DBSNMP: Oracle_456
+
+CDB with `db_name: orcl` and `PDB: orclpdb`
+
+dbpasswords:
+  <CDB db_name>:
+    <CDB db_user>: <db_password>
+    <PDB name>:
+      <PDB db_user>: <db_password>
+
+dbpasswords:
+  orcl:
+    SYS: Oracle_456
+    SYSTEM: Oracle_456
+    DBSNMP: Oracle_456
+    ORCLPDB:
+      PDBADMIN: Oracle_789
 ```
 
 ### default_dbpass
 
+Set the default password for all DB-Users not defined in `dbpasswords`.
+
 #### Default value
 
 ```YAML
-default_dbpass: '{% if item is defined and item.oracle_db_passwd is defined %}{{ item.oracle_db_passwd
-  }}{%- elif dbh is defined and dbh.oracle_db_passwd is defined %}{{ dbh.oracle_db_passwd
-  }}{%- else %}Oracle123{%- endif %}'
+default_dbpass: >-
+  {% if item is defined and item.oracle_db_passwd is defined %}{{ item.oracle_db_passwd
+  -}}
+  {%- elif dbh is defined and dbh.oracle_db_passwd is defined %}{{ dbh.oracle_db_passwd
+  -}}
+  {%- endif %}
+```
+
+#### Example usage
+
+```YAML
+default_dbpass: topeS3cr§t
 ```
 
 ### deploy_ocenv
@@ -874,8 +915,6 @@ shell_ps1: "'[$LOGNAME'@'$ORACLE_SID `basename $PWD`]$'"
 - (information): variable description is missing
 - (information): variable description is missing
 - (information): db_homes_installed not used for a long time...
-- (information): variable description is missing
-- (information): variable description is missing
 - (information): variable description is missing
 - (information): variable description is missing
 - (todo): Remove variable _www_download_bin

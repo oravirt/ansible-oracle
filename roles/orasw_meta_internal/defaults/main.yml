@@ -5,8 +5,9 @@
 # Do not set it in inventory!
 # @end
 # @var _db_password_cdb: $ "_internal_used_"
-_db_password_cdb: "{{ dbpasswords[odb.0.oracle_db_name][db_user] | \
-                      default(default_dbpass) }}"
+_db_password_cdb: >-
+  {{ dbpasswords[odb.0.oracle_db_name][db_user]
+     | default(default_dbpass | mandatory) }}
 
 # @var _db_password_pdb:description: >
 # The variable is internal used only.
@@ -14,8 +15,9 @@ _db_password_cdb: "{{ dbpasswords[odb.0.oracle_db_name][db_user] | \
 # Do not set it in inventory!
 # @end
 # @var _db_password_pdb: $ "_internal_used_"
-_db_password_pdb: "{{ dbpasswords[opdb[0]['cdb']][opdb[0]['pdb_name']][db_user] | \
-                      default(default_dbpass) }}"
+_db_password_pdb: >-
+  {{ dbpasswords[opdb[0]['cdb']][opdb[0]['pdb_name']][db_user]
+     | default(default_dbpass | mandatory) }}
 
 # @var _db_service_name:description: >
 # The variable is internal used only.
