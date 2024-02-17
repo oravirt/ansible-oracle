@@ -767,6 +767,10 @@ transparent_hugepage_disable:
 
 **_hostfs_**
 
+**_hugepages_**
+
+**_molecule-idempotence-notest_**
+
 **_nozeroconf_**
 
 **_orahost_assert_**
@@ -789,11 +793,7 @@ transparent_hugepage_disable:
 
 **_sudoadd_**
 
-**_sysctl,hugepages_**
-
-**_sysctl,hugepages,molecule-idempotence-notest_**
-
-**_sysctl,molecule-idempotence-notest_**
+**_sysctl_**
 
 **_tphnuma_**
 
