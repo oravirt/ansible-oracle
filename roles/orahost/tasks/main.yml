@@ -365,47 +365,50 @@
     reload: true
     ignoreerrors: true
   with_items: "{{ oracle_sysctl }}"
-  tags: sysctl,molecule-idempotence-notest
+  tags:
+    - sysctl
+    - molecule-idempotence-notest
 
 - name: Oracle hugepages
-  ansible.posix.sysctl:
-    name: "{{ item.name }}"
-    value: "{{ item.value }}"
-    state: present
-    reload: true
-    ignoreerrors: true
-  with_items: "{{ oracle_hugepages }}"
-  register: systclcmd
-  tags: sysctl,hugepages,molecule-idempotence-notest
-
-# There is no safe way to allocate Hugepages in a running system.
-# => A reboot should be done after changing the configuration
-# => we won't reboot during installation
-# Work Arroud:
-# => Flush File Cache
-# => retry a sysctl -p
-- name: Flush Buffer Cache  # noqa no-handler
   when:
-    - systclcmd is defined
-    - systclcmd.changed
-  tags: sysctl,hugepages
+    - configure_hugepages | bool
+  tags:
+    - sysctl
+    - hugepages
+    - molecule-idempotence-notest
   block:
-    - name: Flush Buffer Cache when hugepages have been changed
-      ansible.builtin.command: echo 2 > /proc/sys/vm/drop_caches
-      # noqa no-changed-when
-      tags: sysctl,hugepages,molecule-idempotence-notest
-
-    - name: Try sysctl again
+    - name: Oracle hugepages
       ansible.posix.sysctl:
         name: "{{ item.name }}"
         value: "{{ item.value }}"
         state: present
         reload: true
+        ignoreerrors: true
       with_items: "{{ oracle_hugepages }}"
-      tags:
-        - sysctl
-        - hugepages
-        - molecule-idempotence-notest
+      register: systclcmd
+
+    # There is no safe way to allocate Hugepages in a running system.
+    # => A reboot should be done after changing the configuration
+    # => we won't reboot during installation
+    # Work Arroud:
+    # => Flush File Cache
+    # => retry a sysctl -p
+    - name: Flush Buffer Cache  # noqa no-handler
+      when:
+        - systclcmd is defined
+        - systclcmd.changed
+      block:
+        - name: Flush Buffer Cache when hugepages have been changed
+          ansible.builtin.command: echo 2 > /proc/sys/vm/drop_caches
+          # noqa no-changed-when
+
+        - name: Try sysctl again
+          ansible.posix.sysctl:
+            name: "{{ item.name }}"
+            value: "{{ item.value }}"
+            state: present
+            reload: true
+          with_items: "{{ oracle_hugepages }}"
 
 - name: Oracle-recommended PAM config
   ansible.builtin.lineinfile:
