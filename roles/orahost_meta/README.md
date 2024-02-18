@@ -18,7 +18,6 @@ Meta role used by other roles to share variable defaults.
   - [oper_group](#oper_group)
   - [oracle_group](#oracle_group)
   - [oracle_inventory_loc](#oracle_inventory_loc)
-  - [oracle_password](#oracle_password)
   - [oracle_rsp_stage](#oracle_rsp_stage)
   - [oracle_seclimits](#oracle_seclimits)
   - [oracle_stage](#oracle_stage)
@@ -206,22 +205,6 @@ Directory for central Oracle Inventory.
 
 ```YAML
 oracle_inventory_loc: /u01/app/oraInventory
-```
-
-### oracle_password
-
-This is the default password for sys, system, ASM etc.
-
-IMPORTANT!
-
-This will be a mandatory inventory variable in the future!
-
-See: https://github.com/oravirt/ansible-oracle/issues/327
-
-#### Default value
-
-```YAML
-oracle_password: Oracle123
 ```
 
 ### oracle_rsp_stage
