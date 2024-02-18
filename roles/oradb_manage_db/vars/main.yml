@@ -91,8 +91,13 @@ _oradb_manage_db_dbca_system_pass: "{% if dbpasswords[odb.oracle_db_name] is def
                     {%- else %}{{ default_dbpass }}\
                     {%- endif %}"
 
-_oradb_manage_db_default_gipass: "{{ oracle_password }}"
+# default_gipass could be '' when no GI/Restart is used
+_oradb_manage_db_default_gipass: >-
+  {{ (oracle_install_option_gi | length > 0) | ternary(default_gipass, '') }}
 
-_oradb_manage_db_sysasmpassword: "{{ oracle_password }}"
+# default_gipass could be '' when no GI/Restart is used
+_oradb_manage_db_sysasmpassword: >-
+  {{ (oracle_install_option_gi | length > 0) | ternary(default_gipass, '') }}
 
-_oradb_manage_db_asmmonitorpassword: "{{ oracle_password }}"
+_oradb_manage_db_asmmonitorpassword: >-
+  {{ (oracle_install_option_gi | length > 0) | ternary(default_gipass, '') }}

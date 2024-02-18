@@ -80,7 +80,7 @@ ASMSNMP Password for ASM.
 #### Default value
 
 ```YAML
-asmmonitorpassword: '{{ oracle_password }}'
+asmmonitorpassword: '{{ default_gipass }}'
 ```
 
 ### gi_patches
@@ -137,7 +137,7 @@ SYSASM Password for ASM.
 #### Default value
 
 ```YAML
-sysasmpassword: '{{ oracle_password }}'
+sysasmpassword: '{{ default_gipass }}'
 ```
 
 ## Discovered Tags
