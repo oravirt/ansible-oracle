@@ -7,10 +7,13 @@
 gi_ignoreprereq: false
 
 # @var default_gipass:description: >
-# Default password for Grid-Infrastructure.
+# Default password for Grid-Infrastructure and ASM-Users.
 #
+# Important
+#
+# It is mandatory to set this variable in your inventory!
 # @end
-default_gipass: "{{ oracle_password | default('') }}"
+default_gipass: ""
 
 # The check for the old passwords are there for  backwards compatibility and only temporary, will be removed
 default_dbpass: "{% if item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd }}{% else %}Oracle123{% endif %}"

@@ -65,12 +65,16 @@ default_dbpass: '{% if item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_
 
 ### default_gipass
 
-Default password for Grid-Infrastructure.
+Default password for Grid-Infrastructure and ASM-Users.
+
+Important
+
+It is mandatory to set this variable in your inventory!
 
 #### Default value
 
 ```YAML
-default_gipass: "{{ oracle_password | default('') }}"
+default_gipass: ''
 ```
 
 ### endoracle_scan_port
