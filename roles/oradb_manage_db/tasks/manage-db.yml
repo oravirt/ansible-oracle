@@ -6,6 +6,17 @@
     quiet: true
   tags: always
 
+# We need to check if password is set in inventory
+# => Check for password length
+- name: Assert sys Password
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _oradb_manage_db_dbca_sys_pass | length > 0
+    fail_msg: Please set dbpasswords and/or default_dbpass in inventory.
+  when:
+    - odb.state in ('present', 'absent')
+
 - name: manage_db | check if GI is present
   ansible.builtin.stat:
     path: /etc/oracle/olr.loc
