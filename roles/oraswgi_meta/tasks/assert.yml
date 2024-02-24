@@ -26,7 +26,10 @@
 
     - name: Type of Installation
       ansible.builtin.debug:
-        msg: "oracle_install_option_gi: {{ oracle_install_option_gi }}"
+        msg:
+          - "oracle_install_option_gi: {{ oracle_install_option_gi }}"
+          - "role_separation:          {{ role_separation }}"
+          - "_grid_install_user:       {{ _grid_install_user }} (internal variable. Use grid_user + role_separation in inventory.)"
 
     - name: Assert Variables for Restart/Grid Infrastructure Setup
       ansible.builtin.assert:

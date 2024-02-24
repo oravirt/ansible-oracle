@@ -1,5 +1,5 @@
 ---
-- name: Oraswdb_install | Assert variables
+- name: Oraswgi_install | Assert variables
   ansible.builtin.assert:
     quiet: true
     that:
@@ -9,7 +9,7 @@
   tags: always
 
 # RAC is not supported at the moment!
-- name: Oraswdb_install | Assert oracle_install_option_gi
+- name: Oraswgi_install | Assert oracle_install_option_gi
   ansible.builtin.assert:
     quiet: true
     that:
@@ -17,7 +17,20 @@
       # - oracle_install_option_gi in ('HA_CONFIG', 'CRS_CONFIG')
   tags: always
 
-- name: Oraswdb_install | Assert Grid-Infrastructure variables
+- name: Oraswgi_install | Assert role_separation
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - (role_separation and grid_user != oracle_user)
+        or
+        not role_separation
+    fail_msg: >-
+      Role separation is enabled.
+      Different values for grid_user={{ grid_user }}
+      and oracle_user={{ oracle_user }} needed.
+  tags: always
+
+- name: Oraswgi_install | Assert Grid-Infrastructure variables
   ansible.builtin.assert:
     quiet: true
     that:

@@ -2,7 +2,7 @@
 - name: loop_remove_single_opatch | Get unique_patch_id from installed patch
   ansible.builtin.command: "{{ oracle_home_gi }}/OPatch/opatch lspatches -oh {{ oracle_home_gi }} -id {{ gip_opatch.patchid }}"
   become: true
-  become_user: "{{ oracle_user }}"
+  become_user: "{{ _grid_install_user }}"
   changed_when: false
   register: gihome_oneoff_res
 
@@ -33,4 +33,4 @@
         output: verbose
         state: "{{ gip_opatch.state }}"
       become: true
-      become_user: "{{ oracle_user }}"
+      become_user: "{{ _grid_install_user }}"
