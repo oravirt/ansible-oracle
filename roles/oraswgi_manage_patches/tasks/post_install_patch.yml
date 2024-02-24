@@ -2,7 +2,7 @@
 - name: post_install_patch | Get list of current installed patches
   ansible.builtin.command: "{{ oracle_home_gi }}/OPatch/opatch lspatches -oh {{ oracle_home_gi }}"
   become: true
-  become_user: "{{ grid_user }}"
+  become_user: "{{ _grid_install_user }}"
   changed_when: false
   register: gihome_patches
 
@@ -116,7 +116,7 @@
 - name: post_install_patch | Get new list of current installed patches
   ansible.builtin.command: "{{ oracle_home_gi }}/OPatch/opatch lspatches -oh {{ oracle_home_gi }}"
   become: true
-  become_user: "{{ oracle_user }}"
+  become_user: "{{ _grid_install_user }}"
   changed_when: false
   register: dbhome_patches
   when:
