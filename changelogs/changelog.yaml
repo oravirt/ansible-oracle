@@ -696,3 +696,38 @@ releases:
     - wallet.yml
     - wallet2.yml
     release_date: '2024-02-05'
+  4.5.0:
+    changes:
+      breaking_changes:
+      - Removed oracle_password - use default_gipass as replacement (oravirt#409)
+      - 'orahost: Removed fixed password for oracle and grid from defaults (oravirt#409)'
+      - 'orasw_meta: Removed default passwords from default_dbpass and dbpasswords
+        (oravirt#409)'
+      - 'oraswgi_install: Removed default password from default_gipass (oravirt#409)'
+      bugfixes:
+      - 'orahost: fix for broken configure_hugepages=false (oravirt#412)'
+      - 'orasw_meta: Removed warning from ansible (oravirt#409)'
+      minor_changes:
+      - Change Shebang to /usr/bin/env bash (oravirt#409)
+      - Documentation updates (oravirt#389)
+      - 'build(deps): bump ansible-core from 2.15.8 to 2.15.9 in /tools/dev (oravirt#408)'
+      - minor fixes for role separation in Oracle Restart (oravirt#409)
+      - 'oradb_manage_db: Assert SYS password in inventory before dbca (oravirt#409)'
+      security_fixes:
+      - 'orahost: Removed fixed password for oracle and grid from defaults (oravirt#409)'
+      - 'orasw_meta: Removed default passwords from default_dbpass and dbpasswords
+        (oravirt#409)'
+      - 'oraswgi_install: Removed default password from default_gipass (oravirt#409)'
+    fragments:
+    - assert.yml
+    - bash.yml
+    - default_dbpass.yml
+    - default_dbpass_dbca.yml
+    - default_gipass.yml
+    - default_gipass2.yml
+    - dependabot_408.yml
+    - docs.yml
+    - hugepages.yml
+    - os_oracle.yml
+    - role_sparation.yml
+    release_date: '2024-02-24'

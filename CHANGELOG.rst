@@ -5,6 +5,39 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v4.5.0
+======
+
+Minor Changes
+-------------
+
+- Change Shebang to /usr/bin/env bash (oravirt#409)
+- Documentation updates (oravirt#389)
+- build(deps): bump ansible-core from 2.15.8 to 2.15.9 in /tools/dev (oravirt#408)
+- minor fixes for role separation in Oracle Restart (oravirt#409)
+- oradb_manage_db: Assert SYS password in inventory before dbca (oravirt#409)
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- Removed oracle_password - use default_gipass as replacement (oravirt#409)
+- orahost: Removed fixed password for oracle and grid from defaults (oravirt#409)
+- orasw_meta: Removed default passwords from default_dbpass and dbpasswords (oravirt#409)
+- oraswgi_install: Removed default password from default_gipass (oravirt#409)
+
+Security Fixes
+--------------
+
+- orahost: Removed fixed password for oracle and grid from defaults (oravirt#409)
+- orasw_meta: Removed default passwords from default_dbpass and dbpasswords (oravirt#409)
+- oraswgi_install: Removed default password from default_gipass (oravirt#409)
+
+Bugfixes
+--------
+
+- orahost: fix for broken configure_hugepages=false (oravirt#412)
+- orasw_meta: Removed warning from ansible (oravirt#409)
+
 v4.4.2
 ======
 
