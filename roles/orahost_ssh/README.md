@@ -2,18 +2,11 @@
 
 SSH Setup for Oracle Grid-Infrastructure installations.
 
-This role needs a complete refactoring in the future!
-
 ## Table of content
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
-  - [grid_user](#grid_user)
-  - [hostgroup](#hostgroup)
-  - [oracle_group](#oracle_group)
-  - [oracle_user](#oracle_user)
-  - [oracle_users](#oracle_users)
-- [Discovered Tags](#discovered-tags)
+  - [orahost_ssh_keyname](#orahost_ssh_keyname)
 - [Dependencies](#dependencies)
 - [License](#license)
 - [Author](#author)
@@ -26,51 +19,20 @@ This role needs a complete refactoring in the future!
 
 ## Default Variables
 
-### grid_user
+### orahost_ssh_keyname
+
+The name of used key during role execution.
+
+Example for oracle:
+
+/home/oracle/.ssh/{{ orahost_ssh_keyname }}
 
 #### Default value
 
 ```YAML
-grid_user: grid
+orahost_ssh_keyname: id_ed25519
 ```
 
-### hostgroup
-
-#### Default value
-
-```YAML
-hostgroup: '{{ group_names[0] }}'
-```
-
-### oracle_group
-
-#### Default value
-
-```YAML
-oracle_group: oinstall
-```
-
-### oracle_user
-
-#### Default value
-
-```YAML
-oracle_user: oracle
-```
-
-### oracle_users
-
-#### Default value
-
-```YAML
-oracle_users:
-  - {username: oracle, primgroup: oinstall}
-  - {username: grid, primgroup: oinstall}
-```
-
-## Discovered Tags
-
-**_sshkeys,known_hosts_**
 
 
 ## Dependencies
@@ -84,4 +46,4 @@ license (MIT)
 
 ## Author
 
-[Mikael Sandström]
+[Thorsten Bruhns]

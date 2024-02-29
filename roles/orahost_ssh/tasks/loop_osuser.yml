@@ -1,0 +1,48 @@
+---
+# Variables:
+#   _key_owner: oracle
+#   _key_owner_home: /home/oracle
+#
+- name: Create .ssh directory for user {{ _key_owner }}
+  ansible.builtin.file:
+    path: "{{ _key_owner_home }}/.ssh"
+    owner: "{{ _key_owner }}"
+    mode: 0700
+    state: directory
+
+# Keys are only created when not existing.
+- name: Create ssh-key for user {{ _key_owner }}
+  community.crypto.openssh_keypair:
+    path: "{{ _key_owner_home }}/.ssh/{{ orahost_ssh_keyname }}"
+    owner: "{{ _key_owner }}"
+    type: ed25519
+
+- name: Read public key from remote host for user {{ _key_owner }}
+  ansible.builtin.slurp:
+    src: "{{ _key_owner_home }}/.ssh/{{ orahost_ssh_keyname }}.pub"
+  register: ssh_pubkey_res
+
+# All public keys from all cluster node are added to all authorized keys
+# loop over orasw_meta_cluster_hostgroup and write public key to target host.
+- name: Add public key to authorized_keys for user {{ _key_owner }}
+  ansible.posix.authorized_key:
+    key: >-
+      {{ hostvars[item]['ssh_pubkey_res']['content'] | b64decode | split('\n') | first }}
+    user: "{{ _key_owner }}"
+    state: present
+  with_items: "{{ groups[orasw_meta_cluster_hostgroup] }}"
+
+- name: Read host key from remote host with ssh-keyscan
+  ansible.builtin.command: ssh-keyscan -t ecdsa-sha2-nistp256 {{ ansible_hostname }}
+  register: ssh_hostkey_res
+  changed_when: ssh_hostkey_res.rc == 0
+
+- name: Add hostkeys to user {{ _key_owner }}
+  ansible.builtin.known_hosts:
+    name: "{{ _hostkey_line | split(' ') | first }}"
+    key: "{{ _hostkey_line }}"
+    path: "{{ _key_owner_home }}/.ssh/known_hosts"
+    state: present
+  with_items: "{{ groups[orasw_meta_cluster_hostgroup] }}"
+  vars:
+    _hostkey_line: "{{ hostvars[item]['ssh_hostkey_res']['stdout_lines'] | first }}"

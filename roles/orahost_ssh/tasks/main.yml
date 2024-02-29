@@ -2,65 +2,19 @@
 - name: Deploy SSH-Keys on Cluster
   when:
     - _oraswgi_meta_configure_cluster | default(false)
+    - inventory_hostname in groups[orasw_meta_cluster_hostgroup]
   block:
+    - name: SSH-Keys for {{ oracle_user }}
+      ansible.builtin.include_tasks: loop_osuser.yml
+      vars:
+        _key_owner_home: "{{ oracle_user_home }}"
+        _key_owner: "{{ oracle_user }}"
 
-    - name: ssh-keys | get public key for oracle user
-      ansible.builtin.shell: cat /home/{{ oracle_user }}/.ssh/id_rsa.pub
-      # noqa command-instead-of-shell no-changed-when
-      register: oracle_key
-      tags:
-        - sshkeys
-
-    - name: ssh-keys | get public key for grid user
-      ansible.builtin.shell: cat /home/{{ grid_user }}/.ssh/id_rsa.pub
-      # noqa command-instead-of-shell no-changed-when
-      register: grid_key
-      when: role_separation
-      tags:
-        - sshkeys
-
-    - name: ssh-keys | Add keys for {{ oracle_user }}
-      ansible.posix.authorized_key:
-        user: "{{ oracle_user }}"
-        key: "{{ item[1] }}"
-      delegate_to: "{{ item[0] }}"
-      with_nested:
-        - "{{ groups[hostgroup] }}"
-        - "{{ oracle_key.stdout }}"
-      tags:
-        - sshkeys
-      when: oracle_key is defined
-
-    - name: ssh-keys | Add keys for {{ grid_user }}
-      ansible.posix.authorized_key:
-        user: "{{ grid_user }}"
-        key: "{{ item[1] }}"
-      delegate_to: "{{ item[0] }}"
-      with_nested:
-        - "{{ groups[hostgroup] }}"
-        - "{{ grid_key.stdout }}"
-      tags:
-        - sshkeys
-      when: role_separation and grid_key is defined
-
-    - name: ssh-keys | create .known_hosts
-      ansible.builtin.file:
-        path: "/home/{{ item }}/.ssh/known_hosts"
-        state: touch
-        owner: "{{ item }}"
-        group: "{{ oracle_group }}"
-        mode: 0600
-      with_items:
-        - "{{ oracle_user }}"
-        - "{% if role_separation %}{{ grid_user }}{% else %}[]{% endif %}"
-      changed_when: false
-      tags: sshkeys,known_hosts
-
-    - name: Deploy known_hosts
-      ansible.builtin.include_tasks: known-hosts.yml
-      with_items:
-        - "{{ oracle_user }}"
-        - "{% if role_separation %}{{ grid_user }}{% else %}[]{% endif %}"
-      loop_control:
-        loop_var: user
-      tags: sshkeys,known_hosts
+    - name: SSH-Keys for {{ _grid_install_user }}
+      ansible.builtin.include_tasks: loop_osuser.yml
+      vars:
+        _key_owner_home: "{{ grid_user_home }}"
+        _key_owner: "{{ _grid_install_user }}"
+      when:
+        - role_separation | bool
+        - oracle_user != _grid_install_user
