@@ -18,9 +18,19 @@
         group: "{{ oracle_group }}"
         mode: '0644'
 
-    - name: manage_db | add ocenv to .bashrc  # noqa: args[module]
+    # OUI in RAC mode has issues with echo in '.bashrc'
+    # Move the echo to .bash_profile
+    # This task should be removed in a later Release of ansible-oracle
+    - name: manage_db | Remove ocenv from .bashrc
       ansible.builtin.blockinfile:
         path: "{{ oracle_user_home }}/.bashrc"
+        marker: "# {mark} ocenv ANSIBLE MANAGED BLOCK"
+        backup: false
+        state: absent
+
+    - name: manage_db | add ocenv to .bash_profile  # noqa: args[module]
+      ansible.builtin.blockinfile:
+        path: "{{ oracle_user_home }}/.bash_profile"
         marker: "# {mark} ocenv ANSIBLE MANAGED BLOCK"
         block: "{{ ocenv_bashrc_init_section }}"
         create: true
