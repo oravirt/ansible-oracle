@@ -6,16 +6,16 @@ _oraswgi_install_init_dg_exists: "{% for dg in asm_diskgroups if oracle_asm_init
 _oraswgi_install_oracle_grid_responsefile: "grid-{{ oracle_cluster_name }}.rsp"
 
 _oraswgi_manage_patches_oracle_directories:
-  - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_rsp_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_base }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_stage }}", owner: "{{ _grid_install_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ oracle_rsp_stage }}", owner: "{{ _grid_install_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ grid_base }}", owner: "{{ _grid_install_user }}", group: "{{ oracle_group }}", mode: 775}
   - {name: "{{ oracle_inventory_loc }}", owner: "{{ _grid_install_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_base }}/cfgtoollogs", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_base }}/admin", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_base }}/audit", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_base }}/cfgtoollogs/dbca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_base }}/cfgtoollogs/sqlpatch", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
-  - {name: "{{ oracle_base }}/cfgtoollogs/netca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ grid_base }}/cfgtoollogs", owner: "{{ _grid_install_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ grid_base }}/admin", owner: "{{ _grid_install_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ grid_base }}/audit", owner: "{{ _grid_install_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ grid_base }}/cfgtoollogs/dbca", owner: "{{ _grid_install_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ grid_base }}/cfgtoollogs/sqlpatch", owner: "{{ _grid_install_user }}", group: "{{ oracle_group }}", mode: 775}
+  - {name: "{{ grid_base }}/cfgtoollogs/netca", owner: "{{ _grid_install_user }}", group: "{{ oracle_group }}", mode: 775}
 
 _oraswgi_install_oracle_gi_image: >-
   {{ oracle_sw_copy | bool | ternary(oracle_stage, oracle_stage_remote) }}/

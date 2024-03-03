@@ -13,7 +13,8 @@
         msg:
           - "install_home_gi | Start Extract files to ORACLE_HOME (gi)"
           - "oracle_home_gi: {{ oracle_home_gi }}"
-      run_once: "{{ _oraswgi_meta_configure_cluster }}"
+      when:
+        - _orasw_meta_primary_node | bool
 
     - name: install_home_gi | Extract files to ORACLE_HOME (gi)
       ansible.builtin.unarchive:
@@ -27,7 +28,8 @@
         creates: "{{ oracle_home_gi }}/root.sh"
       become: true
       become_user: "{{ _grid_install_user }}"
-      run_once: "{{ _oraswgi_meta_configure_cluster }}"
+      when:
+        - _orasw_meta_primary_node | bool
 
     - name: install_home_gi | Copy Patches for -applyRU when version >=19c
       ansible.builtin.import_role:
@@ -38,26 +40,28 @@
         - oracle_install_version_gi is version(19, '>=')
 
 - name: install_home_gi | Check for file GridSetup.sh
-  no_log: true
   ansible.builtin.stat:
     path: "{{ oracle_home_gi }}/gridSetup.sh"
   register: stat_gridsetup_result
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become: true
   become_user: "{{ _grid_install_user }}"
+  when:
+    - _orasw_meta_primary_node | bool
 
 - name: install_home_gi | State of GridSetup.sh
   ansible.builtin.assert:
     quiet: true
     that: "stat_gridsetup_result.stat.exists == True"
     msg: "Cannot find {{ oracle_home_gi }}/gridSetup.sh }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
+  when:
+    - _orasw_meta_primary_node | bool
 
 - name: check for existing cvuqdisk_rpm
   ansible.builtin.stat:
     path: "{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}"
   register: statcvuqdisk
-  run_once: true
+  when:
+    - _orasw_meta_primary_node | bool
   tags: cvuqdisk
 
 # Oracle Restart + ASMFD
@@ -78,8 +82,9 @@
         src: "{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}"
         dest: /tmp
         mode: 0644
-      run_once: true
       when:
+        - _orasw_meta_primary_node | bool
+        - statcvuqdisk.stat is defined
         - statcvuqdisk.stat.exists
       tags: cvuqdisk
 
@@ -106,13 +111,13 @@
     mode: "0600"
     backup: true
   with_items: "{{ asm_diskgroups }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   loop_control:
     label: "{{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }}"
   tags:
     - responsefilegi
   when:
     - item.diskgroup == oracle_asm_init_dg
+    - _orasw_meta_primary_node | bool
 
 - name: install_home_gi | Block for configure Grid Infrastructure
   when: oracle_home_gi not in checkgiinstall.stdout
@@ -142,6 +147,7 @@
     - name: install_home_gi | Check for bundle.xml in patchru_dir
       when:
         - patch_before_rootsh | bool
+        - _orasw_meta_primary_node | bool
       block:
         # the ORACLE_HOME is damaged, when gridSetup.sh is started wiith wrong path!
         # => Check for existing file bundle.xml
@@ -163,7 +169,20 @@
           - "oracle_home_gi: {{ oracle_home_gi }}"
           - "apply RU before configuration: {{ patch_before_rootsh }}"
           - "{{ patch_before_rootsh | bool | ternary('patchru_dir: ' + __patchru_dir, '') }}"
-      run_once: true
+      when:
+        - _orasw_meta_primary_node | bool
+
+    - name: Detail inventory for Grid-Infrastructure
+      ansible.builtin.debug:
+        msg:
+          - "oracle_cluster_name: {{ oracle_cluster_name }}"
+          - "oracle_scan:         {{ oracle_scan }}"
+          - "oracle_scan_port:    {{ oracle_scan_port }}"
+          - "oracle_gi_nic_pub:   {{ oracle_gi_nic_pub }}"
+          - "oracle_gi_nic_priv:  {{ oracle_gi_nic_priv }}"
+          - "oracle_asm_init_dg:  {{ oracle_asm_init_dg }}"
+      when:
+        - _oraswgi_meta_configure_cluster | bool
 
     - name: install_home_gi | Install Grid Infrastructure
       ansible.builtin.command:
@@ -183,7 +202,8 @@
           - "{{ __patchru_dir }}"
       become: true
       become_user: "{{ _grid_install_user }}"
-      run_once: "{{ _oraswgi_meta_configure_cluster }}"
+      when:
+        - _orasw_meta_primary_node | bool
       tags:
         - oragridinstall
       register: giinstall
@@ -192,8 +212,9 @@
     - name: Info
       ansible.builtin.debug:
         var: giinstall.stdout_lines
-      run_once: "{{ _oraswgi_meta_configure_cluster }}"
-      when: giinstall.stdout_lines is defined
+      when:
+        - giinstall.stdout_lines is defined
+        - _orasw_meta_primary_node | bool
 
 - name: install_home_gi | include role oraswgi_manage_patches
   ansible.builtin.include_role:
@@ -213,22 +234,25 @@
 
     - ansible.builtin.debug:  # noqa name[missing]
         msg: "install_home_gi | Start Run root script after installation (Master Node)"
-      run_once: true
+      when:
+        - _orasw_meta_primary_node | bool
 
     - name: install_home_gi | Run root script after installation (Master Node)
       ansible.builtin.command: "{{ oracle_home_gi }}/root.sh"
       # noqa no-changed-when
       become: true
-      run_once: "{{ _oraswgi_meta_configure_cluster }}"
       register: rootmaster
+      when:
+        - _orasw_meta_primary_node | bool
       tags:
         - runroot
 
     - name: Info
       ansible.builtin.debug:
         var: rootmaster.stdout_lines
-      run_once: "{{ _oraswgi_meta_configure_cluster }}"
-      when: rootmaster.stdout_lines is defined
+      when:
+        - rootmaster.stdout_lines is defined
+        - _orasw_meta_primary_node | bool
 
     - name: Info
       ansible.builtin.debug:
@@ -245,12 +269,12 @@
       args:
         executable: /usr/bin/bash
       become: true
-      with_indexed_items: "{{ groups[hostgroup] }}"
+      with_indexed_items: "{{ groups[orasw_meta_cluster_hostgroup] }}"
       tags:
         - runroot
       when:
         - _oraswgi_meta_configure_cluster
-        - inventory_hostname != cluster_master
+        - not _orasw_meta_primary_node | bool
         - inventory_hostname == item.1
       register: rootother
 
@@ -264,10 +288,10 @@
       # noqa no-changed-when
       become: true
       become_user: "{{ _grid_install_user }}"
-      run_once: "{{ _oraswgi_meta_configure_cluster }}"
       tags:
         - runconfigtool
       when:
         - run_configtoolallcommand
+        - _orasw_meta_primary_node | bool
       ignore_errors: true
       register: configtool

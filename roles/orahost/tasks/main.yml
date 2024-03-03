@@ -117,11 +117,11 @@
 - name: ssh-keys | Generate SSH keys
   local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys  # noqa yaml no-handler deprecated-local-action ignore-errors no-changed-when fqcn[action-core]
   ignore_errors: true
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when:
     - configure_ssh
     - _oraswgi_meta_configure_cluster
     - old_ssh_config
+    - _orasw_meta_primary_node | bool
   become: false
   tags:
     - sshkeys
@@ -236,11 +236,11 @@
   with_items:
     - "{{ ssh_keys }}"
     - "{{ keyfile }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when:
     - configure_ssh
     - _oraswgi_meta_configure_cluster
     - old_ssh_config
+    - _orasw_meta_primary_node | bool
   ignore_errors: true
   become: false
   tags:

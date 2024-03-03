@@ -24,7 +24,7 @@ SELECTED_LANGUAGES=en
 #-------------------------------------------------------------------------------
 oracle.install.option={{ oracle_install_option_gi }}
 
-ORACLE_BASE={{ oracle_base }}
+ORACLE_BASE={{ grid_base }}
 
 #-------------------------------------------------------------------------------
 # Specify the complete path of the Oracle Home.
@@ -159,9 +159,9 @@ oracle.install.crs.config.gpnp.gnsVIPAddress=
 {%  if oracle_gi_cluster_type|upper  == "STANDARD" %}
 
 {%  if ansible_domain  == ""  %}
-oracle.install.crs.config.clusterNodes={% if _oraswgi_meta_configure_cluster %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1") }}{{ oracle_vip }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if _oraswgi_meta_configure_cluster %}{% for host in groups[orasw_meta_cluster_hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}:{{ host |regex_replace("^([^.]+)\..*", "\\1") }}{{ oracle_vip }}{%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
   {% else  %}
-oracle.install.crs.config.clusterNodes={% if _oraswgi_meta_configure_cluster %}{% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}.{{ ansible_domain }} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
+oracle.install.crs.config.clusterNodes={% if _oraswgi_meta_configure_cluster %}{% for host in groups[orasw_meta_cluster_hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}}.{{ ansible_domain }}:{{ host |regex_replace("^([^.]+)\..*", "\\1")}}{{ oracle_vip }}.{{ ansible_domain }} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}{% else %}{% endif %}
 {% endif %}
 
 {% elif oracle_gi_cluster_type|upper == 'FLEX'  %}

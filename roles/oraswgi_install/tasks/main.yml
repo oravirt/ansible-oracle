@@ -24,12 +24,15 @@
 
 - name: install_home_gi | State of current installation
   ansible.builtin.debug:
-    msg: "GI/Restart installed? {{ olrloc.stat.exists }}"
+    msg:
+      - "GI/Restart installed? {{ olrloc.stat.exists }}"
+      - "Clusternode primary?  {{ _orasw_meta_primary_node }}"
 
 - name: Assert inventory
   when:
     - not olrloc.stat.exists
   block:
+
     - name: assert oracle_asm_init_dg in asm_diskgroups
       ansible.builtin.assert:
         quiet: true
@@ -66,11 +69,12 @@
   ansible.builtin.file:
     dest: "{{ oracle_stage }}/{{ item.version }}"
     mode: "0775"
-    owner: "{{ oracle_user }}"
+    owner: "{{ _grid_install_user }}"
     group: "{{ oracle_group }}"
     state: directory
   become: true
-  with_items: "{{ oracle_sw_image_gi | selectattr('version', 'equalto', oracle_install_version_gi) }}"
+  become_user: root
+  with_items: "{{ oracle_sw_image_gi | selectattr('version', 'match', oracle_install_version_gi) }}"
   tags:
     - directories
 
@@ -89,23 +93,26 @@
   tags:
     - crsctl
   register: crsctl
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
-  when: oracle_home_gi not in checkgiinstall.stdout
+  when:
+    - oracle_home_gi not in checkgiinstall.stdout
+    - _orasw_meta_primary_node | bool
 
 - ansible.builtin.debug:  # noqa name[missing]
     var: crsctl.stdout_lines
   tags:
     - crsctl
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
-  when: oracle_home_gi not in checkgiinstall.stdout
+  when:
+    - oracle_home_gi not in checkgiinstall.stdout
+    - _orasw_meta_primary_node | bool
 
 - name: install_home_gi | Update Nodelist, set CRS=TRUE
   ansible.builtin.shell: "{{ oracle_home_gi }}/oui/bin/runInstaller -updateNodeList ORACLE_HOME={{ oracle_home_gi }} CRS=TRUE"
   # noqa command-instead-of-shell no-changed-when ignore-errors
   become: true
   become_user: "{{ _grid_install_user }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
-  when: oracle_home_gi not in checkgiinstall.stdout
+  when:
+    - oracle_home_gi not in checkgiinstall.stdout
+    - _orasw_meta_primary_node | bool
   ignore_errors: true
   tags:
     - updatenodelist

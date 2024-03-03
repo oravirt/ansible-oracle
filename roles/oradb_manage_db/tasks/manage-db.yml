@@ -54,8 +54,9 @@
 - name: state
   ansible.builtin.debug:
     msg: "Maintaining DB - {{ odb.oracle_db_name }}, ORACLE_HOME - {{ _oracle_home_db }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
-  when: odb.state == 'present'
+  when:
+    - odb.state == 'present'
+    - _orasw_meta_primary_node | bool
 
 # dbca_copy_template is for special situations, when using DBCA-templates
 # without executing a template task before.

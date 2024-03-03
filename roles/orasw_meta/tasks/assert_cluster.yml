@@ -1,0 +1,16 @@
+---
+- name: assert ansible-oracle variables
+  tags:
+    - always
+    - assert_ansible_oracle
+  block:
+    - name: assert grid_base (GI enabled)
+      when:
+        - oracle_install_option_gi == 'CRS_CONFIG'
+      block:
+        - name: assert grid_base
+          ansible.builtin.assert:
+            quiet: true
+            that:
+              - grid_base | length > 0
+              - grid_base != oracle_base

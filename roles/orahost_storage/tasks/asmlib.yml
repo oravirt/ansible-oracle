@@ -8,7 +8,11 @@
     - asmstorage
   block:
     - name: ASM-storage | create asmlib labels
-      ansible.builtin.shell: "{{ asmlib_binary }} createdisk {{ item.1.asmlabel }} {{ item.1.device }}{{ partition_suffix }}"
+      ansible.builtin.shell: |-
+        #!/usr/bin/env bash
+        if ! {{ asmlib_binary }} querydisk {{ item.1.device }}{{ partition_suffix }} 2>/dev/null ; then
+          {{ asmlib_binary }} createdisk {{ item.1.asmlabel }} {{ item.1.device }}{{ partition_suffix }}
+        fi
       # noqa command-instead-of-shell
       args:
         creates: "/dev/oracleasm/disks/{{ item.1.asmlabel | upper }}"
@@ -17,7 +21,8 @@
         - disk
       loop_control:
         label: "asmdisk={{ item.1.asmlabel | default('') }} device={{ item.1.device | default('') }}{{ partition_suffix | default('') }}"
-      run_once: "{{ _oraswgi_meta_configure_cluster }}"
+      when:
+        - _orasw_meta_primary_node | bool
 
     - name: ASMlib | Rescan ASM disks
       ansible.builtin.shell: "{{ asmlib_binary }} scandisks"

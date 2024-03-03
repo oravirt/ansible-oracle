@@ -25,6 +25,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [default_dbpass](#default_dbpass)
   - [deploy_ocenv](#deploy_ocenv)
   - [disable_ee_options](#disable_ee_options)
+  - [grid_base](#grid_base)
   - [hostgroup](#hostgroup)
   - [install_from_nfs](#install_from_nfs)
   - [is_sw_source_local](#is_sw_source_local)
@@ -59,6 +60,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [oracle_sw_source_local](#oracle_sw_source_local)
   - [oracle_sw_source_www](#oracle_sw_source_www)
   - [orasw_meta_assert_oracle_databases](#orasw_meta_assert_oracle_databases)
+  - [orasw_meta_cluster_hostgroup](#orasw_meta_cluster_hostgroup)
   - [shell_aliases](#shell_aliases)
   - [shell_ps1](#shell_ps1)
 - [Discovered Tags](#discovered-tags)
@@ -264,6 +266,24 @@ disable_ee_options: true # change options in binary
 disable_ee_options: false # do not change options in binary
 ```
 
+### grid_base
+
+`ORACLE_BASE` for Grid Infrastructure/Restart
+
+Important!
+
+ORACLE_BASE for Grid-Infrastructure must be different the ORACLE_BASE for RDBMS.
+
+ORACLE_BASE for Oracle Rstart is same as RDBMS.
+
+#### Default value
+
+```YAML
+grid_base: >-
+  {% if oracle_install_option_gi == 'CRS_CONFIG' -%}
+  /u01/app/grid/base{% else %}{{ oracle_base }}{% endif %}
+```
+
 ### hostgroup
 
 Defines the hostgroup with nodes for a Grid-Infrastructure Cluster.
@@ -364,11 +384,7 @@ oracle_asm_disk_string: ORCL:*
 
 ### oracle_base
 
-`ORACLE_BASE` for Oracle RDBMS and Grid Infrastructure.
-
-There is a known bug for Grid-Infrastructure/Restart.
-
-See (https://github.com/oravirt/ansible-oracle/issues/259) for details.
+`ORACLE_BASE` for Oracle RDBMS
 
 #### Default value
 
@@ -858,6 +874,16 @@ Please change the state only when really needed!
 
 ```YAML
 orasw_meta_assert_oracle_databases: true
+```
+
+### orasw_meta_cluster_hostgroup
+
+Ansible Inventory hostgroup for RAC-Cluster.
+
+#### Default value
+
+```YAML
+orasw_meta_cluster_hostgroup: ''
 ```
 
 ### shell_aliases
