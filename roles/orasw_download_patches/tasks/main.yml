@@ -60,6 +60,19 @@
       loop_control:
         label: "{{ item.home }}: {{ opatch.filename | d('cannot find oracle_opatch_patch entry for ' + db_version, true) }}"
 
+    - name: Prepare OPatch patch for GI/Restart
+      vars:
+        opatch:
+          patchid: 6880880
+          filename: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) | map(attribute='filename') | join }}"
+          description: "Current OPatch for {{ oracle_install_version_gi }}"
+      ansible.builtin.set_fact:
+        opatchinfo: "{{ opatchinfo + [opatch] }}"
+      when:
+        - oracle_install_option_gi is defined
+        - oracle_install_option_gi in ('CRS_CONFIG', 'HA_CONFIG')
+        - oracle_install_version_gi is defined
+
     - name: Get ARU and URL
       vars:
         url: "https://updates.oracle.com/Orion/SimpleSearch/process_form?search_type=patch&plat_lang={{ oracle_plat_lang }}&patch_number={{ item.patchid }}"
@@ -82,7 +95,7 @@
         use_proxy: "{{ use_proxy }}"
       environment: "{{ proxy_env }}"
       with_items:
-        - "{{ opatchinfo }}"
+        - "{{ opatchinfo | unique }}"
         - "{{ oracle_sw_patches }}"
       failed_when: "aru == 'missing' or password_required"
       loop_control:
