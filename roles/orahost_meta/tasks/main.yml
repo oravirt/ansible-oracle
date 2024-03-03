@@ -1,2 +1,23 @@
 ---
-# Dummyfile for ansible-doctor
+- name: Import assert_cluster.yml
+  ansible.builtin.import_tasks: assert_cluster.yml
+
+# The state of fact is:
+# Single-Instance / Oracle Restart:
+#   _orasw_meta_primary_node: true
+- name: Set fact for _orasw_meta_primary_node (non GI)
+  ansible.builtin.set_fact:
+    _orasw_meta_primary_node: true
+  when:
+    - oracle_install_option_gi != 'CRS_CONFIG'
+
+# RAC:
+#   1st Node:
+#     _orasw_meta_primary_node: true
+#   other Nodes:
+#     _orasw_meta_primary_node: false
+- name: Set fact for _orasw_meta_primary_node (GI)
+  ansible.builtin.set_fact:
+    _orasw_meta_primary_node: "{{ groups[orasw_meta_cluster_hostgroup][0] == inventory_hostname }}"
+  when:
+    - oracle_install_option_gi == 'CRS_CONFIG'

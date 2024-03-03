@@ -11,8 +11,7 @@ _grid_install_user: "{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_
 #
 # Do not change it!
 # @end
-# @todo bug: `ansible-oracle` does not support RAC at the moment.
-_oraswgi_meta_configure_cluster: false
+_oraswgi_meta_configure_cluster: "{{ oracle_install_option_gi == 'CRS_CONFIG' }}"
 
 # @var sysasmpassword:description: >
 # SYSASM Password for ASM.

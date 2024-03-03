@@ -64,7 +64,7 @@
   ansible.builtin.file:
     name: "{{ oracle_home_gi }}"
     mode: "0775"
-    owner: "{{ oracle_user }}"
+    owner: "{{ _grid_install_user }}"
     group: "{{ oracle_group }}"
     state: directory
   when: _oraswgi_meta_configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
@@ -151,7 +151,7 @@
   ansible.builtin.shell: "sleep {{ item.0 * 60 }}; {{ oracle_home_gi }}/root.sh"
   # noqa command-instead-of-shell no-changed-when
   become: true
-  with_indexed_items: "{{ groups[hostgroup] }}"
+  with_indexed_items: "{{ groups[orasw_meta_cluster_hostgroup] }}"
   tags:
     - runroot
   # when: not master_node and oracle_home_gi not in checkgiinstall.stdout and inventory_hostname == item.1

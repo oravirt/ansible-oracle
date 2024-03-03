@@ -9,10 +9,10 @@
   with_subelements:
     - "{{ asm_diskgroups }}"
     - disk
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when:
     - partition_devices
     - asm_diskgroups is defined
+    - _orasw_meta_primary_node | bool
   tags:
     - asmstorage
     - partition

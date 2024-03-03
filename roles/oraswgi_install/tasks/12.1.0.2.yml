@@ -101,7 +101,7 @@
   ansible.builtin.shell: "sleep {{ item.0 * 60 }}; {{ oracle_home_gi }}/root.sh"
   # noqa command-instead-of-shell no-changed-when
   become: true
-  with_indexed_items: "{{ groups[hostgroup] }}"
+  with_indexed_items: "{{ groups[orasw_meta_cluster_hostgroup] }}"
   tags:
     - runroot
   when: _oraswgi_meta_configure_cluster and inventory_hostname != cluster_master and inventory_hostname == item.1 and oracle_home_gi not in checkgiinstall.stdout

@@ -50,15 +50,23 @@ oracle_stage_remote: "{{ oracle_stage }}"
 # @end
 is_sw_source_local: true
 
-# @todo bug: oracle_base for RDBMS and GI are the same. See (https://github.com/oravirt/ansible-oracle/issues/259) for details.
 # @var oracle_base:description: >
-# `ORACLE_BASE` for Oracle RDBMS and Grid Infrastructure.
-#
-# There is a known bug for Grid-Infrastructure/Restart.
-#
-# See (https://github.com/oravirt/ansible-oracle/issues/259) for details.
+# `ORACLE_BASE` for Oracle RDBMS
 # @end
 oracle_base: /u01/app/oracle
+
+# @var grid_base:description: >
+# `ORACLE_BASE` for Grid Infrastructure/Restart
+#
+# Important!
+#
+# ORACLE_BASE for Grid-Infrastructure must be different the ORACLE_BASE for RDBMS.
+#
+# ORACLE_BASE for Oracle Rstart is same as RDBMS.
+# @end
+grid_base: >-
+  {% if oracle_install_option_gi == 'CRS_CONFIG' -%}
+  /u01/app/grid/base{% else %}{{ oracle_base }}{% endif %}
 
 # @var oracle_install_option_gi:description: >
 # Define the installation type for Grid Infrastructure or Oracle Restart.
@@ -605,3 +613,8 @@ dbpasswords: {}
 # Please change the state only when really needed!
 # @end
 orasw_meta_assert_oracle_databases: true
+
+# @var orasw_meta_cluster_hostgroup:description: >
+# Ansible Inventory hostgroup for RAC-Cluster.
+# @end
+orasw_meta_cluster_hostgroup: ""

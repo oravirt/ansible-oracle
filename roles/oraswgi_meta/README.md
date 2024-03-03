@@ -23,7 +23,6 @@ There are a lot of variables who are used by `orasw_meta`
   - [patch_before_rootsh](#patch_before_rootsh)
   - [sysasmpassword](#sysasmpassword)
 - [Discovered Tags](#discovered-tags)
-- [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
 - [License](#license)
 - [Author](#author)
@@ -58,7 +57,7 @@ Do not change it!
 #### Default value
 
 ```YAML
-_oraswgi_meta_configure_cluster: false
+_oraswgi_meta_configure_cluster: "{{ oracle_install_option_gi == 'CRS_CONFIG' }}"
 ```
 
 ### apply_patches_gi
@@ -146,9 +145,6 @@ sysasmpassword: '{{ default_gipass }}'
 
 **_assert_ansible_oracle_**
 
-## Open Tasks
-
-- (bug): `ansible-oracle` does not support RAC at the moment.
 
 ## Dependencies
 

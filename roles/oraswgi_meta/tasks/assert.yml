@@ -27,9 +27,10 @@
     - name: Type of Installation
       ansible.builtin.debug:
         msg:
-          - "oracle_install_option_gi: {{ oracle_install_option_gi }}"
-          - "role_separation:          {{ role_separation }}"
-          - "_grid_install_user:       {{ _grid_install_user }} (internal variable. Use grid_user + role_separation in inventory.)"
+          - "oracle_install_option_gi:     {{ oracle_install_option_gi }}"
+          - "role_separation:              {{ role_separation }}"
+          - "_grid_install_user:           {{ _grid_install_user }} (internal variable. Use grid_user + role_separation in inventory.)"
+          - "orasw_meta_cluster_hostgroup: {{ orasw_meta_cluster_hostgroup | default('') }} (only used in RAC)"
 
     - name: Assert Variables for Restart/Grid Infrastructure Setup
       ansible.builtin.assert:
@@ -40,8 +41,7 @@
           - asm_diskgroups is defined
           - asm_diskgroups | type_debug == 'list'
           - oracle_asm_init_dg in asm_diskgroups | map(attribute='diskgroup')
-          - oracle_install_option_gi | default('') in ('HA_CONFIG')
-          # - oracle_install_option_gi | default('') in ('CRS_CONFIG', 'HA_CONFIG')
+          - oracle_install_option_gi | default('') in ('CRS_CONFIG', 'HA_CONFIG')
           - device_persistence in ('asmfd', 'asmlib')
 
     - name: assert gi_patches

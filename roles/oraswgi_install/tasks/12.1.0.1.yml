@@ -95,17 +95,22 @@
   ansible.builtin.shell: "sleep {{ item.0 * 60 }}; {{ oracle_home_gi }}/root.sh"
   # noqa command-instead-of-shell no-changed-when
   become: true
-  with_indexed_items: "{{ groups[hostgroup] }}"
+  with_indexed_items: "{{ groups[orasw_meta_cluster_hostgroup] }}"
   tags:
     - runroot
   # when: not master_node and oracle_home_gi not in checkgiinstall.stdout and inventory_hostname == item.1
-  when: _oraswgi_meta_configure_cluster and inventory_hostname != cluster_master and inventory_hostname == item.1 and oracle_home_gi not in checkgiinstall.stdout
+  when:
+    - not _orasw_meta_primary_node | bool
+    - inventory_hostname == item.1
+    - oracle_home_gi not in checkgiinstall.stdout
   register: rootother
 
 - ansible.builtin.debug:  # noqa name[missing] ignore-errors
     var: rootother.stdout_lines
-  # when: not master_node and oracle_home_gi not in checkgiinstall.stdout
-  when: _oraswgi_meta_configure_cluster and inventory_hostname != cluster_master and oracle_home_gi not in checkgiinstall.stdout
+  when:
+    - _oraswgi_meta_configure_cluster
+    - not _orasw_meta_primary_node | bool
+    - oracle_home_gi not in checkgiinstall.stdout
   ignore_errors: true
 
 - name: install_home_gi | Setup response file for configToolAllCommands

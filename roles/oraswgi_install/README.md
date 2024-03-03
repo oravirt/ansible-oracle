@@ -4,6 +4,11 @@ Install Grid Infrastructure / ORacle Restart software.
 
 This role has a dependency to `orahost_meta` and `orasw_meta` for default parameter.
 
+Known Issues from Oracle:
+
+- TOP Note: Solutions for Typical Grid Infrastructure/RAC Database runInstaller/DBCA for RAC Issues (Doc ID 1056713.1)
+- INS-06006 GI RunInstaller Fails If OpenSSH Is Upgraded to 8.x (Doc ID 2555697.1)
+
 ## Table of content
 
 - [Requirements](#requirements)
@@ -126,10 +131,17 @@ oracle_cluster_mgmdb: false
 
 Name of Grid-Infrastructure Cluster.
 
+The maximum length allowed for clustername is 63 characters. The name can be
+any combination of lower and uppercase alphabets (A - Z), (0 - 9) and hyphens (-).
+
+Only set this variable, when `orasw_meta_cluster_hostgroup` contains a '_'.
+
+Important! Ansible hostgrouds could not contain a '-' in name!
+
 #### Default value
 
 ```YAML
-oracle_cluster_name: '{{ hostgroup }}'
+oracle_cluster_name: '{{ orasw_meta_cluster_hostgroup }}'
 ```
 
 ### oracle_gi_cluster_type

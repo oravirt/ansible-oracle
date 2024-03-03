@@ -13,8 +13,7 @@
   ansible.builtin.assert:
     quiet: true
     that:
-      - oracle_install_option_gi in ('HA_CONFIG')
-      # - oracle_install_option_gi in ('HA_CONFIG', 'CRS_CONFIG')
+      - oracle_install_option_gi in ('HA_CONFIG', 'CRS_CONFIG')
   tags: always
 
 - name: Oraswgi_install | Assert role_separation
@@ -27,7 +26,7 @@
     fail_msg: >-
       Role separation is enabled.
       Different values for grid_user={{ grid_user }}
-      and oracle_user={{ oracle_user }} needed.
+      and oracle_user={{ _grid_install_user }} needed.
   tags: always
 
 - name: Oraswgi_install | Assert Grid-Infrastructure variables

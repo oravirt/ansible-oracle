@@ -24,6 +24,7 @@ Meta role used by other roles to share variable defaults.
   - [oracle_user](#oracle_user)
   - [oracle_user_home](#oracle_user_home)
   - [role_separation](#role_separation)
+- [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
 - [Author](#author)
@@ -283,6 +284,11 @@ See `grid_user` and `oracle_user` for Grid-Infrastructure user.
 role_separation: false
 ```
 
+## Discovered Tags
+
+**_always_**
+
+**_assert_ansible_oracle_**
 
 
 ## Dependencies
