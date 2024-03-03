@@ -58,6 +58,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [oracle_sw_patches](#oracle_sw_patches)
   - [oracle_sw_source_local](#oracle_sw_source_local)
   - [oracle_sw_source_www](#oracle_sw_source_www)
+  - [orasw_meta_assert_oracle_databases](#orasw_meta_assert_oracle_databases)
   - [shell_aliases](#shell_aliases)
   - [shell_ps1](#shell_ps1)
 - [Discovered Tags](#discovered-tags)
@@ -446,7 +447,6 @@ oracle_databases:
     oracle_db_type: SI
     is_container: true
     storage_type: FS
-    oracle_db_mem_totalmb: 1024
     oracle_database_type: MULTIPURPOSE
     redolog_size: 100M
     redolog_groups: 3
@@ -846,6 +846,18 @@ server during software installation and patching.
 
 ```YAML
 oracle_sw_source_www: http://www/orasw
+```
+
+### orasw_meta_assert_oracle_databases
+
+Switch for enable/disable assert on `oracle_databases`.
+
+Please change the state only when really needed!
+
+#### Default value
+
+```YAML
+orasw_meta_assert_oracle_databases: true
 ```
 
 ### shell_aliases
