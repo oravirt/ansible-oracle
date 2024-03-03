@@ -11,7 +11,6 @@ oracle_database_db1:
   # Example custom DBCA-Template, usable for CDB and nonCDB
   # dbca_templatename: 19c_custom_dbca.dbt
   storage_type: FS                                     # Database storage to be used. ASM or FS.
-  oracle_db_mem_totalmb: 1024                          # Amount of RAM to be used for SGA
   oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
   redolog_size: 75M
   redolog_groups: 3
@@ -50,8 +49,8 @@ oracle_database_db1:
     #  - {name: use_large_pages ,value: 'ONLY', scope: spfile, state: present}
     - {name: log_archive_dest_1, value: 'location=USE_DB_RECOVERY_FILE_DEST', scope: both, state: present}
     - {name: log_buffer, value: '64M', scope: spfile, state: present}
-    - {name: pga_aggregate_target, value: '200M', scope: both, state: present, dbca: false}
-    - {name: sga_target, value: '1800M', scope: spfile, state: present, dbca: false}
+    - {name: pga_aggregate_target, value: '200M', scope: both, state: present}
+    - {name: sga_target, value: '1800M', scope: spfile, state: present}
     - {name: recyclebin, value: 'off', scope: spfile, state: present}
     - {name: standby_file_management, value: 'AUTO', scope: both, state: present}
     - {name: streams_pool_size, value: '152M', scope: spfile, state: present}

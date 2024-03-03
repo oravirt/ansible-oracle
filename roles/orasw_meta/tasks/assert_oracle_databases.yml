@@ -70,7 +70,16 @@
       when:
         - db_homes_installed is defined
 
+    - name: Check switch for  orasw_meta_assert_oracle_databases
+      ansible.builtin.debug:
+        msg: >-
+          WARNING!!! Assert for oracle_databases has been disabled!
+      when:
+        - not orasw_meta_assert_oracle_databases | bool
+
     - name: assert oracle_databases
+      when:
+        - orasw_meta_assert_oracle_databases | bool
       block:
         - name: assert oracle_databases
           ansible.builtin.assert:
@@ -95,6 +104,15 @@
               - ass_odb.users | default([]) | type_debug == 'list'
               - ass_odb.oracle_db_type | default('SI2') in ('SI', 'RAC', 'RACONENODE')
               - ass_odb.storage_type | default('FS') in ('FS', 'ASM')
+              - (ass_odb.oracle_db_mem_totalmb is defined
+                  and ass_odb.init_parameters | default([])
+                      | selectattr ('name', 'match', 'sga_target') | list | length == 0
+                )
+                or
+                (ass_odb.oracle_db_mem_totalmb is not defined
+                  and ass_odb.init_parameters | default([]) | list
+                       | selectattr ('name', 'match', 'sga_target') | list | length > 0
+                )
           with_items:
             - "{{ oracle_databases }}"
           loop_control:

@@ -34,7 +34,6 @@ oracle_databases:
     # Example custom DBCA-Template, usable for CDB and nonCDB
     # dbca_templatename: 19c_custom_dbca.dbt
     storage_type: FS
-    oracle_db_mem_totalmb: 2048  # this value is only valid during dbca - init.ora-parameters are used afterwards.
     oracle_database_type: MULTIPURPOSE
     redolog_size: 50M
     redolog_groups: 3
@@ -72,8 +71,8 @@ oracle_databases:
       - {name: log_archive_dest_1, value: 'location=USE_DB_RECOVERY_FILE_DEST', scope: both, state: present}
       - {name: log_buffer, value: '64M', scope: spfile, state: present}
       # - {name: pga_aggregate_target, value: '1024M', scope: both, state: present, dbca: false}
-      - {name: pga_aggregate_target, value: '1G', scope: both, state: present, dbca: false}
-      - {name: sga_target, value: '3096M', scope: spfile, state: present, dbca: false}
+      - {name: pga_aggregate_target, value: '1G', scope: both, state: present}
+      - {name: sga_target, value: '3096M', scope: spfile, state: present}
       - {name: recyclebin, value: 'off', scope: spfile, state: present}
       - {name: streams_pool_size, value: '152M', scope: spfile, state: present}
       # "_cursor_obsolete_threshold" for 12.2+
