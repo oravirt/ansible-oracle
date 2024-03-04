@@ -22,6 +22,7 @@ This will create issues and problems in `ansible-oracle` and is not supported.
   - [_opdb_home](#_opdb_home)
   - [_opdb_loop_helper](#_opdb_loop_helper)
   - [_oracle_db_instance_name](#_oracle_db_instance_name)
+  - [_oracle_db_unique_name](#_oracle_db_unique_name)
   - [_oracle_ee_opiton_dict](#_oracle_ee_opiton_dict)
   - [_oracle_env](#_oracle_env)
   - [_oracle_env_pdb](#_oracle_env_pdb)
@@ -209,6 +210,18 @@ Do not set it in inventory!
 
 ```YAML
 _oracle_db_instance_name: _internal_used_
+```
+
+### _oracle_db_unique_name
+
+The variable is internal used only.
+
+Do not set it in inventory!
+
+#### Default value
+
+```YAML
+_oracle_db_unique_name: _internal_used_
 ```
 
 ### _oracle_ee_opiton_dict
