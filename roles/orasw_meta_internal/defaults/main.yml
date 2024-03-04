@@ -120,6 +120,20 @@ _oracle_db_instance_name: >-
     {%- endfor -%}
   {%- endif -%}
 
+# @var _oracle_db_unique_name:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+# @end
+# @var _oracle_db_unique_name: $ "_internal_used_"
+_oracle_db_unique_name: >-
+  {%- if _odb_loop_helper.oracle_db_name is defined -%}
+    {{- _odb_loop_helper.oracle_db_unique_name
+      | default(_odb_loop_helper.oracle_db_name) -}}
+  {%- elif _opdb_loop_helper.cdb is defined -%}
+    {{- _db_unique_name_for_pdb -}}
+  {%- endif -%}
+
 # @var _listener_port_cdb:description: >
 # The variable is internal used only.
 #

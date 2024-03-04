@@ -1,40 +1,63 @@
 ---
 # @todo bug: parameter user, password and sysdba needs a refactoring
-- name: Gather Facts from Database
-  opitzconsulting.ansible_oracle.oracle_facts:
-    hostname: "{{ oracle_hostname }}"
-    port: "{{ _listener_port_cdb }}"
-    service_name: "{{ _db_service_name }}"
-    user: "{{ db_user }}"
-    password: "{{ _db_password_cdb }}"
-    mode: sysdba
-  environment: "{{ _oracle_env }}"
-  register: dbfactsreg
-  vars:
-    # set db_user for _db_password_cdb
-    db_user: "{{ oradb_facts_db_user }}"
+- name: Gather Facts
+  block:
+    - name: Gather Facts from Database (rescue failures in later task)
+      opitzconsulting.ansible_oracle.oracle_facts:
+        hostname: "{{ oracle_hostname }}"
+        port: "{{ _listener_port_cdb }}"
+        service_name: "{{ _db_service_name }}"
+        user: "{{ db_user }}"
+        password: "{{ _db_password_cdb }}"
+        mode: sysdba
+      environment: "{{ _oracle_env }}"
+      register: dbfactsreg
+      vars:
+        # set db_user for _db_password_cdb
+        db_user: "{{ oradb_facts_db_user }}"
 
+    # 2nd execution of oracle_facts will overwrite data of last execution.
+    # => Store facts from oracle_facts in structure
+    - name: Write facts to oracledb.db_unique_name
+      ansible.builtin.set_fact:
+        cacheable: true
+        oracledb_facts: "{{ oracledb_facts | default({}) | combine(_db_facts | items2dict) }}"
+      when:
+        - dbfactsreg.ansible_facts['version'] is defined
+      vars:
+        _db_facts:
+          - key: "{{ odb['oracle_db_unique_name'] | default(odb['oracle_db_name']) }}"
+            value:
+              state: present
+              version: "{{ ansible_facts['version'] }}"
+              database: "{{ ansible_facts['database'] }}"
+              instance: "{{ ansible_facts['instance'] }}"
+              pdb: "{{ ansible_facts['pdb'] }}"
+              parameter: "{{ ansible_facts['parameter'] }}"
+              rac: "{{ ansible_facts['rac'] }}"
+              redolog: "{{ ansible_facts['redolog'] }}"
+              tablespace: "{{ ansible_facts['tablespace'] }}"
+              temp_tablespace: "{{ ansible_facts['temp_tablespace'] }}"
+              userenv: "{{ ansible_facts['userenv'] }}"
+              option: "{{ ansible_facts['option'] }}"
 
-# 2nd execution of oracle_factswill overwrite data of last execution.
-# => Store facts from oracle_facts in structure
-- name: Write facts to oracledb.db_unique_name
-  ansible.builtin.set_fact:
-    cacheable: true
-    oracledb_facts: "{{ oracledb_facts | default({}) | combine(_db_facts | items2dict) }}"
-  when:
-    - dbfactsreg.ansible_facts['version'] is defined
-  vars:
-    _db_facts:
-      - key: "{{ odb['oracle_db_unique_name'] | default(odb['oracle_db_name']) }}"
-        value:
-          version: "{{ dbfactsreg.ansible_facts['version'] }}"
-          database: "{{ dbfactsreg.ansible_facts['database'] }}"
-          instance: "{{ dbfactsreg.ansible_facts['instance'] }}"
-          pdb: "{{ dbfactsreg.ansible_facts['pdb'] }}"
-          parameter: "{{ dbfactsreg.ansible_facts['parameter'] }}"
-          rac: "{{ dbfactsreg.ansible_facts['rac'] }}"
-          redolog: "{{ dbfactsreg.ansible_facts['redolog'] }}"
-          tablespace: "{{ dbfactsreg.ansible_facts['tablespace'] }}"
-          temp_tablespace: "{{ dbfactsreg.ansible_facts['temp_tablespace'] }}"
-          userenv: "{{ dbfactsreg.ansible_facts['userenv'] }}"
-          option: "{{ dbfactsreg.ansible_facts['option'] }}"
+  rescue:
+    # default is
+    # => Fail execution of Playbook
+    - name: Fail execution of oradb_facts
+      ansible.builtin.fail:
+        msg: >-
+          Set oradb_facts_ignore_unreachable=false in oracle_databases
+          to disable this fail task.
+      when:
+        - not _odb_loop_helper.oradb_facts_ignore_unreachable | default(false)
+
+    - name: Write empty facts to oracledb.db_unique_name (rescue from failure above)
+      ansible.builtin.set_fact:
+        cacheable: true
+        oracledb_facts: "{{ oracledb_facts | default({}) | combine(_db_facts | items2dict) }}"
+      vars:
+        _db_facts:
+          - key: "{{ odb['oracle_db_unique_name'] | default(odb['oracle_db_name']) }}"
+            value:
+              state: unreachable
