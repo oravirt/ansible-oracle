@@ -183,7 +183,7 @@ _odb_loop_helper: _internal_used_
 #### Default value
 
 ```YAML
-_opdb_home: "{{ (oracle_databases | selectattr('oracle_db_name', 'match', opdb[0]['cdb']))[0]['home']
+_opdb_home: "{{ (oracle_databases | selectattr('oracle_db_name', 'equalto', _opdb_loop_helper['cdb']))[0]['home']
   }}"
 ```
 
