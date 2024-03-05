@@ -27,9 +27,11 @@
     label: >-
       database_name {{ odb.0.oracle_db_name | default('') }}
       name {{ odb.1.name | default('') }}
+      db_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
   when:
     - oracle_databases is defined
     - odb.0.state == 'present'
+    - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
     - odb.1 is defined
     - (odb.1.state == 'present' or odb.1.state == 'started')
   become: true

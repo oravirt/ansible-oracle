@@ -37,12 +37,15 @@
       loop_control:
         loop_var: odb
         label: >-
+          db_name: {{ odb.0.oracle_db_name | default('') }}
           service: {{ _db_service_name }}:{{ _listener_port_cdb }}
           tablespace: {{ odb.1.name }}
           content: {{ odb.1.content | default(omit) }}
           state: {{ odb.1.state | default('present') }}
+          db_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
       when:
         - oracle_databases is defined
+        - oracledb_facts[_oracle_db_unique_name]['state'] | default('absent') == 'present'
         - odb.1 is defined
         - odb.0.state | upper == 'PRESENT'
 
@@ -75,13 +78,16 @@
         - oracle_pdbs is defined
         - opdb.1 is defined
         - opdb.0.state == 'present'
+        - oracledb_facts[_oracle_db_unique_name]['state'] | default('absent') == 'present'
         - >-
           oracle_databases | selectattr('oracle_db_name', 'equalto', opdb.0.cdb)
           | map(attribute='state') | list | first == 'present'
       loop_control:
         loop_var: opdb
         label: >-
+          cdb: {{ opdb.0.cdb | default('') }}
           pdb: {{ opdb.0.pdb_name }}:{{ _listener_port_pdb }}
           tablespace: {{ opdb.1.name }}
           content: {{ opdb.1.content | default(omit) }}
           state: {{ opdb.1.state | default('present') }}
+          cdb_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}

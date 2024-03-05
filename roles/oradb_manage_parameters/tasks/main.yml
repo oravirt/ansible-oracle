@@ -23,18 +23,21 @@
   when:
     - oracle_databases is defined
     - odb.0.state == 'present'
+    - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
     - odb.1 is defined
   become: true
   become_user: "{{ oracle_user }}"
   loop_control:
     loop_var: odb
     label: >-
+      db_name: {{ odb.0.oracle_db_name | default('') }}
       port: {{ _listener_port_cdb }}
       service: {{ _db_service_name }}
       name: {{ odb.1.name }}
       value: {{ odb.1.value }}
       scope: {{ odb.1.scope | default ('both') }}
       state:{{ odb.1.state }}
+      db_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
   register: param_change_cdb
   tags:
     - initparams
@@ -63,6 +66,7 @@
   when:
     - oracle_pdbs is defined
     - opdb.0.state == 'present'
+    - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
     - opdb.1 is defined
     - >-
       oracle_databases | selectattr('oracle_db_name', 'equalto', opdb.0.cdb)
@@ -72,12 +76,14 @@
   loop_control:
     loop_var: opdb
     label: >-
+      cdb: {{ opdb.0.cdb | default('') }}
       port: {{ _listener_port_pdb }}
       service: {{ opdb.0.pdb_name }}
       name: {{ opdb.1.name }}
       value: {{ opdb.1.value }}
       scope: {{ opdb.1.scope | default ('both') }}
       state:{{ opdb.1.state }}"
+      cdb_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
   register: param_change_pdb
   tags:
     - initparams
@@ -99,12 +105,14 @@
     - ""  # dummy to force odb.0 instead of item.
   when:
     - odb.0.restart_spparameter_changed | default(true)
+    - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
     - restart_spparameter_changed
   loop_control:
     loop_var: odb
     label: >-
-      dbname: {{ odb.0.oracle_db_name | d('') }}
-      - {{ param_change_reboot.msg | default('restart_spparameter_changed is false') }}"
+      db_name: {{ odb.0.oracle_db_name | d('') }}
+      db_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
+      parameter: {{ param_change_reboot.msg | default('restart_spparameter_changed is false') }}"
   become: true
   become_user: "{{ oracle_user }}"
   register: param_change_reboot

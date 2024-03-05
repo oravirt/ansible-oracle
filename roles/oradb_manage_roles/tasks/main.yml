@@ -19,14 +19,17 @@
   when:
     - oracle_databases is defined
     - odb.0.state == 'present'
+    - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
     - odb.1 is defined
   loop_control:
     loop_var: odb
     label: >-
+      db_name: {{ odb.0.oracle_db_name | default('') }}
       port {{ _listener_port_cdb }}
       service {{ _db_service_name }}
       role {{ odb.1.name }}
       state {{ odb.1.state }}
+      db_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
   run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become: true
   become_user: "{{ oracle_user }}"
@@ -52,6 +55,7 @@
     - oracle_pdbs is defined
     - opdb.0 is defined
     - opdb.0.state == 'present'
+    - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
     - opdb.1 is defined
     - >-
       oracle_databases | selectattr('oracle_db_name', 'equalto', opdb.0.cdb)
@@ -59,10 +63,12 @@
   loop_control:
     loop_var: opdb
     label: >-
+      cdb: {{ opdb.0.cdb | default('') }}
       port: {{ _listener_port_pdb }},
       service: {{ _db_service_pdb }},
       role: {{ opdb.1.name }},
       state: {{ opdb.1.state }}
+      cdb_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
   run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become: true
   become_user: "{{ oracle_user }}"
