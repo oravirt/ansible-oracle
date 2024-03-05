@@ -22,19 +22,19 @@
     cacheable: true
     oracledb_facts: "{{ oracledb_facts | default({}) | combine(_db_facts | items2dict) }}"
   when:
-    - ansible_facts['version'] is defined
+    - dbfactsreg.ansible_facts['version'] is defined
   vars:
     _db_facts:
-      - key: "{{ odb[0]['oracle_db_unique_name'] | default(odb[0]['oracle_db_name']) }}"
+      - key: "{{ odb['oracle_db_unique_name'] | default(odb['oracle_db_name']) }}"
         value:
-          version: "{{ ansible_facts['version'] }}"
-          database: "{{ ansible_facts['database'] }}"
-          instance: "{{ ansible_facts['instance'] }}"
-          pdb: "{{ ansible_facts['pdb'] }}"
-          parameter: "{{ ansible_facts['parameter'] }}"
-          rac: "{{ ansible_facts['rac'] }}"
-          redolog: "{{ ansible_facts['redolog'] }}"
-          tablespace: "{{ ansible_facts['tablespace'] }}"
-          temp_tablespace: "{{ ansible_facts['temp_tablespace'] }}"
-          userenv: "{{ ansible_facts['userenv'] }}"
-          option: "{{ ansible_facts['option'] }}"
+          version: "{{ dbfactsreg.ansible_facts['version'] }}"
+          database: "{{ dbfactsreg.ansible_facts['database'] }}"
+          instance: "{{ dbfactsreg.ansible_facts['instance'] }}"
+          pdb: "{{ dbfactsreg.ansible_facts['pdb'] }}"
+          parameter: "{{ dbfactsreg.ansible_facts['parameter'] }}"
+          rac: "{{ dbfactsreg.ansible_facts['rac'] }}"
+          redolog: "{{ dbfactsreg.ansible_facts['redolog'] }}"
+          tablespace: "{{ dbfactsreg.ansible_facts['tablespace'] }}"
+          temp_tablespace: "{{ dbfactsreg.ansible_facts['temp_tablespace'] }}"
+          userenv: "{{ dbfactsreg.ansible_facts['userenv'] }}"
+          option: "{{ dbfactsreg.ansible_facts['option'] }}"
