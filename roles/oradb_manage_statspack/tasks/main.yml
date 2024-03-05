@@ -29,13 +29,16 @@
       loop: "{{ oracle_databases }}"
       loop_control:
         loop_var: odb
-        label: "{{ odb.oracle_db_name }}"
+        label: >-
+          db_name: {{ odb.oracle_db_name | default('') }}
+          db_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
       register: statspackdropcmd
       become: true
       become_user: "{{ oracle_user }}"
       when:
         - odb.statspack is defined
         - odb.statspack.state | default('present') == 'absent'
+        - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
       changed_when:
         - '"Statspack dropped" in statspackdropcmd.stdout'
 
@@ -83,7 +86,9 @@
           loop: "{{ oracle_databases }}"
           loop_control:
             loop_var: odb
-            label: "{{ odb.oracle_db_name | default('') }}"
+            label: >-
+              db_name: {{ odb.oracle_db_name | default('') }}
+              db_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
           register: statspackcmd
           become: true
           become_user: "{{ oracle_user }}"
@@ -93,6 +98,7 @@
             - odb.state == 'present'
             - odb.statspack is defined
             - odb.statspack.state == 'present'
+            - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
 
       rescue:
         - name: fail
@@ -133,13 +139,16 @@
   when:
     - oracle_databases is defined
     - odb.state == 'present'
+    - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
     - odb.statspack is defined
     - odb.statspack.state == 'present'
   become: true
   become_user: "{{ oracle_user }}"
   loop_control:
     loop_var: odb
-    label: "{{ odb.oracle_db_name }}"
+    label: >-
+      db_name: {{ odb.oracle_db_name | default('') }}
+      db_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
   tags:
     - spjob
     - statspack
@@ -164,13 +173,16 @@
   when:
     - oracle_databases is defined
     - odb.state == 'present'
+    - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
     - odb.statspack is defined
     - odb.statspack.state == 'present'
   become: true
   become_user: "{{ oracle_user }}"
   loop_control:
     loop_var: odb
-    label: "{{ odb.oracle_db_name }}"
+    label: >-
+      db_name: {{ odb.oracle_db_name | default('') }}
+      db_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
   tags:
     - spjob
     - statspack
@@ -192,8 +204,9 @@
       loop_control:
         loop_var: opdb
         label: >-
-          {{ opdb.cdb | default('') }}
-          {{ opdb.pdb_name | default('') }}
+          cdb: {{ opdb.cdb | default('') }}
+          pdb: {{ opdb.pdb_name | default('') }}
+          cdb_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
       register: statspackdropcmd
       become: true
       become_user: "{{ oracle_user }}"
@@ -203,6 +216,7 @@
         - statspackdropcmd.rc != 0
       when:
         - oracle_pdbs is defined
+        - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
         - opdb.statspack is defined
         - opdb.statspack.state == 'absent'
 
@@ -243,8 +257,9 @@
       loop_control:
         loop_var: opdb
         label: >-
-          {{ opdb.cdb | default('') }}
-          {{ opdb.pdb_name | default('') }}
+          cdb: {{ opdb.cdb | default('') }}
+          pdb: {{ opdb.pdb_name | default('') }}
+          cdb_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
       register: statspackcmd
       become: true
       become_user: "{{ oracle_user }}"
@@ -253,6 +268,7 @@
       when:
         - oracle_pdbs is defined
         - opdb.cdb is defined
+        - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
         - opdb.state == 'present'
         - opdb.statspack is defined
         - opdb.statspack.state == 'present'
@@ -292,11 +308,13 @@
   loop_control:
     loop_var: opdb
     label: >-
-      {{ opdb.cdb | default('') }}
-      {{ opdb.pdb_name | default('') }}
+      cdb: {{ opdb.cdb | default('') }}
+      pdb: {{ opdb.pdb_name | default('') }}
+      cdb_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
   when:
     - oracle_pdbs is defined
     - opdb.cdb is defined
+    - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
     - opdb.pdb_name is defined
     - opdb.state == 'present'
     - opdb.statspack is defined
@@ -330,10 +348,12 @@
   loop_control:
     loop_var: opdb
     label: >-
-      {{ opdb.cdb | default('') }}
-      {{ opdb.pdb_name | default('') }}
+      cdb: {{ opdb.cdb | default('') }}
+      pdb: {{ opdb.pdb_name | default('') }}
+      cdb_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
   when:
     - oracle_pdbs is defined
+    - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
     - opdb.cdb is defined
     - opdb.pdb_name is defined
     - opdb.state == 'present'

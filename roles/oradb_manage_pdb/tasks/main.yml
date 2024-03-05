@@ -36,6 +36,7 @@
           CDB: {{ odb[1].cdb | default('') }},
           PDB: {{ odb[1].pdb_name | default('') }},
           state: {{ odb[1].state | default('') }}
+          db_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
         loop_var: odb
       when:
         - oracle_databases is defined
@@ -45,3 +46,4 @@
         - odb[0].state|upper == 'PRESENT'
         - odb[1].cdb == odb[0].oracle_db_name
         - odb[0].is_container
+        - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
