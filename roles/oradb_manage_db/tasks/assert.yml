@@ -23,9 +23,10 @@
     quiet: true
     fail_msg: "Missing element with listener_name in listener_installed!"
     that:
-      - listener_installed | default([])
-          | selectattr('listener_name', 'match', odb.listener_name)
-          | list | length == 1
+      - >-
+        listener_installed | default([])
+        | selectattr('listener_name', 'equalto', odb.listener_name)
+        | list | length == 1
   with_items: "{{ oracle_databases | selectattr('listener_name', 'defined') }}"
   register: assert2
   loop_control:

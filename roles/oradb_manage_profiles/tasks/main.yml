@@ -89,7 +89,7 @@
         - opdb.0.state == 'present'
         - opdb.1 is defined
         - >-
-          oracle_databases | selectattr('oracle_db_name', 'match', opdb.0.cdb)
+          oracle_databases | selectattr('oracle_db_name', 'equalto', opdb.0.cdb)
           | map(attribute='state') | list | first == 'present'
       run_once: "{{ _oraswgi_meta_configure_cluster }}"
       become: true

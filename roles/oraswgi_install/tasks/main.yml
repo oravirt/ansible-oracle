@@ -70,7 +70,7 @@
     group: "{{ oracle_group }}"
     state: directory
   become: true
-  with_items: "{{ oracle_sw_image_gi | selectattr('version', 'match', oracle_install_version_gi) }}"
+  with_items: "{{ oracle_sw_image_gi | selectattr('version', 'equalto', oracle_install_version_gi) }}"
   tags:
     - directories
 

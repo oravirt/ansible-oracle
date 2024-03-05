@@ -37,12 +37,12 @@ _oraswdb_install_choptcheck: "{% if oraswdb_install_forcechopt | bool %}dochopt{
 
 _oraswdb_install_dbh_stat: >-
   {{ stat_dbh_installed.results
-      | selectattr('invocation.module_args.path', 'match', db_homes_config[dbh.home]['oracle_home'])
+      | selectattr('invocation.module_args.path', 'equalto', db_homes_config[dbh.home]['oracle_home'])
       | first }}
 
 _local_oracle_sw_image_db: >-
   {{ db_homes_config[dbh.home].imagename
       | default((_oraswdb_install_oracle_sw_image_db
-        | selectattr('version', 'match', db_homes_config[dbh.home]['version'])
+        | selectattr('version', 'equalto', db_homes_config[dbh.home]['version'])
         | list)[0]['filename']
       ) }}

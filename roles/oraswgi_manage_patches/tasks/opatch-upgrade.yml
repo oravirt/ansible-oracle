@@ -27,7 +27,7 @@
     owner: "{{ _grid_install_user }}"
     group: "{{ oracle_group }}"
   become: true
-  with_items: "{{ oracle_opatch_patch | selectattr('version', 'match', oracle_install_version_gi) }}"
+  with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) }}"
   when:
     - apply_patches_gi
     - oracle_sw_copy
@@ -46,7 +46,7 @@
     owner: "{{ _grid_install_user }}"
     group: "{{ oracle_group }}"
   become: true
-  with_items: "{{ oracle_opatch_patch | selectattr('version', 'match', oracle_install_version_gi) }}"
+  with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) }}"
   when:
     - apply_patches_gi
     - item.version == oracle_install_version_gi

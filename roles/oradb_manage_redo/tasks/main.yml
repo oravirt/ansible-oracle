@@ -17,22 +17,21 @@
         user: "{{ db_user }}"
         password: "{{ _db_password_cdb }}"
         mode: "{{ db_mode }}"
-        size: "{{ odb.0.redolog_size }}"
-        groups: "{{ odb.0.redolog_groups }}"
+        size: "{{ odb.redolog_size }}"
+        groups: "{{ odb.redolog_groups }}"
       environment: "{{ _oracle_env }}"
       run_once: "{{ _oraswgi_meta_configure_cluster }}"
-      loop:
-        - "{{ oracle_databases | flatten(levels=1) }}"
+      loop: "{{ oracle_databases }}"
       when:
         - oracle_databases is defined
-        - odb.0.redolog_size is defined
-        - odb.0.redolog_groups is defined
-        - odb.0.state == 'present'
+        - odb.redolog_size is defined
+        - odb.redolog_groups is defined
+        - odb.state == 'present'
       become_user: "{{ oracle_user }}"
       become: true
       loop_control:
         loop_var: odb
         label: >-
           service: {{ _db_service_name }}:{{ _listener_port_cdb }}
-          groups: {{ odb.0.redolog_groups }}
-          size: {{ odb.0.redolog_size }}
+          groups: {{ odb.redolog_groups | default('') }}
+          size: {{ odb.redolog_size | default('') }}

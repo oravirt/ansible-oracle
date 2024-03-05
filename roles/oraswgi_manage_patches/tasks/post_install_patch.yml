@@ -13,7 +13,7 @@
 - name: post_install_patch | Remove opatch apply patches from GI 19c+
   ansible.builtin.include_tasks: loop_remove_single_opatch.yml
   with_items:
-    - "{{ gi_patches[oracle_install_version_gi]['opatch'] | selectattr('state', 'match', 'absent') }}"
+    - "{{ gi_patches[oracle_install_version_gi]['opatch'] | selectattr('state', 'equalto', 'absent') }}"
   loop_control:
     loop_var: gip_opatch
     label: >-
@@ -42,7 +42,7 @@
     output: verbose
     state: absent
   with_items:
-    - "{{ gi_patches[oracle_install_version_gi]['opatchauto'] | selectattr('state', 'match', 'absent') }}"
+    - "{{ gi_patches[oracle_install_version_gi]['opatchauto'] | selectattr('state', 'equalto', 'absent') }}"
   loop_control:
     loop_var: gip_opatch
     label: >-
@@ -79,7 +79,7 @@
   with_items:
     - >-
       gi_patches[oracle_install_version_gi]['opatch']
-        | select('state', 'match', 'present')
+        | selectattr('state', 'equalto', 'present')
     - ""  # loop with dummy list due to needed structure for autopatch
   loop_control:
     loop_var: gip_opatch
@@ -98,7 +98,7 @@
 - name: post_install_patch | Manage opatch apply patches for GI 19c+
   ansible.builtin.include_tasks: loop_apply_single_opatch.yml
   with_items:
-    - "{{ gi_patches[oracle_install_version_gi]['opatch'] | selectattr('state', 'match', 'present') }}"
+    - "{{ gi_patches[oracle_install_version_gi]['opatch'] | selectattr('state', 'equalto', 'present') }}"
   # run_once: "{{ _oraswgi_meta_configure_cluster }}"
   loop_control:
     label: >-
