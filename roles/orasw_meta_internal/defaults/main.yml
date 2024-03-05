@@ -6,7 +6,7 @@
 # @end
 # @var _db_password_cdb: $ "_internal_used_"
 _db_password_cdb: >-
-  {{ dbpasswords[odb.0.oracle_db_name][db_user]
+  {{ dbpasswords[_odb_loop_helper['oracle_db_name']][db_user]
      | default(default_dbpass | mandatory) }}
 
 # @var _db_password_pdb:description: >
@@ -16,7 +16,7 @@ _db_password_cdb: >-
 # @end
 # @var _db_password_pdb: $ "_internal_used_"
 _db_password_pdb: >-
-  {{ dbpasswords[opdb[0]['cdb']][opdb[0]['pdb_name']][db_user]
+  {{ dbpasswords[_opdb_loop_helper['cdb']][_opdb_loop_helper['pdb_name']][db_user]
      | default(default_dbpass | mandatory) }}
 
 # @var _db_service_name:description: >
@@ -46,8 +46,8 @@ _db_service_name: "{% if _odb_loop_helper.oracle_db_name is defined -%}
 # @var _db_unique_name_for_pdb: $ "_internal_used_"
 _db_unique_name_for_pdb: >-
   {{ (oracle_databases
-    | selectattr('oracle_db_name', 'match', opdb[0]['cdb'])
-    | map(attribute='oracle_db_unique_name', default=opdb[0]['cdb']))[0]
+    | selectattr('oracle_db_name', 'equalto', _opdb_loop_helper['cdb'])
+    | map(attribute='oracle_db_unique_name', default=_opdb_loop_helper['cdb']))[0]
   }}
 
 # @var _db_service_pdb:description: >
@@ -62,10 +62,10 @@ _db_unique_name_for_pdb: >-
 # @var _db_service_pdb: $ "_internal_used_"
 _db_service_pdb: >-
   {%- set __db_domain_pdb = oracledb_facts[_db_unique_name_for_pdb]['parameter']['db_domain']['value'] -%}
-  {%- if __db_domain_pdb is defined and __db_domain_pdb is string and __db_domain_pdb | length > 0 -%}{{ opdb[0]['pdb_name'] }}.{{ __db_domain_pdb }}{%- else -%}
-  {{ opdb[0]['pdb_name'] }}{% endif %}
+  {%- if __db_domain_pdb is defined and __db_domain_pdb is string and __db_domain_pdb | length > 0 -%}{{ _opdb_loop_helper['pdb_name'] }}.{{ __db_domain_pdb }}{%- else -%}
+  {{ _opdb_loop_helper['pdb_name'] }}{% endif %}
 
-_opdb_home: "{{ (oracle_databases | selectattr('oracle_db_name', 'match', opdb[0]['cdb']))[0]['home'] }}"
+_opdb_home: "{{ (oracle_databases | selectattr('oracle_db_name', 'equalto', _opdb_loop_helper['cdb']))[0]['home'] }}"
 
 # @var _oracle_home_db:description: >
 # This is an internal variable in `ansible-oracle`.
@@ -76,7 +76,7 @@ _opdb_home: "{{ (oracle_databases | selectattr('oracle_db_name', 'match', opdb[0
 _oracle_home_db: "{%- if _odb_loop_helper is defined -%}\
                     {{ db_homes_config[_odb_loop_helper.home]['oracle_home'] | \
                        default(oracle_base + '/' + db_homes_config[_odb_loop_helper.home]['version'] + '/' + _odb_loop_helper.home) }}\
-                  {%- elif opdb[0] is defined -%}\
+                  {%- elif _opdb_loop_helper is defined -%}\
                     {{ db_homes_config[_opdb_home]['oracle_home'] | \
                        default(oracle_base + '/' + db_homes_config[_opdb_home]['version'] + '/' + _opdb_home) }}\
                   {%- endif -%}"

@@ -23,7 +23,7 @@
     dest: "{{ oracle_stage }}"
     mode: "0775"
     force: false
-  with_items: "{{ oracle_sw_image_gi | selectattr('version', 'match', oracle_install_version_gi) }}"
+  with_items: "{{ oracle_sw_image_gi | selectattr('version', 'equalto', oracle_install_version_gi) }}"
   become: true
   become_user: "{{ _grid_install_user }}"
   tags:

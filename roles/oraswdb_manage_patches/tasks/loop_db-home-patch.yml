@@ -50,7 +50,7 @@
     output: verbose
     state: "{{ item.state }}"
   with_items:
-    - "{{ db_homes_config[dbh.home]['opatch'] | selectattr('state', 'match', 'absent') }}"
+    - "{{ db_homes_config[dbh.home]['opatch'] | selectattr('state', 'equalto', 'absent') }}"
   become: true
   become_user: "{{ oracle_user }}"
   tags:

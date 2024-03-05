@@ -60,11 +60,10 @@
     state: directory
     mode: '0755'
     owner: "{{ oracle_user }}"
-  loop:
-    - "{{ oracle_databases | flatten(1) }}"
+  loop: "{{ oracle_databases }}"
   loop_control:
     loop_var: odb
-    label: "oracle_db_name {{ odb.0.oracle_db_name | default('') }}"
+    label: "oracle_db_name {{ odb.oracle_db_name | default('') }}"
   tags:
     - rmancopy
 
@@ -75,11 +74,10 @@
     state: "directory"
     mode: '0755'
     owner: "{{ oracle_user }}"
-  loop:
-    - "{{ oracle_databases | flatten(1) }}"
+  loop: "{{ oracle_databases }}"
   loop_control:
     loop_var: odb
-    label: "oracle_db_name {{ odb.0.oracle_db_name | default('') }}"
+    label: "oracle_db_name {{ odb.oracle_db_name | default('') }}"
   tags:
     - rmancopy
 
@@ -118,11 +116,10 @@
     state: directory
     owner: "{{ oracle_user }}"
     mode: '0755'
-  with_items:
-    - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | map(attribute='oracle_db_name') }}"
+  loop: "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | map(attribute='oracle_db_name') }}"
   loop_control:
     loop_var: odb
-    label: "oracle_db_name {{ odb.0.oracle_db_name | default('') }}"
+    label: "oracle_db_name {{ oracle_db_name | default('') }}"
   tags:
     - tns
 

@@ -25,7 +25,7 @@
     state: started
   become: true
   become_user: "{{ oracle_user }}"
-  with_items: "{{ oracle_databases | selectattr('state', 'match', 'present') }}"
+  with_items: "{{ oracle_databases | selectattr('state', 'equalto', 'present') }}"
   loop_control:
     loop_var: odb
     label: >-
@@ -40,8 +40,8 @@
 - name: oradb_datapatch | Run datapatch
   opitzconsulting.ansible_oracle.oracle_datapatch:
     oracle_home: "{{ _oracle_home_db }}"
-    db_name: "{{ odb.0.oracle_db_name }}"
-    db_unique_name: "{{ odb.0.oracle_db_unique_name | default(omit) }}"
+    db_name: "{{ odb.oracle_db_name }}"
+    db_unique_name: "{{ odb.oracle_db_unique_name | default(omit) }}"
     sid: "{{ odb.oracle_db_instance_name | default(omit) }}"
     output: verbose
     fail_on_db_not_exist: "{{ oradb_datapatch_fail_on_db_not_exist }}"
@@ -50,17 +50,16 @@
     hostname: "{{ ansible_fqdn }}"
     service_name: "{{ _db_service_name }}"
     port: "{{ _listener_port_cdb }}"
-  loop:
-    - "{{ oracle_databases | selectattr('state', 'match', 'present') | flatten(levels=1) }}"
+  loop: "{{ oracle_databases | selectattr('state', 'equalto', 'present') }}"
   become: true
   become_user: "{{ oracle_user }}"
   loop_control:
     loop_var: odb
     label: >-
-      home: {{ odb.0.home | default('') }}
-      db_name: {{ odb.0.oracle_db_name | default('') }}"
+      home: {{ odb.home | default('') }}
+      db_name: {{ odb.oracle_db_name | default('') }}"
   when:
     - oracle_databases is defined
     - oracle_databases | list | length > 0
-    - odb.0.state == 'present'
+    - odb.state == 'present'
   tags: datapatch

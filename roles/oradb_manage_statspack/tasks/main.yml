@@ -26,17 +26,16 @@
         _sid:
           ORACLE_SID: "{{ _oracle_db_instance_name }}"
       environment: "{{ _oracle_env | combine(_sid) }}"
-      loop:
-        - "{{ oracle_databases | flatten(levels=1) }}"
+      loop: "{{ oracle_databases }}"
       loop_control:
         loop_var: odb
-        label: "{{ odb.0.oracle_db_name }}"
+        label: "{{ odb.oracle_db_name }}"
       register: statspackdropcmd
       become: true
       become_user: "{{ oracle_user }}"
       when:
-        - odb.0.statspack is defined
-        - odb.0.statspack.state | default('present') == 'absent'
+        - odb.statspack is defined
+        - odb.statspack.state | default('present') == 'absent'
       changed_when:
         - '"Statspack dropped" in statspackdropcmd.stdout'
 
@@ -74,27 +73,26 @@
             ORACLE_HOME: "{{ _oracle_home_db }}"
             ORACLE_SID: "{{ _oracle_db_instance_name }}"
             perfstat_password: "{{ _db_password_cdb }}"
-            temporary_tablespace: "{{ odb.0.statspack.tablespace_temp | default('temp') }}"
-            default_tablespace: "{{ odb.0.statspack.tablespace | default('sysaux') }}"
-            purgedates: "{{ odb.0.statspack.purgedays | default(35) }}"
-            snaplevel: "{{ odb.0.statspack.snaplevel | default(7) }}"
+            temporary_tablespace: "{{ odb.statspack.tablespace_temp | default('temp') }}"
+            default_tablespace: "{{ odb.statspack.tablespace | default('sysaux') }}"
+            purgedates: "{{ odb.statspack.purgedays | default(35) }}"
+            snaplevel: "{{ odb.statspack.snaplevel | default(7) }}"
           vars:
             # db_user is needed for _db_password_cdb to point to PERFSTAT
             db_user: PERFSTAT
-          loop:
-            - "{{ oracle_databases | flatten(levels=1) }}"
+          loop: "{{ oracle_databases }}"
           loop_control:
             loop_var: odb
-            label: "{{ odb.0.oracle_db_name | default('') }}"
+            label: "{{ odb.oracle_db_name | default('') }}"
           register: statspackcmd
           become: true
           become_user: "{{ oracle_user }}"
           changed_when:
             - '"Installation of Statspack completed." in statspackcmd.stdout'
           when:
-            - odb.0.state == 'present'
-            - odb.0.statspack is defined
-            - odb.0.statspack.state == 'present'
+            - odb.state == 'present'
+            - odb.statspack is defined
+            - odb.statspack.state == 'present'
 
       rescue:
         - name: fail
@@ -128,21 +126,20 @@
     job_type: "plsql_block"
     job_action: "PERFSTAT.STATSPACK.PURGE({{ odb.statspack.purgedays | default(purgedays) }});"
     logging_level: "runs"
-    repeat_interval: "{{ odb.0.statspack.purgeinterval | default(purgeinterval) }}"
+    repeat_interval: "{{ odb.statspack.purgeinterval | default(purgeinterval) }}"
     state: "present"
   environment: "{{ _oracle_env }}"
-  loop:
-    - "{{ oracle_databases | flatten(levels=1) }}"
+  loop: "{{ oracle_databases }}"
   when:
     - oracle_databases is defined
-    - odb.0.state == 'present'
-    - odb.0.statspack is defined
-    - odb.0.statspack.state == 'present'
+    - odb.state == 'present'
+    - odb.statspack is defined
+    - odb.statspack.state == 'present'
   become: true
   become_user: "{{ oracle_user }}"
   loop_control:
     loop_var: odb
-    label: "{{ odb.0.oracle_db_name }}"
+    label: "{{ odb.oracle_db_name }}"
   tags:
     - spjob
     - statspack
@@ -160,21 +157,20 @@
     job_type: "plsql_block"
     job_action: "PERFSTAT.STATSPACK.SNAP(i_snap_level => {{ odb.statspack.snaplevel | default(snaplevel) }});"
     logging_level: "runs"
-    repeat_interval: "{{ odb.0.statspack.snapinterval | default(snapinterval) }}"
+    repeat_interval: "{{ odb.statspack.snapinterval | default(snapinterval) }}"
     state: "present"
   environment: "{{ _oracle_env }}"
-  loop:
-    - "{{ oracle_databases | flatten(levels=1) }}"
+  loop: "{{ oracle_databases }}"
   when:
     - oracle_databases is defined
-    - odb.0.state == 'present'
-    - odb.0.statspack is defined
-    - odb.0.statspack.state == 'present'
+    - odb.state == 'present'
+    - odb.statspack is defined
+    - odb.statspack.state == 'present'
   become: true
   become_user: "{{ oracle_user }}"
   loop_control:
     loop_var: odb
-    label: "{{ odb.0.oracle_db_name }}"
+    label: "{{ odb.oracle_db_name }}"
   tags:
     - spjob
     - statspack
@@ -191,14 +187,13 @@
       environment:
         ORACLE_HOME: "{{ _oracle_home_pdb }}"
         ORACLE_SID: "{{ _oracle_db_instance_name }}"
-        pdb_name: "{{ opdb.0.pdb_name }}"
-      loop:
-        - "{{ oracle_pdbs | flatten(levels=1) }}"
+        pdb_name: "{{ opdb.pdb_name }}"
+      loop: "{{ oracle_pdbs }}"
       loop_control:
         loop_var: opdb
         label: >-
-          {{ opdb.0.cdb | default('') }}
-          {{ opdb.0.pdb_name | default('') }}
+          {{ opdb.cdb | default('') }}
+          {{ opdb.pdb_name | default('') }}
       register: statspackdropcmd
       become: true
       become_user: "{{ oracle_user }}"
@@ -208,8 +203,8 @@
         - statspackdropcmd.rc != 0
       when:
         - oracle_pdbs is defined
-        - opdb.0.statspack is defined
-        - opdb.0.statspack.state == 'absent'
+        - opdb.statspack is defined
+        - opdb.statspack.state == 'absent'
 
     - name: Output  # noqa no-handler
       ansible.builtin.debug:
@@ -240,17 +235,16 @@
         default_tablespace: "{{ opdb.statspack.tablespace | default('sysaux') }}"
         purgedates: "{{ opdb.statspack.purgedays | default(35) }}"
         snaplevel: "{{ opdb.statspack.snaplevel | default(7) }}"
-        pdb_name: "{{ opdb.0.pdb_name }}"
+        pdb_name: "{{ opdb.pdb_name }}"
       vars:
         # db_user is needed for _db_password_pdb to point to PERFSTAT
         db_user: PERFSTAT
-      loop:
-        - "{{ oracle_pdbs | flatten(levels=1) }}"
+      loop: "{{ oracle_pdbs }}"
       loop_control:
         loop_var: opdb
         label: >-
-          {{ opdb.0.cdb | default('') }}
-          {{ opdb.0.pdb_name | default('') }}
+          {{ opdb.cdb | default('') }}
+          {{ opdb.pdb_name | default('') }}
       register: statspackcmd
       become: true
       become_user: "{{ oracle_user }}"
@@ -258,12 +252,12 @@
         - '"Installation of Statspack completed." in statspackcmd.stdout'
       when:
         - oracle_pdbs is defined
-        - opdb.0.cdb is defined
-        - opdb.0.state == 'present'
-        - opdb.0.statspack is defined
-        - opdb.0.statspack.state == 'present'
+        - opdb.cdb is defined
+        - opdb.state == 'present'
+        - opdb.statspack is defined
+        - opdb.statspack.state == 'present'
         - >-
-          oracle_databases | selectattr('oracle_db_name', 'match', opdb.0.cdb)
+          oracle_databases | selectattr('oracle_db_name', 'equalto', opdb.cdb)
           | map(attribute='state') | list | first == 'present'
 
     - name: Output
@@ -291,25 +285,24 @@
     job_type: "plsql_block"
     job_action: "PERFSTAT.STATSPACK.PURGE({{ pdb.statspack.purgedays | default(purgedays) }});"
     logging_level: "runs"
-    repeat_interval: "{{ opdb.0.statspack.purgeinterval | default(purgeinterval) }}"
+    repeat_interval: "{{ opdb.statspack.purgeinterval | default(purgeinterval) }}"
     state: "present"
   environment: "{{ _oracle_env_pdb }}"
-  loop:
-    - "{{ oracle_pdbs | flatten(levels=1) }}"
+  loop: "{{ oracle_pdbs }}"
   loop_control:
     loop_var: opdb
     label: >-
-      {{ opdb.0.cdb | default('') }}
-      {{ opdb.0.pdb_name | default('') }}
+      {{ opdb.cdb | default('') }}
+      {{ opdb.pdb_name | default('') }}
   when:
     - oracle_pdbs is defined
-    - opdb.0.cdb is defined
-    - opdb.0.pdb_name is defined
-    - opdb.0.state == 'present'
-    - opdb.0.statspack is defined
-    - opdb.0.statspack.state == 'present'
+    - opdb.cdb is defined
+    - opdb.pdb_name is defined
+    - opdb.state == 'present'
+    - opdb.statspack is defined
+    - opdb.statspack.state == 'present'
     - >-
-      oracle_databases | selectattr('oracle_db_name', 'match', opdb.0.cdb)
+      oracle_databases | selectattr('oracle_db_name', 'equalto', opdb.cdb)
       | map(attribute='state') | list | first == 'present'
   become: true
   become_user: "{{ oracle_user }}"
@@ -330,25 +323,24 @@
     job_type: "plsql_block"
     job_action: "PERFSTAT.STATSPACK.SNAP(i_snap_level => {{ pdb.0.statspack.snaplevel | default(snaplevel) }});"
     logging_level: "runs"
-    repeat_interval: "{{ opdb.0.statspack.snapinterval | default(snapinterval) }}"
+    repeat_interval: "{{ opdb.statspack.snapinterval | default(snapinterval) }}"
     state: "present"
   environment: "{{ _oracle_env_pdb }}"
-  loop:
-    - "{{ oracle_pdbs | flatten(levels=1) }}"
+  loop: "{{ oracle_pdbs }}"
   loop_control:
     loop_var: opdb
     label: >-
-      {{ opdb.0.cdb | default('') }}
-      {{ opdb.0.pdb_name | default('') }}
+      {{ opdb.cdb | default('') }}
+      {{ opdb.pdb_name | default('') }}
   when:
     - oracle_pdbs is defined
-    - opdb.0.cdb is defined
-    - opdb.0.pdb_name is defined
-    - opdb.0.state == 'present'
-    - opdb.0.statspack is defined
-    - opdb.0.statspack.state == 'present'
+    - opdb.cdb is defined
+    - opdb.pdb_name is defined
+    - opdb.state == 'present'
+    - opdb.statspack is defined
+    - opdb.statspack.state == 'present'
     - >-
-      oracle_databases | selectattr('oracle_db_name', 'match', opdb.0.cdb)
+      oracle_databases | selectattr('oracle_db_name', 'equalto', opdb.cdb)
       | map(attribute='state') | list | first == 'present'
   become: true
   become_user: "{{ oracle_user }}"

@@ -20,7 +20,7 @@
         src: "{{ _oraswgi_install_oracle_gi_image }}"
         dest: "{{ oracle_home_gi }}"
         copy: false
-      with_items: "{{ oracle_sw_image_gi | selectattr('version', 'match', oracle_install_version_gi) }}"
+      with_items: "{{ oracle_sw_image_gi | selectattr('version', 'equalto', oracle_install_version_gi) }}"
       loop_control:
         label: "{{ _oraswgi_install_oracle_gi_image | default('') }}"
       args:
@@ -120,7 +120,7 @@
     # get 1st opatchauto patch with state=present
     __applyruopatchauto: |-
       {{ gi_patches[oracle_install_version_gi]['opatchauto']
-        | selectattr('state', 'match', 'present') | list | first }}
+        | selectattr('state', 'equalto', 'present') | list | first }}
     __patchru_dir: |-
       {{ oracle_sw_copy | bool | ternary(oracle_stage, oracle_stage_remote) }}/patches/{{ oracle_install_version_gi }}/
       {{- __applyruopatchauto['path'] | default(__applyruopatchauto['patchid']) }}
