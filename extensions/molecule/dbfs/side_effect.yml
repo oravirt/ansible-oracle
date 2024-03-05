@@ -58,3 +58,24 @@
         init_parameters:
           - {name: recyclebin, value: 'off', scope: spfile, state: present}
           - {name: sga_target, value: '1808M', scope: spfile, state: present}
+
+    oracle_pdbs:
+      - cdb: DB1
+        home: db19-si-ee
+        pdb_name: ORCLPDB
+        listener_port: 1521
+        state: present
+        datafile_dest: /u01/app/oracle/oradata
+        statspack:
+          purgedays: 14
+          snaplevel: 7
+          tablespace: PERFSTAT
+          state: present
+        tablespaces:
+          - name: PERFSTAT
+            size: 10M
+            autoextend: true
+            next: 50M
+            maxsize: 4G
+            content: permanent
+            state: present
