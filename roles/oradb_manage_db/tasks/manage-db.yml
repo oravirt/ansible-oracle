@@ -103,30 +103,41 @@
   when: odb.state == 'present'
 
 - name: manage_db | create/manage database
-  opitzconsulting.ansible_oracle.oracle_db:
-    oracle_home: "{{ _oracle_home_db }}"
-    port: "{{ listener_port_template }}"
-    sys_password: "{{ _oradb_manage_db_dbca_sys_pass }}"
-    db_name: "{{ odb.oracle_db_name }}"
-    db_unique_name: "{{ odb.oracle_db_unique_name | default(omit) }}"
-    sid: "{{ odb.oracle_db_instance_name | default(omit) }}"
-    responsefile: "{{ oracle_rsp_stage }}/{{ _oradb_manage_db_oracle_dbca_rsp }}"
-    archivelog: "{{ odb.archivelog | default(omit) }}"
-    flashback: "{{ odb.flashback | default(omit) }}"
-    force_logging: "{{ odb.force_logging | default(omit) }}"
-    initparams: "{{ _oradb_manage_db_init_params_list | default(omit) }}"
-    output: verbose
-    state: "{{ odb.state }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
-  become: true
-  become_user: "{{ oracle_user }}"
-  when: odb.state == 'present'
-  register: dbca_create
   tags:
     - molecule-idempotence-notest
     - create_db
     - manage_db
     - dbca
+  block:
+    - name: manage_db | create/manage database
+      opitzconsulting.ansible_oracle.oracle_db:
+        oracle_home: "{{ _oracle_home_db }}"
+        port: "{{ listener_port_template }}"
+        sys_password: "{{ _oradb_manage_db_dbca_sys_pass }}"
+        db_name: "{{ odb.oracle_db_name }}"
+        db_unique_name: "{{ odb.oracle_db_unique_name | default(omit) }}"
+        sid: "{{ odb.oracle_db_instance_name | default(omit) }}"
+        responsefile: "{{ oracle_rsp_stage }}/{{ _oradb_manage_db_oracle_dbca_rsp }}"
+        archivelog: "{{ odb.archivelog | default(omit) }}"
+        flashback: "{{ odb.flashback | default(omit) }}"
+        force_logging: "{{ odb.force_logging | default(omit) }}"
+        initparams: "{{ _oradb_manage_db_init_params_list | default(omit) }}"
+        output: verbose
+        state: "{{ odb.state }}"
+      run_once: "{{ _oraswgi_meta_configure_cluster }}"
+      become: true
+      become_user: "{{ oracle_user }}"
+      when: odb.state == 'present'
+      register: dbca_create
+
+  rescue:
+    - name: manage_db | fail create/manage database
+      ansible.builtin.fail:
+        msg: >-
+          Set oradb_facts_ignore_unreachable=false in oracle_databases
+          to disable this fail task.qq
+      when:
+        - not _odb_loop_helper.oradb_facts_ignore_unreachable | default(false)
 
 - name: manage_db | Customize oratab for autostart
   ansible.builtin.lineinfile:
