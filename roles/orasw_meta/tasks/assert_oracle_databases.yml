@@ -153,6 +153,8 @@
               - ass_pdb.state in ['absent', 'present']
               - ass_pdb.home is defined
               - db_homes_config[ass_pdb.home] is defined
+              - oracle_databases | selectattr('oracle_db_name', 'match', ass_pdb.cdb)
+                  | list | length == 1
           with_items:
             - "{{ oracle_pdbs }}"
           loop_control:
