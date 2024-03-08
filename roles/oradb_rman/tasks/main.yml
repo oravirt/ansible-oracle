@@ -311,10 +311,10 @@
   # noqa risky-shell-pipe no-changed-when
   ansible.builtin.shell: >-
     {{ oracle_base }}/bin/rman_backup.sh
-      -a {{ odb.1.name }}
-      -s {{ odb.0.oracle_db_instance_name | default(odb.0.oracle_db_name) }}
-      -r {{ oradb_rman_script_dir }}
-      -l {{ oradb_rman_log_dir }} | tee -a {{ rman_cron_logdir }}/rman_{{ odb.1.name }}.log
+    -a {{ odb.1.name }}
+    -s {{ odb.0.oracle_db_instance_name | default(odb.0.oracle_db_name) }}
+    -r {{ oradb_rman_script_dir }}
+    -l {{ oradb_rman_log_dir }} | tee -a {{ rman_cron_logdir }}/rman_{{ odb.1.name }}.log
   environment:
     PATH: /bin:/usr/bin
   become: true
