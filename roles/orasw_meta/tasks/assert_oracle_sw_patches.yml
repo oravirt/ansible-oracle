@@ -16,14 +16,14 @@
               - osp_loop.filename is defined
               - >-
                   oracle_sw_patches
-                    | selectattr('unique_patchid', 'defined')
-                    | selectattr('unique_patchid', 'equalto', osp_loop.unique_patchid | default(0))
-                    | list | length <= 1
+                  | selectattr('unique_patchid', 'defined')
+                  | selectattr('unique_patchid', 'equalto', osp_loop.unique_patchid | default(0))
+                  | list | length <= 1
               - >-
                   oracle_sw_patches
-                    | selectattr('unique_patchid', 'undefined')
-                    | selectattr('patchid', 'equalto', osp_loop.patchid)
-                    | list | length <= 1
+                  | selectattr('unique_patchid', 'undefined')
+                  | selectattr('patchid', 'equalto', osp_loop.patchid)
+                  | list | length <= 1
           with_items:
             - "{{ oracle_sw_patches }}"
           loop_control:
