@@ -731,3 +731,73 @@ releases:
     - os_oracle.yml
     - role_sparation.yml
     release_date: '2024-02-24'
+  4.6.0:
+    changes:
+      breaking_changes:
+      - 'oradb_manage_db: move echo for usage of ocenv from .bashrc to .bash_profile
+        (oravirt#418)'
+      - 'orasw_meta: added assert for oracle_db_mem_totalmb in oracle_databases (oravirt#414)'
+      - 'orasw_meta: added variable orasw_meta_cluster_hostgroup for RAC (oravirt#418)'
+      - 'orasw_meta: assert that cdb from oracle_pdbs is in oracle_databases (oravirt#417)'
+      bugfixes:
+      - 'global: removed redundant flatten(levels=1) filter on oracle_database/oracle_pdbs
+        (oravirt#416)'
+      - 'global: replaced `match` filter fith `equalto` to prevent partial matches
+        where not wanted (oravirt#416)'
+      - 'oradb_facts: Loop gathered facts only for first database from oracle_databases
+        (oravirt#416)'
+      - 'oradb_facts: Prevent re-using results from previous loop run when ignore_errors
+        set to true (oravirt#416)'
+      - 'oradb_manage_redo: Loop processed only first database from oracle_databases
+        (oravirt#416)'
+      - 'oradb_manage_statspack: Loops processed only first database/pdb from oracle_databases/oracle_pdbs
+        (oravirt#416)'
+      - 'oradb_rman: Loops processed only first database from oracle_databases (oravirt#416)'
+      - 'orasw_meta_internal: replaced all odb[0]/opdb[0] with _odb_loop_helper/_opdb_loop_helper
+        (oravirt#416)'
+      minor_changes:
+      - 'RAC: Reenabled RAC-Support in 4.x (oravirt#418)'
+      - 'molecule: Added 2nd database to tests (oravirt#417)'
+      - 'oradb_facts: add attribute oradb_facts_ignore_unreachable to oracle_databases
+        (oravirt#417)'
+      - 'oradb_manage_db: Ignore errors during create/manage db when oradb_facts_ignore_unreachable=true
+        (oravirt#417)'
+      - 'oradb_manage_grants: check state from oracledb_facts during execution (oravirt#417)'
+      - 'oradb_manage_parameters: check state from oracledb_facts during execution
+        (oravirt#417)'
+      - 'oradb_manage_pdb: check state from oracledb_facts during execution (oravirt#417)'
+      - 'oradb_manage_profiles: check state from oracledb_facts during execution (oravirt#417)'
+      - 'oradb_manage_redo: Disable role in RAC environments (oravirt#418)'
+      - 'oradb_manage_redo: check state from oracledb_facts during execution (oravirt#417)'
+      - 'oradb_manage_roles: check state from oracledb_facts during execution (oravirt#417)'
+      - 'oradb_manage_services: check state from oracledb_facts during execution (oravirt#417)'
+      - 'oradb_manage_statspack: check state from oracledb_facts during execution
+        (oravirt#417)'
+      - 'oradb_manage_tablespace: check state from oracledb_facts during execution
+        (oravirt#417)'
+      - 'oradb_manage_users: check state from oracledb_facts during execution (oravirt#417)'
+      - 'orahost_ssh: Role rewritten with modern ansible modules (oravirt#418)'
+      - 'orasw_download_patches: Download OPatch for GI/Restart (oravirt#415)'
+      release_summary: 'This is the 1st Release of ansible-oracle 4.x with RAC support
+        in expeimental stete.
+
+        The fixes from (oravirt#416) are very important for setups with more then
+        1 database on a host.
+
+        Please remove `oracle_db_mem_totalmb` from `oracle_databases` and set `sga_target`
+        in `initparams` as a replacement.'
+    fragments:
+    - assert_pdbs.yml
+    - fix_loops.yml
+    - molecule.yml
+    - ocenv.yml
+    - oracle_db_mem_totalmb.yml
+    - oradb_facts.yml
+    - oradb_facts2.yml
+    - oradb_facts3.yml
+    - oradb_manage_redo.yml
+    - orasw_download.yml
+    - rac.yml
+    - release.yml
+    - ssh.yml
+    release_date: '2024-03-08'
