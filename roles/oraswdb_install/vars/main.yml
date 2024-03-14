@@ -37,8 +37,9 @@ _oraswdb_install_choptcheck: "{% if oraswdb_install_forcechopt | bool %}dochopt{
 
 _oraswdb_install_dbh_stat: >-
   {{ stat_dbh_installed.results
-      | selectattr('invocation.module_args.path', 'equalto', db_homes_config[dbh.home]['oracle_home'])
-      | first }}
+  | selectattr('invocation.module_args.path', 'equalto', (db_homes_config[dbh.home]['oracle_home'] + '/root.sh'))
+  | list | first
+  }}
 
 _local_oracle_sw_image_db: >-
   {{ db_homes_config[dbh.home].imagename
