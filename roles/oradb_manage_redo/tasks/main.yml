@@ -23,9 +23,9 @@
         size: "{{ odb.redolog_size }}"
         groups: "{{ odb.redolog_groups }}"
       environment: "{{ _oracle_env }}"
-      run_once: "{{ _oraswgi_meta_configure_cluster }}"
       loop: "{{ oracle_databases }}"
       when:
+        - _orasw_meta_primary_node | bool
         - oracle_databases is defined
         - odb.redolog_size is defined
         - odb.redolog_groups is defined

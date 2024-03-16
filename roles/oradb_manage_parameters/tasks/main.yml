@@ -14,13 +14,13 @@
     state: "{{ odb.1.state }}"
     scope: "{{ odb.1.scope | default ('both') }}"
   environment: "{{ _oracle_env }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   with_subelements:
     - "{{ oracle_databases }}"
     - init_parameters
     - flags:
       skip_missing: true
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_databases is defined
     - odb.0.state == 'present'
     - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
@@ -57,13 +57,13 @@
     state: "{{ opdb.1.state }}"
     scope: "{{ opdb.1.scope | default ('both') }}"
   environment: "{{ _oracle_env_pdb }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   with_subelements:
     - "{{ oracle_pdbs }}"
     - init_parameters
     - flags:
       skip_missing: true
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_pdbs is defined
     - opdb.0.state == 'present'
     - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
@@ -99,11 +99,11 @@
     sid: "{{ _oracle_db_instance_name | default(omit) }}"
     state: "restarted"
     force_restart: false
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   with_nested:
     - "{{ oracle_databases }}"
     - ""  # dummy to force odb.0 instead of item.
   when:
+    - _orasw_meta_primary_node | bool
     - odb.0.restart_spparameter_changed | default(true)
     - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
     - restart_spparameter_changed

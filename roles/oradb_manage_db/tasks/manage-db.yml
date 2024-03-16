@@ -90,8 +90,9 @@
     # loop_var dbh was replaced by odb in outer loop
     # => no need to change all dbca-templates...
     dbh: "{{ odb }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
-  when: odb.state == 'present'
+  when:
+    - odb.state == 'present'
+    - _orasw_meta_primary_node | bool
   tags:
     - create_db
     - dbcatemplate
@@ -125,10 +126,11 @@
         initparams: "{{ _oradb_manage_db_init_params_list | default(omit) }}"
         output: verbose
         state: "{{ odb.state }}"
-      run_once: "{{ _oraswgi_meta_configure_cluster }}"
       become: true
       become_user: "{{ oracle_user }}"
-      when: odb.state == 'present'
+      when:
+        - odb.state == 'present'
+        - _orasw_meta_primary_node | bool
       register: dbca_create
 
   rescue:
@@ -159,8 +161,9 @@
 
 - ansible.builtin.debug:
     msg: "Removing DB - {{ odb.oracle_db_name }}, ORACLE_HOME - {{ _oracle_home_db }}"  # noqa name[missing]
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
-  when: odb.state == 'absent'
+  when:
+    - odb.state == 'absent'
+    - _orasw_meta_primary_node | bool
 
 - name: manage_db | remove database
   opitzconsulting.ansible_oracle.oracle_db:
@@ -171,10 +174,11 @@
     db_name: "{{ odb.oracle_db_name }}"
     output: verbose
     state: "{{ odb.state }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become: true
   become_user: "{{ oracle_user }}"
-  when: odb.state == 'absent'
+  when:
+    - odb.state == 'absent'
+    - _orasw_meta_primary_node | bool
   register: dbca_remove
   tags: remove_db,dbca
 

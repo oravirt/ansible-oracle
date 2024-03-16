@@ -17,6 +17,7 @@
       skip_missing: true
   environment: "{{ _oracle_env }}"
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_databases is defined
     - odb.0.state == 'present'
     - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
@@ -30,10 +31,11 @@
       role {{ odb.1.name }}
       state {{ odb.1.state }}
       db_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become: true
   become_user: "{{ oracle_user }}"
-  tags: users,grants
+  tags:
+    - users
+    - grants
 
 - name: Manage roles (pdb)
   opitzconsulting.ansible_oracle.oracle_role:
@@ -52,6 +54,7 @@
       skip_missing: true
   environment: "{{ _oracle_env_pdb }}"
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_pdbs is defined
     - opdb.0 is defined
     - opdb.0.state == 'present'
@@ -69,7 +72,8 @@
       role: {{ opdb.1.name }},
       state: {{ opdb.1.state }}
       cdb_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become: true
   become_user: "{{ oracle_user }}"
-  tags: users,grants
+  tags:
+    - users
+    - grants

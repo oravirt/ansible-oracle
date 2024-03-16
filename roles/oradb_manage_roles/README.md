@@ -19,7 +19,9 @@ Manage roles in Oracle
 
 ## Discovered Tags
 
-**_users,grants_**
+**_grants_**
+
+**_users_**
 
 
 ## Dependencies

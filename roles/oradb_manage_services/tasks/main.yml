@@ -16,7 +16,6 @@
     password: "{{ _db_password_cdb }}"
     service_name: "{{ _db_service_name }}"
   environment: "{{ _oracle_env }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   with_subelements:
     - "{{ oracle_databases }}"
     - services
@@ -29,6 +28,7 @@
       name {{ odb.1.name | default('') }}
       db_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_databases is defined
     - odb.0.state == 'present'
     - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
@@ -36,7 +36,9 @@
     - (odb.1.state == 'present' or odb.1.state == 'started')
   become: true
   become_user: "{{ oracle_user }}"
-  tags: create_service,services
+  tags:
+    - create_service
+    - services
 
 - name: Create services (pdb)
   opitzconsulting.ansible_oracle.oracle_services:
@@ -53,20 +55,22 @@
     pw: "{{ _db_password_pdb }}"
     sn: "{{ item.0.pdb_name }}"
   environment: "{{ oracle_env }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   with_subelements:
     - "{{ oracle_pdbs }}"
     - services
     - flags:
       skip_missing: true
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_pdbs is defined
     - item.0.state == 'present'
     - item.1 is defined
     - (item.1.state == 'present' or item.1.state == 'started')
   become: true
   become_user: "{{ oracle_user }}"
-  tags: create_service,services
+  tags:
+    - create_service
+    - services
 
 - name: Start services (db/cdb)
   opitzconsulting.ansible_oracle.oracle_services:
@@ -80,20 +84,22 @@
     pw: "{{ _db_password_cdb }}"
     sn: "{{ db_service_name }}"
   environment: "{{ oracle_env }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   with_subelements:
     - "{{ oracle_databases }}"
     - services
     - flags:
       skip_missing: true
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_databases is defined
     - item.0.state | lower == 'present'
     - item.1 is defined
     - item.1.state == 'started'
   become: true
   become_user: "{{ oracle_user }}"
-  tags: start_service,services
+  tags:
+    - start_service
+    - services
 
 - name: Start services (pdbs)
   opitzconsulting.ansible_oracle.oracle_services:
@@ -107,19 +113,21 @@
     pw: "{{ _db_password_pdb }}"
     sn: "{{ item.0.pdb_name }}"
   environment: "{{ oracle_env }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   with_subelements:
     - "{{ oracle_pdbs }}"
     - services
     - flags:
       skip_missing: true
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_pdbs is defined
     - item.0.state == 'present'
     - item.1 is defined and item.1.state == 'started'
   become: true
   become_user: "{{ oracle_user }}"
-  tags: start_service,services
+  tags:
+    - start_service
+    - services
 
 - name: Stop services (db/cdb)
   opitzconsulting.ansible_oracle.oracle_services:
@@ -133,20 +141,22 @@
     pw: "{{ _db_password_cdb }}"
     sn: "{{ db_service_name }}"
   environment: "{{ oracle_env }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   with_subelements:
     - "{{ oracle_databases }}"
     - services
     - flags:
       skip_missing: true
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_databases is defined
     - item.0.state | lower == 'present'
     - item.1 is defined
     - item.1.state == 'stopped' or item.1.state == 'absent'
   become: true
   become_user: "{{ oracle_user }}"
-  tags: start_service,services
+  tags:
+    - start_service
+    - services
 
 - name: Stop services (pdbs)
   opitzconsulting.ansible_oracle.oracle_services:
@@ -160,20 +170,22 @@
     pw: "{{ _db_password_pdb }}"
     sn: "{{ item.0.pdb_name }}"
   environment: "{{ oracle_env }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   with_subelements:
     - "{{ oracle_pdbs }}"
     - services
     - flags:
       skip_missing: true
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_pdbs is defined
     - item.0.state | lower == 'present'
     - item.1 is defined
     - item.1.state == 'stopped' or item.1.state == 'absent'
   become: true
   become_user: "{{ oracle_user }}"
-  tags: start_service,services
+  tags:
+    - start_service
+    - services
 
 - name: Remove services (db/cdb)
   opitzconsulting.ansible_oracle.oracle_services:
@@ -187,20 +199,22 @@
     pw: "{{ _db_password_cdb }}"
     sn: "{{ db_service_name }}"
   environment: "{{ oracle_env }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   with_subelements:
     - "{{ oracle_databases }}"
     - services
     - flags:
       skip_missing: true
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_databases is defined
     - item.0.state | lower == 'present'
     - item.1 is defined
     - item.1.state == 'absent'
   become: true
   become_user: "{{ oracle_user }}"
-  tags: start_service,services
+  tags:
+    - start_service
+    - services
 
 - name: Remove services (pdbs)
   opitzconsulting.ansible_oracle.oracle_services:
@@ -214,17 +228,19 @@
     pw: "{{ _db_password_pdb }}"
     sn: "{{ item.0.pdb_name }}"
   environment: "{{ oracle_env }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   with_subelements:
     - "{{ oracle_pdbs }}"
     - services
     - flags:
       skip_missing: true
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_pdbs is defined
     - item.0.state == 'present'
     - item.1 is defined
     - item.1.state == 'absent'
   become: true
   become_user: "{{ oracle_user }}"
-  tags: start_service,services
+  tags:
+    - start_service
+    - services

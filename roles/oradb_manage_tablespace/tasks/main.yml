@@ -1,6 +1,8 @@
 ---
 - name: manage tablespaces
   tags: tablespace
+  when:
+    - _orasw_meta_primary_node | bool
   block:
 
     - name: assert
@@ -28,7 +30,6 @@
         content: "{{ odb.1.content | default(omit) }}"
         state: "{{ odb.1.state | default('present') }}"
       environment: "{{ _oracle_env }}"
-      run_once: "{{ _oraswgi_meta_configure_cluster }}"
       with_subelements:
         - "{{ oracle_databases }}"
         - tablespaces
@@ -68,7 +69,6 @@
         content: "{{ opdb.1.content | default(omit) }}"
         state: "{{ opdb.1.state | default('present') }}"
       environment: "{{ _oracle_env_pdb }}"
-      run_once: "{{ _oraswgi_meta_configure_cluster }}"
       with_subelements:
         - "{{ oracle_pdbs }}"
         - tablespaces

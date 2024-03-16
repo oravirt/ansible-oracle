@@ -20,9 +20,11 @@ Manage services in Oracle
 
 ## Discovered Tags
 
-**_create_service,services_**
+**_create_service_**
 
-**_start_service,services_**
+**_services_**
+
+**_start_service_**
 
 ## Open Tasks
 

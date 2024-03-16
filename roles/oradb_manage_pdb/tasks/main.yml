@@ -25,7 +25,6 @@
         port: "{{ listener_port_template }}"
         state: "{{ odb[1].state | default(omit) }}"
       environment: "{{ _oracle_env }}"
-      run_once: "{{ _oraswgi_meta_configure_cluster }}"
       with_nested:
         - "{{ oracle_databases }}"
         - "{{ oracle_pdbs }}"
@@ -39,6 +38,7 @@
           db_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
         loop_var: odb
       when:
+        - _orasw_meta_primary_node | bool
         - oracle_databases is defined
         - odb[0].oracle_db_name
         - oracle_pdbs is defined
