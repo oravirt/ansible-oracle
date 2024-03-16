@@ -4,6 +4,7 @@
 - name: Set asmcmd dsset for ASMfd
   when:
     - device_persistence == "asmfd"
+    - _orasw_meta_primary_node | bool
   tags:
     - dsset
   block:
@@ -16,7 +17,6 @@
       become: true
       become_user: "{{ _grid_install_user }}"
       register: asmcmddsset
-      run_once: true
       environment:
         ORACLE_BASE: "{{ grid_base }}"
         ORACLE_HOME: "{{ oracle_home_gi }}"
@@ -25,4 +25,3 @@
     - name: Output asmcmd dsset
       ansible.builtin.debug:
         msg: "{{ asmcmddsset.stdout_lines }}"
-      run_once: true

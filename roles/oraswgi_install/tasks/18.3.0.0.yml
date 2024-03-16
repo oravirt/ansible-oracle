@@ -10,10 +10,13 @@
     creates: "{{ oracle_home_gi }}/root.sh"
   become: true
   become_user: "{{ _grid_install_user }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   tags:
     - oragridswunpack
-  when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and oracle_sw_copy and oracle_sw_unpack
+  when:
+    - _orasw_meta_primary_node | bool
+    - oracle_home_gi not in checkgiinstall.stdout
+    - oracle_install_version_gi == item.version
+    - oracle_sw_copy and oracle_sw_unpack
 
 - name: install_home_gi | Extract files to ORACLE_HOME (gi) (from remote location)
   ansible.builtin.unarchive:
@@ -25,10 +28,13 @@
     creates: "{{ oracle_home_gi }}/root.sh"
   become: true
   become_user: "{{ _grid_install_user }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   tags:
     - oragridswunpack
-  when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and not oracle_sw_copy
+  when:
+    - _orasw_meta_primary_node | bool
+    - oracle_home_gi not in checkgiinstall.stdout
+    - oracle_install_version_gi == item.version
+    - not oracle_sw_copy
 
 # Check for an existing GRID_HOME before reinstallation of OPatch
 - name: install_home_gi | Check for file GridSetup.sh
@@ -36,14 +42,15 @@
   ansible.builtin.stat:
     path: "{{ oracle_home_gi }}/gridSetup.sh"
   register: stat_gridsetup_result
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
+  when:
+    - _orasw_meta_primary_node | bool
 
 - name: install_home_gi | State of GridSetup.sh
   ansible.builtin.assert:
     that: "stat_gridsetup_result.stat.exists == True"
     msg: "Cannot find {{ oracle_home_gi }}/gridSetup.sh }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
-  # when: master_node
+  when:
+    - _orasw_meta_primary_node | bool
 
 - name: install_home_gi | Install cvuqdisk rpm
   ansible.builtin.yum:
@@ -78,10 +85,12 @@
     mode: "0600"
     backup: true
   with_items: "{{ asm_diskgroups }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   tags:
     - responsefilegi
-  when: oracle_home_gi not in checkgiinstall.stdout and item.diskgroup == oracle_asm_init_dg
+  when:
+    - _orasw_meta_primary_node | bool
+    - oracle_home_gi not in checkgiinstall.stdout
+    - item.diskgroup == oracle_asm_init_dg
 
 # returncode of gridSetup.sh is always <> 0 => forced exit 0
 # - name: install_home_gi | Apply Release Update on ORACLE_HOME
@@ -107,17 +116,20 @@
   # noqa command-instead-of-shell no-changed-when
   become: true
   become_user: "{{ _grid_install_user }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   tags:
     - oragridinstall
-  when: oracle_home_gi not in checkgiinstall.stdout  # and oracle_sw_unpack
+  when:
+    - _orasw_meta_primary_node | bool
+    - oracle_home_gi not in checkgiinstall.stdout
   register: giinstall
   failed_when: giinstall.rc = not in [0, 6]
 
 - ansible.builtin.debug:  # noqa name[missing]
     var: giinstall.stdout_lines
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
-  when: oracle_home_gi not in checkgiinstall.stdout and giinstall.changed
+  when:
+    - _orasw_meta_primary_node | bool
+    - oracle_home_gi not in checkgiinstall.stdout
+    - giinstall.changed
 
 - ansible.builtin.include_role:
     # noqa name[missing]
@@ -136,16 +148,18 @@
   ansible.builtin.shell: "{{ oracle_home_gi }}/root.sh"
   # noqa command-instead-of-shell no-changed-when
   become: true
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   tags:
     - runroot
-  when: oracle_home_gi not in checkgiinstall.stdout
+  when:
+    - _orasw_meta_primary_node | bool
+    - oracle_home_gi not in checkgiinstall.stdout
   register: rootmaster
 
 - ansible.builtin.debug:  # noqa name[missing]
     var: rootmaster.stdout_lines
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
-  when: oracle_home_gi not in checkgiinstall.stdout
+  when:
+    - _orasw_meta_primary_node | bool
+    - oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Run root script after installation (Other Nodes)
   ansible.builtin.shell: "sleep {{ item.0 * 60 }}; {{ oracle_home_gi }}/root.sh"
@@ -169,9 +183,11 @@
   # noqa command-instead-of-shell no-changed-when
   become: true
   become_user: "{{ _grid_install_user }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   tags:
     - runconfigtool
-  when: run_configtoolallcommand and oracle_home_gi not in checkgiinstall.stdout
+  when:
+    - _orasw_meta_primary_node | bool
+    - run_configtoolallcommand
+    - oracle_home_gi not in checkgiinstall.stdout
   ignore_errors: true
   register: configtool

@@ -41,9 +41,9 @@
       changed_when: cmdruncluvfygi.rc == 0
       become: true
       become_user: "{{ _grid_install_user }}"
-      run_once: true
       when:
         - _oraswgi_meta_configure_cluster
+        - _orasw_meta_primary_node | bool
 
     - ansible.builtin.debug:  # noqa name[missing]
         var: cmdruncluvfygi.stdout_lines

@@ -21,11 +21,11 @@
       skip_missing: true
   environment: "{{ _oracle_env_cdb }}"
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_databases is defined
     - odb.0.state == 'present'
     - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
     - (odb.1.grants is defined or odb.1.object_privs is defined)
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become: true
   become_user: "{{ oracle_user }}"
   loop_control:
@@ -62,6 +62,7 @@
       skip_missing: true
   environment: "{{ _oracle_env_pdb }}"
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_pdbs is defined
     - opdb.0 is defined
     - opdb.0.state == 'present'
@@ -70,7 +71,6 @@
     - >-
       oracle_databases | selectattr('oracle_db_name', 'equalto', opdb.0.cdb)
       | map(attribute='state') | list | first == 'present'
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become: true
   become_user: "{{ oracle_user }}"
   loop_control:
@@ -110,11 +110,11 @@
       skip_missing: true
   environment: "{{ _oracle_env }}"
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_databases is defined
     - odb.0.state == 'present'
     - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
     - (odb.1.grants is defined or odb.1.object_privs is defined)
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become: true
   become_user: "{{ oracle_user }}"
   loop_control:
@@ -151,6 +151,7 @@
       skip_missing: true
   environment: "{{ _oracle_env_pdb }}"
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_pdbs is defined
     - opdb.0 is defined
     - opdb.0.state == 'present'
@@ -159,7 +160,6 @@
     - >-
       oracle_databases | selectattr('oracle_db_name', 'equalto', opdb.0.cdb)
       | map(attribute='state') | list | first == 'present'
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   become: true
   become_user: "{{ oracle_user }}"
   loop_control:

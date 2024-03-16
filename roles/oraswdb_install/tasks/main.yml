@@ -71,8 +71,8 @@
     state: directory
   with_items:
     - "{{ db_homes_installed }}"
-  run_once: "{{ _oraswgi_meta_configure_cluster }}"
   when:
+    - _orasw_meta_primary_node | bool
     - db_homes_installed is defined
     - item.state | lower == 'present'
   tags:

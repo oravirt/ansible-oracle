@@ -175,15 +175,19 @@ ulimit_systemd_mapping:
 
 **_autostartup_service_**
 
+**_checkdbswinstall_**
+
 **_create_db,dotprofile_db_**
 
 **_dbchopt_**
 
 **_directoriesdb_**
 
+**_existing_dbhome_**
+
 **_glogindb_**
 
-**_install_home,existing_dbhome,checkdbswinstall_**
+**_install_home_**
 
 **_nfsmountdb_**
 
