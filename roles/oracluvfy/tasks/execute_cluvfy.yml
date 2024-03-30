@@ -1,0 +1,42 @@
+---
+# run cluvfy comp sys ...
+- name: execute_cluvfy | Execute cluvfy
+  block:
+    - name: execute_cluvfy | Assert parameter
+      ansible.builtin.assert:
+        quiet: false
+        that:
+          - cluvfy_args is defined
+          - cluvfy_args | length > 2
+        success_msg: >-
+          Parameter: {{ cluvfy_args }}
+
+    - name: execute_cluvfy | Check for executable
+      ansible.builtin.stat:
+        path: "{{ _oracluvfy_executable }}"
+      register: _oracluvfy_executable_stat
+
+    - name: execute_cluvfy | Install cluvfy
+      ansible.builtin.include_tasks: install_cluvfy.yml
+      when:
+        - not _oracluvfy_executable_stat.stat.exists
+
+    - name: execute_cluvfy | Execute cluvfy
+      ansible.builtin.command: >-
+        {{ _oracluvfy_executable }} {{ cluvfy_args }}
+      args:
+        chdir: "{{ oracluvfy_home }}"
+      register: cluvfy_execute_res
+      changed_when: cluvfy_execute_res.rc == 0
+      become: true
+      become_user: "{{ _grid_install_user }}"
+
+  rescue:
+    - name: execute_cluvfy | cluvfy failed
+      ansible.builtin.fail:
+        msg: See next task for details
+
+  always:
+    - name: execute_cluvfy | Show result
+      ansible.builtin.debug:
+        var: cluvfy_execute_res.stdout_lines

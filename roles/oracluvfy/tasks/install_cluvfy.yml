@@ -1,0 +1,70 @@
+---
+- name: Assert
+  ansible.builtin.include_tasks: assert.yml
+  tags:
+    - assert
+    - always
+
+- name: install_cluvfy | Install
+  become: true
+  become_user: "{{ _grid_install_user }}"
+  vars:
+    _creates: >-
+      {{ oracluvfy_force_update | bool | ternary((oracluvfy_home + '/missing_file'), _oracluvfy_executable) }}
+  block:
+    - name: install_cluvfy | download cluvfy (copy)
+      ansible.builtin.copy:
+        src: "{{ oracle_sw_source_local }}/{{ oracluvfy_archive }}"
+        dest: "{{ oracle_stage }}"
+        mode: 0664
+        force: false
+        remote_src: false
+      when:
+        - is_sw_source_local
+        - oracle_sw_copy
+        - not _oracluvfy_executable_stat.stat.exists | default(false) or oracluvfy_force_update
+
+    - name: install_cluvfy | download cluvfy (www)
+      ansible.builtin.get_url:
+        url: "{{ oracle_sw_source_www }}/{{ oracluvfy_archive }}"
+        dest: "{{ oracle_stage }}"
+        mode: 0644
+        force: false
+      when:
+        - not is_sw_source_local
+        - oracle_sw_copy
+        - not _oracluvfy_executable_stat.stat.exists | default(false) or oracluvfy_force_update
+
+    - name: install_cluvfy | Create target directory
+      ansible.builtin.file:
+        path: "{{ oracluvfy_home }}"
+        mode: "0755"
+        recurse: true
+        state: directory
+
+    - name: install_cluvfy | Unarchive cluvfy archive
+      ansible.builtin.unarchive:
+        src: "{{ _oracluvfy_stage }}/{{ oracluvfy_archive }}"
+        dest: "{{ oracluvfy_home }}"
+        copy: false
+      args:
+        creates: "{{ _creates }}"
+
+    - name: install_cluvfy | Remove local copy of {{ oracluvfy_archive }}
+      ansible.builtin.file:
+        path: "{{ _oracluvfy_stage }}/{{ oracluvfy_archive }}"
+        state: absent
+      when:
+        - oracle_sw_copy
+
+    - name: install_cluvfy | Show installed version
+      ansible.builtin.command: >-
+        {{ _oracluvfy_executable }} -version
+      args:
+        chdir: "{{ oracluvfy_home }}"
+      register: cluvfy_version_res
+      changed_when: cluvfy_version_res.rc == 0
+
+    - name: install_cluvfy | Show version
+      ansible.builtin.debug:
+        var: cluvfy_version_res.stdout_lines

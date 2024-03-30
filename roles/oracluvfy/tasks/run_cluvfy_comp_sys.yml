@@ -1,0 +1,13 @@
+---
+# run cluvfy comp sys ...
+- name: run_cluvfy_comp_sys | Execute cluvfy comp sys
+  ansible.builtin.include_tasks: execute_cluvfy.yml
+  vars:
+    cluvfy_args: >-
+      comp sys
+      -p
+      {% if oracle_install_option_gi == 'HA_CONFIG' %}ha{% endif %}
+      -osdba {{ dba_group }}
+      -osoper {{ oper_group }}
+
+# oracle_install_option_gi: HA_CONFIG
