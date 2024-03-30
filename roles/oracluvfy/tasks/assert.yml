@@ -1,0 +1,15 @@
+---
+- name: Assert variables
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - oracluvfy_home is defined
+      - oracle_base is defined
+      - oracle_stage is defined
+
+- name: Show variables
+  ansible.builtin.debug:
+    msg:
+      - "oracluvfy_home:          {{ oracluvfy_home }}"
+      - "oracluvfy_archive:       {{ oracluvfy_archive }}"
+      - "oracluvfy_force_update:  {{ oracluvfy_force_update }}"
