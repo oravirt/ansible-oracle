@@ -234,10 +234,10 @@ oracle_seclimits:
   - {name: hard nofile, value: 65536}
   - {name: soft stack, value: 10240}
   - {name: hard stack, value: 32768}
-  - {name: soft memlock, value: '{{ ((0.9 * ansible_memtotal_mb) * 1024) | round |
-      int }}'}
-  - {name: hard memlock, value: '{{ ((0.9 * ansible_memtotal_mb) * 1024) | round |
-      int }}'}
+  - {name: soft memlock, value: '{{ ((0.91 * ansible_memtotal_mb) * 1024) | round
+      | int }}'}
+  - {name: hard memlock, value: '{{ ((0.91 * ansible_memtotal_mb) * 1024) | round
+      | int }}'}
 ```
 
 ### oracle_stage
