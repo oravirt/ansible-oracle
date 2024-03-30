@@ -27,49 +27,34 @@
         - ansible_distribution_major_version | int == 8
         - oracle_install_version_gi == "19.3.0.0"
 
-    - name: install_home_gi | Execute runcluvfy.sh for Grid-Infrastructure
-      ansible.builtin.command:
-        argv:
-          - "{{ oracle_home_gi }}/runcluvfy.sh"
-          - stage
-          - -pre
-          - crsinst
-          - -responseFile
-          - "{{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }}"
+    - name: install_home_gi | Execute cluvfy for Grid-Infrastructure
+      ansible.builtin.import_role:
+        name: oracluvfy
+        tasks_from: execute_cluvfy.yml
+      vars:
+        cluvfy_args: >-
+          stage -pre
+          crsinst
+          -responseFile {{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }}
       register: cmdruncluvfygi
-      failed_when: cmdruncluvfygi.rc == -1
-      changed_when: cmdruncluvfygi.rc == 0
       become: true
       become_user: "{{ _grid_install_user }}"
       when:
         - _oraswgi_meta_configure_cluster
         - _orasw_meta_primary_node | bool
-
-    - ansible.builtin.debug:  # noqa name[missing]
-        var: cmdruncluvfygi.stdout_lines
-      when: cmdruncluvfygi.stdout_lines is defined
-
-    - name: install_home_gi | runcluvfy.sh failed
-      ansible.builtin.fail:
-        msg: "runcluvfy.sh failed - aborting Playbook rc={{ cmdruncluvfygi.rc }}"
-      when:
-        - cmdruncluvfygi.rc is defined
-        - cmdruncluvfygi.rc != 0
         - not gi_ignoreprereq | bool
 
-    - name: install_home_gi | Execute runcluvfy.sh for Oracle Restart
-      ansible.builtin.command:
-        argv:
-          - "{{ oracle_home_gi }}/runcluvfy.sh"
-          - comp
-          - sys
-          - -p
-          - crs
-          - -orainv
-          - oinstall
+    - name: install_home_gi | Execute cluvfy for Oracle Restart
+      ansible.builtin.import_role:
+        name: oracluvfy
+        tasks_from: execute_cluvfy.yml
+      vars:
+        cluvfy_args: >-
+          stage -pre hacfg
+          -osdba {{ dba_group }}
+          -osoper {{ oper_group }}
+          -orainv oinstall
       register: cmdruncluvfy
-      failed_when: cmdruncluvfy.rc == -1
-      changed_when: cmdruncluvfy.rc == 0
       become: true
       become_user: "{{ _grid_install_user }}"
       when:
