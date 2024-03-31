@@ -255,10 +255,10 @@
     - name: filesystem | Create directories
       ansible.builtin.file:
         path: "{{ item.1.mntp }}"
+        owner: "{{ item.1.owner | default(oracle_user) }}"
+        group: "{{ item.1.group | default(oracle_group) }}"
+        mode: "{{ item.1.mode | default('0775') }}"
         state: directory
-        owner: "{{ oracle_user }}"
-        group: "{{ oracle_group }}"
-        mode: "0775"
       with_subelements:
         - "{{ host_fs_layout }}"
         - filesystem
