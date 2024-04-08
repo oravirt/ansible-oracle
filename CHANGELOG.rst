@@ -5,6 +5,31 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v4.7.0
+======
+
+Minor Changes
+-------------
+
+- Replace run_once: _oraswgi_meta_configure_cluster with when condition (oravirt#422)
+- molecule: download for current cluvfy added (oravirt#423)
+- oracluvfy: New role for managing cluvfy (oravirt#423)
+- orahost_meta: increase defaults for memlock limits from 0.90 to 0.91 for cluvfy (oravirt#423)
+- oraswgi_install: use role oracluvfy for cluvfy during installation (oravirt#423)
+
+Bugfixes
+--------
+
+- oradb_rman: Removed unwanted newlines from rman_backup.sh command line (oravirt#420)
+- orahost: fix wrong permissions in filesystem | Create directories (oravirt#424)
+- oraswdb_install: fix broken Transfer oracle installfiles to server (oravirt#421)
+- reviewed entire roles/ code basis and removed unwanted indents from yaml multiline blocks (oravirt#420)
+
+Known Issues
+------------
+
+- RAC installation with oracle_sw_copy=true not working
+
 v4.6.0
 ======
 
