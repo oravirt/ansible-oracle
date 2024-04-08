@@ -801,3 +801,31 @@ releases:
     - release.yml
     - ssh.yml
     release_date: '2024-03-08'
+  4.7.0:
+    changes:
+      bugfixes:
+      - 'oradb_rman: Removed unwanted newlines from rman_backup.sh command line (oravirt#420)'
+      - 'orahost: fix wrong permissions in filesystem | Create directories (oravirt#424)'
+      - 'oraswdb_install: fix broken Transfer oracle installfiles to server (oravirt#421)'
+      - reviewed entire roles/ code basis and removed unwanted indents from yaml multiline
+        blocks (oravirt#420)
+      known_issues:
+      - RAC installation with oracle_sw_copy=true not working
+      minor_changes:
+      - 'Replace run_once: _oraswgi_meta_configure_cluster with when condition (oravirt#422)'
+      - 'molecule: download for current cluvfy added (oravirt#423)'
+      - 'oracluvfy: New role for managing cluvfy (oravirt#423)'
+      - 'orahost_meta: increase defaults for memlock limits from 0.90 to 0.91 for
+        cluvfy (oravirt#423)'
+      - 'oraswgi_install: use role oracluvfy for cluvfy during installation (oravirt#423)'
+    fragments:
+    - 420_yaml_indents.yml
+    - cluvfy_oraswgi_install.yml
+    - cluvy.yml
+    - oracluvfy.yml
+    - orahost_dir.yml
+    - orahost_meta_limits.yml
+    - oraswdb_install.yml
+    - rac_known_issue.yml
+    - run_once.yml
+    release_date: '2024-04-08'
