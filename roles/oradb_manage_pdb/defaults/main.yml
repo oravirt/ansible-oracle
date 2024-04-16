@@ -1,1 +1,14 @@
 ---
+# @var pdbadmin_user:description: >
+# Default pdb_admin user for newly created PDBs.
+#
+# Could be set in `oracle_pdbs` to define different pdb_admin user for each PDB.
+# @end
+pdbadmin_user: >-
+  {{ odb[1].pdbadmin_user | default('PDBADMIN') }}
+
+# @var pdbadmin_password:description: >
+# Password for pdb_admin user.
+# @end
+pdbadmin_password: >-
+  {{ dbpasswords[odb.1.cdb][odb.1.pdb_name][pdbadmin_user] | default(default_dbpass) }}
