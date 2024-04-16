@@ -5,6 +5,14 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v4.8.0
+======
+
+Minor Changes
+-------------
+
+- oradb_manage_pdb: added missing defaults for pdbadmin_user and pdbadmin_password (oravirt#426)
+
 v4.7.0
 ======
 
