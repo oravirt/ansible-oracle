@@ -424,7 +424,16 @@ oracle.install.asm.diskGroup.FailureGroups=
 #     oracle.install.asm.diskGroup.disksWithFailureGroupNames=\\.\ORCLDISKDATA0,FGName,\\.\ORCLDISKDATA1,FGName
 #
 #-------------------------------------------------------------------------------
-oracle.install.asm.diskGroup.disksWithFailureGroupNames=
+oracle.install.asm.diskGroup.disksWithFailureGroupNames={%- for disk in item.disk|selectattr('failure_group','defined') -%}
+  {%- if device_persistence in ['udev',''] -%}{{ disk.device }}
+  {%- elif device_persistence=='asmfd' -%}AFD:{{ disk.asmlabel | upper }}
+  {%- else -%}
+    {%- if oracle_asm_disk_string.endswith('*') %}{{ oracle_asm_disk_string[:-1] }}
+    {%- else -%}{{ oracle_asm_disk_string }}
+    {%- endif -%}{{ disk.asmlabel | upper }}
+  {%- endif -%}
+,{{ disk.failure_group }}{%- if not loop.last %},{% endif %}
+{% endfor %}
 
 #-------------------------------------------------------------------------------
 # List of disks to create a ASM DiskGroup
@@ -437,12 +446,12 @@ oracle.install.asm.diskGroup.disksWithFailureGroupNames=
 #
 #-------------------------------------------------------------------------------
 oracle.install.asm.diskGroup.disks={%- for disk in  item.disk %}
-  {%- if device_persistence=='udev' -%}{{ disk.device }}
+  {%- if device_persistence in ['udev',''] -%}{{ disk.device }}
   {%- else -%}
     {%- if oracle_asm_disk_string.endswith('*') %}{{ oracle_asm_disk_string[:-1] }}
     {%- else -%}{{ oracle_asm_disk_string }}
     {%- endif -%}{{ disk.asmlabel | upper }}
-  {%- endif -%}{%- if not loop.last %} , {% endif %}{% endfor %}
+  {%- endif -%}{%- if not loop.last %},{% endif %}{% endfor %}
 
 #-------------------------------------------------------------------------------
 # List of failure groups to be marked as QUORUM.
@@ -450,7 +459,9 @@ oracle.install.asm.diskGroup.disks={%- for disk in  item.disk %}
 # Example:
 #	oracle.install.asm.diskGroup.quorumFailureGroupNames=FGName1,FGName2
 #-------------------------------------------------------------------------------
-oracle.install.asm.diskGroup.quorumFailureGroupNames=
+oracle.install.asm.diskGroup.quorumFailureGroupNames={%- for disk in item.disk|selectattr('quorum','defined')|selectattr('quorum','equalto',true) -%}
+  {{ disk.failure_group }}{%- if not loop.last %},{% endif %}
+{% endfor %}
 #-------------------------------------------------------------------------------
 # The disk discovery string to be used to discover the disks used create a ASM DiskGroup
 #
