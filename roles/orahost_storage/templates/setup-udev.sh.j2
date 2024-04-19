@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 TEMPFILE=/tmp/udev-temp-file
 UDEVRULE=/etc/udev/rules.d/99-asm-devices.rules
-scsi_id_bin={% if ansible_distribution_major_version == '6' %}/sbin/scsi_id{% elif ansible_distribution_major_version == '7' %}/usr/lib/udev/scsi_id{% endif %}
+scsi_id_bin={% if ansible_distribution_major_version == '6' %}/sbin/scsi_id{% elif ansible_distribution_major_version >= '7' %}/usr/lib/udev/scsi_id{% endif %}
 
 
 if [[ -f $TEMPFILE ]]; then
@@ -16,25 +16,46 @@ if [[ ${device} == /dev/sda ]]; then
  continue
 fi
 
+chkexist=0
 scsiid=`$scsi_id_bin -g -u -d $device`
-chkexist=`grep $scsiid $UDEVRULE |wc -l`
+[ -z $scsiid ] || ( [ -f $UDEVRULE ] && grep -Pq "\bRESULT==\"$scsiid\"" $UDEVRULE && chkexist=1 )
+# if device has no scsiid, it might be a dm-device
+if [[ $scsiid == "" ]]; then
+   dmname=`udevadm info -q property $device | grep -P "^DM_NAME\b" | cut -d"=" -f2`
+   [ -z $dmname ] || ( [ -f $UDEVRULE ] && grep -Pq "\bENV\{DM_NAME\}==\"$dmname\"" $UDEVRULE && chkexist=1 )
+   # if device has no scsiid and no dmname, it might be a partition (block device must be ignored because it has no unique udev property)
+   if [[ $dmname == "" ]]; then
+      partuuid=`udevadm info -q property $device | grep -P "^ID_PART_ENTRY_UUID\b" | cut -d"=" -f2`
+      [ -z $partuuid ] || ( [ -f $UDEVRULE ] && grep -Pq "\bENV\{ID_PART_ENTRY_UUID\}==\"$partuuid\"" $UDEVRULE && chkexist=1 )
+   fi
+fi
+
 if [[ $chkexist == 1 ]]; then
  echo "Error: $scsiid is already present. Exiting"
  continue
 fi
-{% if use_partition_devices %}
-{% if ansible_distribution_major_version == '6' %}
-echo "KERNEL==\"sd?1\", BUS==\"scsi\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", NAME=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
-{% elif ansible_distribution_major_version == '7' %}
-echo "KERNEL==\"sd?1\", SUBSYSTEM==\"block\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
-{% endif %}
-{% elif not use_partition_devices %}
-{% if ansible_distribution_major_version == '6' %}
-echo "KERNEL==\"sd?\", BUS==\"scsi\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", NAME=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
-{% elif ansible_distribution_major_version == '7' %}
-echo "KERNEL==\"sd?\", SUBSYSTEM==\"block\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
-{% endif %}
-{% endif %}
+
+if [[ $scsiid != "" ]]; then
+   {% if use_partition_devices %}
+   {% if ansible_distribution_major_version == '6' %}
+   echo "KERNEL==\"sd*1\", BUS==\"scsi\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", NAME=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+   {% elif ansible_distribution_major_version >= '7' %}
+   echo "KERNEL==\"sd*1\", SUBSYSTEM==\"block\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+   {% endif %}
+   {% elif not use_partition_devices %}
+   {% if ansible_distribution_major_version == '6' %}
+   echo "KERNEL==\"sd*\", BUS==\"scsi\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", NAME=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+   {% elif ansible_distribution_major_version >= '7' %}
+   echo "KERNEL==\"sd*\", SUBSYSTEM==\"block\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+   {% endif %}
+   {% endif %}
+fi
+if [[ $dmname != "" ]]; then
+   echo "KERNEL==\"dm-*\", ENV{DM_NAME}==\"$dmname\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+fi
+if [[ $partuuid != "" ]]; then
+   echo "KERNEL==\"sd*\", ENV{ID_PART_ENTRY_UUID}==\"$partuuid\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+fi
 done < {{ oracle_rsp_stage }}/udev-device-input.txt
 
 if [[ -f $TEMPFILE ]]; then
