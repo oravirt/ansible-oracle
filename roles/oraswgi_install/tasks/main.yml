@@ -10,7 +10,7 @@
     allow_duplicates: false
 
 - name: install_home_gi | Check if GI is already installed
-  ansible.builtin.shell: cat "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" | grep -w {{ oracle_home_gi }} |awk  '{print $3}' | cut -f2 -d'"'
+  ansible.builtin.shell: grep -w {{ oracle_home_gi }} "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" | grep -iv 'REMOVED=.T.' | awk  '{print $3}' | cut -f2 -d'"'
   # noqa command-instead-of-shell no-changed-when risky-shell-pipe
   tags:
     - always
