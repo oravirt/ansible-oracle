@@ -7,7 +7,7 @@
   ansible.builtin.debug:
     msg:
       - >-
-          patchid: {{ dhc_opatch.patchid | default('') }}
+          patchid: {{ osp_loop.patchid | default('') }}
           unique_patchid: {{ osp_loop.unique_patchid | default('') }}
       - >-
           oracle_patch_stage: {{ oracle_patch_stage }}
@@ -24,7 +24,7 @@
     - name: Loop_stage_patch | Copy oracle DB patch (opatch) to server
       when:
         - oracle_sw_copy | bool
-        - dhc_opatch.state == 'present'
+        - osp_loop.state == 'present'
       block:
 
         - name: Loop_stage_patch | Check for unarchived patch archive
@@ -32,9 +32,9 @@
             path: "{{ __patch_unarchive_dir }}/{{ __sw_patches_filename_creates }}"
           register: checkpatcharchiveres
           vars:
-            __sw_patches_filename_creates: "{{ osp_loop.creates | default((dhc_opatch.patchid | string) + '/README.txt') }}"
+            __sw_patches_filename_creates: "{{ osp_loop.creates | default((osp_loop.patchid | string) + '/README.txt') }}"
 
-        - name: Loop_stage_patch | Copy oracle DB patch (opatch) to server (local)
+        - name: Loop_stage_patch | Copy oracle GI patch (opatch) to server (local)
           ansible.builtin.copy:
             src: "{{ oracle_sw_source_local }}/{{ osp_loop.filename }}"
             dest: "{{ oracle_stage }}/{{ osp_loop.filename }}"
@@ -44,7 +44,7 @@
             - is_sw_source_local | bool
             - not checkpatcharchiveres.stat.exists
 
-        - name: Loop_stage_patch | Copy oracle DB patch (opatch) to server (www)
+        - name: Loop_stage_patch | Copy oracle GI patch (opatch) to server (www)
           ansible.builtin.get_url:
             url: "{{ oracle_sw_source_www }}/{{ osp_loop.filename }}"
             dest: "{{ oracle_stage }}/{{ osp_loop.filename }}"
@@ -58,7 +58,7 @@
       when:
         - oracle_sw_copy | bool
         - oracle_sw_unpack | bool
-        - dhc_opatch.state == 'present'
+        - osp_loop.state == 'present'
       tags:
         - oraswdbpsuunpack1
       block:
