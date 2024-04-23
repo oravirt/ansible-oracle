@@ -1,0 +1,19 @@
+---
+- name: reboot if needed
+  ansible.builtin.shell: "needs-restarting -r"
+  failed_when: false
+  register: _global_handlers_needs_restarting
+  changed_when: _global_handlers_needs_restarting.rc > 0
+  notify: restart server
+
+- name: "restart server block (on behalf of 'restart server')"
+  block:
+    - name: Reboot
+      when: restart_on_requirement
+      listen: restart server
+      ansible.builtin.reboot:
+    - name: Reboot recommendation
+      when: not restart_on_requirement
+      listen: restart server
+      ansible.builtin.debug:
+        msg: Please REBOOT {{ ansible_hostname }} for modifications to take effect.
