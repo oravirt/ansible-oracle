@@ -10,6 +10,7 @@
     - install_os_packages
     - ansible_distribution_major_version is version('7', '<=')
   tags: os_packages, oscheck
+  notify: reboot if needed
 
 - name: Install packages required by Oracle for ASMlib on OL/RHEL
   ansible.builtin.yum:
@@ -22,6 +23,7 @@
     - device_persistence == 'asmlib'
     - asm_diskgroups is defined
   tags: os_packages, oscheck
+  notify: reboot if needed
 
 - name: Disable Firewall
   when:

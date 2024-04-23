@@ -8,6 +8,7 @@
     - install_os_packages
     - ansible_os_family == 'Suse'
   tags: os_packages, oscheck
+  notify: reboot if needed
 
 - name: Install default packages required by Oracle on SLES (version dependant)
   community.general.zypper:
@@ -23,6 +24,7 @@
     - ansible_os_family == 'Suse'
     - item.condition | default(false)
   tags: os_packages, oscheck
+  notify: reboot if needed
 
 - name: Install packages required by Oracle for ASMlib on SLES
   community.general.zypper:
@@ -33,6 +35,7 @@
     - device_persistence == 'asmlib'
     - asm_diskgroups is defined
   tags: os_packages, oscheck, asm1
+  notify: reboot if needed
 
 - name: Disable Transparent Hugepages (runtime)
   ansible.builtin.shell: |
