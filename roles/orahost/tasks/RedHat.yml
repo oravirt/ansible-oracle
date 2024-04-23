@@ -83,26 +83,48 @@
   when:
     - ansible_distribution_major_version is version('7', '>=')
   block:
-    - name: Disable Transparent Hugepages (runtime)
-      ansible.builtin.shell: if test -f {{ item.path }}; then {{ item.disable }} {{ item.path }}; fi;
-      # noqa no-changed-when
-      with_items:
-        - "{{ transparent_hugepage_disable }}"
-      tags: tphnuma,molecule-idempotence-notest
+    - name: Disable Transparent Hugepages by script
+      when: not transparent_hugepage_disable_by_grub
+      block:
+        - name: Disable Transparent Hugepages (runtime)
+          ansible.builtin.shell: if test -f {{ item.path }}; then {{ item.disable }} {{ item.path }}; fi;
+          # noqa no-changed-when
+          with_items:
+            - "{{ transparent_hugepage_disable }}"
+          tags: tphnuma,molecule-idempotence-notest
 
-    - name: Disable Transparent Hugepages (permanently)
-      ansible.builtin.lineinfile:
-        dest: "{{ item.rclocal }}"
-        line: "{{ item.disable }} {{ item.path }}"
-        state: present
-      with_items:
-        - "{{ transparent_hugepage_disable }}"
-      tags: tphnuma,molecule-idempotence-notest
+        - name: Disable Transparent Hugepages (permanently)
+          ansible.builtin.lineinfile:
+            dest: "{{ item.rclocal }}"
+            line: "{{ item.disable }} {{ item.path }}"
+            state: present
+          with_items:
+            - "{{ transparent_hugepage_disable }}"
+          tags: tphnuma,molecule-idempotence-notest
 
-    - name: Fix permissions on /etc/rc.d/rc.local
-      ansible.builtin.file:
-        path: "{{ item.rclocal }}"
-        mode: "0755"
-      with_items:
-        - "{{ transparent_hugepage_disable }}"
-      tags: tphnuma
+        - name: Fix permissions on /etc/rc.d/rc.local
+          ansible.builtin.file:
+            path: "{{ item.rclocal }}"
+            mode: "0755"
+          with_items:
+            - "{{ transparent_hugepage_disable }}"
+          tags: tphnuma
+
+    - name: Disable Transparent Hugepages by grub cmdline
+      when: transparent_hugepage_disable_by_grub
+      block:
+        - name: Check if transparent_hugepage=never already present in kernel cmdline
+          ansible.builtin.lineinfile:
+            path: /proc/cmdline
+            regexp: '.*\btransparent_hugepage\s*=\s*never\b'
+            state: absent
+          check_mode: true
+          changed_when: false
+          register: __orahost_transhp_in_cmdline
+
+        - name: Set transparent_hugepage=never in kernel cmdline
+          when:  __orahost_transhp_in_cmdline.found == 0
+          notify:
+            - restart server
+          ansible.builtin.shell:
+            cmd: grubby --update-kernel=ALL --args=transparent_hugepage=never
