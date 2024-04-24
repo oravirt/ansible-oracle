@@ -19,6 +19,8 @@ Install/Remove Patches from Oracle Database Homes
 
 ## Discovered Tags
 
+**_always_**
+
 **_current_opatch_version_**
 
 **_oragridpatchunpack_**

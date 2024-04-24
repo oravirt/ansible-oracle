@@ -1,4 +1,14 @@
 ---
+- name: Show variables
+  ansible.builtin.debug:
+    msg:
+      - "oracle_install_option_gi:  {{ oracle_install_option_gi }}"
+      - "apply_patches_gi:          {{ apply_patches_gi }}"
+      - "patch_before_rootsh:       {{ patch_before_rootsh }}"
+      - "oracle_sw_copy:            {{ oracle_sw_copy }}"
+  tags:
+    - always
+
 - name: Grid-Infrastructure/Restart
   when:
     - oracle_install_option_gi != ''
