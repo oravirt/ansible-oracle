@@ -1,0 +1,40 @@
+---
+# Set ansible_python_interpreter only when python is executable with that path
+# ansible_python_interpreter: /bin/python3
+
+configure_public_yum_repo: true
+configure_epel_repo: true
+configure_motd: false
+configure_etc_hosts: true
+
+configure_oracle_sudo: true
+disable_ee_options: true  # noqa var-naming
+
+control_management_pack_access: NONE
+
+configure_hugepages_by: memory
+
+# disable hugepages on small systems
+# don't forget to enable use_large_pages in oracle parameter
+# size_in_gb_hugepages: 2
+size_in_gb_hugepages: 0
+
+oracle_stage: /u01/stage
+
+configure_host_disks: true
+
+host_fs_layout:
+  - vgname: oravg
+    state: present
+    filesystem:
+      - {mntp: /u01, lvname: orabaselv, lvsize: 50G, fstype: xfs}
+      - {mntp: swap, lvname: swaplv, lvsize: 16g, fstype: swap}
+    disk:
+      - {device: /dev/sdb, pvname: /dev/sdb1}
+  - vgname: rootvg
+    state: present
+    filesystem:
+      - {mntp: /tmp, lvname: tmplv, lvsize: 1400m, fstype: ext4, owner: root, group: root, mode: "u+rwx,g+rwx,o+rwxt"}
+      - {mntp: /var, lvname: varlv, lvsize: 7g, fstype: ext4, owner: root, group: root, mode: "755"}
+    disk:
+      - {device: /dev/sda, pvname: /dev/sda2}

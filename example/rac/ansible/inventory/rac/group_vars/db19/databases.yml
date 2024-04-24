@@ -1,0 +1,18 @@
+---
+# rmanautofs: yes
+# rmanautofsmount: /u01/rmanbackup
+rman_retention_policy: "RECOVERY WINDOW OF 14 DAYS"
+rman_channel_disk: "format '/u01/rmanbackup/%d/%d_%T_%U'"
+rman_controlfile_autobackup_disk: "'/u01/rmanbackup/%d/%d_%F'"
+rman_device_type_disk: 'PARALLELISM 1 BACKUP TYPE TO COMPRESSED BACKUPSET'
+
+db_homes_installed:
+  - home: db19-gi-ee
+    apply_patches: true
+    state: present
+
+oracle_databases:
+  - "{{ oracle_database_dbr1 }}"
+
+oracle_pdbs:
+  - "{{ oracle_pdb_dbr1_orclpdb }}"

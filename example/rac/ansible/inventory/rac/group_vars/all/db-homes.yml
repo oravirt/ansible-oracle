@@ -1,0 +1,49 @@
+---
+apply_patches_db: true
+db_homes_config:
+  db1913-gi-ee: &db1913-gi-ee
+    home: db1912-si-ee
+    version: 19.3.0.0
+    oracle_home: /u01/app/oracle/product/19/db1913-si-ee
+    edition: EE
+    opatch_minversion: 12.2.0.1.27
+    opatchauto:
+      - patchid: 33182768
+        patchversion: 19.13.0.0.211019
+        state: present
+        subpatches:
+          - 33208123  # OCW Release Update 19.13.0.0.211019
+          - 32585572  # DBWLM Release Update
+          - 33192793  # Database Release Update 19.13.0.0.211019
+    opatch: []
+    #   # Remove Oracle Database 19c Important Recommended One-off Patches (Doc ID 555.1)
+    #   - {patchid: 29213893, state: absent, excludeUPI: 24384541, stop_processes: true}
+    #   - {patchid: 30978304, state: absent, excludeUPI: 24384338, stop_processes: true}
+    #   # - {patchid: 31602782, state: absent, excludeUPI: 24384398, stop_processes: true}
+    #   - {patchid: 33121934, state: absent, excludeUPI: 24407586, stop_processes: true}
+    #   - {patchid: 32522300, state: absent, stop_processes: true}
+    #   - {patchid: 31143146, state: absent, stop_processes: true}
+    #   - {patchid: 32919937, state: absent, stop_processes: true}
+    #   - {patchid: 33144001, state: absent, stop_processes: true}
+    #   - patchid: 32876380
+    #     # Oracle JavaVM Component Release Update (OJVM RU) 19.13.0.0.211019
+    #     stop_processes: true
+    #     state: present
+    #     path: 19.13.0.0.211019/ojvm/p33192694_190000_Linux-x86-64.zip
+    #     # Oracle Database 19c Important Recommended One-off Patches (Doc ID 555.1)
+    #   - {patchid: 29213893, path: 19.13.0.0.211019/p29213893_1913000DBRU_Generic.zip, state: present, stop_processes: true}
+    #   - {patchid: 30978304, path: 19.13.0.0.211019/p30978304_1913000DBRU_Generic.zip, state: present, stop_processes: true}
+    #   # Contention on "CURSOR: PIN S WAIT ON X" when PQ slave's execution plan does not match with QC
+    #   # conflicts with 33121934 ...
+    #   # - {patchid: 31602782, path: 19.13.0.0.211019/p31602782_1913000DBRU_Linux-x86-64.zip, state: present, stop_processes: true}
+    #   # Library cache lock / load lock / mutex x during connection storm
+    #   - {patchid: 33121934, path: 19.13.0.0.211019/p33121934_1913000DBRU_Linux-x86-64.zip, state: present, stop_processes: true}
+
+  # Current Mapping of ORACLE_HOMEs
+  # use this mapping for fast change between the Release Updates
+  # <<: * => merge values from alias and overwrite oracle_home + home
+  db19-gi-ee:
+    <<: *db1913-gi-ee
+    # imagename: db_home_19.13.zip
+    oracle_home: /u01/app/oracle/product/19/db1
+    home: db19-gi-ee

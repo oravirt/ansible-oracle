@@ -1,0 +1,53 @@
+---
+
+- name: Host configuration for Vagrant
+  hosts: "{{ hostgroup | default('all') }}"
+  become: true
+  become_user: root
+  any_errors_fatal: true
+  tasks:
+    - name: set new hostname
+      ansible.builtin.hostname:
+        name: "{{ inventory_hostname }}"
+
+    - name: Remove /etc/hosts
+      ansible.builtin.file:
+        path: /etc/hosts
+        state: absent
+
+    - name: Update /etc/hosts
+      ansible.builtin.blockinfile:
+        path: /etc/hosts
+        mode: "0644"
+        create: true
+        backup: false
+        block: |
+          127.0.0.1 localhost
+          {% for item in play_hosts %}
+          {{ hostvars[item]['ansible_eth1']['ipv4']['address'] }}  {{ hostvars[item]['ansible_fqdn'] }} {{ hostvars[item]['ansible_hostname'] }}
+          {% endfor %}
+
+    - name: List availible updates
+      ansible.builtin.yum:
+        list: updates
+        update_cache: true
+        security: true
+        bugfix: true
+      register: yum_update_list_res
+
+    - name: List updates output
+      ansible.builtin.debug:
+        var: yum_update_list_res.results | map(attribute='name') | sort
+
+    - name: Update all OS packages to latest
+      ansible.builtin.yum:  # noqa: package-latest
+        name: '*'
+        state: latest
+        lock_timeout: 600
+      async: 1800
+      poll: 15
+      register: yum_update_res
+
+    - name: Update output
+      ansible.builtin.debug:
+        var: yum_update_res.results | first | split('\n')

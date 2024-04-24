@@ -1,0 +1,115 @@
+---
+# IMPORTANT!!!!
+# Don't forget to add the oracle_database_<name> to oracle_databases!
+#
+oracle_database_dbr1:
+  home: &db_config_home db19-gi-ee
+  oracle_db_name: &oracle_db_name DBR1
+  oracle_db_type: RAC                                   # Type of database (RAC,RACONENODE,SI)
+  is_container: true
+  storage_type: ASM                                     # Database storage to be used. ASM or FS.
+  oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+  redolog_size: 75M
+  redolog_groups: 3
+  datafile_dest: +DATA
+  recoveryfile_dest: +FRA
+  # listener_name: LISTENER                            # This home will have a listener configured
+  listener_port: &cdb_listener_port 1521
+  # *local_listener is used in initparam as an achor
+  local_listener: &local_listener "'{{ ansible_hostname }}:1521'"
+  archivelog: false
+  flashback: false
+  force_logging: true
+  state: present
+  # Statspack is not supported in RAC at the moment
+  # statspack:
+  #   purgedays: 14
+  #   snaplevel: 5
+  #   state: present
+  tablespaces:
+    - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+    - {name: sysaux, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+    - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
+    - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
+    - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+  init_parameters:
+    - {name: audit_trail, value: 'NONE', scope: spfile, state: present}
+    - {name: processes, value: '400', scope: spfile, state: present, dbca: false}
+    # - {name: local_listener, value: *local_listener, scope: both, state: present}
+    - {name: archive_lag_target, value: '900', scope: both, state: present}
+    - {name: control_management_pack_access, value: '{{ control_management_pack_access }}', scope: both, state: present}
+    - {name: control_file_record_keep_time, value: '30', scope: both, state: present}
+    - {name: db_files, value: '200', scope: spfile, state: present}
+    - {name: deferred_segment_creation, value: 'false', scope: both, state: present}
+    - {name: filesystemio_options, value: 'setall', scope: spfile, state: present}
+    - {name: job_queue_processes, value: '10', scope: both, state: present}
+    # Disable forcing hugepages on really small systems
+    #  - {name: use_large_pages ,value: 'ONLY', scope: spfile, state: present}
+    - {name: log_archive_dest_1, value: 'location=USE_DB_RECOVERY_FILE_DEST', scope: both, state: present}
+    #  - {name: dg_broker_start, value: 'false', scope: both, state: present, dbca: False}
+    #  - {name: log_archive_config , value: 'DG_CONFIG=(DBR19u1, DBR19u2)', scope: both, state: present, dbca: False}
+    - {name: log_buffer, value: '64M', scope: spfile, state: present}
+    - {name: pga_aggregate_target, value: '200M', scope: both, state: present}
+    - {name: sga_target, value: '1800M', scope: spfile, state: present}
+    - {name: recyclebin, value: 'off', scope: spfile, state: present}
+    - {name: standby_file_management, value: 'AUTO', scope: both, state: present}
+    - {name: streams_pool_size, value: '152M', scope: spfile, state: present}
+    # "_cursor_obsolete_threshold" for 12.2+
+    - {name: "_cursor_obsolete_threshold", value: '1024', scope: spfile, state: present}
+    - {name: max_pdbs, value: '3', scope: both, state: present}
+    - {name: clonedb, value: 'true', scope: spfile, state: present, dbca: false}
+    - {name: db_create_file_dest, value: '+DATA', scope: both, state: present}
+    - {name: db_create_online_log_dest_1, value: '+DATA', scope: both, state: present}
+    # file_dest_size in bytes in 12.1.0.2 due to bug in DBCA
+    - {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
+
+  profiles:
+    - name: DEFAULT
+      state: present
+      attributes:
+        - {name: password_life_time, value: unlimited}
+
+    - name: "C##CMK_MONITORING"
+      state: present
+      attributes:
+        - {name: password_life_time, value: unlimited}
+        - {name: sessions_per_user, value: 5}
+        - {name: password_grace_time, value: 7}
+        - {name: password_lock_time, value: 1}
+        - {name: password_verify_function, value: "NULL"}
+
+  users:
+    - schema: dbsnmp
+      state: unlocked
+      update_password: always
+    - schema: c##check_mk
+      grants:
+        - select_catalog_role
+        - create session
+      state: present
+
+  rman_jobs:
+    - {name: parameter}
+    - {name: offline_level0, disabled: false, weekday: "0", hour: "01", minute: "10", day: "*"}
+
+oracle_pdb_dbr1_orclpdb:
+  home: *db_config_home
+  listener_port: *cdb_listener_port
+  cdb: *oracle_db_name
+  pdb_name: ORCLPDB
+  state: present
+  profiles: "{{ oracle_default_profiles }}"
+  # Statspack is not supported in RAC at the moment
+  # statspack:
+  #   purgedays: 14
+  #   snaplevel: 7
+  #   state: present
+
+  tablespaces:
+    - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+    - {name: sysaux, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+    - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
+    - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
+    - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+    # init_parameters:
+    #      - {name: db_create_file_dest, value: '/u02/oradata/', scope: both, state: present}
