@@ -32,6 +32,8 @@
       when:
         - _orasw_meta_primary_node | bool
 
+    # IMPORTANT!
+    # Copy patches to 1st node only, when -applyRU is used.
     - name: include 19c/21c | Copy Patches for -applyRU when version >=19c
       ansible.builtin.import_role:
         name: oraswgi_manage_patches

@@ -1,62 +1,14 @@
 ---
-- name: Opatch-upgrade | Check current opatch version
-  opitzconsulting.ansible_oracle.oracle_opatch:
-    oracle_home: "{{ oracle_home_gi }}"
-    state: opatchversion
-  register: current_opatch_version
-  tags: current_opatch_version
-  when: gi_patches is defined and gi_patches[oracle_install_version_gi] is defined and gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined
-  become: true
-
-- name: Opatch-upgrade | Info
-  ansible.builtin.debug:  # noqa name[missing]
-    msg:
-      - "current: {{ current_opatch_version.msg }}"
-      - "needed:  {{ gi_patches[oracle_install_version_gi]['opatch_minversion'] }}"
-  tags: current_opatch_version
-  when:
-    - gi_patches is defined
-    - gi_patches[oracle_install_version_gi] is defined
-    - gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined
-
-- name: Opatch-upgrade | Extract OPatch to GI Home
-  ansible.builtin.unarchive:
-    src: "{{ oracle_stage }}/{{ item.filename }}"
-    dest: "{{ oracle_home_gi }}"
-    copy: false
-    owner: "{{ _grid_install_user }}"
-    group: "{{ oracle_group }}"
-  become: true
-  with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) }}"
-  when:
-    - apply_patches_gi
-    - oracle_sw_copy
-    - gi_patches is defined
-    - gi_patches[oracle_install_version_gi] is defined
-    - gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined
-    - (current_opatch_version.msg is version_compare(gi_patches[oracle_install_version_gi]['opatch_minversion'], '<'))
+- name: Opatch-upgrade | Assert
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - gi_patches is defined
+      - gi_patches[oracle_install_version_gi] is defined
+      - gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined
   tags:
-    - oragridpatchunpack
-
-- name: Opatch-upgrade | Extract OPatch to GI Home (from remote location)
-  ansible.builtin.unarchive:
-    src: "{{ oracle_stage_remote }}/{{ item.filename }}"
-    dest: "{{ oracle_home_gi }}"
-    copy: false
-    owner: "{{ _grid_install_user }}"
-    group: "{{ oracle_group }}"
-  become: true
-  with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) }}"
-  when:
-    - apply_patches_gi
-    - item.version == oracle_install_version_gi
-    - not oracle_sw_copy
-    - gi_patches is defined
-    - gi_patches[oracle_install_version_gi] is defined
-    - gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined
-    - (current_opatch_version.msg is version_compare(gi_patches[oracle_install_version_gi]['opatch_minversion'], '<'))
-  tags:
-    - oragridpatchunpack
+    - always
+    - assert
 
 - name: Opatch-upgrade | Check current opatch version
   opitzconsulting.ansible_oracle.oracle_opatch:
@@ -64,15 +16,124 @@
     state: opatchversion
   register: current_opatch_version
   tags: current_opatch_version
-  when:
-    - gi_patches is defined
-    - gi_patches[oracle_install_version_gi] is defined
-    - gi_patches[oracle_install_version_gi]['opatch_minversion'] is defined
   become: true
   become_user: "{{ _grid_install_user }}"
 
 - name: Opatch-upgrade | Info
   ansible.builtin.debug:
-    var: current_opatch_version.msg
+    msg:
+      - "current: {{ current_opatch_version.msg }}"
+      - "needed:  {{ gi_patches[oracle_install_version_gi]['opatch_minversion'] }}"
   tags: current_opatch_version
-  when: current_opatch_version.changed  # noqa: no-handler
+
+- name: Opatch-upgrade | Upgrade Opatch block
+  when:
+    - current_opatch_version.msg is version_compare(gi_patches[oracle_install_version_gi]['opatch_minversion'], '<')
+  block:
+    # - debug:
+    #     msg: >-
+    #       {{ current_opatch_version.msg is version_compare(gi_patches[oracle_install_version_gi]['opatch_minversion'], '<') }}
+
+    - name: Opatch-upgrade | Copy oracle opatch to server (www)
+      ansible.builtin.get_url:
+        url: "{{ oracle_sw_source_www }}/{{ oop_loop.filename }}"
+        dest: "{{ oracle_stage }}"
+        mode: "0644"
+        force: true
+      with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', db_version) }}"
+      loop_control:
+        loop_var: oop_loop
+        label: >-
+          filename: {{ oop_loop.filename | default('') }}
+      when:
+        - oracle_sw_copy
+        - not is_sw_source_local
+      become: true
+      become_user: "{{ oracle_user }}"
+      tags:
+        - oragridopatchget
+
+    - name: Opatch-upgrade | Copy oracle opatch to server (local)
+      ansible.builtin.copy:
+        src: "{{ oracle_sw_source_local }}/{{ item.filename }}"
+        dest: "{{ oracle_stage }}"
+        mode: "0644"
+        force: true
+      with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) }}"
+      when:
+        - oracle_sw_copy
+        - is_sw_source_local
+      tags:
+        - oragridpatchpush
+
+    # - name: Opatch-upgrade | Copy oracle opatch to server (www)
+    #   ansible.builtin.get_url:
+    #     url: "{{ oracle_sw_source_www }}/{{ osp_loop.filename }}"
+    #     dest: "{{ oracle_stage }}"
+    #     mode: "0644"
+    #     force: true
+    #   with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', db_version) }}"
+    #   loop_control:
+    #     loop_var: oop_loop
+    #     label: >-
+    #       filename: {{ oop_loop.filename | default('') }}
+    #   when:
+    #     - oracle_sw_copy
+    #     - not is_sw_source_local
+    #   become: true
+    #   become_user: "{{ oracle_user }}"
+    #   tags:
+    #     - oragridpatchpush
+
+    - name: Opatch-upgrade | Extract OPatch to GI/Restart Home
+      ansible.builtin.unarchive:
+        src: "{{ oracle_stage }}/{{ item.filename }}"
+        dest: "{{ oracle_home_gi }}"
+        copy: false
+        owner: "{{ _grid_install_user }}"
+        group: "{{ oracle_group }}"
+      become: true
+      become_user: "{{ _grid_install_user }}"
+      with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) }}"
+      when:
+        - oracle_sw_copy
+      tags:
+        - oragridpatchunpack
+
+    - name: Opatch-upgrade | Extract OPatch to GI/Restart Home (from remote location)
+      ansible.builtin.unarchive:
+        src: "{{ oracle_stage_remote }}/{{ item.filename }}"
+        dest: "{{ oracle_home_gi }}"
+        copy: false
+        owner: "{{ _grid_install_user }}"
+        group: "{{ oracle_group }}"
+      become: true
+      become_user: "{{ _grid_install_user }}"
+      with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) }}"
+      when:
+        - not oracle_sw_copy
+      tags:
+        - oragridpatchunpack
+
+    - name: Opatch-upgrade | Check current opatch version 2
+      opitzconsulting.ansible_oracle.oracle_opatch:
+        oracle_home: "{{ oracle_home_gi }}"
+        state: opatchversion
+      register: current_opatch_version2
+      tags: current_opatch_version
+      become: true
+      become_user: "{{ _grid_install_user }}"
+
+    - name: Opatch-upgrade | Assert installed OPatch version
+      ansible.builtin.assert:
+        that:
+          - current_opatch_version2.msg is version_compare(gi_patches[oracle_install_version_gi]['opatch_minversion'], '>=')
+        success_msg: >-
+          current: {{ current_opatch_version2.msg }}
+          needed: {{ gi_patches[oracle_install_version_gi]['opatch_minversion'] }}
+        fail_msg: >-
+          current: {{ current_opatch_version2.msg }}
+          needed: {{ gi_patches[oracle_install_version_gi]['opatch_minversion'] }}
+      when:
+        - current_opatch_version2.msg is defined
+      tags: current_opatch_version

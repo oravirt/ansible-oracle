@@ -4,4 +4,13 @@ _oraswgi_manage_patches_ocm_response_file: "{{ oracle_patch_stage }}/{{ oracle_i
 
 _oraswgi_manage_patches_crstype: has
 
-_oraswgi_manage_patches_crs_running: "{{ crscheckres.stdout_lines is search('CRS-4638:') }}"
+_oraswgi_manage_patches_crs_running: >-
+  {{ crscheckres.stdout_lines is search('CRS-4638:') }}
+
+_oraswgi_manage_patches_crs_configured: >-
+  {{ olrloc.stat.exists | default(false) }}
+
+# get unique patchid list for Grid-Infrastructure
+_oraswgi_manage_patches_patchid_list: >-
+  {{ (gi_patches[oracle_install_version_gi]['opatchauto'] | default([]) | map(attribute='patchid')
+   + gi_patches[oracle_install_version_gi]['opatch'] | default([]) | list | map(attribute='patchid')) | unique }}

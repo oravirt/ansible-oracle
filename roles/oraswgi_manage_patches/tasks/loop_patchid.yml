@@ -1,5 +1,7 @@
 ---
-- name: Work on Patch {{ gip_opatch.0.patchid }}
+# loop_var: gip_opatch
+#
+- name: loop_patchid | Work on Patch {{ gip_opatch.0.patchid }}
   ansible.builtin.debug:
     msg:
       - >-
@@ -12,7 +14,7 @@
       - >-
           patchsubdir: {{ __oraswdb_manage_patches_patchsubdir | default('') }}
 
-- name: Work on oracle_sw_patches
+- name: loop_patchid | Work on oracle_sw_patches
   ansible.builtin.include_tasks: loop_stage_patch.yml
   vars:
     __sw_patches_filename_creates: "{{ osp_loop.creates | default((gip_opatch.0.patchid | string) + '/README.txt') }}"
@@ -21,7 +23,7 @@
       {%- if osp_loop.unique_patchid is defined -%}
       upi_{{ osp_loop.unique_patchid -}}/{% endif -%}
   with_items:
-    - "{{ oracle_sw_patches | selectattr('patchid', 'equalto', gip_opatch.0.patchid) }}"
+    - "{{ oracle_sw_patches | selectattr('patchid', 'equalto', gip_opatch.0.patchid) | list }}"
   loop_control:
     loop_var: osp_loop
     label: >-
@@ -29,23 +31,21 @@
       filename: {{ osp_loop.filename }}
       unique_patchid: {{ osp_loop.unique_patchid | default('') }}
   when:
-    - apply_patches_db
+    - apply_patches_db | bool
     - gip_opatch.0.state == 'present'
     - not gihome_patches.stdout_lines | select('match', osp_loop.patchid | string) | length > 0
     # - osp_loop.unique_patchid | default(0) == gip_opatch.excludeUPI | default(0)
 
-
-- name: Info
+- name: loop_patchid | Info
   ansible.builtin.debug:
     msg: Starting opatch apply. This could take some time to complete...
 
 # opatchauto needs root user for execution
-- name: Manage patch with opatch (opatchauto / apply)
+- name: loop_patchid | Manage patch with opatch (opatchauto / apply)
   opitzconsulting.ansible_oracle.oracle_opatch:
     oracle_home: "{{ oracle_home_gi }}"
-    patch_base: |-
-      {{ oracle_patch_install }}/{{ oracle_install_version_gi }}/
-      {{- gip_opatch.0.path | default(__patch_upisubdir + (gip_opatch.0.patchid | string)) }}/
+    patch_base: >-
+      {{ oracle_patch_install }}/{{ oracle_install_version_gi }}/{{ dhc_opatch.path | default(__patch_base_local) }}
     patch_id: "{{ gip_opatch.0.patchid }}"
     patch_version: "{{ gip_opatch.0.patchversion | default(omit) }}"
     exclude_upi: "{{ gip_opatch.0.excludeUPI | default(omit) }}"
@@ -59,8 +59,7 @@
   become: true
   become_user: "{{ __opatchauto_patchtype | ternary('root', grid_user) }}"
   vars:
-    __patch_upisubdir: >-
-      {%- if gip_opatch.0.excludeUPI is defined -%}
-      upi_{{ gip_opatch.0.excludeUPI -}}/{% endif -%}
+    __patch_base_local: |-
+      {{ gip_opatch.0.excludeUPI | default(gip_opatch.0.patchid) }}/{{ gip_opatch.0.patchid | string }}/{{ gip_opatch.1 | string }}
   when:
     - __execute_opatch | bool
