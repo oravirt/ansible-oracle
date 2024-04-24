@@ -9,7 +9,7 @@
   block:
 
     - ansible.builtin.debug:  # noqa name[missing]
-        msg: "install_home_gi | Start Execute runcluvfy.sh for Grid-Infrastructure"
+        msg: "runcluvfy | Start Execute runcluvfy.sh for Grid-Infrastructure"
       run_once: true
       when:
         - _oraswgi_meta_configure_cluster
@@ -27,7 +27,7 @@
     #     - ansible_distribution_major_version | int == 8
     #     - oracle_install_version_gi == "19.3.0.0"
 
-    - name: install_home_gi | Execute cluvfy for Grid-Infrastructure
+    - name: runcluvfy | Execute cluvfy for Grid-Infrastructure
       ansible.builtin.import_role:
         name: oracluvfy
         tasks_from: execute_cluvfy.yml
@@ -45,7 +45,7 @@
         - _orasw_meta_primary_node | bool
         - not gi_ignoreprereq | bool
 
-    - name: install_home_gi | Execute cluvfy for Oracle Restart
+    - name: runcluvfy | Execute cluvfy for Oracle Restart
       ansible.builtin.import_role:
         name: oracluvfy
         tasks_from: execute_cluvfy.yml
@@ -66,16 +66,16 @@
         var: cmdruncluvfy.stdout_lines
       when: cmdruncluvfy.stdout_lines is defined
 
-    - name: install_home_gi | runcluvfy.sh failed
+    - name: runcluvfy | cluvfy failed
       ansible.builtin.fail:
-        msg: "runcluvfy.sh failed - aborting Playbook rc={{ cmdruncluvfy.rc }}"
+        msg: "cluvfy failed - aborting Playbook rc={{ cmdruncluvfy.rc }}"
       when:
         - cmdruncluvfy.rc is defined
         - cmdruncluvfy.rc != 0
         - not gi_ignoreprereq | bool
 
     # Oracle GI/Restart: Configuration will fail when hostname points to localhost ip!
-    - name: Check for hostname with localhost ip in hosts
+    - name: runcluvfy | Check for hostname with localhost ip in hosts
       ansible.builtin.lineinfile:
         name: /etc/hosts
         regexp: "127.0.[0-1].1 .*{{ ansible_hostname }}.*"

@@ -1,5 +1,5 @@
 ---
-- name: install_home_gi | Create ORACLE_HOME directory (GI)
+- name: main_install | Create ORACLE_HOME directory (GI)
   ansible.builtin.file:
     dest: "{{ oracle_home_gi }}"
     owner: "{{ _grid_install_user }}"
@@ -11,13 +11,14 @@
     - directories
   when: oracle_home_gi not in checkgiinstall.stdout
 
-- name: Download oracle installfiles to server (GI) (www)
+- name: main_install | Download oracle installfiles to server (GI) (www)
   ansible.builtin.include_tasks: "{{ www_download_bin }}.yml"  # noqa name[missing]
   when:
+    - _orasw_meta_primary_node | bool
     - not is_sw_source_local
     - oracle_sw_copy
 
-- name: install_home_gi | Copy oracle installfiles to server (GI) (local)
+- name: main_install | Copy oracle installfiles to server (GI) (local)
   ansible.builtin.copy:
     src: "{{ oracle_sw_source_local }}/{{ item.filename }}"
     dest: "{{ oracle_stage }}"
@@ -29,10 +30,13 @@
   tags:
     - oragridsw
   when:
+    - _orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
     - is_sw_source_local
     - oracle_sw_copy
 
-- name: include_tasks {{ oracle_install_version_gi }}
+# root.sh is executed on all cluster nodes.
+# => Do NOT limit the following include to 1st node!
+- name: main_install | include_tasks {{ oracle_install_version_gi }}
   ansible.builtin.include_tasks: "{{ oracle_install_version_gi }}.yml"
   tags: always
