@@ -24,9 +24,11 @@
         loop_var: gip_opatch
         label: >-
           patchid: {{ gip_opatch.0.patchid | default('') }}
+          subpatch: {{ gip_opatch.1 | default('') }}
           state: {{ gip_opatch.0.state | default('') }}
       when:
         - gi_patches[oracle_install_version_gi]['opatchauto'] is defined
+        - gip_opatch.0.patchid is defined
         - gip_opatch.0.state | default('') == 'present'
       vars:
         __opatchauto_patchtype: false  # opatch apply in patch_before_rootsh

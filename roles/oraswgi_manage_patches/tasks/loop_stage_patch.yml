@@ -20,8 +20,39 @@
 - name: Loop_stage_patch | Become User to oracle
   become: true
   become_user: "{{ _grid_install_user }}"
+  vars:
+    _oraswgi_manage_patches_sw_patch_dict: "{{ osp_loop }}"
+    _oraswgi_manage_patches_unique_patchid: >-
+      {{ _oraswgi_manage_patches_sw_patch_dict.unique_patchid | default(_oraswgi_manage_patches_sw_patch_dict.patchid) }}
+    _oraswgi_manage_patches_unarchive_dir: "{{ oracle_patch_stage }}/{{ _oraswgi_manage_patches_sw_patch_dict.version }}/{{ _oraswgi_manage_patches_unique_patchid }}"
+    _oraswgi_manage_patches_creates: >-
+      {{ _oraswgi_manage_patches_unarchive_dir }}/{{ _oraswgi_manage_patches_sw_patch_dict.creates | default((_oraswgi_manage_patches_sw_patch_dict.patchid | string) + '/README.txt') }}
+
   block:
-    - name: Loop_stage_patch | Copy oracle DB patch (opatch) to server
+    - name: Loop_stage_patch | State data for loop_stage_patch.yml
+      ansible.builtin.debug:
+        msg:
+          - >-
+              patchid: {{ _oraswgi_manage_patches_sw_patch_dict['patchid'] | default('') }}
+              unique_patchid: {{ _oraswgi_manage_patches_unique_patchid | default('') }}
+          - >-
+              oracle_patch_stage: {{ oracle_patch_stage }}
+              is_sw_source_local: {{ is_sw_source_local | bool }}
+          - >-
+              creates: {{ _oraswgi_manage_patches_creates }}
+              patch_unarchive_dir: {{ _oraswgi_manage_patches_unarchive_dir }}
+
+    - name: Loop_stage_patch | Check for unarchived patch archive
+      ansible.builtin.stat:
+        path: "{{ _oraswgi_manage_patches_creates }}"
+      register: checkpatcharchiveres
+
+    - name: Loop_stage_patch | Copy oracle GI/Restart patch to server (local)
+      ansible.builtin.copy:
+        src: "{{ oracle_sw_source_local }}/{{ _oraswgi_manage_patches_sw_patch_dict.filename }}"
+        dest: "{{ oracle_stage }}/{{ _oraswgi_manage_patches_sw_patch_dict.filename }}"
+        mode: "0644"
+        force: false
       when:
         - oracle_sw_copy | bool
         - osp_loop.state == 'present'
@@ -64,20 +95,29 @@
       block:
         - name: Loop_stage_patch | Create destination folder for unarchive
           ansible.builtin.file:
-            dest: "{{ __patch_unarchive_dir }}"
-            mode: 0755
+            dest: "{{ _oraswgi_manage_patches_unarchive_dir }}"
+            mode: 0775
             state: directory
+            owner: "{{ _grid_install_user }}"
+            group: "{{ oracle_group }}"
+          become: true
+          become_user: root
 
         - name: Loop_stage_patch | Extract one-off patch files to patch base
           ansible.builtin.unarchive:
-            src: "{{ oracle_stage }}/{{ osp_loop.filename }}"
-            dest: "{{ __patch_unarchive_dir }}"
-            creates: "{{ __patch_unarchive_dir }}/{{ __sw_patches_filename_creates }}"
+            src: "{{ oracle_stage }}/{{ _oraswgi_manage_patches_sw_patch_dict.filename }}"
+            dest: "{{ _oraswgi_manage_patches_unarchive_dir }}"
+            creates: "{{ _oraswgi_manage_patches_creates }}"
             copy: false
+            owner: "{{ _grid_install_user }}"
+            group: "{{ oracle_group }}"
+            mode: o+r,g+r
+          become: true
+          become_user: root
 
         - name: Loop_stage_patch | Remove patch archive from stage
           ansible.builtin.file:
-            path: "{{ oracle_stage }}/{{ osp_loop.filename }}"
+            path: "{{ oracle_stage }}/{{ _oraswgi_manage_patches_sw_patch_dict.filename }}"
             state: absent
           when:
             - oracle_sw_copy | bool

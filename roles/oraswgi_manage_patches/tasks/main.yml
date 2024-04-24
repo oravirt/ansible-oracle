@@ -6,6 +6,7 @@
       - "apply_patches_gi:          {{ apply_patches_gi }}"
       - "patch_before_rootsh:       {{ patch_before_rootsh }}"
       - "oracle_sw_copy:            {{ oracle_sw_copy }}"
+      - "is_sw_source_local:        {{ is_sw_source_local }}"
   tags:
     - always
 
@@ -29,6 +30,10 @@
       ansible.builtin.stat:
         path: /etc/oracle/olr.loc
       register: olrloc
+      become: true
+      become_user: "{{ _grid_install_user }}"
+      tags:
+        - always
 
     - name: Create patch-base directory (version specific)
       ansible.builtin.file:
@@ -37,43 +42,189 @@
         owner: "{{ _grid_install_user }}"
         group: "{{ oracle_group }}"
         state: directory
+      become: true
+      become_user: root
       tags:
         - directories
 
-    - name: Upgrade OPatch
-      ansible.builtin.include_tasks: opatch-upgrade.yml
-
-    - name: Check current opatch version
-      opitzconsulting.ansible_oracle.oracle_opatch:
-        oracle_home: "{{ oracle_home_gi }}"
-        state: opatchversion
-      register: current_opatch_version
-      tags: current_opatch_version
-
-    - name: Configure ocm.rsp for opatch < 12.2.0.1.5
+    - name: Patch when olr exists or -applyRU and primary node
       when:
-        - current_opatch_version is defined
-        - current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
+        - _oraswgi_manage_patches_crs_configured | bool
+          or
+          (patch_before_rootsh | bool
+          and _orasw_meta_primary_node | bool
+          )
       block:
-        - name: Configure ocm.rsp (1)
-          ansible.builtin.template:
-            src: ocmrsp.expect.j2
-            dest: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect"
-            mode: "0777"
-            force: true
-          become: true
-          become_user: "{{ _grid_install_user }}"
-          tags:
-            - ocmconfig
+        - name: Upgrade OPatch
+          ansible.builtin.include_tasks: opatch-upgrade.yml
 
-        - name: Configure ocm.rsp (2)
-          ansible.builtin.shell: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect"
-          # noqa command-instead-of-shell
+        - name: Check current opatch version
+          opitzconsulting.ansible_oracle.oracle_opatch:
+            oracle_home: "{{ oracle_home_gi }}"
+            state: opatchversion
           become: true
           become_user: "{{ _grid_install_user }}"
-          changed_when: false
-          tags:
-            - ocmconfig
+          register: current_opatch_version
+          tags: current_opatch_version
+
+        - name: Configure ocm.rsp for opatch < 12.2.0.1.5
+          when:
+            - current_opatch_version is defined
+            - current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
+          block:
+            - name: Configure ocm.rsp (1)
+              ansible.builtin.template:
+                src: ocmrsp.expect.j2
+                dest: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect"
+                mode: "0644"
+                force: true
+              become: true
+              become_user: "{{ _grid_install_user }}"
+              tags:
+                - ocmconfig
+
+            - name: Configure ocm.rsp (2)
+              ansible.builtin.shell: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/ocmrsp.expect"
+              # noqa command-instead-of-shell
+              become: true
+              become_user: "{{ _grid_install_user }}"
+              changed_when: false
+              tags:
+                - ocmconfig
+
+    # detailed formatted information for installed patches are only availible via a XML file.
+    # => Create XML, copy to Ansible-Controller, remove XML file, set facts from XML data
+    - name: Get current list of installed patches
+      vars:
+        _opatch_lsinv_xml: "/tmp/opatch_gi_lsinv_{{ ansible_date_time.iso8601_basic_short }}.xml"
+      tags:
+        - opatch_lsinv
+      when:
+        - _oraswgi_manage_patches_crs_configured | bool
+      become: true
+      become_user: "{{ _grid_install_user }}"
+      block:
+        - name: Execute opatch lsinv to create temporary XML file
+          ansible.builtin.command:  # noqa no-changed-when
+            argv:
+              - "{{ oracle_home_gi }}/OPatch/opatch"
+              - lsinv
+              - "-all"
+              - "-xml"
+              - "{{ _opatch_lsinv_xml }}"
+
+        - name: Read temporary XML from target host
+          ansible.builtin.slurp:
+            src: "{{ _opatch_lsinv_xml }}"
+          register: _opatch_lsinv_xml_res
+
+        - name: Remove temporary XML file
+          ansible.builtin.file:
+            path: "{{ _opatch_lsinv_xml }}"
+            state: absent
+
+        - name: Set facts for installed patches
+          ansible.builtin.set_fact:
+            _oraswgi_gi_patches: >-
+              {{ opatch_content['InventoryInstance']['patches']['patch'] | ansible.utils.keep_keys(target=['uniquePatchID', 'patchID', 'patchDescription']) }}
+          vars:
+            opatch_content: "{{ _opatch_lsinv_xml_res['content'] | b64decode | ansible.utils.from_xml }}"
+
+    - name: List of installed patches
+      ansible.builtin.debug:
+        var: _oraswgi_gi_patches
+
+    # - name: Debug Test installed_patches
+    #   ansible.builtin.debug:
+    #     msg:
+    #       - "{{ gipl_loop }}"
+    #       - "{{ _subpatch_missing }}"
+    #   with_items:
+    #     - "{{ gi_patchlist }}"
+    #   loop_control:
+    #     loop_var: gipl_loop
+    #     label: >-
+    #       patchid: {{ gipl_loop.patchid | default('') }}
+    #       unique_patchid: {{ gipl_loop.unique_patchid | default('not defined') }}
+    #       subpatches: {{ gipl_loop.subpatches | default([]) | length }}
+    #   vars:
+    #     osp_loop: >-
+    #       {{ oracle_sw_patches | selectattr('patchid', 'equalto', gipl_loop.patchid) | default([]) | list | first }}
+    #     gi_patchlist: >-
+    #       {{ gi_patches[oracle_install_version_gi]['opatchauto'] | default([]) +
+    #       gi_patches[oracle_install_version_gi]['opatch'] | default([]) }}
+    #     # check if all subpatches of an autopatch are installed
+    #     # _subpatch_missing_count == 0 => no need to copy the patch archive!
+    #     _gi_patchlist_subpatches: |-
+    #       {{ gipl_loop['subpatches'] | default([]) | map('int') | sort }}
+    #     _oraswgi_gi_patches_sorted_patches: "{{ _oraswgi_gi_patches | map(attribute='patchID') | default([]) | map('int') | sort }}"
+    #     _subpatch_missing_count: |-
+    #         {{ (_gi_patchlist_subpatches | difference(_oraswgi_gi_patches_sorted_patches)) | list | length | int }}
+    #     # check for missing subpatch
+    #     # Note! true for normal patches without subpatches!
+    #     _subpatch_missing: |-
+    #       {% if _subpatch_missing_count | int > 0 %}true
+    #       {%- elif gipl_loop['subpatches'] is not defined %}true
+    #       {%- else %}false
+    #       {%- endif %}
+    #   when:
+    #     - oracle_sw_copy | bool
+    #     - oracle_sw_patches is defined
+    #     - gipl_loop.patchid is defined
+    #     - gipl_loop.patchid in _oraswgi_manage_patches_patchid_list
+    #     - not _oraswgi_manage_patches_crs_configured | bool
+    #       or
+    #         (_oraswgi_manage_patches_crs_configured | bool
+    #         )
+
+    # todo: keep attention for unique_patch_id
+    # Important!
+    # We need to loop over gi_patches[oracle_install_version_gi]
+    # => opatchauto has subpatches to check against
+    # copy of patch archive could be skipped when all subpatches are installed.
+    # patchid in gi_patchlist = patchid from oracle_sw_patches
+    # prepare patches in stage area, when oracle_sw_copy | bool
+    - name: Copy patches into stage area
+      ansible.builtin.include_tasks: loop_stage_patch.yml
+      with_items:
+        - "{{ gi_patchlist }}"
+      loop_control:
+        loop_var: gipl_loop
+        label: >-
+          patchid: {{ gipl_loop.patchid | default('') }}
+          unique_patchid: {{ gipl_loop.unique_patchid | default('not defined') }}
+          subpatches: {{ gipl_loop.subpatches | default([]) | length }}
+        # filename: {{ osp_loop.filename | default('') }}
+      vars:
+        osp_loop: >-
+          {{ oracle_sw_patches | selectattr('patchid', 'equalto', gipl_loop.patchid) | default([]) | list | first }}
+        gi_patchlist: >-
+          {{ gi_patches[oracle_install_version_gi]['opatchauto'] | default([]) +
+          gi_patches[oracle_install_version_gi]['opatch'] | default([]) }}
+        # check if all subpatches of an autopatch are installed
+        # _subpatch_missing_count == 0 => no need to copy the patch archive!
+        _gi_patchlist_subpatches: |-
+          {{ gipl_loop['subpatches'] | default([]) | map('int') | sort }}
+        _oraswgi_gi_patches_sorted_patches: "{{ _oraswgi_gi_patches | map(attribute='patchID') | default([]) | map('int') | sort }}"
+        _subpatch_missing_count: |-
+            {{ (_gi_patchlist_subpatches | difference(_oraswgi_gi_patches_sorted_patches)) | list | length | int }}
+        # check for missing subpatch
+        # Note! true for normal patches without subpatches!
+        _subpatch_missing: |-
+          {% if _subpatch_missing_count | int > 0 %}true
+          {%- elif gipl_loop['subpatches'] is not defined %}true
+          {%- else %}false
+          {%- endif %}
+      when:
+        - oracle_sw_copy | bool
+        - oracle_sw_patches is defined
+        - gipl_loop.patchid is defined
+        - gipl_loop.patchid in _oraswgi_manage_patches_patchid_list
+        - not _oraswgi_manage_patches_crs_configured | bool
+          or
+            (_oraswgi_manage_patches_crs_configured | bool
+            and _subpatch_missing | bool
+            )
 
     # The apply is done with gridSetup.sh
     # => no work, when patches are mounted to target server
@@ -82,10 +233,10 @@
       ansible.builtin.include_tasks: pre_install_patch.yml
       when:
         - patch_before_rootsh | bool
-        - not olrloc.stat.exists | bool
-        - oracle_sw_copy | bool
+        - _orasw_meta_primary_node | bool
+        - not _oraswgi_manage_patches_crs_configured | bool
 
     - name: Patch configured Grid-Infrastructure/Restart
       ansible.builtin.include_tasks: post_install_patch.yml
       when:
-        - olrloc.stat.exists
+        - _oraswgi_manage_patches_crs_configured

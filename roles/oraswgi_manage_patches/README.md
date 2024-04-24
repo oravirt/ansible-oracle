@@ -6,6 +6,7 @@ Install/Remove Patches from Oracle Database Homes
 
 - [Requirements](#requirements)
 - [Discovered Tags](#discovered-tags)
+- [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
 - [License](#license)
 - [Author](#author)
@@ -21,10 +22,13 @@ Install/Remove Patches from Oracle Database Homes
 
 **_always_**
 
+**_assert_**
+
 **_current_opatch_version_**
 
-**_oragridpatchunpack_**
+## Open Tasks
 
+- (information): support for www download missing
 
 ## Dependencies
 
