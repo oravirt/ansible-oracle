@@ -1,0 +1,18 @@
+---
+#
+# ansible-playbook -i inventory/racattack/hosts.yml -e hostgroup=collabn racattackl-install.yml --skip-tags redolog
+#
+# Note: oradb-manage-redolog not working on RAC at the moment
+#
+- name: Playbook os_racattack
+  import_playbook: os_racattack.yml
+- name: Playbook os
+  import_playbook: opitzconsulting.ansible_oracle.os
+# - name: Playbook sql-zauberkastern
+# - import_playbook: opitzconsulting.ansible_oracle.sql-zauberkastern.yml
+- name: Playbook swgi
+  import_playbook: opitzconsulting.ansible_oracle.swgi
+- name: Playbook swdb
+  import_playbook: opitzconsulting.ansible_oracle.swdb
+- name: Playbook manage_db
+  import_playbook: opitzconsulting.ansible_oracle.manage_db

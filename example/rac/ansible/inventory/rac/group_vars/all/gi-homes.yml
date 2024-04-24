@@ -1,0 +1,34 @@
+---
+# This configuration file is used as a global default
+# The variable gi_patches_config is not part of ansible-oracle. It is
+# referenced from other structures in the Inventory.
+
+gi_patches_config:
+  19.23.0.0.240116:
+    19.3.0.0:  # Base Release
+      opatch_minversion: 12.2.0.1.40
+      opatchauto:
+        - patchid: 36233126
+          patchversion: 19.23.0.0.240416
+          state: present
+          subpatches:
+            - 36240578  # OCW Release Update 19.23.0.0.240416
+            - 36383196  # DBWLM Release Update
+            - 36233343  # ACFS Release Update 19.23.0.0.240416
+            - 36460248  # Tomcat Release Update 19.0.0.0.0
+            - 36233263  # Database Release Update 19.23.0.0.240416
+      opath: []
+  19.22.0.0.240116:
+    19.3.0.0:  # Base Release
+      opatch_minversion: 12.2.0.1.40
+      opatchauto:
+        - patchid: 35940989
+          patchversion: 19.22.0.0.240116
+          state: present
+          subpatches:
+            - 35967489  # OCW Release Update 19.22.0.0.240116
+            - 33575402  # DBWLM Release Update
+            - 35956421  # ACFS Release Update 19.22.0.0.240116
+            - 36115038  # Tomcat Release Update 19.0.0.0.0
+            - 35943157  # Database Release Update 19.22.0.0.240116
+      opath: []

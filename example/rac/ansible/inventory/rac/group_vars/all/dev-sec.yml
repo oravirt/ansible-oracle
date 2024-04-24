@@ -1,0 +1,22 @@
+---
+# Oracle gets problems, when root processes are not visible
+hidepid_option: 0
+
+os_security_kernel_enable_module_loading: true
+
+sysctl_overwrite:
+  network_ipv6_enable: false
+  fs.protected_regular: 0  # needed for opatchauto ...
+
+# ssh settings
+ssh_print_last_log: true
+ssh_allow_agent_forwarding: false
+ssh_permit_tunnel: false
+ssh_allow_tcp_forwarding: 'no'
+ssh_max_auth_retries: 3
+
+ssh_allow_users: vagrant ansible
+
+# disable some ansible-oracle options
+disable_selinux: false
+configure_oracle_sudo: false
