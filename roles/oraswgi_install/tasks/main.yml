@@ -29,12 +29,12 @@
       - "GI/Restart installed? {{ olrloc.stat.exists }}"
       - "Clusternode primary?  {{ _orasw_meta_primary_node }}"
 
-- name: Assert inventory
+- name: install_home_gi | Assert inventory
   when:
     - not olrloc.stat.exists
   block:
 
-    - name: assert oracle_asm_init_dg in asm_diskgroups
+    - name: install_home_gi | assert oracle_asm_init_dg in asm_diskgroups
       ansible.builtin.assert:
         quiet: true
         that:
@@ -84,7 +84,7 @@
   when:
     - not olrloc.stat.exists
 
-- name: include_tasks asmcmd_dsset.yml
+- name: install_home_gi | include_tasks asmcmd_dsset.yml
   ansible.builtin.include_tasks: asmcmd_dsset.yml
   tags: always
 
@@ -125,7 +125,9 @@
     backup: true
   tags:
     - glogingi
-  when: oracle_home_gi not in checkgiinstall.stdout
+  when:
+    - oracle_home_gi not in checkgiinstall.stdout
+    - _orasw_meta_primary_node | bool
 
 - name: install_home_gi | Add additional info to glogin.sql (2)
   ansible.builtin.lineinfile:
@@ -134,14 +136,17 @@
     backup: true
   tags:
     - glogingi
-  when: oracle_home_gi not in checkgiinstall.stdout
+  when:
+    - oracle_home_gi not in checkgiinstall.stdout
+    - _orasw_meta_primary_node | bool
 
-- name: ansible.builtin.include_role oraswgi_manage_patches
+- name: install_home_gi | ansible.builtin.include_role oraswgi_manage_patches
   ansible.builtin.include_role:
     name: oraswgi_manage_patches
   when:
     - not patch_before_rootsh
     - apply_patches_gi
+    - _orasw_meta_primary_node | bool
 
 - name: install_home_gi | Check opatch lsinventory (GI)
   ansible.builtin.shell: "{{ oracle_home_gi }}/OPatch/opatch lspatches"
@@ -153,31 +158,43 @@
   register: opatchls
   tags:
     - opatchls
-  when: oracle_home_gi not in checkgiinstall.stdout
+  when:
+    - oracle_home_gi not in checkgiinstall.stdout
+    - _orasw_meta_primary_node | bool
 
 - name: install_home_gi | Check opatch lsinventory (GI)
   ansible.builtin.debug:
     var: opatchls.stdout_lines
   tags:
     - opatchls
-  when: oracle_home_gi not in checkgiinstall.stdout
+  when:
+    - oracle_home_gi not in checkgiinstall.stdout
+    - _orasw_meta_primary_node | bool
 
-- name: install_home_gi | Check olsnodes (GI)
-  ansible.builtin.shell: "{{ oracle_home_gi }}/bin/olsnodes -a -n -s -t"
-  # noqa command-instead-of-shell no-changed-when
-  become: true
-  become_user: "{{ _grid_install_user }}"
-  when: oracle_gi_cluster_type | upper == 'FLEX' and '12' in oracle_install_version_gi
-  register: olsnodes
-  tags:
-    - olsnodes
+# disable 12c stuff
+# => not tested anymore and usually needed in version specified scripts.
+# - name: install_home_gi | Check olsnodes (GI)
+#   ansible.builtin.shell: "{{ oracle_home_gi }}/bin/olsnodes -a -n -s -t"
+#   # noqa command-instead-of-shell no-changed-when
+#   become: true
+#   become_user: "{{ _grid_install_user }}"
+#   when:
+#     - oracle_gi_cluster_type | upper == 'FLEX'
+#     - '12' in oracle_install_version_gi
+#   register: olsnodes
+#   tags:
+#     - olsnodes
 
-- name: install_home_gi | Check olsnodes (GI)
-  ansible.builtin.debug:
-    var: olsnodes.stdout_lines
-  when: oracle_gi_cluster_type | upper == 'FLEX' and '12' in oracle_install_version_gi
-  tags:
-    - olsnodes
+# disable 12c stuff
+# => not tested anymore and usually needed in version specified scripts.
+# - name: install_home_gi | Check olsnodes (GI)
+#   ansible.builtin.debug:
+#     var: olsnodes.stdout_lines
+#   when:
+#     - oracle_gi_cluster_type | upper == 'FLEX'
+#     - '12' in oracle_install_version_gi
+#   tags:
+#     - olsnodes
 
 - name: install_home_gi | Unmount nfs share with installation media
   ansible.builtin.include_role:

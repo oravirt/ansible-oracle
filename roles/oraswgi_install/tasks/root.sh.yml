@@ -1,0 +1,48 @@
+---
+- ansible.builtin.debug:  # noqa name[missing]
+    msg: "root.sh | Start Run root script after installation (Master Node)"
+  when:
+    - _orasw_meta_primary_node | bool
+
+- name: root.sh | Run root script after installation (Master Node)
+  ansible.builtin.command: "{{ oracle_home_gi }}/root.sh"
+  # noqa no-changed-when
+  become: true
+  register: rootmaster
+  when:
+    - _orasw_meta_primary_node | bool
+  tags:
+    - runroot
+
+- name: root.sh | Info
+  ansible.builtin.debug:
+    var: rootmaster.stdout_lines
+  when:
+    - rootmaster.stdout_lines is defined
+    - _orasw_meta_primary_node | bool
+
+- name: root.sh | Info
+  ansible.builtin.debug:
+    msg: "root.sh | Start Run root script after installation (Other Nodes)"
+  run_once: true
+
+# do not start root.sh on all nodes in parallel
+# => throttle: 1
+- name: root.sh | Run root script after installation (Other Nodes)
+  ansible.builtin.command: "{{ oracle_home_gi }}/root.sh"
+  # noqa no-changed-when
+  become: true
+  become_user: root
+  throttle: 1
+  tags:
+    - runroot
+  when:
+    - _oraswgi_meta_configure_cluster
+    - not _orasw_meta_primary_node | bool
+    - inventory_hostname in groups[orasw_meta_cluster_hostgroup]
+  register: rootother
+
+- name: root.sh | Info
+  ansible.builtin.debug:
+    var: rootother.stdout_lines
+  when: rootother.stdout_lines is defined

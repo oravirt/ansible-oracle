@@ -271,8 +271,6 @@ run_configtoolallcommand: true
 
 **_nfsumountdb_**
 
-**_olsnodes_**
-
 **_opatchls_**
 
 **_oragridinstall_**
@@ -297,6 +295,12 @@ run_configtoolallcommand: true
 
 - (bug): oracle_vip is not flexible enough.
 - (bug): oracle_ic_net will be removed in the future
+- (bug): ConfigTools should not depend on olr.loc...
+- (bug): ConfigTools should not depend on olr.loc...
+- (information): add selectattr to asm_diskgroups
+- (information): Check if path for patches is ok with patch_id/patch_id
+- (information): add selectattr to asm_diskgroups
+- (information): Check if path for patches is ok with patch_id/patch_id
 
 ## Dependencies
 
