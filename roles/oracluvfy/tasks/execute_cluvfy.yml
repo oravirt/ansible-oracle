@@ -37,12 +37,15 @@
       environment: |-
         {{ oracle_script_env | ansible.utils.remove_keys(target=['CV_ASSUME_DISTID']) }}
 
-  rescue:
-    - name: execute_cluvfy | cluvfy failed
-      ansible.builtin.fail:
-        msg: See next task for details
-
-  always:
     - name: execute_cluvfy | Show result
       ansible.builtin.debug:
         var: cluvfy_execute_res.stdout_lines
+
+  rescue:
+
+    - name: execute_cluvfy | Show result from failed cluvfy
+      ansible.builtin.debug:
+        var: cluvfy_execute_res.stdout_lines
+
+    - name: execute_cluvfy | cluvfy failed
+      ansible.builtin.fail:
