@@ -65,8 +65,12 @@
         - name: loop_opatch_apply | Create destination folder for unarchive
           ansible.builtin.file:
             dest: "{{ __patch_unarchive_dir }}"
-            mode: 0755
+            mode: 0775
             state: directory
+            owner: "{{ _grid_install_user }}"
+            group: "{{ oracle_group }}"
+          become: true
+          become_user: root
 
         - name: loop_opatch_apply | Extract one-off patch files to patch base
           ansible.builtin.unarchive:
