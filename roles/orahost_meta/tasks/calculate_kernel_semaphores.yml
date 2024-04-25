@@ -1,0 +1,45 @@
+---
+- name: Get current kernel.sem
+  ansible.builtin.command:
+    cmd: "sysctl kernel.sem"
+  changed_when: false
+  register: __orahost_current_kernel_sem
+
+- name: Split current kernel.sem into it's parts
+  ansible.builtin.set_fact:
+    __orahost_current_semmsl: "{{ (__orahost_current_kernel_sem.stdout | split())[2] }}"
+    __orahost_current_semmns: "{{ (__orahost_current_kernel_sem.stdout | split())[3] }}"
+    __orahost_current_semopm: "{{ (__orahost_current_kernel_sem.stdout | split())[4] }}"
+    __orahost_current_semmni: "{{ (__orahost_current_kernel_sem.stdout | split())[5] }}"
+
+- name: Calculate processes based semaphore values
+  # SEMMSL: largest processes value plus 10 Doc ID 187405.1
+  # SEMMNS: (processes * 2) + ( bg_processes * instances ) + system (10%)
+  ansible.builtin.set_fact:
+    __orahost_kernel_semmsl: "{{ oracle_databases_processes_max | int + 10 }}"
+    __orahost_kernel_semmns: "{{ ((( oracle_databases_processes_sum | int * 2 ) + ( oracle_nr_bg_processes * oracle_nr_instances | int )) * 1.1 ) | round(0,'ceil') | int }}"
+
+- name: Calculate semaphore value based semaphore values
+  # SEMOPM: min(SEMMSL,1000)
+  # SEMMNI: SEMMNS/SEMMSL rounded up to the nearest multiple of 1024
+  ansible.builtin.set_fact:
+    __orahost_kernel_semopm: "{{ [ __orahost_kernel_semmsl|int,1000 ] | min }}"
+    __orahost_kernel_semmni: "{{ (( __orahost_kernel_semmns | int / __orahost_kernel_semmsl | int / 1024 ) | round(0,'ceil') * 1024) | int }}"
+
+- name: Increase kernel.sem, if set too low
+  ansible.builtin.set_fact:
+    sysctl_kernel_sem:
+      "{{ [ __orahost_kernel_semmsl | int, __orahost_current_semmsl | int ] | max }}
+      {{ [ __orahost_kernel_semmns | int, __orahost_current_semmns | int ] | max }}
+      {{ [ __orahost_kernel_semopm | int, __orahost_current_semopm | int ] | max }}
+      {{ [ __orahost_kernel_semmni | int, __orahost_current_semmni | int ] | max }}"
+  when: not sysctl_kernel_sem_force
+
+- name: Force kernel.sem settings
+  ansible.builtin.set_fact:
+    sysctl_kernel_sem:
+      "{{ __orahost_kernel_semmsl }}
+      {{ __orahost_kernel_semmns }}
+      {{ __orahost_kernel_semopm }}
+      {{ __orahost_kernel_semmni }}"
+  when: sysctl_kernel_sem_force

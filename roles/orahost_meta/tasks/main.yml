@@ -21,3 +21,66 @@
     _orasw_meta_primary_node: "{{ groups[orasw_meta_cluster_hostgroup][0] == inventory_hostname }}"
   when:
     - oracle_install_option_gi == 'CRS_CONFIG'
+
+### Determine kernel.panic according to Doc ID 2821641.1
+# kdump state cannot savely be retrieved from service_facts
+- name: Determine kernel.panic setting
+  block:
+    - name: Get kdump state
+      ansible.builtin.command:
+        cmd: "systemctl is-active kdump"
+      failed_when: false
+      changed_when: false
+      register: __orahost_kdump_state
+
+    - name: Set/unset kernel.panic according to kdump state
+      ansible.builtin.set_fact:
+        sysctl_kernel_panic: "{{ (__orahost_kdump_state.stdout=='active') | ternary(0,1) }}"
+
+- name: Calculate SGA aggregates
+  ansible.builtin.include_tasks: aggregate_sgas.yml
+  loop: "{{ (( oracle_databases | default ([]) | selectattr('init_parameters','defined') ) + ( oracle_asm_instance | default ([]) )) | lower }}"
+  loop_control:
+    loop_var: __orahost_oracle_database
+  when:
+    "'sga_target' in __orahost_oracle_database.init_parameters | map(attribute='name') or
+    'sga_max_size' in __orahost_oracle_database.init_parameters | map(attribute='name') "
+
+- name: Calculate processes aggregates
+  ansible.builtin.include_tasks: aggregate_processes.yml
+  loop: "{{ (( oracle_databases | default ([]) | selectattr('init_parameters','defined') ) + ( oracle_asm_instance | default ([]) )) | lower }}"
+  loop_control:
+    loop_var: __orahost_oracle_database
+  when:
+    "'processes' in __orahost_oracle_database.init_parameters | map(attribute='name')"
+
+- name: Count number of instances (including ASM)
+  ansible.builtin.set_fact:
+    oracle_nr_instances: "{{ oracle_databases | default({}) | length + oracle_asm_instance | default({}) | length }}"
+
+- name: Get system's pagesize
+  block:
+    - name: Read PAGE_SIZE
+      ansible.builtin.command:
+        cmd: "getconf PAGE_SIZE"
+      changed_when: false
+      register: __orahost_pagesize_result
+
+    - name: Provide PAGE_SIZE variable
+      ansible.builtin.set_fact:
+        page_size_bytes: "{{ __orahost_pagesize_result.stdout }}"
+
+- name: Get system's Hugepagesize
+  block:
+    - name: Read Hugepagesize
+      ansible.builtin.command:
+        cmd: 'grep -Pi "\bHugepagesize\b" /proc/meminfo'
+      changed_when: false
+      register: __orahost_hugepagesize_result
+
+    - name: Provide hugepagesize variable
+      ansible.builtin.set_fact:
+        hugepage_size_bytes: "{{ (__orahost_hugepagesize_result.stdout | split())[1] | int * 1024 }}"
+
+- name: Calculate kernel.sem
+  ansible.builtin.include_tasks: calculate_kernel_semaphores.yml
