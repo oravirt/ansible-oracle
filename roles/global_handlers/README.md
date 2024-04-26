@@ -6,7 +6,6 @@ Collection of handlers includeable by other roles
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
-  - [reboot_on_requirement](#reboot_on_requirement)
   - [restart_on_requirement](#restart_on_requirement)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -20,12 +19,12 @@ Collection of handlers includeable by other roles
 
 ## Default Variables
 
-### reboot_on_requirement
+### restart_on_requirement
 
 Controls if reboot handler actually reboots the host (true)
 or just displays a reboot advice (false)
 
-### restart_on_requirement
+**_Type:_** bool<br />
 
 #### Default value
 
