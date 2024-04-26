@@ -2,6 +2,7 @@
 # tasks file for orahost-logrotate
 
 - name: Setup logrotate
+  when: orahost_logrotate_setup_logrotate
   block:
 
     - name: Manage logrotate
@@ -21,5 +22,3 @@
         mode: "0744"
       when: logrotate_config is defined
       tags: cleanup
-
-  when: orahost_logrotate_setup_logrotate
