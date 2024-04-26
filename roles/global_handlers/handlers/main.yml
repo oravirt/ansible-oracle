@@ -1,10 +1,10 @@
 ---
 - name: reboot if needed
-  ansible.builtin.shell: 
+  ansible.builtin.command:
     "{%- if ansible_facts.os_family == 'RedHat' -%}
-      yum needs-restarting -r
+      yum needs-restarting -r\
     {%- elif ansible_facts.os_family == 'Suse' -%}
-      zypper needs-rebooting
+      zypper needs-rebooting\
     {%- endif -%}"
   failed_when: false
   register: _global_handlers_needs_restarting
