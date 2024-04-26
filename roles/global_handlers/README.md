@@ -1,6 +1,9 @@
 # global_handlers
 
-Collection of handlers includeable by other roles
+Collection of handlers includeable by other roles.
+
+Make them available to your role by including it into the
+dependency list in meta/main.yml of your role, for instance.
 
 ## Table of content
 
