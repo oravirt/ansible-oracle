@@ -26,6 +26,7 @@ Role to configure the hostsystem for ansible-oracle
   - [disable_firewall](#disable_firewall)
   - [disable_numa_boot](#disable_numa_boot)
   - [disable_selinux](#disable_selinux)
+  - [etc_hosts_entries](#etc_hosts_entries)
   - [etc_hosts_ip](#etc_hosts_ip)
   - [extrarepos_disabled](#extrarepos_disabled)
   - [extrarepos_enabled](#extrarepos_enabled)
@@ -282,6 +283,31 @@ disable_numa_boot: true
 
 ```YAML
 disable_selinux: true
+```
+
+### etc_hosts_entries
+
+List of additional entries, optionally along with aliases, to be put into /etc/hosts. E.g. on non-DNS environments or if we don't rely on DNS
+
+#### Default value
+
+```YAML
+etc_hosts_entries: []
+```
+
+#### Example usage
+
+```YAML
+etc_hosts_entries:
+  - fqdn: clusternode1.example.com
+    ip: 192.168.1.1
+  - fqdn: clusternode2.example.com
+    ip: 192.168.1.2
+    aliases:
+      - myalias.example.com
+would create following entries in /etc/hosts:
+192.168.1.1 clusternode1  clusternode1.example.com
+192.168.1.2 clusternode2  clusternode2.example.com  myalias.example.com
 ```
 
 ### etc_hosts_ip
