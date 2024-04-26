@@ -19,8 +19,10 @@ Meta role used by other roles to share variable defaults.
   - [oracle_group](#oracle_group)
   - [oracle_inventory_loc](#oracle_inventory_loc)
   - [oracle_rsp_stage](#oracle_rsp_stage)
+  - [oracle_script_env](#oracle_script_env)
   - [oracle_seclimits](#oracle_seclimits)
   - [oracle_stage](#oracle_stage)
+  - [oracle_tmp_stage](#oracle_tmp_stage)
   - [oracle_user](#oracle_user)
   - [oracle_user_home](#oracle_user_home)
   - [role_separation](#role_separation)
@@ -220,6 +222,21 @@ There is usually no need to change this variable.
 oracle_rsp_stage: '{{ oracle_stage }}/rsp'
 ```
 
+### oracle_script_env
+
+(Minimum) environment settings to pass to Oracle scripts.
+Usually passed to shell: or command: through "environment:" keyword
+
+#### Default value
+
+```YAML
+oracle_script_env:
+  TMPDIR: '{{ oracle_tmp_stage }}'
+  _JAVA_OPTIONS: -Djava.io.tmpdir={{ oracle_tmp_stage }}
+  CV_ASSUME_DISTID: |-
+    {{ (ansible_facts.os_family == 'RedHat') | ternary('OL7', omit) }}
+```
+
 ### oracle_seclimits
 
 ulimit definition for orahost role.
@@ -250,6 +267,19 @@ There is usually no need to change this variable.
 
 ```YAML
 oracle_stage: /u01/stage
+```
+
+### oracle_tmp_stage
+
+Defines the temporary directory to be used by Oracle scripts.
+(on hardened systems, /tmp usually is noexec-flagged and thus not usable to execute scripts)
+
+There is usually no need to change this variable.
+
+#### Default value
+
+```YAML
+oracle_tmp_stage: '{{ oracle_stage }}/tmp'
 ```
 
 ### oracle_user
