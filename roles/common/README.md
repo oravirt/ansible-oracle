@@ -142,6 +142,7 @@ common_packages_el7:
   - btrfs-progs
   - procps
   - psmisc
+  - grubby
 ```
 
 ### common_packages_el8
@@ -203,6 +204,7 @@ common_packages_el8:
   - psmisc
   - python3
   - python3-pip
+  - grubby
 ```
 
 ### common_packages_el9
@@ -256,6 +258,7 @@ common_packages_el9:
   - util-linux-ng
   - xorg-x11-utils
   - xorg-x11-xauth
+  - grubby
 ```
 
 ### common_packages_sles
@@ -421,7 +424,7 @@ ol7_repo_file: public-yum-ol7.repo
 
 ## Dependencies
 
-None.
+- global_handlers
 
 ## License
 

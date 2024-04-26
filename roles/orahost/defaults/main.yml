@@ -229,9 +229,10 @@ oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }}
 transparent_hugepage_disable:
   - {disable: "echo never >", path: /sys/kernel/mm/transparent_hugepage/enabled, rclocal: /etc/rc.d/rc.local}
   - {disable: "echo never >", path: /sys/kernel/mm/transparent_hugepage/defrag, rclocal: /etc/rc.d/rc.local}
-  
+
 # @var transparent_hugepage_disable_by_grub:description: >
-# Alternatively to using rc.local, disable Transparent Hugepages using kernel command line.
+# Alternatively to dynamically disabling transparent hugepages using rc.local,
+# disable transparent hugepages using kernel command line.
 #
 # _Note_: Setting transparent_hugepage_disable_by_grub true obsoletes transparent_hugepage_disable
 #

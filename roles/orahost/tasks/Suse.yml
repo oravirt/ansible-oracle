@@ -35,12 +35,51 @@
   tags: os_packages, oscheck, asm1
 
 - name: Disable Transparent Hugepages (runtime)
+  when: not transparent_hugepage_disable_by_grub
   ansible.builtin.shell: |
     [ -f /sys/kernel/mm/transparent_hugepage/enabled ] && echo never > /sys/kernel/mm/transparent_hugepage/enabled && echo changed
     [ -f /sys/kernel/mm/transparent_hugepage/defrag ] && echo never > /sys/kernel/mm/transparent_hugepage/defrag && echo changed
   register: tphnuma_result
   changed_when: "'changed' in tphnuma_result.stdout"
   tags: tphnuma
+
+- name: Disable Transparent Hugepages by grub cmdline
+  when: transparent_hugepage_disable_by_grub
+  block:
+
+    - name: Check if transparent_hugepage=never already present in kernel cmdline
+      ansible.builtin.lineinfile:
+        path: /proc/cmdline
+        regexp: '.*\btransparent_hugepage\s*=\s*never\b'
+        state: absent
+      check_mode: true
+      changed_when: false
+      register: __orahost_transhp_in_cmdline
+
+    - name: Force transparent_hugepage=never in cmdline defaults
+      ansible.builtin.lineinfile:
+        path: /etc/default/grub
+        regexp: '(^\s*GRUB_CMDLINE_LINUX\s*=.*\btransparent_hugepage\s*=\s*)(\b\S+\b)(.*)'
+        backrefs: true
+        line: '\1never\3'
+      when: __orahost_transhp_in_cmdline.found > 0
+      register: __orahost_transhp_disabled
+
+    - name: Append transparent_hugepage=never to cmdline defaults
+      ansible.builtin.lineinfile:
+        path: /etc/default/grub
+        regexp: '(^\s*GRUB_CMDLINE_LINUX\s*=.*)(")'
+        backrefs: true
+        line: '\1 transparent_hugepage=never\2'
+      when: __orahost_transhp_in_cmdline.found == 0
+      register: __orahost_transhp_appended
+
+    - name: Write new grub2 config file
+      ansible.builtin.command: grub2-mkconfig -o /boot/grub2/grub.cfg
+      when: ( __orahost_transhp_disabled.changed | default(false) ) or ( __orahost_transhp_appended.changed | default(false) )
+      changed_when: true
+      notify:
+        - restart server
 
 - name: Oracle-recommended security limits on SLES  # noqa args[module]
   community.general.pam_limits:

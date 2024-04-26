@@ -123,8 +123,8 @@
           register: __orahost_transhp_in_cmdline
 
         - name: Set transparent_hugepage=never in kernel cmdline
-          when:  __orahost_transhp_in_cmdline.found == 0
+          ansible.builtin.command: grubby --update-kernel=ALL --args=transparent_hugepage=never
+          changed_when: true
+          when: __orahost_transhp_in_cmdline.found == 0
           notify:
             - restart server
-          ansible.builtin.shell:
-            cmd: grubby --update-kernel=ALL --args=transparent_hugepage=never
