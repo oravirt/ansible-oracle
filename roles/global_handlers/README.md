@@ -1,6 +1,6 @@
 # global_handlers
 
-sets up the host generic stuff
+Collection of handlers includeable by other roles
 
 ## Table of content
 
@@ -45,4 +45,4 @@ license (MIT)
 
 ## Author
 
-[Mikael Sandström]
+[Thilo Solbrig]
