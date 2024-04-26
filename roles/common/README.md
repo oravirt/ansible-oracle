@@ -421,7 +421,7 @@ ol7_repo_file: public-yum-ol7.repo
 
 ## Dependencies
 
-None.
+- global_handlers
 
 ## License
 
