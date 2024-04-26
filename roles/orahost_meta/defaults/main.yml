@@ -81,12 +81,14 @@ oracle_tmp_stage: "{{ oracle_stage }}/tmp"
 # @var oracle_script_env:description: >
 # (Minimum) environment settings to pass to Oracle scripts.
 # Usually passed to shell: or command: through "environment:" keyword
-# 
+#
 # @end
 oracle_script_env:
   TMPDIR: "{{ oracle_tmp_stage }}"
   _JAVA_OPTIONS: "-Djava.io.tmpdir={{ oracle_tmp_stage }}"
-  CV_ASSUME_DISTID: "OL7" # forward compatibility for GI < 19.7 on Linux 8/9
+  # forward compatibility for GI < 19.7 on Linux 8/9
+  CV_ASSUME_DISTID: |-
+    {{ (ansible_facts.os_family == 'RedHat') | ternary('OL7', omit) }}
 
 # @var oracle_seclimits:description: ulimit definition for orahost role.
 oracle_seclimits:
