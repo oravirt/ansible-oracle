@@ -126,7 +126,7 @@
         - name: Set facts for installed patches
           ansible.builtin.set_fact:
             _oraswgi_gi_patches: >-
-              {{ opatch_content['InventoryInstance']['patches']['patch'] | ansible.utils.keep_keys(target=['uniquePatchID', 'patchID', 'patchDescription']) }}
+              {{ opatch_content['InventoryInstance']['patches']['patch'] | default([]) | ansible.utils.keep_keys(target=['uniquePatchID', 'patchID', 'patchDescription']) }}
           vars:
             opatch_content: "{{ _opatch_lsinv_xml_res['content'] | b64decode | ansible.utils.from_xml }}"
 

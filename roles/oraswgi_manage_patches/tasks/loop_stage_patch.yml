@@ -13,9 +13,6 @@
           oracle_patch_stage: {{ oracle_patch_stage }}
           oracle_sw_copy: {{ oracle_sw_copy | bool }}
           is_sw_source_local: {{ is_sw_source_local | bool }}
-      - >-
-          creates: {{ __sw_patches_filename_creates }}
-          patch_unarchive_dir: {{ __patch_unarchive_dir }}
 
 - name: Loop_stage_patch | Become User to oracle
   become: true
@@ -45,25 +42,17 @@
     - name: Loop_stage_patch | Check for unarchived patch archive
       ansible.builtin.stat:
         path: "{{ _oraswgi_manage_patches_creates }}"
-      register: checkpatcharchiveres
+      register: __checkpatcharchiveres
 
     - name: Loop_stage_patch | Copy oracle GI/Restart patch to server (local)
-      ansible.builtin.copy:
-        src: "{{ oracle_sw_source_local }}/{{ _oraswgi_manage_patches_sw_patch_dict.filename }}"
-        dest: "{{ oracle_stage }}/{{ _oraswgi_manage_patches_sw_patch_dict.filename }}"
-        mode: "0644"
-        force: false
       when:
         - oracle_sw_copy | bool
-        - osp_loop.state == 'present'
       block:
 
         - name: Loop_stage_patch | Check for unarchived patch archive
           ansible.builtin.stat:
-            path: "{{ __patch_unarchive_dir }}/{{ __sw_patches_filename_creates }}"
-          register: checkpatcharchiveres
-          vars:
-            __sw_patches_filename_creates: "{{ osp_loop.creates | default((osp_loop.patchid | string) + '/README.txt') }}"
+            path: "{{ _oraswgi_manage_patches_creates }}"
+          register: __checkpatcharchiveres
 
         - name: Loop_stage_patch | Copy oracle GI patch (opatch) to server (local)
           ansible.builtin.copy:
@@ -73,7 +62,7 @@
             force: false
           when:
             - is_sw_source_local | bool
-            - not checkpatcharchiveres.stat.exists
+            - not __checkpatcharchiveres.stat.exists
 
         - name: Loop_stage_patch | Copy oracle GI patch (opatch) to server (www)
           ansible.builtin.get_url:
@@ -83,13 +72,12 @@
             force: false
           when:
             - not is_sw_source_local | bool
-            - not checkpatcharchiveres.stat.exists | bool
+            - not __checkpatcharchiveres.stat.exists | bool
 
     - name: Loop_stage_patch | Extract one-off patch files to patch base
       when:
         - oracle_sw_copy | bool
         - oracle_sw_unpack | bool
-        - osp_loop.state == 'present'
       tags:
         - oraswdbpsuunpack1
       block:

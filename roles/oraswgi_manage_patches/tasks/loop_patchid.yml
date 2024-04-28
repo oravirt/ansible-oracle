@@ -13,6 +13,7 @@
           opatchauto: {{ __opatchauto_patchtype }}
       - >-
           patchsubdir: {{ __oraswdb_manage_patches_patchsubdir | default('') }}
+          custom_path: {{ gip_opatch.0.path | default('') }}
 
 - name: loop_patchid | Work on oracle_sw_patches
   ansible.builtin.include_tasks: loop_stage_patch.yml
@@ -45,7 +46,7 @@
   opitzconsulting.ansible_oracle.oracle_opatch:
     oracle_home: "{{ oracle_home_gi }}"
     patch_base: >-
-      {{ oracle_patch_install }}/{{ oracle_install_version_gi }}/{{ dhc_opatch.path | default(__patch_base_local) }}
+      {{ oracle_patch_install }}/{{ oracle_install_version_gi }}/{{ gip_opatch.0.path | default(__patch_base_local) }}
     patch_id: "{{ gip_opatch.0.patchid }}"
     patch_version: "{{ gip_opatch.0.patchversion | default(omit) }}"
     exclude_upi: "{{ gip_opatch.0.excludeUPI | default(omit) }}"
