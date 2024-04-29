@@ -305,6 +305,7 @@
         var: rootother.stdout_lines
       when: rootother.stdout_lines is defined
 
+    # @todo bug: ConfigTools should not depend on olr.loc...
     - name: install_home_gi | Execute ConfigTools
       ansible.builtin.command: "{{ oracle_home_gi }}/gridSetup.sh -executeConfigTools -responseFile {{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }} -silent"
       environment: "{{ oracle_script_env }}"
@@ -316,5 +317,4 @@
       when:
         - run_configtoolallcommand
         - _orasw_meta_primary_node | bool
-      ignore_errors: true
       register: configtool
