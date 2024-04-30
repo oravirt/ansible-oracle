@@ -169,6 +169,7 @@
           - "oracle_home_gi: {{ oracle_home_gi }}"
           - "apply RU before configuration: {{ patch_before_rootsh }}"
           - "{{ patch_before_rootsh | bool | ternary('patchru_dir: ' + __patchru_dir, '') }}"
+          - "oracle_script_env:   {{ oracle_script_env | default({}) }}"
       when:
         - _orasw_meta_primary_node | bool
 

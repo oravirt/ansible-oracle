@@ -1,12 +1,6 @@
 ---
 - name: install_home_db | Install Oracle Database Server
   ansible.builtin.shell: >-
-    {% if ansible_os_family == 'RedHat' %}
-    {% if ansible_distribution_major_version | int == 8 %}
-    CV_ASSUME_DISTID=OL7{% endif %}
-    {% if ansible_distribution_major_version | int == 9 %}
-    CV_ASSUME_DISTID=OL8{% endif %}
-    {% endif %}
     {{ oracle_home_db }}/runInstaller
     -responseFile {{ oracle_rsp_stage }}/{{ _oraswdb_install_db_responsefile }}
     -ignorePrereq
@@ -23,6 +17,14 @@
     - oradbinstall
   register: oradbinstall
   failed_when: oradbinstall.rc not in [0, 6]
+  environment: "{{ oracle_script_env }}"
+  vars:
+    orahost_meta_cv_assume_distid: >-
+      {% if ansible_os_family == 'RedHat' -%}
+      {% if ansible_distribution_major_version | int == 8 %}OL7{% endif -%}
+      {% if ansible_distribution_major_version | int == 9 %}OL8{% endif -%}
+      {% elif ansible_os_family in ('SuSe', 'Suse') %}SUSE{{ ansible_distribution_major_version -}}
+      {% endif %}
 
 - ansible.builtin.debug:  # noqa name[missing] ignore-errors
     var: oradbinstall.stdout_lines
