@@ -10,6 +10,8 @@
           - cluvfy_args | length > 2
         success_msg: >-
           Parameter: {{ cluvfy_args }}
+          oracle_script_env:
+          {{ oracle_script_env | ansible.utils.remove_keys(target=['CV_ASSUME_DISTID']) }}
 
     - name: execute_cluvfy | Check for executable
       ansible.builtin.stat:
@@ -21,6 +23,8 @@
       when:
         - not _oracluvfy_executable_stat.stat.exists
 
+    # most current versions of cluvfy is compatible against all supported distributions.
+    # => no need to set CV_ASSUME_DISTID during execution
     - name: execute_cluvfy | Execute cluvfy
       ansible.builtin.command: >-
         {{ _oracluvfy_executable }} {{ cluvfy_args }}
@@ -30,6 +34,8 @@
       changed_when: cluvfy_execute_res.rc == 0
       become: true
       become_user: "{{ _grid_install_user }}"
+      environment: |-
+        {{ oracle_script_env | ansible.utils.remove_keys(target=['CV_ASSUME_DISTID']) }}
 
   rescue:
     - name: execute_cluvfy | cluvfy failed

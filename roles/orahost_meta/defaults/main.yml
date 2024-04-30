@@ -76,7 +76,52 @@ oracle_rsp_stage: "{{ oracle_stage }}/rsp"
 #
 # There is usually no need to change this variable.
 # @end
-oracle_tmp_stage: "{{ oracle_stage }}/tmp"
+oracle_tmp_stage: >-
+  {% if ansible_fips | default(false) %}{{ oracle_stage }}{%- endif %}/tmp
+
+# @var orahost_meta_cv_assume_distid:description: >
+# The variable is used by `oracle_script_env` and passed
+# to shell: or command: through "environment:" keyword
+#
+# Riles:
+#   - Redhat/OL and ansible_distribution_major_version <= 8
+#
+#     `OL{{ ansible_distribution_major_version }}`
+#
+#   - Redhat/OL and ansible_distribution_major_version = 9
+#
+#     `OL8`
+#
+#  - SuSE
+#
+#    `SLES15`
+#
+# @end
+orahost_meta_cv_assume_distid: |-
+  {% if ansible_os_family == 'RedHat' %}OL
+  {%- if ansible_distribution_major_version is version('8', '<=') %}{{ ansible_distribution_major_version }}
+  {%- elif ansible_distribution_major_version is version('9', '=') %}8
+  {%- endif %}
+  {%- elif ansible_os_family in ('SuSe', 'Suse') %}SUSE{{ ansible_distribution_major_version }}
+  {%- endif %}
+
+# @var orahost_meta_java_options:description: >
+# The variable is used by `oracle_script_env` and passed
+# to shell: or command: through "environment:" keyword
+#
+# `java.io.tmpdir` is needed for FIPS configured systems,
+# because starting tools from `/tmp` is forbidden.
+# @end
+orahost_meta_java_options: >-
+  {% if oracle_tmp_stage != '/tmp' -%}
+  -Djava.io.tmpdir={{ oracle_tmp_stage -}}
+  {% endif %}
+
+# @var orahost_meta_java_options:description: >
+# The variable is used by `oracle_script_env` and passed
+# to shell: or command: through "environment:" keyword
+# @end
+orahost_meta_tmpdir: "{{ oracle_tmp_stage }}"
 
 # @var oracle_script_env:description: >
 # (Minimum) environment settings to pass to Oracle scripts.
@@ -84,11 +129,9 @@ oracle_tmp_stage: "{{ oracle_stage }}/tmp"
 #
 # @end
 oracle_script_env:
-  TMPDIR: "{{ oracle_tmp_stage }}"
-  _JAVA_OPTIONS: "-Djava.io.tmpdir={{ oracle_tmp_stage }}"
-  # forward compatibility for GI < 19.7 on Linux 8/9
-  CV_ASSUME_DISTID: |-
-    {{ (ansible_facts.os_family == 'RedHat') | ternary('OL7', omit) }}
+  CV_ASSUME_DISTID: "{{ orahost_meta_cv_assume_distid }}"
+  TMPDIR: "{{ orahost_meta_tmpdir }}"
+  "_JAVA_OPTIONS": "{{ orahost_meta_java_options }}"
 
 # @var oracle_seclimits:description: ulimit definition for orahost role.
 oracle_seclimits:
