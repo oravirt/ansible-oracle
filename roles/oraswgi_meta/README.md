@@ -117,6 +117,7 @@ gi_patches_config:
           state: present
           path: 19.16.0.0.220719/ojvm/p34086870_190000_Linux-x86-64.zip
           # Oracle Database 19c Important Recommended One-off Patches (Doc ID 555.1)
+gi_patches: "{{ gi_patches_config['19.16.0.0.220719'] }}"
 ```
 
 ### patch_before_rootsh

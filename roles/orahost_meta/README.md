@@ -19,10 +19,15 @@ Meta role used by other roles to share variable defaults.
   - [oracle_group](#oracle_group)
   - [oracle_inventory_loc](#oracle_inventory_loc)
   - [oracle_rsp_stage](#oracle_rsp_stage)
+  - [oracle_script_env](#oracle_script_env)
   - [oracle_seclimits](#oracle_seclimits)
   - [oracle_stage](#oracle_stage)
+  - [oracle_tmp_stage](#oracle_tmp_stage)
   - [oracle_user](#oracle_user)
   - [oracle_user_home](#oracle_user_home)
+  - [orahost_meta_cv_assume_distid](#orahost_meta_cv_assume_distid)
+  - [orahost_meta_java_options](#orahost_meta_java_options)
+  - [orahost_meta_tmpdir](#orahost_meta_tmpdir)
   - [role_separation](#role_separation)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
@@ -220,6 +225,20 @@ There is usually no need to change this variable.
 oracle_rsp_stage: '{{ oracle_stage }}/rsp'
 ```
 
+### oracle_script_env
+
+(Minimum) environment settings to pass to Oracle scripts.
+Usually passed to shell: or command: through "environment:" keyword
+
+#### Default value
+
+```YAML
+oracle_script_env:
+  CV_ASSUME_DISTID: '{{ orahost_meta_cv_assume_distid }}'
+  TMPDIR: '{{ orahost_meta_tmpdir }}'
+  _JAVA_OPTIONS: '{{ orahost_meta_java_options }}'
+```
+
 ### oracle_seclimits
 
 ulimit definition for orahost role.
@@ -252,6 +271,20 @@ There is usually no need to change this variable.
 oracle_stage: /u01/stage
 ```
 
+### oracle_tmp_stage
+
+Defines the temporary directory to be used by Oracle scripts.
+(on hardened systems, /tmp usually is noexec-flagged and thus not usable to execute scripts)
+
+There is usually no need to change this variable.
+
+#### Default value
+
+```YAML
+oracle_tmp_stage: >-
+  {% if ansible_fips | default(false) %}{{ oracle_stage }}{%- endif %}/tmp
+```
+
 ### oracle_user
 
 Defines the os-User for Oracle Database installation.
@@ -271,6 +304,58 @@ home directory for `oracle_user`.
 
 ```YAML
 oracle_user_home: /home/oracle
+```
+
+### orahost_meta_cv_assume_distid
+
+The variable is used by `oracle_script_env` and passed
+to shell: or command: through "environment:" keyword
+
+Riles:
+- Redhat/OL and ansible_distribution_major_version <= 8
+
+`OL{{ ansible_distribution_major_version }}`
+
+- Redhat/OL and ansible_distribution_major_version = 9
+
+`OL8`
+
+- SuSE
+
+`SLES15`
+
+#### Default value
+
+```YAML
+orahost_meta_cv_assume_distid: |-
+  {% if ansible_os_family == 'RedHat' %}OL
+  {%- if ansible_distribution_major_version is version('8', '<=') %}{{ ansible_distribution_major_version }}
+  {%- elif ansible_distribution_major_version is version('9', '=') %}8
+  {%- endif %}
+  {%- elif ansible_os_family in ('SuSe', 'Suse') %}SUSE{{ ansible_distribution_major_version }}
+  {%- endif %}
+```
+
+### orahost_meta_java_options
+
+The variable is used by `oracle_script_env` and passed
+to shell: or command: through "environment:" keyword
+
+#### Default value
+
+```YAML
+orahost_meta_java_options: >-
+  {% if oracle_tmp_stage != '/tmp' -%}
+  -Djava.io.tmpdir={{ oracle_tmp_stage -}}
+  {% endif %}
+```
+
+### orahost_meta_tmpdir
+
+#### Default value
+
+```YAML
+orahost_meta_tmpdir: '{{ oracle_tmp_stage }}'
 ```
 
 ### role_separation

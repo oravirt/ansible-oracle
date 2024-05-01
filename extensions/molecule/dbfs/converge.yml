@@ -4,11 +4,25 @@
   gather_facts: true
   any_errors_fatal: true
   tasks:
+
     # install missing cron on rhel9 container
     - name: Install cron on RHEL/OL9
       ansible.builtin.package:
         name: cronie
-      when: ansible_distribution_major_version | int == 9
+      when:
+        - ansible_os_family == 'RedHat'
+        - ansible_distribution_major_version | int == 9
+
+    # install missing packages for openSUSE
+    - name: Install packages on openSUSE
+      ansible.builtin.package:
+        name:
+          - cronie
+          - git
+          - lsof
+          - ssh-tools
+      when:
+        - ansible_os_family == 'Suse'
 
 - name: Converge os
   ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.os

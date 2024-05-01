@@ -12,7 +12,7 @@ Configure logrotate for ansible-oracle
   - [oracle_home_gi_cl](#oracle_home_gi_cl)
   - [oracle_home_gi_so](#oracle_home_gi_so)
   - [oracle_trace_cleanup_days](#oracle_trace_cleanup_days)
-- [Discovered Tags](#discovered-tags)
+  - [orahost_logrotate_setup_logrotate](#orahost_logrotate_setup_logrotate)
 - [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -108,11 +108,16 @@ Define number of days for ADR in Oracle.
 oracle_trace_cleanup_days: 7
 ```
 
-## Discovered Tags
+### orahost_logrotate_setup_logrotate
 
-**_cleanup_**
+Setup of logrotate/cleanup is optional
 
-**_logrotate_**
+#### Default value
+
+```YAML
+orahost_logrotate_setup_logrotate: true
+```
+
 
 ## Open Tasks
 
