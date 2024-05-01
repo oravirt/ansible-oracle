@@ -866,6 +866,7 @@ transparent_hugepage_disable:
 
 ## Dependencies
 
+- global_handlers
 - orahost_meta
 
 ## License
