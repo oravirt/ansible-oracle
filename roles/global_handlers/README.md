@@ -33,7 +33,7 @@ or just displays a reboot advice (false)
 
 ```YAML
 restart_on_requirement: false
-
+```
 
 
 
