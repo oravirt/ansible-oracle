@@ -32,7 +32,7 @@ or just displays a reboot advice (false)
 #### Default value
 
 ```YAML
-restart_on_requirement: true
+restart_on_requirement: false
 ```
 
 

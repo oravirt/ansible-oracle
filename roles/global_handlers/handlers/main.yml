@@ -1,11 +1,11 @@
 ---
 - name: Reboot concerning package updates
-  ansible.builtin.command:
-    "{%- if ansible_facts.os_family == 'RedHat' -%}
-      yum needs-restarting -r
-    {%- elif ansible_facts.os_family == 'Suse' -%}
-      zypper needs-rebooting
-    {%- endif -%}"
+  ansible.builtin.command: >-
+    {% if ansible_facts.os_family == 'RedHat' -%}
+    yum needs-restarting -r
+    {% elif ansible_facts.os_family == 'Suse' -%}
+    zypper needs-rebooting
+    {% endif -%}
   failed_when: false
   register: _global_handlers_needs_restarting
   changed_when: _global_handlers_needs_restarting.rc > 0
@@ -17,8 +17,9 @@
       when: restart_on_requirement
       listen: restart server
       ansible.builtin.reboot:
+
     - name: Reboot recommendation
       when: not restart_on_requirement
       listen: restart server
       ansible.builtin.debug:
-        msg: Please REBOOT {{ ansible_hostname }} for modifications to take effect.
+        msg: "Please REBOOT {{ ansible_hostname }} for modifications to take effect."
