@@ -34,6 +34,7 @@ Role to configure the hostsystem for ansible-oracle
   - [host_fs_layout](#host_fs_layout)
   - [install_os_packages](#install_os_packages)
   - [keyfile](#keyfile)
+  - [max_size_in_gb_hugepages](#max_size_in_gb_hugepages)
   - [nr_hugepages](#nr_hugepages)
   - [nr_hugepages_memory](#nr_hugepages_memory)
   - [nr_hugepages_percent](#nr_hugepages_percent)
@@ -379,6 +380,16 @@ install_os_packages: true
 
 ```YAML
 keyfile: /tmp/known_hosts
+```
+
+### max_size_in_gb_hugepages
+
+Cap HugePages to 70% of physical memory to prevent overcomitting. Only valid when configure_hugepages_by: memory
+
+#### Default value
+
+```YAML
+max_size_in_gb_hugepages: '{{ ansible_memtotal_mb / 1024 * 0.7 }}'
 ```
 
 ### nr_hugepages

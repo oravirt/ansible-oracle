@@ -72,11 +72,15 @@ max_size_in_gb_hugepages: "{{ ansible_memtotal_mb / 1024 * 0.7 }}"
 
 # @var nr_hugepages_percent:description: This is an internal variable only. Do not define it!
 # @var nr_hugepages_percent: $ "_unset_"
-nr_hugepages_percent: "{{ ((((percent_hugepages / 100) * ansible_memtotal_mb) * 1024**2 / hugepage_size_bytes|int ) + (oracle_nr_instances|int * 2)) | round | int }}"
+nr_hugepages_percent: |-
+  {{ ((((percent_hugepages / 100) * ansible_memtotal_mb) * 1024**2 / hugepage_size_bytes | int)
+  + (oracle_nr_instances | int * 2)) | round | int }}
 
 # @var nr_hugepages_memory:description: This is an internal variable only. Do not define it!
 # @var nr_hugepages_memory: $ "_unset_"
-nr_hugepages_memory: "{{ ((([ size_in_gb_hugepages|int, max_size_in_gb_hugepages|int ] | min | int ) * 1024**3 / hugepage_size_bytes|int ) + (oracle_nr_instances|int * 2)) | int }}"
+nr_hugepages_memory: |-
+  {{ ((([ size_in_gb_hugepages | int, max_size_in_gb_hugepages | int ] | min | int ) * 1024**3 / hugepage_size_bytes | int)
+  + (oracle_nr_instances | int * 2)) | int }}
 
 # @var nr_hugepages:description: >
 # This is an internal variable only. Do not define it!
