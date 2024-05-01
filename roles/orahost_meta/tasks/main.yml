@@ -27,36 +27,44 @@
 - name: Determine kernel.panic setting
   block:
     - name: Get kdump state
-      ansible.builtin.command:
-        cmd: "systemctl is-active kdump"
-      failed_when: false
-      changed_when: false
+      ansible.builtin.systemd:
+        name: kdump
       register: __orahost_kdump_state
 
     - name: Set/unset kernel.panic according to kdump state
       ansible.builtin.set_fact:
-        sysctl_kernel_panic: "{{ (__orahost_kdump_state.stdout=='active') | ternary(0,1) }}"
+        sysctl_kernel_panic: |
+          {{ (__orahost_kdump_state.status.ActiveState == 'active') | ternary(0, 1) }}
 
 - name: Calculate SGA aggregates
   ansible.builtin.include_tasks: aggregate_sgas.yml
-  loop: "{{ (( oracle_databases | default ([]) | selectattr('init_parameters','defined') ) + ( oracle_asm_instance | default ([]) )) | lower }}"
+  loop: |
+    {{ (( oracle_databases | default ([]) | selectattr('init_parameters','defined') )
+    + ( oracle_asm_instance | default ([]) )) | lower }}
   loop_control:
     loop_var: __orahost_oracle_database
+    label: >-
+      oracle_db_name: {{ __orahost_oracle_database.oracle_db_name | default('') }}
   when:
     "'sga_target' in __orahost_oracle_database.init_parameters | map(attribute='name') or
     'sga_max_size' in __orahost_oracle_database.init_parameters | map(attribute='name') "
 
 - name: Calculate processes aggregates
   ansible.builtin.include_tasks: aggregate_processes.yml
-  loop: "{{ (( oracle_databases | default ([]) | selectattr('init_parameters','defined') ) + ( oracle_asm_instance | default ([]) )) | lower }}"
+  loop: |
+    {{ (( oracle_databases | default ([]) | selectattr('init_parameters','defined') )
+    + ( oracle_asm_instance | default ([]) )) | lower }}
   loop_control:
     loop_var: __orahost_oracle_database
+    label: >-
+      oracle_db_name: {{ __orahost_oracle_database.oracle_db_name | default('') }}
   when:
     "'processes' in __orahost_oracle_database.init_parameters | map(attribute='name')"
 
 - name: Count number of instances (including ASM)
   ansible.builtin.set_fact:
-    oracle_nr_instances: "{{ oracle_databases | default({}) | length + oracle_asm_instance | default({}) | length }}"
+    oracle_nr_instances: |
+      {{ oracle_databases | default({}) | length + oracle_asm_instance | default({}) | length }}
 
 - name: Get system's pagesize
   block:
@@ -82,5 +90,8 @@
       ansible.builtin.set_fact:
         hugepage_size_bytes: "{{ (__orahost_hugepagesize_result.stdout | split())[1] | int * 1024 }}"
 
+# Kernelsettings are not availible in molecule
 - name: Calculate kernel.sem
   ansible.builtin.include_tasks: calculate_kernel_semaphores.yml
+  tags:
+    - molecule-notest

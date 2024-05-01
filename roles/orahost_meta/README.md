@@ -18,6 +18,7 @@ Meta role used by other roles to share variable defaults.
   - [oper_group](#oper_group)
   - [oracle_group](#oracle_group)
   - [oracle_inventory_loc](#oracle_inventory_loc)
+  - [oracle_nr_bg_processes](#oracle_nr_bg_processes)
   - [oracle_rsp_stage](#oracle_rsp_stage)
   - [oracle_script_env](#oracle_script_env)
   - [oracle_seclimits](#oracle_seclimits)
@@ -29,6 +30,7 @@ Meta role used by other roles to share variable defaults.
   - [orahost_meta_java_options](#orahost_meta_java_options)
   - [orahost_meta_tmpdir](#orahost_meta_tmpdir)
   - [role_separation](#role_separation)
+  - [sysctl_kernel_sem_force](#sysctl_kernel_sem_force)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -213,6 +215,16 @@ Directory for central Oracle Inventory.
 oracle_inventory_loc: /u01/app/oraInventory
 ```
 
+### oracle_nr_bg_processes
+
+Estimated number of background processes of an Oracle instance. Used to calculate kernel SEMMNS
+
+#### Default value
+
+```YAML
+oracle_nr_bg_processes: 130
+```
+
 ### oracle_rsp_stage
 
 Defines the directory for response files for installation.
@@ -369,11 +381,24 @@ See `grid_user` and `oracle_user` for Grid-Infrastructure user.
 role_separation: false
 ```
 
+### sysctl_kernel_sem_force
+
+Force setting kernel.sem depending on configured instances
+(collections: oracle_databases, oracle_asm_instance), even if calculated values are lower than current ones
+
+#### Default value
+
+```YAML
+sysctl_kernel_sem_force: false
+```
+
 ## Discovered Tags
 
 **_always_**
 
 **_assert_ansible_oracle_**
+
+**_molecule-notest_**
 
 
 ## Dependencies
