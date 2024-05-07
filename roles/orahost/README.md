@@ -26,6 +26,7 @@ Role to configure the hostsystem for ansible-oracle
   - [disable_firewall](#disable_firewall)
   - [disable_numa_boot](#disable_numa_boot)
   - [disable_selinux](#disable_selinux)
+  - [etc_hosts_entries](#etc_hosts_entries)
   - [etc_hosts_ip](#etc_hosts_ip)
   - [extrarepos_disabled](#extrarepos_disabled)
   - [extrarepos_enabled](#extrarepos_enabled)
@@ -42,10 +43,12 @@ Role to configure the hostsystem for ansible-oracle
   - [oracle_asm_packages_sles](#oracle_asm_packages_sles)
   - [oracle_groups](#oracle_groups)
   - [oracle_hugepages](#oracle_hugepages)
+  - [oracle_hugepages_sysctl_file](#oracle_hugepages_sysctl_file)
   - [oracle_ic_net](#oracle_ic_net)
   - [oracle_packages](#oracle_packages)
   - [oracle_packages_sles_multi](#oracle_packages_sles_multi)
   - [oracle_sysctl](#oracle_sysctl)
+  - [oracle_sysctl_file](#oracle_sysctl_file)
   - [oracle_users](#oracle_users)
   - [os_family_supported](#os_family_supported)
   - [os_min_supported_version](#os_min_supported_version)
@@ -285,6 +288,31 @@ disable_numa_boot: true
 disable_selinux: true
 ```
 
+### etc_hosts_entries
+
+List of additional entries, optionally along with aliases, to be put into /etc/hosts. E.g. on non-DNS environments or if we don't rely on DNS
+
+#### Default value
+
+```YAML
+etc_hosts_entries: []
+```
+
+#### Example usage
+
+```YAML
+etc_hosts_entries:
+  - fqdn: clusternode1.example.com
+    ip: 192.168.1.1
+  - fqdn: clusternode2.example.com
+    ip: 192.168.1.2
+    aliases:
+      - myalias.example.com
+would create following entries in /etc/hosts:
+192.168.1.1 clusternode1  clusternode1.example.com
+192.168.1.2 clusternode2  clusternode2.example.com  myalias.example.com
+```
+
 ### etc_hosts_ip
 
 Set IP to 2nd Interface on virtualbox and 1st for all otehr installations
@@ -481,6 +509,24 @@ oracle_hugepages:
   - {name: vm.nr_hugepages, value: '{{ nr_hugepages }}'}
 ```
 
+### oracle_hugepages_sysctl_file
+
+Allows to specify the file in which sysctl settings for huge pages will be stored.
+When unspecified it will first fallback to be `oracle_sysctl_file`
+and then to module defaults (`/etc/sysctl.conf`) should that one also be not defined.
+
+#### Default value
+
+```YAML
+oracle_hugepages_sysctl_file: _unset_
+```
+
+#### Example usage
+
+```YAML
+oracle_hugepages_sysctl_file: '/etc/sysctl.d/oracle-hugepages.conf'
+```
+
 ### oracle_ic_net
 
 Picks the last octet from the public ip to use for
@@ -656,6 +702,23 @@ oracle_sysctl:
   - {name: vm.min_free_kbytes, value: 524288}
 ```
 
+### oracle_sysctl_file
+
+Allows to specify the file in which sysctl settings will be stored. When unspecified it will
+be put to `/etc/sysctl.conf` by the module defaults (omit)
+
+#### Default value
+
+```YAML
+oracle_sysctl_file: _unset_
+```
+
+#### Example usage
+
+```YAML
+oracle_sysctl_file: '/etc/sysctl.d/oracle.conf'
+```
+
 ### oracle_users
 
 oracle OS-User
@@ -817,6 +880,7 @@ transparent_hugepage_disable_by_grub: false
 
 ## Dependencies
 
+- global_handlers
 - orahost_meta
 
 ## License

@@ -139,6 +139,23 @@ sudoers_template: sudoers.j2
 # @end
 etc_hosts_ip: "{% if 'virtualbox' in ansible_virtualization_type %}{{ ansible_all_ipv4_addresses[1] }}{% else %}{{ ansible_default_ipv4.address }}{% endif %}"
 
+# @var etc_hosts_entries:description: >
+# List of additional entries, optionally along with aliases, to be put into /etc/hosts. E.g. on non-DNS environments or if we don't rely on DNS
+# @end
+# @var etc_hosts_entries:example: >
+# etc_hosts_entries:
+#   - fqdn: clusternode1.example.com
+#     ip: 192.168.1.1
+#   - fqdn: clusternode2.example.com
+#     ip: 192.168.1.2
+#     aliases:
+#       - myalias.example.com
+# would create following entries in /etc/hosts:
+# 192.168.1.1 clusternode1  clusternode1.example.com
+# 192.168.1.2 clusternode2  clusternode2.example.com  myalias.example.com
+# @end
+etc_hosts_entries: []
+
 # Extra repositories that should be enabled
 extrarepos_enabled: "{%- if ansible_distribution == 'OracleLinux' -%}\
                           ol{{ ansible_distribution_major_version }}_addons\
@@ -429,8 +446,27 @@ oracle_sysctl:
   - {name: kernel.panic_on_oops, value: 1}
   - {name: vm.min_free_kbytes, value: 524288}
 
+# @var oracle_sysctl_file:description: >
+# Allows to specify the file in which sysctl settings will be stored. When unspecified it will
+# be put to `/etc/sysctl.conf` by the module defaults (omit)
+# @end
+# @var oracle_sysctl_file: $ "_unset_"
+# @var oracle_sysctl_file:example: >
+# oracle_sysctl_file: '/etc/sysctl.d/oracle.conf'
+# @end
+
 # @var oracle_hugepages:description: >
 # This is an internal variable. Do not change it!
 # @end
 oracle_hugepages:
   - {name: vm.nr_hugepages, value: "{{ nr_hugepages }}"}
+
+# @var oracle_hugepages_sysctl_file:description: >
+# Allows to specify the file in which sysctl settings for huge pages will be stored.
+# When unspecified it will first fallback to be `oracle_sysctl_file`
+# and then to module defaults (`/etc/sysctl.conf`) should that one also be not defined.
+# @end
+# @var oracle_hugepages_sysctl_file: $ "_unset_"
+# @var oracle_hugepages_sysctl_file:example: >
+# oracle_hugepages_sysctl_file: '/etc/sysctl.d/oracle-hugepages.conf'
+# @end

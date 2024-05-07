@@ -45,6 +45,25 @@
   when: configure_etc_hosts
   tags: etchosts
 
+- name: Add manually defined hosts to /etc/hosts
+  # e.g. on non-DNS environments or if we don't rely on DNS
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    regexp: '.*{{ __orahost_etc_hosts_entry.fqdn }}$'
+    line:
+      "{{ __orahost_etc_hosts_entry.ip }}
+      {{ (__orahost_etc_hosts_entry.fqdn|split('.'))[0] }}
+      {{ __orahost_etc_hosts_entry.fqdn is search('\\.') | ternary(__orahost_etc_hosts_entry.fqdn, '') }}\
+      {% for alias in __orahost_etc_hosts_entry.aliases|default([]) %} {{ alias }}{% endfor %} # ANSIBLE managed"
+    state: present
+  loop: "{{ etc_hosts_entries }}"
+  loop_control:
+    loop_var: __orahost_etc_hosts_entry
+  when:
+    - configure_etc_hosts
+    - etc_hosts_entries|type_debug == "list"
+  tags: etchosts
+
 #  - name: Add local node's ip & hostname to /etc/hosts
 #    lineinfile: dest=/etc/hosts line="{{ ansible_default_ipv4.address }} {{ ansible_fqdn }} {{ ansible_hostname }} " state=present
 #    when: configure_etc_hosts and ansible_default_ipv4.address is defined
@@ -361,7 +380,8 @@
   ansible.posix.sysctl:
     name: "{{ item.name }}"
     value: "{{ item.value }}"
-    state: present
+    sysctl_file: "{{ item.sysctl_file | default(oracle_sysctl_file) | default(omit) }}"
+    state: "{{ item.state | default('present') }}"
     reload: true
     ignoreerrors: true
   with_items: "{{ oracle_sysctl }}"
@@ -381,7 +401,8 @@
       ansible.posix.sysctl:
         name: "{{ item.name }}"
         value: "{{ item.value }}"
-        state: present
+        sysctl_file: "{{ item.sysctl_file | default(oracle_hugepages_sysctl_file) | default(oracle_sysctl_file) | default(omit) }}"
+        state: "{{ item.state | default('present') }}"
         reload: true
         ignoreerrors: true
       with_items: "{{ oracle_hugepages }}"
@@ -406,7 +427,8 @@
           ansible.posix.sysctl:
             name: "{{ item.name }}"
             value: "{{ item.value }}"
-            state: present
+            sysctl_file: "{{ item.sysctl_file | default(oracle_hugepages_sysctl_file) | default(oracle_sysctl_file) | default(omit) }}"
+            state: "{{ item.state | default('present') }}"
             reload: true
           with_items: "{{ oracle_hugepages }}"
 

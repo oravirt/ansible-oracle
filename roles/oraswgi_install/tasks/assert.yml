@@ -3,7 +3,8 @@
   ansible.builtin.assert:
     quiet: true
     that:
-      - default_gipass | length > 0
+      - default_gipass | length > 0 or sysasmpassword | default('',true) | length > 0
+      - default_gipass | length > 0 or asmmonitorpassword | default('',true) | length > 0
       - oracle_install_version_gi is defined
       - oracle_gi_cluster_type in ('STANDARD', 'STANDALONE')
   tags: always

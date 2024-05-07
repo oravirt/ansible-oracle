@@ -15,19 +15,19 @@
 - name: Work on oracle_sw_patches
   ansible.builtin.include_tasks: loop_stage_patch.yml
   vars:
-    __sw_patches_filename_creates: "{{ osp_loop.0.creates | default((gip_opatch.0.patchid | string) + '/README.txt') }}"
-    __patch_unarchive_dir: "{{ oracle_patch_stage }}/{{ db_version }}/{{ __patch_upisubdir }}/"
+    __sw_patches_filename_creates: "{{ osp_loop.creates | default((gip_opatch.0.patchid | string) + '/README.txt') }}"
+    __patch_unarchive_dir: "{{ oracle_patch_stage }}/{{ oracle_install_version_gi }}/{{ __patch_upisubdir }}/"
     __patch_upisubdir: >-
-      {%- if osp_loop.0.unique_patchid is defined -%}
-      upi_{{ osp_loop.0.unique_patchid -}}/{% endif -%}
+      {%- if osp_loop.unique_patchid is defined -%}
+      upi_{{ osp_loop.unique_patchid -}}/{% endif -%}
   with_items:
     - "{{ oracle_sw_patches | selectattr('patchid', 'equalto', gip_opatch.0.patchid) }}"
   loop_control:
     loop_var: osp_loop
     label: >-
-      patchid: {{ osp_loop.0.patchid }}
-      filename: {{ osp_loop.0.filename }}
-      unique_patchid: {{ osp_loop.0.unique_patchid | default('') }}
+      patchid: {{ osp_loop.patchid }}
+      filename: {{ osp_loop.filename }}
+      unique_patchid: {{ osp_loop.unique_patchid | default('') }}
   when:
     - apply_patches_db
     - gip_opatch.0.state == 'present'

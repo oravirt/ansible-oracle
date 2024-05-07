@@ -8,7 +8,7 @@
                     {%- endif %}"  # noqa jinja[spacing]
 
 - name: install_home_db | Check if DB-server is already installed
-  ansible.builtin.shell: cat "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" | grep -w {{ oracle_home_db }} | awk  '{print $3}' | cut -f2 -d'"'
+  ansible.builtin.shell: grep -w {{ oracle_home_db }} "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml" | grep -iv 'REMOVED=.T.' | awk  '{print $3}' | cut -f2 -d'"'
   # noqa risky-shell-pipe
   register: existing_dbhome
   changed_when: false

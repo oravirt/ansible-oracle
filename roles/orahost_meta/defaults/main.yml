@@ -70,6 +70,69 @@ oracle_stage: /u01/stage
 # @end
 oracle_rsp_stage: "{{ oracle_stage }}/rsp"
 
+# @var oracle_tmp_stage:description: >
+# Defines the temporary directory to be used by Oracle scripts.
+# (on hardened systems, /tmp usually is noexec-flagged and thus not usable to execute scripts)
+#
+# There is usually no need to change this variable.
+# @end
+oracle_tmp_stage: >-
+  {% if ansible_fips | default(false) %}{{ oracle_stage }}{%- endif %}/tmp
+
+# @var orahost_meta_cv_assume_distid:description: >
+# The variable is used by `oracle_script_env` and passed
+# to shell: or command: through "environment:" keyword
+#
+# Riles:
+#   - Redhat/OL and ansible_distribution_major_version <= 8
+#
+#     `OL{{ ansible_distribution_major_version }}`
+#
+#   - Redhat/OL and ansible_distribution_major_version = 9
+#
+#     `OL8`
+#
+#  - SuSE
+#
+#    `SLES15`
+#
+# @end
+orahost_meta_cv_assume_distid: |-
+  {% if ansible_os_family == 'RedHat' %}OL
+  {%- if ansible_distribution_major_version is version('8', '<=') %}{{ ansible_distribution_major_version }}
+  {%- elif ansible_distribution_major_version is version('9', '=') %}8
+  {%- endif %}
+  {%- elif ansible_os_family in ('SuSe', 'Suse') %}SUSE{{ ansible_distribution_major_version }}
+  {%- endif %}
+
+# @var orahost_meta_java_options:description: >
+# The variable is used by `oracle_script_env` and passed
+# to shell: or command: through "environment:" keyword
+#
+# `java.io.tmpdir` is needed for FIPS configured systems,
+# because starting tools from `/tmp` is forbidden.
+# @end
+orahost_meta_java_options: >-
+  {% if oracle_tmp_stage != '/tmp' -%}
+  -Djava.io.tmpdir={{ oracle_tmp_stage -}}
+  {% endif %}
+
+# @var orahost_meta_java_options:description: >
+# The variable is used by `oracle_script_env` and passed
+# to shell: or command: through "environment:" keyword
+# @end
+orahost_meta_tmpdir: "{{ oracle_tmp_stage }}"
+
+# @var oracle_script_env:description: >
+# (Minimum) environment settings to pass to Oracle scripts.
+# Usually passed to shell: or command: through "environment:" keyword
+#
+# @end
+oracle_script_env:
+  CV_ASSUME_DISTID: "{{ orahost_meta_cv_assume_distid }}"
+  TMPDIR: "{{ orahost_meta_tmpdir }}"
+  "_JAVA_OPTIONS": "{{ orahost_meta_java_options }}"
+
 # @var oracle_seclimits:description: ulimit definition for orahost role.
 oracle_seclimits:
   - {name: 'soft nproc', value: 16384}

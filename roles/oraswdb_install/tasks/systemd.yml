@@ -1,4 +1,6 @@
 ---
+# Configure systemd only for Single-Instance without GI/Restart
+# We need a minimum of 1 entry in db_homes_installed with state=present
 - name: install_home_db | Configure oracle-rdbms auto-startup service (systemd.d)
   ansible.builtin.template:
     src: oracle-rdbms-service.j2
@@ -9,11 +11,17 @@
   become_user: root
   notify:
     - systemd register and reload
-  with_items: "{{ db_homes_installed }}"
+  with_items:
+    - "{{ db_homes_installed | selectattr('state', 'equalto', 'present') | list | first | default([]) }}"
+  loop_control:
+    label: >-
+      {{ item.home | default('') }}
+      state: {{ item.state | default('') }}
   when:
     - autostartup_service
+    - oracle_install_option_gi | default('') | length == 0
+    - db_homes_installed | length > 0
     - hostinitdaemon == "systemd"
-    - item.state|lower == 'present'
   tags:
     - autostartup_service
     - seclimit    # Update template when ulimits have been chagned as well.

@@ -169,6 +169,7 @@
           - "oracle_home_gi: {{ oracle_home_gi }}"
           - "apply RU before configuration: {{ patch_before_rootsh }}"
           - "{{ patch_before_rootsh | bool | ternary('patchru_dir: ' + __patchru_dir, '') }}"
+          - "oracle_script_env:   {{ oracle_script_env | default({}) }}"
       when:
         - _orasw_meta_primary_node | bool
 
@@ -200,6 +201,7 @@
         __argvru:
           - -applyRU
           - "{{ __patchru_dir }}"
+      environment: "{{ oracle_script_env }}"
       become: true
       become_user: "{{ _grid_install_user }}"
       when:
@@ -227,6 +229,7 @@
   block:  # when: oracle_home_gi not in checkgiinstall.stdout
     - name: install_home_gi | Run oraInstroot script after installation
       ansible.builtin.command: "{{ oracle_inventory_loc }}/orainstRoot.sh"
+      environment: "{{ oracle_script_env }}"
       # noqa no-changed-when
       become: true
       tags:
@@ -239,6 +242,7 @@
 
     - name: install_home_gi | Run root script after installation (Master Node)
       ansible.builtin.command: "{{ oracle_home_gi }}/root.sh"
+      environment: "{{ oracle_script_env }}"
       # noqa no-changed-when
       become: true
       register: rootmaster
@@ -268,6 +272,7 @@
       # noqa no-changed-when
       args:
         executable: /usr/bin/bash
+      environment: "{{ oracle_script_env }}"
       become: true
       with_indexed_items: "{{ groups[orasw_meta_cluster_hostgroup] }}"
       tags:
@@ -285,6 +290,7 @@
 
     - name: install_home_gi | Execute ConfigTools
       ansible.builtin.command: "{{ oracle_home_gi }}/gridSetup.sh -executeConfigTools -responseFile {{ oracle_rsp_stage }}/{{ _oraswgi_install_oracle_grid_responsefile }} -silent"
+      environment: "{{ oracle_script_env }}"
       # noqa no-changed-when
       become: true
       become_user: "{{ _grid_install_user }}"
