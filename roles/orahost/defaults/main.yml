@@ -451,6 +451,7 @@ oracle_sysctl:
 # @end
 oracle_hugepages:
   - {name: vm.nr_hugepages, value: "{{ nr_hugepages }}"}
+  - {name: vm.hugetlb_shm_group, value: "{{ oracle_user_getent['ansible_facts']['getent_passwd'][oracle_user][2] }}"}
 
 # @var oracle_hugepages_sysctl_file:description: >
 # Allows to specify the file in which sysctl settings for huge pages will be stored.
