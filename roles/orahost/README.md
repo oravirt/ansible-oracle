@@ -506,6 +506,8 @@ This is an internal variable. Do not change it!
 ```YAML
 oracle_hugepages:
   - {name: vm.nr_hugepages, value: '{{ nr_hugepages }}'}
+  - {name: vm.hugetlb_shm_group, value: "{{ oracle_user_getent['ansible_facts']['getent_passwd'][oracle_user][2]
+      }}"}
 ```
 
 ### oracle_hugepages_sysctl_file
