@@ -55,6 +55,7 @@
     ocm_response_file: "{{ ocm_response_file | default(omit) }}"
     output: verbose
     state: "{{ gip_opatch.0.state }}"
+    script_env: "{{ {'TMPDIR': orahost_meta_tmpdir, '_JAVA_OPTIONS': '-Djava.io.tmpdir=' + orahost_meta_java_options} }}"
   become: true
   become_user: "{{ __opatchauto_patchtype | ternary('root', grid_user) }}"
   vars:
