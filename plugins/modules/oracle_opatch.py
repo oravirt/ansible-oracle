@@ -103,7 +103,11 @@ options:
             The listener port to connect to the database if using dbms_service
         required: false
         default: 1521
-
+    script_env:
+        description: >
+            Dictionary of environment settings to be passed to run_command
+        required: false
+        default: {}
 notes:
 requirements: [ "os","pwd","distutils.version" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
@@ -114,13 +118,13 @@ EXAMPLES = '''
 '''
 
 
-def get_version(module, msg, oracle_home):
+def get_version(module, msg, oracle_home, script_env):
     '''
     Returns the DB server version
     '''
 
     def loc_exec_command(command):
-        (rc, stdout, stderr) = module.run_command(command)
+        (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
         if rc != 0:
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (
                 stdout,
@@ -145,13 +149,13 @@ def get_version(module, msg, oracle_home):
             return stdout.split(' ')[2][0:4]
 
 
-def get_opatch_version(module, msg, oracle_home):
+def get_opatch_version(module, msg, oracle_home, script_env):
     '''
     Returns the Opatch version
     '''
 
     command = '%s/OPatch/opatch version' % (oracle_home)
-    (rc, stdout, stderr) = module.run_command(command)
+    (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
         module.fail_json(msg=msg, changed=False)
@@ -179,7 +183,14 @@ def get_file_owner(module, msg, oracle_home):
 
 
 def check_patch_applied(
-    module, msg, oracle_home, patch_id, patch_version, opatchauto, exclude_upi
+    module,
+    msg,
+    oracle_home,
+    patch_id,
+    patch_version,
+    opatchauto,
+    exclude_upi,
+    script_env,
 ):
     '''
     Gets all patches already applied and compares to the
@@ -191,7 +202,7 @@ def check_patch_applied(
         oh_owner = get_file_owner(module, msg, oracle_home)
         command += 'sudo -u %s ' % (oh_owner)
     command += '%s/OPatch/opatch lspatches ' % (oracle_home)
-    (rc, stdout, stderr) = module.run_command(command)
+    (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
     # module.exit_json(msg=stdout, changed=False)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
@@ -209,7 +220,9 @@ def check_patch_applied(
                 return True
             else:
                 command += ' -id %s' % patch_id
-                (rc, stdout, stderr) = module.run_command(command)
+                (rc, stdout, stderr) = module.run_command(
+                    command, environ_update=script_env
+                )
                 if rc != 0:
                     msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (
                         stdout,
@@ -224,7 +237,7 @@ def check_patch_applied(
             return False
 
 
-def analyze_patch(module, msg, oracle_home, patch_base, opatchauto):
+def analyze_patch(module, msg, oracle_home, patch_base, opatchauto, script_env):
     checks = []
 
     if opatchauto:
@@ -267,7 +280,7 @@ def analyze_patch(module, msg, oracle_home, patch_base, opatchauto):
         checks.append(spacecommand)
 
     for cmd in checks:
-        (rc, stdout, stderr) = module.run_command(cmd)
+        (rc, stdout, stderr) = module.run_command(cmd, environ_update=script_env)
         # module.exit_json(msg=stdout, changed=False)
         if rc != 0:
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, cmd)
@@ -291,6 +304,7 @@ def apply_patch(
     offline,
     stop_processes,
     rolling,
+    script_env,
     output,
 ):
     '''
@@ -298,7 +312,9 @@ def apply_patch(
     '''
 
     if conflict_check:
-        if not analyze_patch(module, msg, oracle_home, patch_base, opatchauto):
+        if not analyze_patch(
+            module, msg, oracle_home, patch_base, opatchauto, script_env
+        ):
             module.fail_json(msg='Prereq checks failed')
 
     if opatchauto:
@@ -342,7 +358,7 @@ def apply_patch(
     ):
         command += ' -ocmrf %s' % (ocm_response_file)
 
-    (rc, stdout, stderr) = module.run_command(command)
+    (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
         module.fail_json(msg=msg, changed=False)
@@ -454,6 +470,7 @@ def remove_patch(
     opatchauto,
     ocm_response_file,
     stop_processes,
+    script_env,
     output,
 ):
     '''
@@ -485,7 +502,7 @@ def remove_patch(
         command += ' -ocmrf %s' % (ocm_response_file)
 
     # module.exit_json(msg=command, changed=False)
-    (rc, stdout, stderr) = module.run_command(command)
+    (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
         module.fail_json(msg=msg, changed=False)
@@ -538,6 +555,7 @@ def main():
             ),
             hostname=dict(required=False, default='localhost', aliases=['host']),
             port=dict(required=False, type='int', default=1521),
+            script_env=dict(required=False, type='dict', default={}),
         ),
     )
 
@@ -557,6 +575,7 @@ def main():
     state = module.params["state"]
     hostname = module.params["hostname"]
     port = module.params["port"]
+    script_env = module.params["script_env"]
 
     if not os.path.exists(oracle_home):
         msg = 'oracle_home: %s doesn\'t exist' % (oracle_home)
@@ -587,8 +606,8 @@ def main():
         module.fail_json(msg=msg, changed=False)
 
     # Get the Oracle % Opatch version
-    major_version = get_version(module, msg, oracle_home)
-    opatch_version = get_opatch_version(module, msg, oracle_home)
+    major_version = get_version(module, msg, oracle_home, script_env)
+    opatch_version = get_opatch_version(module, msg, oracle_home, script_env)
     opatch_version_noocm = '12.2.0.1.5'
 
     if opatch_minversion is not None:
@@ -616,7 +635,14 @@ def main():
 
     if state == 'present':
         if not check_patch_applied(
-            module, msg, oracle_home, patch_id, patch_version, opatchauto, None
+            module,
+            msg,
+            oracle_home,
+            patch_id,
+            patch_version,
+            opatchauto,
+            None,
+            script_env,
         ):
             if apply_patch(
                 module,
@@ -630,6 +656,7 @@ def main():
                 offline,
                 stop_processes,
                 rolling,
+                script_env,
                 output,
             ):
                 if patch_version is not None:
@@ -658,7 +685,14 @@ def main():
 
     elif state == 'absent':
         if check_patch_applied(
-            module, msg, oracle_home, patch_id, patch_version, opatchauto, exclude_upi
+            module,
+            msg,
+            oracle_home,
+            patch_id,
+            patch_version,
+            opatchauto,
+            exclude_upi,
+            script_env,
         ):
             if remove_patch(
                 module,
@@ -669,6 +703,7 @@ def main():
                 opatchauto,
                 ocm_response_file,
                 stop_processes,
+                script_env,
                 output,
             ):
                 if patch_version is not None:
