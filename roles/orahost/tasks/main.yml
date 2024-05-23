@@ -52,9 +52,9 @@
     regexp: '.*{{ __orahost_etc_hosts_entry.fqdn }}$'
     line:
       "{{ __orahost_etc_hosts_entry.ip }}
-      {{ (__orahost_etc_hosts_entry.fqdn|split('.'))[0] }}
+      {{ (__orahost_etc_hosts_entry.fqdn | split('.'))[0] }}
       {{ __orahost_etc_hosts_entry.fqdn is search('\\.') | ternary(__orahost_etc_hosts_entry.fqdn, '') }}\
-      {% for alias in __orahost_etc_hosts_entry.aliases|default([]) %} {{ alias }}{% endfor %} # ANSIBLE managed"
+      {% for alias in __orahost_etc_hosts_entry.aliases | default([]) %} {{ alias }}{% endfor %} # ANSIBLE managed"
     state: present
   loop: "{{ etc_hosts_entries }}"
   loop_control:
