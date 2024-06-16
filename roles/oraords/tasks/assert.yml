@@ -1,0 +1,25 @@
+---
+- name: assert | Assert OS
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution == 'OracleLinux'
+      - ansible_distribution_major_version is version('8', '>=')
+    fail_msg: >-
+      Installation of ORDS is limited to Oracle Linux 8 and 9 at the moment.
+
+- name: assert | Check for existing APEX Images when oraords_apex_image_path is defined
+  when:
+    - oraords_apex_image_path | default('') | length > 0
+  block:
+    - name: assert | Check for existing APEX Images
+      ansible.builtin.stat:
+        path: "{{ oraords_apex_image_path }}/css/apex.css"
+      register: _oraords_apex_images_dir
+
+    - name: assert | Assert for existing APEX Images
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _oraords_apex_images_dir.stat.exists
+        fail_msg: >-
+          Missing APEX Images in {{ oraords_apex_image_path }}

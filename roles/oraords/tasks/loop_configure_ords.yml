@@ -1,0 +1,95 @@
+---
+- name: loop_configure_ords | Assert
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - oraords_db_pools_password[_loop_pool.db_pool]['admin_password'] is defined
+      - oraords_db_pools_password[_loop_pool.db_pool]['ords_password'] is defined
+
+- name: loop_configure_ords | Defaults
+  tags:
+    - ords_config
+  environment:
+    ADMIN_USER: "{{ _loop_pool.admin_user | default(oraords_admin_user) }}"
+    ADMIN_PASSWORD: "{{ oraords_db_pools_password[_loop_pool.db_pool]['admin_password'] }}"
+    ORDS_PASSWORD: "{{ oraords_db_pools_password[_loop_pool.db_pool]['ords_password'] }}"
+    APEX_IMAGE_PATH: "{{ oraords_apex_image_path | default('') }}"
+    APEX_IMAGE_CONTEXT: "{{ oraords_apex_image_context | default('') }}"
+    DB_POOL: "{{ _loop_pool.db_pool }}"
+  block:
+    - name: loop_configure_ords |  | DB setup
+      ansible.builtin.shell:  # noqa: no-changed-when
+        chdir: /tmp
+        cmd: |
+          /usr/bin/env bash
+          set -eu
+          set -o pipefail
+
+          echo "config:             {{ oraords_ords_config }}"
+          echo "log:                {{ oraords_ords_logs }}"
+          echo "admin-user:         ${ADMIN_USER}"
+          echo "db-pool:            ${DB_POOL}"
+          echo "db-hostname:        {{ _loop_pool.host }}"
+          echo "db-port:            {{ _loop_pool.port | default(oraords_default_port) }}"
+          echo "db-servicename:     {{ _loop_pool.service | mandatory }}"
+          echo "APEX_IMAGE_PATH:    ${APEX_IMAGE_PATH}"
+          echo "APEX_IMAGE_CONTEXT: ${APEX_IMAGE_CONTEXT}"
+
+          if [ ${DB_POOL} = 'default' ] ; then
+            DB_POOL_PARAM=""
+          else
+            DB_POOL_PARAM="${DB_POOL}"
+          fi
+
+          {{ oraords_ords_bin }}/ords \
+            --config {{ oraords_ords_config }} \
+            --verbose \
+            install \
+            --log-folder {{ oraords_ords_logs }} \
+            ${DB_POOL_PARAM} \
+            --admin-user "${ADMIN_USER}" \
+            --db-hostname "{{ _loop_pool.host | mandatory }}" \
+            --db-port {{ _loop_pool.port | default(oraords_default_port) }} \
+            --db-servicename {{ _loop_pool.service | mandatory }} \
+            --feature-db-api {{ _loop_pool.feature_db_api | default(false) | ternary('true', 'false') }} \
+            --feature-rest-enabled-sql {{ _loop_pool.feature_rest_enabled_sql | default(false) | ternary('true', 'false') }} \
+            --feature-sdw {{ _loop_pool.feature_sdw | default('false') | ternary('true', 'false') }} \
+            --proxy-user \
+            --password-stdin <<EOF
+          ${ADMIN_PASSWORD}
+          ${ORDS_PASSWORD}
+          EOF
+
+          if [ -n "${APEX_IMAGE_CONTEXT}"  ] ; then
+            echo ""
+            echo "Change APEX Image context: ${APEX_IMAGE_CONTEXT}"
+            {{ oraords_ords_bin }}/ords \
+              --config {{ oraords_ords_config }} \
+              config set standalone.static.context.path "${APEX_IMAGE_CONTEXT}"
+          fi
+
+          if [ -n "${APEX_IMAGE_PATH}" ] ; then
+            echo ""
+            echo "Change APEX Image path: ${APEX_IMAGE_PATH}"
+            {{ oraords_ords_bin }}/ords \
+              --config {{ oraords_ords_config }} \
+              config set standalone.static.path "${APEX_IMAGE_PATH}"
+          fi
+
+      register: ords_config1_res
+
+    - name: loop_configure_ords | Reload ORDS Service
+      ansible.builtin.service:
+        name: ords
+        state: reloaded
+
+  rescue:
+    - name: loop_configure_ords | ORDS configuration failed
+      ansible.builtin.fail:
+
+  always:
+    - name: loop_configure_ords | ords Output
+      ansible.builtin.debug:
+        var: ords_config1_res.stdout_lines
+      when:
+        - ords_config1_res.stdout_lines is defined

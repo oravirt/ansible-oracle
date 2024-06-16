@@ -1,0 +1,47 @@
+---
+- name: Include Assert
+  ansible.builtin.include_tasks: assert.yml
+  tags: always
+
+- name: Execute under root
+  become: true
+  become_user: root
+  block:
+    - name: Configure repository on OracleLinux
+      ansible.builtin.yum_repository:
+        name: ol{{ ansible_distribution_major_version }}_oracle_software
+        description: ol{{ ansible_distribution_major_version }}_oracle_software
+        file: external_repos
+        baseurl: "{{ _ords_ol_reposiory }}"
+        gpgcheck: false
+
+    - name: Install RPMs with dnf
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - "{{ oraords_java_rpm }}"
+        - ords
+
+    - name: Create directories for ORDS
+      ansible.builtin.file:
+        state: directory
+        path: "{{ item }}"
+        owner: oracle
+        mode: "0755"
+      with_items:
+        - "{{ oraords_ords_config }}"
+
+    - name: Include Configure ORDS
+      ansible.builtin.include_tasks: loop_configure_ords.yml
+      with_items:
+        - "{{ oraords_db_pools }}"
+      loop_control:
+        label: >-
+          db_pool: {{ _loop_pool.db_pool | default('') }}
+          service: {{ _loop_pool.service | default('') }}
+        loop_var: _loop_pool
+      when:
+        - oraords_db_pools is defined
+      tags:
+        - always

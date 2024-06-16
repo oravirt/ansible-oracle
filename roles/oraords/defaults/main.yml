@@ -1,0 +1,66 @@
+---
+# @var oraords_oracle_home:description: >
+# `ORACLE_HOME` for _ORDS_.
+# @end
+oraords_oracle_home: >-
+  {{ oracle_base }}/product/ords
+
+# @var ords_config:description: >
+# ORDS configuration directory.
+# @end
+oraords_ords_config: >-
+  /etc/ords/config
+
+# @var ords_config:description: >
+# ORDS logging directory.
+# @end
+oraords_ords_logs: >-
+  /etc/ords/logs
+
+oraords_java_rpm: java-21-openjdk
+
+# @var ords_config:description: >
+# PATH for ords binary
+# @end
+oraords_ords_bin: >-
+  /usr/local/bin
+
+# oraords_apex_admin_password:
+
+# default admin_user when no user is set in oraords_db_pools
+oraords_default_admin_user: sys
+oraords_default_port: 1521
+
+# @var oraords_apex_image_path:description: >
+# Directory for APEX Images on ORDS Host.
+#
+# @end
+# oraords_apex_image_path:
+
+# @var ords_config:description: >
+# APEX context path for Images.
+# @end
+# oraords_apex_image_context:
+
+# @var oraords_db_pools:description: >
+# List of configured target in ORDS.
+#
+# Attributes:
+#
+# db_pool: <Pool in ORDS>
+#
+# pdb_name: <Target PDB. Needed to find the Password s>
+#
+# port: <Listener Port>
+#
+# service: <servicename of target. Defaults to pdb_name>
+#
+# hostname: <Hostname for target. Defaults to `inventory_hostname`>
+# @end
+oraords_db_pools:
+  - db_pool: default
+    pdb_name: orclpdb
+    admin_user: sys
+    service: orclpdb
+    port: 1521
+    # hostname:
