@@ -58,6 +58,7 @@ Role to configure the hostsystem for ansible-oracle
   - [ssh_keys](#ssh_keys)
   - [sudoers_template](#sudoers_template)
   - [transparent_hugepage_disable](#transparent_hugepage_disable)
+  - [transparent_hugepage_disable_by_grub](#transparent_hugepage_disable_by_grub)
 - [Discovered Tags](#discovered-tags)
 - [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
@@ -823,6 +824,19 @@ It is strongly recommended to disable Transparent Hugepages. Do not change this 
 transparent_hugepage_disable:
   - {disable: echo never >, path: /sys/kernel/mm/transparent_hugepage/enabled, rclocal: /etc/rc.d/rc.local}
   - {disable: echo never >, path: /sys/kernel/mm/transparent_hugepage/defrag, rclocal: /etc/rc.d/rc.local}
+```
+
+### transparent_hugepage_disable_by_grub
+
+Alternatively to dynamically disabling transparent hugepages using rc.local,
+disable transparent hugepages using kernel command line.
+
+_Note_: Setting transparent_hugepage_disable_by_grub true obsoletes transparent_hugepage_disable
+
+#### Default value
+
+```YAML
+transparent_hugepage_disable_by_grub: false
 ```
 
 ## Discovered Tags
