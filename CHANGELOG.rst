@@ -5,6 +5,53 @@ opitzconsulting.ansible_oracle Release Notes
 .. contents:: Topics
 
 
+v4.9.0
+======
+
+Release Summary
+---------------
+
+This is the 1st production release of ansible-oracle 4.x.
+The RAC support was the last missing option in 4.x compared to 3.12.0.
+A documentation for migration from 3.12.0 to 4.x is work in progress.
+
+Minor Changes
+-------------
+
+- added option to disable transparent hugepages in grub (oravirt#460)
+- bugfix set custom environment for executables with oracle_script_env (oravirt#458)
+- global_handlers: Introduce a global handlers role (oravirt#455)
+- global_handlers: Reboot handler improvements, restart_on_requirement=false, ansible-lint (oravirt#457)
+- molecule: added MOLECULE_IMAGE for custom images and support for SuSE (oravirt#458)
+- oracle_opatch.py needs to support configurable temp directory  (oravirt#462)
+- orahost: Add a list of additional hosts to /etc/hosts (oravirt#447)
+- orahost: add oracle_sysctl_file and oracle_hugepages_sysctl_file variables (oravirt#432)
+- orahost: set vm.hugetlb_shm_group to oracle user GID (oravirt#461)
+- orahost_logrotate: logrotate setup for oracle files should be optional (oravirt#449)
+- orahost_meta: Enable calculation of several kernel parameters (oravirt#451)
+- orahost_meta: added oracle_tmp_stage for hardened systems (oravirt#453)
+- oraswdb_manage_patches: make role compatible with oraswgi_manage_patches (oravirt#464)
+- oraswgi_install: Next refactoring of role for RAC (oravirt#464)
+- set custom environment for executables with oracle_script_env (oravirt#453)
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- CV_ASSUME_DISTID: SLES15 when ansible_os_family == 'SuSE' (oravirt#458)
+- oraswgi_manage_patches: python-module xmltodict needed on ansible-controller (oravirt#464)
+
+Bugfixes
+--------
+
+- Consider home was removed earlier, leaving REMOVED=T (oravirt#437)
+- bugfix: added apply_patches_gi to some tasks with patch_before_rootsh (oravirt#464)
+- default_gipass is not required if sysasmpassword and asmmonitorpassword are set (oravirt#433)
+- fixed jinja spacing warning (oravirt#463)
+- oracluvfy did not fail when error was detected (oravirt#464)
+- orasw_meta: grid_base != oracle_base only required if role_separation=true (oravirt#439)
+- oraswdb_install: Configure systemd only for Single Instance without GI/Restart (oravirt#431)
+- oraswgi_install: honour deploy_ocenv setting (oravirt#443)
+
 v4.8.0
 ======
 
