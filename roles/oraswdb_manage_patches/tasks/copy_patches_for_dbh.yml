@@ -1,0 +1,32 @@
+---
+# copy Patches to target server for oracle_homes_installed
+# Used in oraswdb_install for copy patches to prepatch runInstaller with -applyRU
+
+# dhc_opatch is needed as an input for this task-file!
+- name: copy_patches_for_dbh | Assert
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - dhc_opatch is defined
+
+- name: copy_patches_for_dbh | Work on oracle_sw_patches
+  ansible.builtin.include_tasks: loop_opatch_apply.yml
+  vars:
+    __sw_patches_filename_creates: "{{ osp_loop.creates | default((dhc_opatch.patchid | string) + '/README.txt') }}"
+    __patch_unarchive_dir: "{{ oracle_patch_stage }}/{{ db_version }}/{{ __patch_upisubdir }}/"
+    __patch_upisubdir: >-
+      {{ osp_loop.unique_patchid is defined
+          | ternary(osp_loop.unique_patchid,
+                    osp_loop.patchid) }}/
+  with_items:
+    - "{{ oracle_sw_patches | selectattr('patchid', 'equalto', dhc_opatch.patchid) }}"
+  loop_control:
+    loop_var: osp_loop
+    label: >-
+      patchid: {{ osp_loop.patchid }}
+      filename: {{ osp_loop.filename }}
+      unique_patchid: {{ osp_loop.unique_patchid | default('') }}
+  when:
+    - apply_patches_db
+    - dhc_opatch.state == 'present'
+    - osp_loop.unique_patchid | default(0) == dhc_opatch.excludeUPI | default(0)

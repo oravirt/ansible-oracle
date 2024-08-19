@@ -7,6 +7,7 @@ Manage Patch Installation in Database ORACLE_HOMEs.
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [oraswdb_manage_patches_cleanup_staging](#oraswdb_manage_patches_cleanup_staging)
+  - [oraswdb_manage_patches_force_opatch_upgrade](#oraswdb_manage_patches_force_opatch_upgrade)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -32,6 +33,19 @@ Remove following list of directories after DB-Patching when `oracle_sw_copy: tru
 oraswdb_manage_patches_cleanup_staging: true
 ```
 
+### oraswdb_manage_patches_force_opatch_upgrade
+
+Upgrade OPatch without checking for existing version.
+
+Needed for prepatch installations, because Home is not
+registered in central inventory.
+
+#### Default value
+
+```YAML
+oraswdb_manage_patches_force_opatch_upgrade: false
+```
+
 ## Discovered Tags
 
 **_always_**
@@ -39,8 +53,6 @@ oraswdb_manage_patches_cleanup_staging: true
 **_apply_patch_db_**
 
 **_autopatch_**
-
-**_current_opatch_version_**
 
 **_directories_**
 
