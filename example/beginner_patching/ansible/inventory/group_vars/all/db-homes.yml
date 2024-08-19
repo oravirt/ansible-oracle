@@ -10,19 +10,19 @@ db_homes_config:
     state: present
     opatchauto: []
     opatch:
-      - patchid: 35042068
-        # Database Release Update 19.19.0.0.230418
-        patchversion: 19.19.0.0.230418
+      - patchid: 36582781
+        # Database Release Update 19.24.0.0.240716
+        patchversion: 19.24.0.0.240716
         stop_processes: true
         state: present
-      - patchid: 35050341
-        # Oracle JavaVM Component Release Update (OJVM RU) 19.19.0.0.230418
+      - patchid: 36414915
+        # Oracle JavaVM Component Release Update (OJVM RU) 19.24.0.0.240716
         stop_processes: true
         state: present
-      - patchid: 35261302
-        # DATAPUMP BUNDLE PATCH 19.19.0.0.0
-        stop_processes: true
-        state: present
+      # - patchid: 35261302
+      #   # DATAPUMP BUNDLE PATCH 19.19.0.0.0
+      #   stop_processes: true
+      #   state: present
 
   db1918_si_se2: &db1918_si_se2
     version: 19.3.0.0
@@ -63,20 +63,27 @@ db_homes_config:
     readonly_home: true
 
 oracle_sw_patches:
-  - filename: p35042068_190000_Linux-x86-64.zip
-    patchid: 35042068
+  - filename: cvupack_linux_ol7_x86_64.zip
+    patchid: 30839369
+    version: 21.0.0.0
+    description: Latest cluvfy
+  - filename: p36582781_190000_Linux-x86-64.zip
+    patchid: 36582781
     version: 19.3.0.0
-    description: DBRU 19.19
-    creates: 35042068/README.txt
-  - filename: p35050341_190000_Linux-x86-64.zip
-    patchid: 35050341
+    description: Database Release Update 19.24.0.0.240716
+  - filename: p36414915_190000_Linux-x86-64.zip
+    patchid: 36414915
     version: 19.3.0.0
-    description: OJVM 19.19
-    creates: 35050341/README.txt
-  - filename: p35261302_1919000DBRU_Generic.zip
-    patchid: 35261302
-    version: 19.3.0.0
-    description: DATAPUMP BUNDLE PATCH 19.19.0.0.0
-    creates: 35261302/README.txt
+    description: OJVM 19.24
+    # creates: 36414915/README.txt
 
 # oracle_sw_patches: []
+      # - patchid: 36582781
+      #   # Database Release Update 19.24.0.0.240716
+      #   patchversion: 19.24.0.0.240716
+      #   stop_processes: true
+      #   state: present
+      # - patchid: 36414915
+      #   # Oracle JavaVM Component Release Update (OJVM RU) 19.24.0.0.240716
+      #   stop_processes: true
+      #   state: present
