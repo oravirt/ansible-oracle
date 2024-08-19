@@ -15,9 +15,16 @@ size_in_gb_hugepages: 0
 configure_host_disks: true
 
 host_fs_layout:
+  - vgname: rootvg
+    state: present
+    filesystem:
+      - {mntp: /tmp, lvname: tmplv, lvsize: 2G, fstype: ext4}
+    disk:
+      - {device: /dev/sda, pvname: /dev/sda2}
   - vgname: vgora
     state: present
     filesystem:
+      - {mntp: swap, lvname: lvswap, lvsize: 16G, fstype: swap}
       - {mntp: /u01, lvname: lvorabase, lvsize: 25G, fstype: xfs}
       - {mntp: /u02, lvname: lvoradata, lvsize: 25G, fstype: xfs, fsopts: "-m reflink=1 -m crc=1"}
     disk:
