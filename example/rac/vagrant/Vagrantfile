@@ -36,7 +36,8 @@ count_shared_disk     = 2
 ##### END CUSTOMIZATION #####
 #############################
 
-
+# variable used to provide information only once
+give_info ||=true
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
@@ -48,6 +49,25 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.ssh.insert_key = false
   config.vm.box = "Rendanic/oraclelinux-8.x"
 
+  config.vm.provision "shell", inline: <<-SHELL
+  # copy public key to vagrant user
+  ssh_public_key=/vagrant/id_rsa.pub
+  if test -f "$ssh_public_key" ; then
+    echo "Check if public key $ssh_public_key is valid."
+    if ssh-keygen -l -f "$ssh_public_key" ; then
+      echo "Add public key to /home/vagrant/.ssh/authorized_keys"
+      cat "$ssh_public_key" >> /home/vagrant/.ssh/authorized_keys
+    fi
+  fi
+
+  sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+  systemctl restart sshd.service
+
+  yum install -y gcc make perl kernel-uek-devel
+  yum update -y
+  /sbin/rcvboxadd quicksetup all
+SHELL
+
   (1..num_DB_INSTANCES).each do |i|
     # this is to start machines higher to lower
     i = num_DB_INSTANCES+1-i
@@ -57,8 +77,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       config.vm.synced_folder ENV['VAGRANT_ANSIBLE_ORACLE_SW'], "/sw/oracle", disabled: false, mount_options: ["ro"]
 
       puts " "
-      config.vm.hostname = "#{vm_name}-192-168-56-#{i+170}.nip.io"
-      lanip = "192.168.56.#{i+170}"
+      config.vm.hostname = "#{vm_name}-192-168-56-#{i+190}.nip.io"
+      lanip = "192.168.56.#{i+190}"
       puts vm_name + " eth1 lanip  :" + lanip
       privip = "192.168.57.#{i+170}"
       puts vm_name + " eth2 privip :" + privip
