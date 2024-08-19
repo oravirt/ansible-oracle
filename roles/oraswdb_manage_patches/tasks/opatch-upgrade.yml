@@ -1,23 +1,31 @@
 ---
+# We need the following block for prepatch installations of ORACLE_HOMEs
+# because the home is not registered in central Inventtory and the check
+# for getting current version of OPatch will fail.
 - name: db_opatch | Check current opatch version
-  opitzconsulting.ansible_oracle.oracle_opatch:
-    oracle_home: "{{ oracle_home_db }}"
-    state: opatchversion
-  register: current_opatch_version
-  tags: current_opatch_version
-  when: db_homes_config[dbh.home]['opatch_minversion'] is defined
+  when: not oraswdb_manage_patches_force_opatch_upgrade | bool
+  block:
+    - name: db_opatch | Check current opatch version
+      opitzconsulting.ansible_oracle.oracle_opatch:
+        oracle_home: "{{ oracle_home_db }}"
+        state: opatchversion
+      register: current_opatch_version
+      tags: current_opatch_version
+      when: db_homes_config[dbh.home]['opatch_minversion'] is defined
 
-- name: Output
-  ansible.builtin.debug:  # noqa: no-handler
-    var: current_opatch_version.msg
-  tags: current_opatch_version
-  when: current_opatch_version.changed
+    - name: Output
+      ansible.builtin.debug:  # noqa: no-handler
+        var: current_opatch_version.msg
+      tags: current_opatch_version
+      when: current_opatch_version.changed
 
 - name: db_opatch | Upgrade Opatch block
   when:
     - apply_patches_db
     - db_homes_config[dbh.home]['opatch_minversion'] is defined
-    - (current_opatch_version.msg is version_compare(db_homes_config[dbh.home]['opatch_minversion'], '<'))
+    - (current_opatch_version.msg | default('0')) is version_compare(db_homes_config[dbh.home]['opatch_minversion'], '<')
+      or
+      oraswdb_manage_patches_force_opatch_upgrade
   block:
     - name: db_opatch | Copy oracle opatch to server (www)
       ansible.builtin.get_url:
@@ -102,7 +110,9 @@
         - oragridpatchunpack
 
     - name: db_opatch | Check current opatch version 2
-      when: db_homes_config[dbh.home]['opatch_minversion'] is defined
+      when:
+        - db_homes_config[dbh.home]['opatch_minversion'] is defined
+        - not oraswdb_manage_patches_force_opatch_upgrade
       block:
         - name: db_opatch | Check current opatch version 2
           opitzconsulting.ansible_oracle.oracle_opatch:
