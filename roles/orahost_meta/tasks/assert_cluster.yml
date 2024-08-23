@@ -6,7 +6,7 @@
   block:
     - name: assert orasw_meta_cluster_hostgroup (GI enabled)
       when:
-        - oracle_install_option_gi == 'CRS_CONFIG'
+        - oracle_install_option_gi | default('') == 'CRS_CONFIG'
       block:
         - name: assert orasw_meta_cluster_hostgroup
           ansible.builtin.assert:
