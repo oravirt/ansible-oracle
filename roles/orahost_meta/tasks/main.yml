@@ -9,7 +9,7 @@
   ansible.builtin.set_fact:
     _orasw_meta_primary_node: true
   when:
-    - oracle_install_option_gi != 'CRS_CONFIG'
+    - oracle_install_option_gi | default('') != 'CRS_CONFIG'
 
 # RAC:
 #   1st Node:
@@ -20,7 +20,7 @@
   ansible.builtin.set_fact:
     _orasw_meta_primary_node: "{{ groups[orasw_meta_cluster_hostgroup][0] == inventory_hostname }}"
   when:
-    - oracle_install_option_gi == 'CRS_CONFIG'
+    - oracle_install_option_gi | default('') == 'CRS_CONFIG'
 
 ### Determine kernel.panic according to Doc ID 2821641.1
 # kdump state cannot savely be retrieved from service_facts
