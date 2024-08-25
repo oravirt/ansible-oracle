@@ -10,6 +10,11 @@
         name: cronie
       when: ansible_distribution_major_version | int == 9
 
+    - name: Install ssh-client on openSuSE
+      ansible.builtin.package:
+        name: openssh-clients
+      when: ansible_os_family == 'Suse'
+
     - name: "Import common"
       ansible.builtin.import_role:
         name: opitzconsulting.ansible_oracle.common
