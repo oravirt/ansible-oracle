@@ -1,39 +1,128 @@
 ---
-- name: install_home_db | Install Oracle Database Server
-  ansible.builtin.shell: >-
-    {{ oracle_home_db }}/runInstaller
-    -responseFile {{ oracle_rsp_stage }}/{{ _oraswdb_install_db_responsefile }}
-    -ignorePrereq
-    -silent
-    -waitforcompletion
-    {% if db_homes_config[dbh.home]['oracle_home_name'] is defined %}ORACLE_HOME_NAME={{ db_homes_config[dbh.home]['oracle_home_name'] }}{% endif %}
-  # noqa command-instead-of-shell no-changed-when
-  become: true
-  become_user: "{{ oracle_user }}"
+- name: install_home_db | Steps for runInstaller --applyRU
   when:
+    - patch_before_rootsh | bool
+    - apply_patches_db | bool
     - _orasw_meta_primary_node | bool
     - oracle_home_db not in existing_dbhome.stdout_lines
-  tags:
-    - oradbinstall
-  register: oradbinstall
-  failed_when: oradbinstall.rc not in [0, 6]
-  environment: "{{ oracle_script_env }}"
-  vars:
-    orahost_meta_cv_assume_distid: >-
-      {% if ansible_os_family == 'RedHat' -%}
-      {% if ansible_distribution_major_version | int == 8 %}OL7{% endif -%}
-      {% if ansible_distribution_major_version | int == 9 %}OL8{% endif -%}
-      {% elif ansible_os_family in ('SuSe', 'Suse') %}SUSE{{ ansible_distribution_major_version -}}
-      {% endif %}
+  block:
 
-- ansible.builtin.debug:  # noqa name[missing] ignore-errors
-    var: oradbinstall.stdout_lines
+    # runInstaller -applyRU fails when OS has not enough swap
+    - name: install_home_db | Check for swap when prepatching is enabled
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - ansible_memory_mb.swap.total > 16384
+      tags:
+        - assertswap
+
+    # Do not cleanup patches at the end.
+    # => We keep them for later patch installation with oradb-manage-patches.
+    - name: install_home_db | OPatch Upgrade
+      ansible.builtin.include_role:
+        name: oraswdb_manage_patches
+        tasks_from: opatch-upgrade.yml
+      vars:
+        oraswdb_manage_patches_force_opatch_upgrade: true
+        oraswdb_manage_patches_cleanup_staging: false
+
+    # The loop_var dhc_opatch is needed for copy_patches_for_dbh.yml
+    - name: install_home_db | Prepare Patches for DB server
+      ansible.builtin.include_role:
+        name: oraswdb_manage_patches
+        tasks_from: copy_patches_for_dbh.yml
+      with_items:
+        - "{{ db_homes_config[dbh.home]['opatch'] | default({}) }}"
+      loop_control:
+        loop_var: dhc_opatch
+        label: >-
+          patchid {{ dhc_opatch.patchid | default('') }}
+          state {{ dhc_opatch.state | default('') }}
+      vars:
+        oraswdb_manage_patches_force_opatch_upgrade: true
+      when:
+        - dhc_opatch.patchid is defined
+        - dhc_opatch.state | default('') == 'present'
+
+    # The loop_var dhc_opatch is needed for copy_patches_for_dbh.yml
+    - name: install_home_db | Prepare Patches for DB server (opatchauto)
+      ansible.builtin.include_role:
+        name: oraswdb_manage_patches
+        tasks_from: copy_patches_for_dbh.yml
+      with_items:
+        - "{{ db_homes_config[dbh.home]['opatchauto'] | default({}) }}"
+      loop_control:
+        loop_var: dhc_opatch
+        label: >-
+          patchid {{ dhc_opatch.patchid | default('') }}
+          state {{ dhc_opatch.state | default('') }}
+      vars:
+        oraswdb_manage_patches_force_opatch_upgrade: true
+      when:
+        - dhc_opatch.patchid is defined
+        - dhc_opatch.state | default('') == 'present'
+
+    - name: install_home_db | List of Patches to apply during runInstaller
+      ansible.builtin.debug:
+        msg:
+          - >-
+            opatch {{ db_homes_config[dbh.home]['opatch'] | default({})
+            | selectattr('state', 'match', 'present')
+            | map(attribute='patchid') }}
+          - >-
+            opatchauto {{ db_homes_config[dbh.home]['opatchauto'] | default({})
+            | selectattr('state', 'match', 'present')
+            | map(attribute='patchid') }}
+
+- name: install_home_db | Install Oracle Database Server
   when:
     - _orasw_meta_primary_node | bool
     - oracle_home_db not in existing_dbhome.stdout_lines
-    - oradbinstall.changed
-  tags:
-    - oradbinstall
-  ignore_errors: true
+  block:
+    - name: install_home_db | Install Oracle Database Server
+      ansible.builtin.shell: >-
+        {{ oracle_home_db }}/runInstaller
+        -responseFile {{ oracle_rsp_stage }}/{{ _oraswdb_install_db_responsefile }}
+        -ignorePrereq
+        -silent
+        -waitforcompletion
+        {% if (_oraswdb_install_patches_dirlist | length > 1
+        and patch_before_rootsh | bool
+        and apply_patches_db | bool) %}{{ __argvruoneoffs }}{% endif %}
+        {% if (_oraswdb_install_opatchauto_dirlist | length > 1
+        and patch_before_rootsh | bool
+        and apply_patches_db | bool) %}{{ __argvru }}{% endif %}
+        {% if db_homes_config[dbh.home]['oracle_home_name'] is defined %}ORACLE_HOME_NAME={{ db_homes_config[dbh.home]['oracle_home_name'] }}{% endif %}
+      # noqa command-instead-of-shell no-changed-when
+      become: true
+      become_user: "{{ oracle_user }}"
+      tags:
+        - oradbinstall
+      register: oradbinstall
+      failed_when: oradbinstall.rc not in [0, 6]
+      environment: "{{ oracle_script_env }}"
+      vars:
+        orahost_meta_cv_assume_distid: >-
+          {% if ansible_os_family == 'RedHat' -%}
+          {% if ansible_distribution_major_version | int == 8 %}OL7{% endif -%}
+          {% if ansible_distribution_major_version | int == 9 %}OL8{% endif -%}
+          {% elif ansible_os_family in ('SuSe', 'Suse') %}SUSE{{ ansible_distribution_major_version -}}
+          {% endif %}
+        __argvruoneoffs:
+          -applyOneOffs
+          "{{ _oraswdb_install_patches_dirlist }}"
+        __argvru:
+          -applyRU
+          "{{ _oraswdb_install_opatchauto_dirlist }}"
+
+    - ansible.builtin.debug:  # noqa name[missing] ignore-errors
+        var: oradbinstall.stdout_lines
+      when:
+        - _orasw_meta_primary_node | bool
+        - oracle_home_db not in existing_dbhome.stdout_lines
+        - oradbinstall.changed
+      tags:
+        - oradbinstall
+      ignore_errors: true
 
 - ansible.builtin.include_tasks: roohctl.yml  # noqa name[missing]

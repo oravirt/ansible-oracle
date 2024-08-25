@@ -1,7 +1,45 @@
 ---
+__patchru_id: >-
+  {{ db_homes_config[dbh.home]['opatchauto'] | map(attribute='patchid') | first }}
+
+__patchru_dir: >-
+  /u01/stage/patches/19.3.0.0/35940989/35940989
 
 # internal use only
 _oraswdb_install_db_responsefile: "{{ dbh.home }}_{{ ansible_hostname }}.rsp"
+
+# _oraswdb_install_opatchid_list: |-
+#   {{ db_homes_config[dbh.home]['opatch'] | default({})
+#   | selectattr('state', 'match', 'present')
+#   | join(',') }}
+
+# _oraswdb_install_applyruopatchauto: |-
+#   {{ gi_patches[oracle_install_version_gi]['opatchauto']
+#   | selectattr('state', 'equalto', 'present') | list | first }}
+
+_oraswdb_install_opatchauto_dirlist: |-
+  {% for __patch_dict in db_homes_config[dbh.home]['opatchauto'] | default({}) | selectattr('state', 'match', 'present') -%}
+  {{- _oraswdb_install_patch_dir_prefix }}/{{ __patch_dict.path
+  | default((__patch_dict.patchid | string)+ '/' + (__patch_dict.patchid | string)) -}}
+  {%- if not loop.last %},{% endif -%}
+  {%- endfor %}
+
+_oraswdb_install_patches_dirlist: |-
+  {% for __patch_dict in db_homes_config[dbh.home]['opatch'] | default({}) | selectattr('state', 'match', 'present') -%}
+  {{- _oraswdb_install_patch_dir_prefix }}/{{ __patch_dict.path
+  | default((__patch_dict.patchid | string)+ '/' + (__patch_dict.patchid | string)) -}}
+  {%- if not loop.last %},{% endif -%}
+  {%- endfor %}
+
+_oraswdb_install_patch_dir_prefix: |-
+  {{ oracle_sw_copy | bool | ternary(oracle_stage, oracle_stage_remote) }}/patches/{{ db_version }}
+
+_oraswdb_install_patch_unarchive_dir: "{{ oracle_patch_stage }}/{{ db_version }}/{{ _oraswdb_install_patch_upisubdir }}/"
+_oraswdb_install_patch_upisubdir: >-
+  {{ osp_loop.unique_patchid is defined
+  | ternary(osp_loop.unique_patchid,
+  |  osp_loop.patchid) }}/
+
 
 # Mapping for installation media for Oracle
 _oraswdb_install_oracle_sw_image_db:
