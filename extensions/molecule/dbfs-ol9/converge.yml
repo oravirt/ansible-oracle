@@ -1,0 +1,39 @@
+---
+- name: Converge
+  hosts: all
+  gather_facts: true
+  any_errors_fatal: true
+  vars:
+    patch_before_rootsh: true
+    apply_patches_db: true
+
+    db_homes_installed:
+      - home: db19-si-ee
+        state: present
+        apply_patches: true
+  tasks:
+
+    # install missing cron on rhel9 container
+    - name: Install cron on RHEL/OL9
+      ansible.builtin.package:
+        name: cronie
+      when:
+        - ansible_os_family == 'RedHat'
+        - ansible_distribution_major_version | int == 9
+
+- name: Converge os
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.os
+
+- name: Converge swdb
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swdb
+  vars:
+    # install it directly from remote in this test
+    # => Do not copy the installation media into container
+    oracle_sw_copy: true
+    is_sw_source_local: true
+
+- name: Converge sql_zauberkastern
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.sql_zauberkastern
+
+- name: Converge manage_db
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db
