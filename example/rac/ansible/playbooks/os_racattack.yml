@@ -28,7 +28,7 @@
           {% endfor %}
 
     - name: List availible updates
-      ansible.builtin.yum:
+      ansible.builtin.yum:  # noqa fqcn[action-core]
         list: updates
         update_cache: true
         security: true
@@ -40,7 +40,7 @@
         var: yum_update_list_res.results | map(attribute='name') | sort
 
     - name: Update all OS packages to latest
-      ansible.builtin.yum:  # noqa: package-latest
+      ansible.builtin.yum:  # noqa: package-latest fqcn[action-core]
         name: '*'
         state: latest
         lock_timeout: 600
