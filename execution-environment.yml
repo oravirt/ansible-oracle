@@ -3,10 +3,18 @@ version: 3
 
 images:
   base_image:
-    name: ghcr.io/ansible/creator-ee:v24.2.0
-
-options:
-    package_manager_path: /usr/bin/microdnf
+    name: quay.io/centos/centos:stream9
 
 dependencies:
-  python: requirements.txt
+  python_interpreter:
+    package_system: python3.11
+    python_path: /usr/bin/python3.11
+  system:
+    - iputils
+    - openssh-clients
+    - less
+  ansible_core:
+    package_pip: ansible-core<2.17.0
+  ansible_runner:
+    package_pip: ansible-runner==2.4.0
+  python: tools/dev/requirements_dev.txt
