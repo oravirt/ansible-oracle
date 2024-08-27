@@ -11,7 +11,7 @@
         key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_distribution_major_version }}
 
     - name: Add EPEL Repo
-      ansible.builtin.yum:
+      ansible.builtin.yum:  # noqa fqcn[action-core]
         name: "{{ _common_epel_rpm }}"
         state: installed
 
@@ -43,7 +43,7 @@
     - olrepo
 
 - name: Install common packages OL/RHEL
-  ansible.builtin.yum:
+  ansible.builtin.yum:  # noqa fqcn[action-core]
     name: "{{ common_packages }}"
     state: installed
   when:

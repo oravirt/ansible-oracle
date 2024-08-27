@@ -1,7 +1,7 @@
 ---
 # OL8/RHEL8 has all needed RPMs in orahost role!
 - name: Install packages required by Oracle on OL/RHEL version 6,7,8,9
-  ansible.builtin.yum:
+  ansible.builtin.yum:  # noqa fqcn[action-core]
     name: "{{ oracle_packages }}"
     state: installed
     enablerepo: "{{ extrarepos_enabled | default(omit, True) }}"
@@ -13,7 +13,7 @@
   notify: Reboot concerning package updates
 
 - name: Install packages required by Oracle for ASMlib on OL/RHEL
-  ansible.builtin.yum:
+  ansible.builtin.yum:  # noqa fqcn[action-core]
     name: "{{ oracle_asm_packages }}"
     state: installed
     enablerepo: "{{ extrarepos_enabled | default(omit, True) }}"
@@ -30,7 +30,7 @@
     - disable_firewall
   block:
     - name: Check if firewall is installed
-      ansible.builtin.yum:
+      ansible.builtin.yum:  # noqa fqcn[action-core]
         list: "{{ firewall_service }}"
         disablerepo: "*"
       tags: iptables,firewalld
