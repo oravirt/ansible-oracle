@@ -590,6 +590,51 @@ releases:
     - release_410.yml
     - statspack.yml
     release_date: '2023-11-08'
+  4.10.0:
+    changes:
+      bugfixes:
+      - 'orahost_meta: Added default for oracle_install_option_gi to limit dependency
+        to other roles (oravirt#467)'
+      deprecated_features:
+      - End of Life for Oracle Linux 7 and RHEL7 (oravirt#466)
+      minor_changes:
+      - added missing collection dependencies (oravirt#469)
+      - 'ansible-builder: moved to new base image (oravirt#470)'
+      - 'ansible-lint: Update ansible-lint to 24.7.0 (oravirt#471)'
+      - 'ansible-lint: fqcn[action-core] for ansible.builtin.yum due to OL7 compatibility
+        (oravirt#471)'
+      - 'antsibull-changelog: Upgrade version 0.29.0'
+      - 'beginner_patching: updated example to ansible-oracle 4.x (oravirt#469)'
+      - 'molecule: changes to dbfs for new dbfs-ol9 szenario (oravirt#469)'
+      - 'molecule: dbfs-ol9 for RDBMS prepatch testing (oravirt#469)'
+      - 'ocenv: version 2024-08-23 of ocenv environment script (oravirt#468)'
+      - 'oraswdb_install: Added support for prepatching in runInstaller for 19c (oravirt#469)'
+      - 'oraswdb_manage_patches: added parameter oraswdb_manage_patches_force_opatch_upgrade
+        for applyRU in runInstaller (oravirt#469)'
+      - 'tools: changed requirements_dev.txt for venv (oravirt#470)'
+      release_summary: '`ansible-oracle` 4.10.0 supports OL9/RHEL9 without the need
+        to install the software
+
+        from a golden image. The exmples for beginner_patching and RAC have been fixed
+        to
+
+        use the new pre-patching support in `oraswdb_install`.'
+    fragments:
+    - ansible-lint.yml
+    - ansible-lint2.yml
+    - antsibull.yml
+    - beginner_patching.yml
+    - builder.yml
+    - collection_dependencies.yml
+    - molecule_dbfs.yml
+    - molecule_dbfs_ol9.yml
+    - ocenv.yml
+    - orahost_meta_gi.yml
+    - oraswdb_manage_patches.yml
+    - prepatching_19c.yml
+    - release.yml
+    - rhel_ol7.yaml
+    release_date: '2024-09-01'
   4.2.0:
     changes:
       breaking_changes:

@@ -1,9 +1,44 @@
-============================================
-opitzconsulting.ansible_oracle Release Notes
-============================================
+=============================================
+opitzconsulting.ansible\_oracle Release Notes
+=============================================
 
 .. contents:: Topics
 
+v4.10.0
+=======
+
+Release Summary
+---------------
+
+`ansible-oracle` 4.10.0 supports OL9/RHEL9 without the need to install the software
+from a golden image. The exmples for beginner_patching and RAC have been fixed to
+use the new pre-patching support in `oraswdb_install`.
+
+Minor Changes
+-------------
+
+- added missing collection dependencies (oravirt#469)
+- ansible-builder: moved to new base image (oravirt#470)
+- ansible-lint: Update ansible-lint to 24.7.0 (oravirt#471)
+- ansible-lint: fqcn[action-core] for ansible.builtin.yum due to OL7 compatibility (oravirt#471)
+- antsibull-changelog: Upgrade version 0.29.0 (oravirt#472)
+- beginner_patching: updated example to ansible-oracle 4.x (oravirt#469)
+- molecule: changes to dbfs for new dbfs-ol9 szenario (oravirt#469)
+- molecule: dbfs-ol9 for RDBMS prepatch testing (oravirt#469)
+- ocenv: version 2024-08-23 of ocenv environment script (oravirt#468)
+- oraswdb_install: Added support for prepatching in runInstaller for 19c (oravirt#469)
+- oraswdb_manage_patches: added parameter oraswdb_manage_patches_force_opatch_upgrade for applyRU in runInstaller (oravirt#469)
+- tools: changed requirements_dev.txt for venv (oravirt#470)
+
+Deprecated Features
+-------------------
+
+- End of Life for Oracle Linux 7 and RHEL7 (oravirt#466)
+
+Bugfixes
+--------
+
+- orahost_meta: Added default for oracle_install_option_gi to limit dependency to other roles (oravirt#467)
 
 v4.9.0
 ======
@@ -325,7 +360,6 @@ Please make sure, that furture Pull-Requests have updated README.md included, wh
 A new github Action will check for it.
 Some variable defaults have been changed.
 
-
 Minor Changes
 -------------
 
@@ -510,7 +544,6 @@ Release Summary
 This is ansible-oracle 3.8.0.
 The target database server must have Python3 installaed which is automatically done with role `orahost`.
 It is mandatory for the module `oracle_db` which is used in `oradb_manage_db`.
-
 
 Minor Changes
 -------------
@@ -731,7 +764,6 @@ Release Summary
 
 ansible-oracle has been converted into a collection.
 This release starts using antsibull-changelog for managing the CHANGELOG.rst.
-
 
 Major Changes
 -------------
