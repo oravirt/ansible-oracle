@@ -1,0 +1,23 @@
+---
+# CHeck if target is 19c or newer
+# => ORACLE_PDB_SID is supported in 18c or newer
+
+# Check if apex_state is present
+# => more is not supported at the moment
+
+# apex_version is mandatory when apex_state=present
+- name: assert | Check for apex_state not in oracle_databases
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - odb.apex_state is not defined
+    fail_msg: >-
+      APEX is not supported in nonCDB or CDB at the moment.
+  with_items:
+    - "{{ oracle_databases | default([]) }}"
+  loop_control:
+    loop_var: odb
+    label: >-
+      db_name: {{ odb.oracle_db_name | default('') }}
+  when:
+    - oracle_databases is defined
