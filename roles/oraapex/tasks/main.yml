@@ -1,0 +1,32 @@
+---
+- name: assert
+  ansible.builtin.include_tasks: assert.yml
+
+# selectattr on apex_state is more selective then on state
+- name: APEX installation - loop over oracle_databases
+  ansible.builtin.include_tasks: loop_databases.yml
+  with_items:
+    - "{{ oracle_databases | default([]) | selectattr('apex_state', 'defined') | selectattr('apex_state', 'match', 'present') }}"
+  loop_control:
+    loop_var: apex_loop
+    label: >-
+      db_name: {{ apex_loop.oracle_db_name | default('') }}
+      apex_version: {{ apex_loop.apex_version | default('') }}
+  when:
+    - apex_loop.state | default('') == 'present'
+    - apex_loop.apex_version is defined
+
+# selectattr on apex_state is more selective then on state
+- name: APEX installation - loop over oracle_pdbs
+  ansible.builtin.include_tasks: loop_databases.yml
+  with_items:
+    - "{{ oracle_pdbs | default([]) | selectattr('apex_state', 'defined') | selectattr('apex_state', 'match', 'present') }}"
+  loop_control:
+    loop_var: apex_loop
+    label: >-
+      cdb: {{ apex_loop.cdb | default('') }}
+      pdb_name: {{ apex_loop.pdb_name | default('') }}
+      apex_version: {{ apex_loop.apex_version | default('') }}
+  when:
+    - apex_loop.state | default('') == 'present'
+    - apex_loop.apex_version is defined

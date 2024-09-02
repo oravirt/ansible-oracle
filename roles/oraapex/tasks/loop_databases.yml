@@ -1,0 +1,159 @@
+---
+- name: loop_databases | Assert
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - apex_loop.apex_version is defined
+      - apex_loop.apex_state is defined
+
+- name: loop_databases | work as oracle
+  become: true
+  become_user: "{{ oracle_user }}"
+  vars:
+    _oraapex_dbpassword:
+      apex_public_user: |-
+        {{ dbpasswords[apex_loop.cdb][apex_loop.pdb_name]['apex_public_user']
+        | default(dbpasswords[apex_loop.cdb][apex_loop.pdb_name]['APEX_PUBLIC_USER']) }}
+      apex_rest_public_user: |-
+        {{ dbpasswords[apex_loop.cdb][apex_loop.pdb_name]['apex_rest_public_user']
+        | default(dbpasswords[apex_loop.cdb][apex_loop.pdb_name]['APEX_REST_PUBLIC_USER']) }}
+
+  block:
+
+    - name: loop_databases | Assert passwords for apxsilentins.sql
+      ansible.builtin.assert:
+        quiet: true
+        fail_msg: >-
+          One or more passwords are missing in dbpasswords. Please define them.
+        that:
+          - _oraapex_dbpassword['apex_public_user'] | length > 0
+          - _oraapex_dbpassword['apex_rest_public_user'] | length > 0
+
+    - name: "loop_databases | Create target directory {{ _oraapex_homedir }}"
+      ansible.builtin.file:
+        path: "{{ _oraapex_homedir }}"
+        state: directory
+        mode: "0755"
+
+    - name: loop_databases | unarchive apex.zip
+      ansible.builtin.unarchive:
+        src: "{{ oracle_sw_source_local }}/{{ _oraapex_archive }}"
+        dest: "{{ _oraapex_homedir }}"
+        copy: true
+        creates: "{{ _oraapex_homedir }}/META-INF"
+
+    - name: loop_databases | install APEX in PDB
+      when:
+        - _orasw_meta_primary_node | bool
+      vars:
+        _apex_version_string: |-
+          {{ apex_loop.apex_version | string }}
+        _apex_db_user: |-
+          APEX_{{ _apex_version_string.split('.')[0] }}0{{ _apex_version_string.split('.')[1] }}
+        _apex_db_user_long: "{{ _apex_db_user }}00"
+        _oraapex_admin_password: "{{ oraapex_default_admin_password }}"
+
+      block:
+
+        - name: loop_databases | install APEX in PDB
+          opitzconsulting.ansible_oracle.oracle_sqldba:
+            sqlscript: >-
+              apxsilentins.sql
+              {{ apex_loop.oraapex_tablespace | default(oraapex_default_tablespace) }}
+              {{ apex_loop.oraapex_files_tablespace | default(oraapex_default_files_tablespace) }}
+              {{ apex_loop.oraapex_temp_tablespace | default(oraapex_default_temp_tablespace) }}
+              {{ apex_loop.oraapex_image_path | default(oraapex_image_path) }}
+              {{ _oraapex_dbpassword['apex_public_user'] }}
+              {{ lookup('ansible.builtin.password', '/tmp/passwordfile', chars=['ascii_letters', 'digits']) }}
+              {{ _oraapex_dbpassword['apex_rest_public_user'] }}
+              {{ _oraapex_admin_password }}
+            scope: pdbs
+            pdb_list: "{{ apex_loop.pdb_name }}"
+            creates_sql: >-
+              select username
+                from DBA_USERS
+               where username like '{{ _apex_db_user }}%'
+            oracle_home: "{{ _oracle_home_db_pdb }}"
+            oracle_db_name: "{{ _oracle_db_instance_name }}"
+            chdir: "{{ _oraapex_homedir }}/apex"
+          when:
+            - apex_loop.pdb_name is defined
+          vars:
+            opdb: "{{ apex_loop }}"  # odb is needed for _oracle_* variables
+
+        # apex_create_admin_user is not working with old APEX verions. :-(
+        - name: loop_databases | copy sql helper for APEX configuration
+          ansible.builtin.copy:
+            src: "{{ item }}"
+            dest: "{{ oracle_stage }}"
+            mode: "0644"
+          loop:
+            # - apex_create_admin_user.sql
+            - apex_set_image_loc_cdn.sql
+
+        # apex_create_admin_user is not working with old APEX verions. :-(
+        # We use apxsilentins.sql to configure the admin user instead.
+        # - name: loop_databases | create admin user in APEX
+        #   block:
+        #     # assert password before execution tas.
+        #     # => no_log prevents detailed output dring admin user configuration
+        #     - name: loop_databases | Assert admin password
+        #       ansible.builtin.assert:
+        #         quiet: true
+        #         that: _oraapex_admin_password is defined
+        #         fail_msg: >-
+        #           Missing variable oraapex_default_admin_password in inventory.
+
+        #     - name: loop_databases | create admin user in APEX
+        #       opitzconsulting.ansible_oracle.oracle_sqldba:
+        #         sqlscript: >-
+        #           {{ oracle_stage }}/apex_create_admin_user.sql
+        #           {{ _apex_db_user_long }}
+        #           {{ apex_loop.apex_admin_user }}
+        #           {{ _oraapex_admin_password }}
+        #           {{ apex_loop.apex_admin_user_email }}
+        #         scope: pdbs
+        #         pdb_list: "{{ apex_loop.pdb_name }}"
+        #         creates_sql: >-
+        #           select user_name
+        #             from {{ _apex_db_user_long }}.wwv_flow_fnd_user
+        #           where security_group_id = 10
+        #             and upper(user_name) = upper('{{ apex_loop.apex_admin_user }}')
+        #         oracle_home: "{{ _oracle_home_db_pdb }}"
+        #         oracle_db_name: "{{ _oracle_db_instance_name }}"
+        #         chdir: "{{ oracle_stage }}"
+        #       # no_log: true
+        #       when:
+        #         - apex_loop.pdb_name is defined
+        #       vars:
+        #         opdb: "{{ apex_loop }}"  # odb is needed for _oracle_* variables
+
+        # The task will execute each time a patch has been installed.
+        # => It's not a problem to configure the CDN each time the role is executed.
+        - name: loop_databases | Configure CDN (APEX Image URL pointing to OCI)
+          opitzconsulting.ansible_oracle.oracle_sqldba:
+            sqlscript: >-
+              @{{ oracle_stage }}/apex_set_image_loc_cdn.sql
+            scope: pdbs
+            pdb_list: "{{ apex_loop.pdb_name }}"
+            creates_sql: >-
+              SELECT 1
+                FROM apex_release ar
+               WHERE apex_instance_admin.get_parameter('IMAGE_PREFIX') like '%/' || ar.version_no || '/'
+            oracle_home: "{{ _oracle_home_db_pdb }}"
+            oracle_db_name: "{{ _oracle_db_instance_name }}"
+            chdir: "{{ oracle_stage }}"
+          when:
+            - apex_loop.pdb_name is defined
+            - apex_loop.apex_use_cdn | default(true) | bool
+          vars:
+            opdb: "{{ apex_loop }}"  # odb is needed for _oracle_* variables
+
+        # It's important to include these after the installation
+        # => We need the view apex_patches inside the database!
+        - name: loop_databases | include loop_databases_patching.yml
+          ansible.builtin.include_tasks: loop_databases_patching.yml
+          when:
+            - apex_loop.apex_patchid is defined
+          vars:
+            opdb: "{{ apex_loop }}"  # odb is needed for _oracle_* variables

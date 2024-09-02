@@ -1,0 +1,118 @@
+---
+# How it works:
+# Read Patch version from Database
+# Read Patch Version from Patch archive by unarchive README.txt
+# Check statefile for installed patch
+# no Patch version from Database or no statefile
+# => no patches in database
+# => install patch in software an database
+#
+# Found Pa<tch in Database and Software
+# same patch => nothing to do
+# different versions => install patch
+
+- name: loop_databases_patching | working on APEX Patch
+  when:
+    - apex_loop.apex_patchid is defined
+  vars:
+    _oraapex_unarchive_patch_dir: >-
+      {{ oracle_stage }}/apex_patches
+    _oraapex_statefile_version: >-
+      {{ _oraapex_patchuid_res.stdout | default('') }}
+    _oraapex_sql_patch_version: >-
+      {{ _oraapex_patches_db_res['state']['ROW'][0]['IMAGES_VERSION'] | default('') }}
+
+  environment:
+    APEX_VERSION: "{{ apex_loop.apex_version }}"
+    APEX_HOME: "{{ _oraapex_homedir }}"
+    APEX_PATCHID: "{{ apex_loop.apex_patchid }}"
+  block:
+
+    - name: Get current APEX patch state from database
+      opitzconsulting.ansible_oracle.oracle_sqldba:
+        sqlselect: >-
+          select *
+            from apex_patches
+            order by installed_on desc
+            offset 0 rows fetch next 1 rows only
+        scope: pdbs
+        pdb_list: "{{ apex_loop.pdb_name }}"
+        oracle_home: "{{ _oracle_home_db_pdb }}"
+        oracle_db_name: "{{ _oracle_db_instance_name }}"
+      register: _oraapex_patches_db_res
+
+    # Important: APEX Patches are incremental
+    # => We need to unarchive README.txt to read the version inside the archive...
+    - name: loop_databases_patching | unarchive README.txt from APEX Patch
+      ansible.builtin.unarchive:
+        src: "{{ oracle_sw_source_local }}/{{ _oraapex_patch_archive }}"
+        dest: "{{ _oraapex_homedir }}"
+        copy: true
+        include: >-
+          {{ apex_loop.apex_patchid }}/README.txt
+
+    - name: loop_databases_patching | Read patch version from README.txt
+      ansible.builtin.shell:  # noqa: no-changed-when
+        cmd: |-
+          #!/usr/bin/env bash
+          set -eu
+          set -o pipefail
+
+          head -1 "${APEX_HOME}/{{ apex_loop.apex_patchid }}/README.txt" | tr -d '[:space:]' | cut -d":" -f2
+      register: _oraapex_patchuid_res
+
+    - name: loop_databases_patching | statefile for existing patch
+      ansible.builtin.stat:
+        path: "{{ _oraapex_patch_statefile }}"
+      register: _oraapex_patch_statefile_res
+
+    - name: loop_databases_patching | statefile debug data
+      ansible.builtin.debug:
+        msg:
+          - "statefile:         {{ _oraapex_patch_statefile }}"
+          - "statefile_exists:  {{ _oraapex_patch_statefile_res.stat.exists }}"
+          - "Software Patch: {{ _oraapex_statefile_version }}"
+          - "Database Patch: {{ _oraapex_sql_patch_version }}"
+
+    # - no statefile => 1st installation
+    # - _oraapex_sql_patch_version | length == 0 => no patches installed
+    - name: loop_databases_patching | copy APEX Patch into APEX installation
+      when:
+        - (not _oraapex_patch_statefile_res.stat.exists | bool)
+          or _oraapex_sql_patch_version | length == 0
+          or (_oraapex_sql_patch_version | length > 0
+              and _oraapex_statefile_version | length > 0
+              and _oraapex_sql_patch_version != _oraapex_statefile_version
+             )
+      block:
+
+        - name: loop_databases_patching | unarchive APEX Patch
+          ansible.builtin.unarchive:
+            src: "{{ oracle_sw_source_local }}/{{ _oraapex_patch_archive }}"
+            dest: "{{ _oraapex_homedir }}"
+            copy: true
+            creates: "{{ _oraapex_homedir }}/{{ apex_loop.apex_patchid }}/catpatch.sql"
+
+        - name: loop_databases_patching | copy APEX Patch into APEX installation
+          ansible.builtin.script: apex_copy_patch.sh
+          register: _oraapex_copy_patch_res
+
+        - name: loop_databases_patching | output copy APEX Patch into APEX installation
+          ansible.builtin.debug:
+            var: _oraapex_copy_patch_res.stdout_lines
+
+        - name: loop_databases_patching | APEX install patch with catpatch.sql
+          opitzconsulting.ansible_oracle.oracle_sqldba:
+            sqlscript: >-
+              @catpatch.sql
+            nls_lang: American_America.AL32UTF8
+            scope: pdbs
+            pdb_list: "{{ apex_loop.pdb_name }}"
+            oracle_home: "{{ _oracle_home_db_pdb }}"
+            oracle_db_name: "{{ _oracle_db_instance_name }}"
+            chdir: "{{ _oraapex_homedir }}/apex"
+          register: _oraapex_catpatch_res
+
+        - name: loop_databases_patching | catpatch output
+          ansible.builtin.debug:
+            var: _oraapex_catpatch_res.msg
