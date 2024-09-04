@@ -1,0 +1,61 @@
+---
+# selectattr on apex_state is more selective then on state
+- name: apex | get version from oracle_databases
+  ansible.builtin.set_fact:
+    _orasw_download_patches_apex_versions: |-
+      {{ _download_apex_versions | default({})
+      | combine(__apex_version_dict)}}
+  with_items:
+    - "{{ oracle_databases | default([]) | selectattr('apex_state', 'match', 'present') }}"
+  loop_control:
+    loop_var: apex_loop
+    label: >-
+      db_name: {{ apex_loop.oracle_db_name | default('') }}
+      apex_version: {{ apex_loop.apex_version | default('') }}
+  vars:
+    __apex_version_item:
+      - key: "{{ apex_loop.apex_version }}"
+        value: present
+    __apex_version_dict: "{{ __apex_version_item | items2dict }}"
+  when:
+    - apex_loop.state | default('') == 'present'
+    - apex_loop.apex_version is defined
+
+# selectattr on apex_state is more selective then on state
+- name: apex | get version from oracle_pdbs
+  ansible.builtin.set_fact:
+    _orasw_download_patches_apex_versions: |-
+      {{ _download_apex_versions | default({})
+      | combine(__apex_version_dict)}}
+  with_items:
+    - "{{ oracle_pdbs | default([]) }}"
+  loop_control:
+    loop_var: apex_loop
+    label: >-
+      db_name: {{ apex_loop.cdb | default('') }}
+      pdb_name: {{ apex_loop.pdb_name | default('') }}
+      state: {{ apex_loop.state | default('') }}
+      apex_version: {{ apex_loop.apex_version | default('') }}
+  vars:
+    __apex_version_item:
+      - key: "{{ apex_loop.apex_version }}"
+        value: present
+    __apex_version_dict: "{{ __apex_version_item | items2dict }}"
+  when:
+    - apex_loop.state | default('') == 'present'
+    - apex_loop.apex_version is defined
+
+- name: apex | Download APEX from Oracle
+  ansible.builtin.get_url:
+    url: "{{ _oraapex_url_prefix }}/{{ _oraapex_archive }}"
+    dest: "{{ oracle_sw_source_local }}/{{ _oraapex_archive }}"
+    mode: '0644'
+  with_dict: "{{ _orasw_download_patches_apex_versions }}"
+  loop_control:
+    label: >-
+      version: {{ item.key }}
+  when:
+    - _orasw_download_patches_apex_versions is defined
+  vars:
+    _oraapex_archive: "apex_{{ item.key }}.zip"
+    _oraapex_url_prefix: https://download.oracle.com/otn_software/apex
