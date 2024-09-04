@@ -30,7 +30,16 @@
       ansible.builtin.file:
         path: "{{ oracle_patch_download_dir }}"
         state: directory
-        mode: 0755
+        mode: "0755"
+
+    # APEX download is possible without login at Oracle!
+    - name: Download APEX images
+      ansible.builtin.include_tasks: apex.yml
+      when:
+        - (oracle_databases | selectattr('apex_state', 'defined') | list | length > 0
+          or
+           oracle_pdbs | selectattr('apex_state', 'defined') | list | length > 0
+          )
 
     - name: Login to Oracle
       ansible.builtin.uri:
@@ -57,6 +66,7 @@
       when:
         - opatch.filename | length > 0
         - "opatch.filename not in (opatchinfo | map(attribute='filename'))"  # do not create duplicates
+        - opatch.opatch_install | default(true) | bool
       loop_control:
         label: "{{ item.home }}: {{ opatch.filename | d('cannot find oracle_opatch_patch entry for ' + db_version, true) }}"
 
@@ -152,7 +162,7 @@
         use_proxy: "{{ use_proxy }}"
         # owner: "{{ oracle_user }}"   # not always ansible contorller knows this user
         # group: "{{ oracle_group }}"  # not always ansible contorller knows this group
-        mode: 0644
+        mode: "0644"
       environment: "{{ proxy_env }}"
       register: download_patches
       with_items:
