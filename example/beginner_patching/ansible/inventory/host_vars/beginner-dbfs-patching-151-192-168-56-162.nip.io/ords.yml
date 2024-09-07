@@ -1,0 +1,20 @@
+---
+# Images are pulled from CDN at Oracle.
+# oraords_apex_image_path: /u01/app/oracle/product/apex_24.1/apex/images/
+# oraords_apex_image_context: /i
+
+oraords_db_pools:
+  - db_pool: default
+    pdb_name: PDB1
+    admin_user: sys
+    service: pdb1
+    port: 1521
+    host: "{{ inventory_hostname }}"
+    feature_db_api: true
+    feature_rest_enabled_sql: true
+    feature_sdw: true
+
+oraords_db_pools_password:
+  default:
+    admin_password: "{{ dbpasswords['DB1']['sys'] }}"
+    ords_password: "{{ dbpasswords['DB1']['PDB1']['ords_public_user'] }}"

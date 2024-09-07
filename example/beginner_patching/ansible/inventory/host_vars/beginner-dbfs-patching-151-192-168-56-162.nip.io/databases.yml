@@ -72,7 +72,7 @@ oracle_databases:
       - {name: log_buffer, value: '64M', scope: spfile, state: present}
       # - {name: pga_aggregate_target, value: '1024M', scope: both, state: present, dbca: false}
       - {name: pga_aggregate_target, value: '1G', scope: both, state: present}
-      - {name: sga_target, value: '3096M', scope: spfile, state: present}
+      - {name: sga_target, value: '2048M', scope: spfile, state: present}
       - {name: recyclebin, value: 'off', scope: spfile, state: present}
       - {name: streams_pool_size, value: '152M', scope: spfile, state: present}
       # "_cursor_obsolete_threshold" for 12.2+
@@ -109,7 +109,10 @@ oracle_pdbs:
     pdb_name: PDB1
     state: present
     apex_state: present
-    apex_version: 23.2
+    apex_version: 24.1
+    apex_patchid: 36695709
+    # apex_version: 23.2
+    # apex_patchid: 35895964
     profiles: "{{ oracle_default_profiles }}"
     statspack:
       purgedays: 14
