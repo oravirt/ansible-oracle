@@ -1,0 +1,72 @@
+---
+oraords_db_pools:
+  - db_pool: default
+    pdb_name: ORCLPDB1
+    admin_user: sys
+    service: ORCLPDB1
+    port: 1521
+    host: dbfs-ol9
+    feature_db_api: true
+    feature_rest_enabled_sql: true
+    feature_sdw: true
+
+oraords_db_pools_password:
+  default:
+    admin_password: Oracle_123
+    ords_password: Oracle_456
+
+oracle_databases:
+  - home: db19-si-ee
+    oradb_facts_ignore_unreachable: true
+    oracle_db_name: &oracle_db_name2 DB2
+    oracle_db_type: SI
+    is_container: true
+    storage_type: FS
+    oracle_database_type: MULTIPURPOSE
+    redolog_size: 50M
+    redolog_groups: 3
+    datafile_dest: /u01/app/oracle/oradata
+    recoveryfile_dest: /u01/app/oracle//fra
+    listener_name: LISTENER
+    listener_port: 1521
+    archivelog: false
+    flashback: false
+    force_logging: false
+    state: present
+    tablespaces:
+      - name: TEST
+        size: 10M
+        autoextend: true
+        next: 50M
+        maxsize: 4G
+        content: permanent
+        state: present
+    init_parameters:
+      - {name: db_create_file_dest, value: '/u01/app/oracle/oradata', scope: both, state: present}
+      - {name: db_create_online_log_dest_1, value: '/u01/app/oracle/oradata', scope: both, state: present}
+      - {name: recyclebin, value: 'off', scope: spfile, state: present}
+      - {name: pga_aggregate_target, value: '128M', scope: both, state: present}
+      - {name: sga_target, value: '1808M', scope: spfile, state: present}
+
+oracle_pdbs:
+  - cdb: DB2
+    home: db19-si-ee
+    pdb_name: ORCLPDB1
+    listener_port: 1521
+    state: present
+    datafile_dest: /u01/app/oracle/oradata
+    apex_state: present
+    apex_version: 24.1
+    apex_patch: 36695709
+  - cdb: DB2
+    home: db19-si-ee
+    pdb_name: ORCLPDB2
+    listener_port: 1521
+    state: present
+    datafile_dest: /u01/app/oracle/oradata
+  - cdb: DB2
+    home: db19-si-ee
+    pdb_name: ORCLPDB3
+    listener_port: 1521
+    state: present
+    datafile_dest: /u01/app/oracle/oradata
