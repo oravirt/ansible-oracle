@@ -1,0 +1,205 @@
+:toc:
+:toc-placement!:
+:toclevels: 4
+toc::[]
+
+:sectnums:
+:sectnumlevels: 4
+
+== Setup APEX and ORDS
+
+IMPORTANT: The installation of APEX and ORDS with `ansible-oracle` is currently _experimental_.
+
+=== Requirements
+
+==== APEX
+
+- RDBMS 19c or newer
+- APEX 20.x or newer is mandatory for RDBMS 19c
+- Tested with APEX 23.2, 24.1 - may work with older versions as well
+- Installation is tested with PDB only.
+- CDB and nonCDB is not supported at the moment.
+- Download ZIP from Oracle with Playbook `patch_download.yml` supported for Version 22.1 or newer
+- APEX only with ORDS - no old APEX Listener
+
+Important Notes:
+
+- Primary Note for Oracle APEX Upgrades (Doc ID 1088970.1)
+
+Known Issues:
+
+- ADMIN password of INTERNAL Workspace is wrong after APEX upgrade
+  Silent script to reset ADMIN password depends on APEX Relöease. +
+  There was no reliable solution found for the moment...
+
+==== ORDS
+
+- OracleLinux 8 or 9 only
+- Installation with ords.rpm from `public-yum.oracle.com`
+- Limited database configuration - see documentation
+
+=== APEX Configuration
+
+IMPORTANT: Install APEX before ORDS - otherwise, the ORDS will not detect and configure APEX. +
+ORDS is only tested with existing APEX installation.
+
+==== Mandatory variables
+
+The following global variables are needed for an APEX installation.
+
+.Mandatory variables
+[options="header,footer"]
+|=======================
+|Value |Description
+|`oraapex_default_admin_password` | The parameter is mandatory, because it is the only way to configure a password for the admin user at the moment.
+|=======================
+
+.Optional variables
+[options="header,footer"]
+|=======================
+|Value |Description
+|`oraapex_base`
+| Default: `{{ oracle_base }}/product` +
+The unzip is done into `{{ oraapex_base }}/apex_<APEX Version>`
+|`oraapex_default_tablespace`
+| Default: `SYSAUX` +
+Could be set in each PDB.
+|`oraapex_default_files_tablespace`
+| Default: `SYSAUX` +
+Could be set in each PDB.
+|`oraapex_default_temp_tablespace`
+| Default: `TEMP` +
+Could be set in each PDB.
+|=======================
+
+==== APEX in PDB
+
+APEX can be installed in each PDB.
+
+.mandatory Variables in `oracle_pdbs`
+[options="header,footer"]
+|=======================
+|Value |Description
+| `apex_state`
+| State for APEX installation. +
+Only `present` supported at the moment.
+| `apex_version`
+| Version of APEX. +
+Is used to download the Archive from Oracle.
+|=======================
+
+.optional Variables in `oracle_pdbs`
+[options="header,footer"]
+|=======================
+|Value |Description
+| `oraapex_tablespace`
+| Custom APEX Tablespace.
+| `oraapex_files_tablespace`
+| Custom APEX Tablespace for files.
+| `oraapex_temp_tablespace`
+| Custom APEX temporary Tablespace.
+| `apex_patchid`
+| Patchid for _PSE BUNDLE FOR APEX_
+|=======================
+
+IMPORTANT: The example shows the minimum attributes for an APEX installation. +
+That's not the minimum needed to create a PDB.
+
+.Example `oracle_pdbs`
+----
+oracle_pdbs:
+  - cdb: CDB1
+    pdb_name: PDB1
+    state: present
+    apex_state: present
+    apex_version: 24.1
+    apex_patchid: 36695709
+----
+
+IMPORTANT: `oraapex` does not use the default passwords from `ansible-oracle`. +
+You have to define them in `dbpasswords`.
+
+The user `APEX_PUBLIC_ROUTER` is new in APEX 24.1. +
+`oraapex` checks for an existing password regardless of the version of APEX.
+
+.Example `dbpasswords` for APEX in a PDB with mandatory values for `oraapex`
+----
+dbpasswords:
+  CDB1:
+    PDB1:
+      apex_public_router: ords123
+      apex_public_user: ords123
+      apex_rest_public_user: ords123
+      ords_public_user: ords123
+----
+
+IMPORTANT: Do not forget to download the APEX Patch when `apex_patchid` is set in `oracle_pdbs`. +
+`opatch_install` is very important, because these Patches are not applied with OPatch.
+
+.Example `oracle_sw_patches`
+----
+oracle_sw_patches:
+  - filename: p36695709_2410_Generic.zip
+    patchid: 36695709
+    version: 24.1
+    description: PSE BUNDLE FOR APEX 24.1
+    opatch_needed: false
+----
+
+==== Playbook execution
+
+The installation of APEX is part of `playbooks/manage_db.yml`. +
+This allows the creation of custom Tablespaces, Profiles etc. for APEX, without the need to use a dedicated Playbook.
+
+
+=== ORDS Configuration
+
+IMPORTANT: The configuration of ORDS is limited to the following variables at the moment.
+
+.Mandatory variables in `oraords_db_pools`
+[options="header,footer"]
+|=======================
+|Value |Description
+| db_pool | Database Pool
+| pdb_name | PDB-Name of Target
+| service | Database Service Name
+| port | Listener Port
+| host | Database Hostname
+|=======================
+
+.Optional variables in `oraords_db_pools`
+[options="header,footer"]
+|=======================
+|Value |Description
+| feature_db_api | true / false (Default)
+| feature_rest_enabled_sql | true / false (Default)
+| feature_sdw | true / false (Default)
+|=======================
+
+----
+oraords_db_pools:
+  - db_pool: default
+    pdb_name: PDB1
+    admin_user: sys
+    service: pdb1
+    port: 1521
+    host: "{{ inventory_hostname }}"
+    feature_db_api: true
+    feature_rest_enabled_sql: true
+    feature_sdw: true
+----
+
+The passwords for Admin- and ORDS-User are defined in `oraords_db_pools_password`. +
+They are set in a dedicated variable to prevent `no_log=true` in loops over `oraords_db_pools`. +
+Referencing `dbpasswords` helps to reduce redundancy for passwords.
+
+----
+oraords_db_pools_password:
+  default:
+    admin_password: "{{ dbpasswords['DB1']['sys'] }}"
+    ords_password: "{{ dbpasswords['DB1']['PDB1']['ords_public_user'] }}"
+----
+
+==== Playbook execution
+
+The Playbook `playbooks/manage_ords.yml` is used to install ORDS.

@@ -21,9 +21,9 @@
 
 ### Next Steps
 
-1. Read the full documentation <https://github.com/oravirt/ansible-oracle/tree/master/doc>
-1. How to develop in ansible-oracle <https://github.com/oravirt/ansible-oracle/blob/master/doc/development.adoc>
-1. List of roles in ansible-oracle <https://github.com/oravirt/ansible-oracle/blob/master/doc/roles.adoc>
+1. [APEX and ORDS in `ansible-oracle`](doc/guides/apex_ords.adoc)
+2. [How to develop in ansible-oracle](doc/development.adoc)
+3. [List of roles in ansible-oracle](doc/roles.adoc)
 
 
 ## Pre-requisites
