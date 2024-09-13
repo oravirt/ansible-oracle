@@ -99,8 +99,7 @@ gi_ignoreprereq: false
 
 ### oracle_asm_init_dg
 
-Do not use - is replaced in the future!
-Reason why RAC support has been disabled...
+1st Diskgroup where ASM SPFile is placed.
 
 #### Default value
 
@@ -190,8 +189,11 @@ oracle_gi_nic_pub: eth0
 
 ### oracle_ic_net
 
-Do not use - is replaced in the future!
-Reason why RAC support has been disabled...
+Defines the network for the interconnect.
+
+Important!
+
+Only used, when `configure_interconnect=true` and `ansible_os_family='RedHat'` during cluster installations.
 
 #### Default value
 
@@ -231,7 +233,13 @@ oracle_sw_image_gi:
 
 suffix added to hostnames for VIPs.
 
-hostnamea{{ oracle_vip }}
+{{ ansible_hostname }}{{ oracle_vip }}
+
+Important!
+
+`oracle_node_vip` defines a fixed hostname for the VIP.
+
+That replaces the logic from `oracle_vip` for the VIP!
 
 #### Default value
 
@@ -293,8 +301,6 @@ run_configtoolallcommand: true
 
 ## Open Tasks
 
-- (bug): oracle_vip is not flexible enough.
-- (bug): oracle_ic_net will be removed in the future
 - (bug): ConfigTools should not depend on olr.loc...
 - (bug): ConfigTools should not depend on olr.loc...
 - (information): add selectattr to asm_diskgroups

@@ -1,0 +1,63 @@
+:toc:
+:toc-placement!:
+:toclevels: 4
+toc::[]
+
+:sectnums:
+:sectnumlevels: 4
+
+== Setup ASM for Oracle Grid Infrastructure / Restart
+
+.Inventory Variables for ASM
+[options="header,footer"]
+|=======================
+|Value |Default |Description
+|`device_persistence`
+|empty string
+| Allowed values: `asmfd`, `asmlib`
+|`oracle_asm_disk_string`
+|`ORCL:*`
+| init.ora-Parameter for `asm_diskstring`.
+|`oracle_asm_init_dg`
+|`crs`
+| 1st Diskgroup for ASM SPFile.
+|`asm_diskgroups`
+|
+| Defines the ASM-Diskgroups. More Details below.
+|=======================
+
+.Example `asm_diskgroups`
+----
+asm_diskgroups:        # ASM Diskgroups used for DB-storage. Should map to dict asm_storage_layout.
+  - diskgroup: data
+    state: present
+    properties:
+      - {redundancy: external, ausize: 4}
+    attributes:
+      - {name: compatible.rdbms, value: 11.2.0.4.0}
+      - {name: compatible.asm, value: "19.0.0.0.0"}
+    disk:
+      - {device: /dev/sdc, asmlabel: data01}
+----
+
+== Setup Real Application Clusters (RAC)
+
+IMPORTANT: The documentation is heavily work in progress.
+
+=== Inventory Variables
+
+.Inventory Variables for Cluster configuration
+[options="header,footer"]
+|=======================
+|Value |Default |Description
+|`oracle_install_option_gi`
+|empty string
+| Allowed values: `CRS_CONFIG`, `HA_CONFIG`
+| `oracle_node_vip`
+| {{ ansible_hostname }}{{ oracle_vip }}
+| Defines the VIP of the clusternode.
+| `oracle_vip`
+| `-vip`
+| Suffix for VIP when `oracle_node_vip` is not defined.
+|=======================
+
