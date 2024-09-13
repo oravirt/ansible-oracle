@@ -23,11 +23,16 @@ default_dbpass: "{% if item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_
 # @end
 # oracle_scan:
 
-# @todo bug: oracle_vip is not flexible enough.
 # @var oracle_vip:description: >
 # suffix added to hostnames for VIPs.
 #
-# hostnamea{{ oracle_vip }}
+# {{ ansible_hostname  }}{{ oracle_vip }}
+#
+# Important!
+#
+# `oracle_node_vip` defines a fixed hostname for the VIP.
+#
+# That replaces the logic from `oracle_vip` for the VIP!
 # @end
 oracle_vip: -vip
 
@@ -36,16 +41,17 @@ oracle_vip: -vip
 # @end
 oracle_scan_port: 1521
 
-# @todo bug: oracle_ic_net will be removed in the future
 # @var oracle_ic_net:description: >
-# Do not use - is replaced in the future!
-# Reason why RAC support has been disabled...
+# Defines the network for the interconnect.
+#
+# Important!
+#
+# Only used, when `configure_interconnect=true` and `ansible_os_family='RedHat'` during cluster installations.
 # @end
 oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }}
 
 # @var oracle_asm_init_dg:description: >
-# Do not use - is replaced in the future!
-# Reason why RAC support has been disabled...
+# 1st Diskgroup where ASM SPFile is placed.
 # @end
 oracle_asm_init_dg: crs
 
