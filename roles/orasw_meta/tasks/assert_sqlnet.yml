@@ -10,8 +10,10 @@
           ansible.builtin.assert:
             quiet: true
             that:
-              - sqlni.home is defined
-              - db_homes_config[sqlni.home] is defined
+              - (sqlni.home is defined and not sqlni.use_gi_home | default(false))
+                or
+                (sqlni.home is undefined and sqlni.use_gi_home | default(false))
+              - sqlni.use_gi_home | default(false) or (sqlni.home is defined and db_homes_config[sqlni.home] is defined)
               - sqlni.state is defined
               - sqlni.state in ['absent', 'present']
               - sqlni.sqlnet is defined
@@ -33,7 +35,8 @@
           with_items:
             - "{{ assertsqlnet_installed['results'] }}"
           loop_control:
-            label: "{{ item['sqlni']['key'] | default('') }}"
+            label: >-
+              {{ item['sqlni']['sqlnet'] | default('') }}
           when:
             - assertsqlnet_installed.results is defined
             - item.failed is defined
@@ -49,7 +52,10 @@
           ansible.builtin.assert:
             quiet: true
             that:
-              - tnsni.home is defined
+              - (tnsni.home is defined and not tnsni.use_gi_home | default(false))
+                or
+                (tnsni.home is undefined and tnsni.use_gi_home | default(false))
+              - tnsni.use_gi_home | default(false) or (tnsni.home is defined and db_homes_config[tnsni.home] is defined)
               - db_homes_config[tnsni.home] is defined
               - tnsni.state is defined
               - tnsni.state in ['absent', 'present']
@@ -58,7 +64,8 @@
           with_items:
             - "{{ tnsnames_installed }}"
           loop_control:
-            label: "{{ tnsni.key | default('') }}"
+            label: >-
+              {{ tnsni.name | default('') }}
             loop_var: tnsni
           when:
             - tnsnames_installed is defined
@@ -72,7 +79,8 @@
           with_items:
             - "{{ asserttnsnames_installed['results'] }}"
           loop_control:
-            label: "{{ item['tnsni']['key'] | default('') }}"
+            label: >-
+              {{ item['tnsni']['name'] | default('') }}
           when:
             - asserttnsnames_installed.results is defined
             - item.failed is defined
@@ -88,8 +96,10 @@
           ansible.builtin.assert:
             quiet: true
             that:
-              - lsnri.home is defined
-              - db_homes_config[lsnri.home] is defined
+              - (lsnri.home is defined and not lsnri.use_gi_home | default(false))
+                or
+                (lsnri.home is undefined and lsnri.use_gi_home | default(false))
+              - lsnri.use_gi_home | default(false) or (lsnri.home is defined and db_homes_config[lsnri.home] is defined)
               - lsnri.state is defined
               - lsnri.state in ['absent', 'present']
               - lsnri.listener_name is defined
@@ -97,7 +107,8 @@
           with_items:
             - "{{ listener_installed }}"
           loop_control:
-            label: "{{ lsnri.key | default('') }}"
+            label: >-
+              {{ lsnri.listener_name | default('') }}
             loop_var: lsnri
           when:
             - listener_installed is defined
@@ -111,7 +122,8 @@
           with_items:
             - "{{ assertlistener_installed['results'] }}"
           loop_control:
-            label: "{{ item['lsnri']['key'] | default('') }}"
+            label: >-
+              item={{ item['lsnri'] | default('') }}
           when:
             - assertlistener_installed.results is defined
             - item.failed is defined
