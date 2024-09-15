@@ -1,0 +1,19 @@
+---
+- name: SQLNet Configuration (sqlnet.ora, listener.ora, tnsnames.ora)
+  hosts: "{{ hostgroup | default('all') }}"
+  any_errors_fatal: true
+  tasks:
+    - name: Configure tnsnames.ora
+      ansible.builtin.import_role:
+        name: opitzconsulting.ansible_oracle.oradb_manage_db
+        tasks_from: configure_tnsnames.yml
+
+    - name: Configure sqlnet.ora
+      ansible.builtin.import_role:
+        name: opitzconsulting.ansible_oracle.oradb_manage_db
+        tasks_from: configure_sqlnet.yml
+
+    - name: Configure listener.ora
+      ansible.builtin.import_role:
+        name: opitzconsulting.ansible_oracle.oradb_manage_db
+        tasks_from: configure_listener.yml

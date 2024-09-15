@@ -1,0 +1,70 @@
+---
+- name: listener | loop data
+  ansible.builtin.debug:
+    msg:
+      - "ORACLE_HOME      {{ _oradb_manage_db_listener_home }}"
+      - "Listener Name    {{ lsnrinst.listener_name }}"
+      - "os-user          {{ _oradb_manage_db_listener_oracle_user }}"
+  tags:
+    - listener
+    - listener2
+
+- name: listener | block
+  become: true
+  become_user: "{{ _oradb_manage_db_listener_oracle_user }}"
+  tags:
+    - listener
+    - listener2
+  block:
+
+    - name: listener | create custom configuration in listener.ora
+      ansible.builtin.blockinfile:
+        path: "{{ _oradb_manage_db_listener_home }}/network/admin/listener.ora"
+        backup: true
+        create: true
+        mode: "0644"
+        state: present
+        insertafter: "EOF"
+        marker: "# {mark} Ansible managed for  {{ lsnrinst.listener_name }}"
+        block: "{{ lookup('template', 'listener_details.j2') }}"
+
+    # Don't try to stop the listener at this point
+    # => Restart of role will fail at create/manage database due to TNS-12514
+    # Only executed when on Single-Instance!
+    - name: listener | Start/Reload Listener  # noqa no-changed-when
+      ansible.builtin.shell: |
+        #!/usr/bin/env bash
+        set -eu
+        set -o pipefail
+        LSNRCTL="${ORACLE_HOME}/bin/lsnrctl"
+
+        if "${LSNRCTL}" status {{ lsnrinst.listener_name }} 2>/dev/null ; then
+          # Reload running listener
+          "${LSNRCTL}" reload {{ lsnrinst.listener_name }} > /dev/null
+        else
+          # Start listener
+          "${LSNRCTL}" start {{ lsnrinst.listener_name }} > /dev/null
+        fi
+      environment: "{{ oracle_env_lsnrctl }}"
+      when:
+        - oracle_install_option_gi == ''
+      tags:
+        - molecule-idempotence-notest
+
+    - name: listener | Register listener with srvctl
+      ibre5041.ansible_oracle_modules.oracle_crs_listener:
+        name: "{{ lsnrinst.listener_name }}"
+        endpoints: >-
+          {{ _oradb_manage_db_endpoints['protocol'] | default('TCP') }}:{{ _oradb_manage_db_endpoints['port'] | default('1521') }}
+        enabled: true
+      environment:
+        ORACLE_BASE: "{{ grid_base }}"
+      vars:
+        _oradb_manage_db_endpoints: >-
+          {{ oracle_listeners_config[lsnrinst.listener_name]['address'][0] | default({}) }}
+      when:
+        - oracle_install_option_gi in ('CRS_CONFIG', 'HA_CONFIG')
+        - _orasw_meta_primary_node | default(true) | bool
+        - oracle_listeners_config[lsnrinst.listener_name]['listener_type'] | default('NORMAL') == 'NORMAL'
+      tags:
+        - listener

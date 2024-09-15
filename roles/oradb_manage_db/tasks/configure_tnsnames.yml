@@ -1,0 +1,11 @@
+---
+# Taskfile to configure tnsnames.ora only
+- name: tnsnames | include tnsnames.yml
+  ansible.builtin.include_tasks: loop_tnsnames.yml
+  with_items:
+    - "{{ tnsnames_installed }}"
+  loop_control:
+    loop_var: tnsinst
+  when:
+    - tnsnames_installed is defined
+  tags: tnsnames2
