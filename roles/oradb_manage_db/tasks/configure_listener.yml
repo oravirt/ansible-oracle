@@ -1,0 +1,13 @@
+---
+# Taskfile to configure listener.ora only
+- name: configure_listener | include listener_details.yml
+  ansible.builtin.include_tasks: loop_listener_details.yml
+  with_items:
+    - "{{ listener_installed }}"
+  loop_control:
+    loop_var: lsnrinst
+  when:
+    - listener_installed is defined
+  tags:
+    - listener
+    - listener2

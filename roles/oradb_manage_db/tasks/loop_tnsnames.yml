@@ -1,0 +1,37 @@
+---
+- name: loop_tnsnames | loop data
+  ansible.builtin.debug:
+    msg:
+      - "ORACLE_BASE_HOME {{ _oradb_manage_db_listener_home }}"
+      - "os-user          {{ _oradb_manage_db_listener_oracle_user }}"
+  tags: tnsnames
+
+- name: loop_tnsnames | block
+  become: true
+  become_user: "{{ _oradb_manage_db_listener_oracle_user }}"
+  tags:
+    - tnsnames
+    - tnsnames2
+  block:
+
+    - name: loop_tnsnames | create IFILE entry in tnsnames.ora
+      ansible.builtin.lineinfile:
+        line: "IFILE={{ _oradb_manage_db_tns_home }}/network/admin/tnsnames_ansible.ora"
+        regexp: "^IFILE=/"
+        insertbefore: BOF
+        path: "{{ _oradb_manage_db_tns_home }}/network/admin/tnsnames.ora"
+        backup: true
+        create: true
+        state: present
+        mode: "0644"
+
+    - name: loop_tnsnames | create custom configuration in tnsnames_ansible.ora  # noqa: args[module]
+      ansible.builtin.blockinfile:
+        path: "{{ _oradb_manage_db_tns_home }}/network/admin/tnsnames_ansible.ora"
+        backup: true
+        create: true
+        state: "{{ tnsinst.state | default('present') }}"
+        mode: "0644"
+        insertafter: "EOF"
+        marker: "# {mark} Ansible managed for  {{ tnsinst.tnsname }}"
+        block: "{{ lookup('template', 'tnsnames' + oracle_tnsnames_config[tnsinst.tnsname]['tnstemplate'] | default('') + '.ora.j2') }}"

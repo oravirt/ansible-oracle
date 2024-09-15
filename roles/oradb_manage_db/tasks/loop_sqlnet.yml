@@ -1,0 +1,77 @@
+---
+- name: loop_sqlnet | loop data
+  ansible.builtin.debug:
+    msg:
+      - "ORACLE_BASE_HOME {{ _oradb_manage_db_listener_home }}"
+      - "os-user          {{ _oradb_manage_db_listener_oracle_user }}"
+  tags:
+    - sqlnet
+    - sqlnet2
+
+- name: loop_sqlnet | block
+  become: true
+  become_user: "{{ _oradb_manage_db_listener_oracle_user }}"
+  tags:
+    - sqlnet
+    - sqlnet2
+  block:
+    - name: loop_sqlnet | create IFILE entry in sqlnet.ora
+      ansible.builtin.lineinfile:
+        line: "IFILE={{ _oradb_manage_db_tns_home }}/network/admin/sqlnet_ansible.ora"
+        regexp: "^IFILE=/"
+        insertbefore: BOF
+        path: "{{ _oradb_manage_db_tns_home }}/network/admin/sqlnet.ora"
+        backup: true
+        create: true
+        state: present
+        mode: "0644"
+
+    # Important!
+    # ansible-oracle <= 4.3 used lineinfile instead blockinfile with marker
+    # => Remove old entries before readding them with blockinfile
+    - name: loop_sqlnet | Check for existing sqlnet_ansible.ora
+      ansible.builtin.stat:
+        path: "{{ _sqlnet_ansible_file }}"
+      register: _sqlnet_ansible_file_res
+
+    - name: loop_sqlnet | Working on sqlnet_ansible.ora
+      when:
+        - _sqlnet_ansible_file_res.stat.exists
+      block:
+        - name: loop_sqlnet | Search for marker in sqlnet_ansible.ora
+          ansible.builtin.lineinfile:
+            path: "{{ _sqlnet_ansible_file }}"
+            regexp: "# BEGIN Ansible managed for .*"
+            line: "# BEGIN Ansible managed for .*"
+            state: present
+          register: old_sqlnet_ansible_res
+          changed_when: false
+          check_mode: true
+
+        # Remove existing sqlnet_ansible.ora when no new marker is in place
+        # => we found an old configuration file created with lineinfile
+        #    this must be changed to blockinfile with marker
+        - name: loop_sqlnet | Remove existing sqlnet_ansible.ora due to missing new marker items
+          ansible.builtin.file:
+            path: "{{ _sqlnet_ansible_file }}"
+            state: absent
+          when: "'line added' in old_sqlnet_ansible_res.msg"
+
+    - name: loop_sqlnet | create custom configuration in sqlnet_ansible.ora
+      ansible.builtin.blockinfile:
+        path: "{{ _sqlnet_ansible_file }}"
+        block: >-
+          {{ sc_loop.name }} = {{ sc_loop.value }}
+        marker: "# {mark} Ansible managed for {{ sc_loop.name }}"
+        insertafter: "EOF"
+        backup: true
+        create: true
+        state: present
+        mode: "0644"
+      with_items:
+        - "{{ sqlnet_config[sqlnetinst.sqlnet] }}"
+      loop_control:
+        label: >-
+          {{ sqlnetinst.sqlnet }}
+          {{ sc_loop.name }}
+        loop_var: sc_loop

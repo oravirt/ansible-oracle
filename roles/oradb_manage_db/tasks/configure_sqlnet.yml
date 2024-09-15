@@ -1,0 +1,13 @@
+---
+# Taskfile to configure sqlnet.ora only
+- name: sqlnet | include sqlnet.yml
+  ansible.builtin.include_tasks: loop_sqlnet.yml
+  with_items:
+    - "{{ sqlnet_installed }}"
+  loop_control:
+    loop_var: sqlnetinst
+  when:
+    - sqlnet_installed is defined
+  tags: sqlnet2
+  vars:
+    _sqlnet_ansible_file: "{{ _oradb_manage_db_tns_home }}/network/admin/sqlnet_ansible.ora"
