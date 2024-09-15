@@ -1,0 +1,66 @@
+---
+# Example for multiple Listener in Cluster
+listener_installed:
+  - listener_name: LISTENER
+    use_gi_home: true
+    state: present
+  - listener_name: LISTENER_SCAN1
+    use_gi_home: true
+    state: present
+  - listener_name: LISTENER_SCAN2
+    use_gi_home: true
+    state: present
+  - listener_name: LISTENER_SCAN3
+    use_gi_home: true
+    state: present
+
+oracle_listeners_config:
+  LISTENER_SCAN1:
+    listener_type: SCAN
+    parameter:
+      - param: LOG_FILE_NUM
+        value: 3
+      - param: LOG_FILE_SIZE
+        value: 10
+  LISTENER_SCAN2:
+    listener_type: SCAN
+    parameter:
+      - param: LOG_FILE_NUM
+        value: 3
+      - param: LOG_FILE_SIZE
+        value: 10
+  LISTENER_SCAN3:
+    listener_type: SCAN
+    parameter:
+      - param: LOG_FILE_NUM
+        value: 3
+      - param: LOG_FILE_SIZE
+        value: 10
+  LISTENER:
+    parameter:
+      - param: LOG_FILE_NUM
+        value: 3
+      - param: LOG_FILE_SIZE
+        value: 100
+    address:
+      - port: 1521
+        protocol: TCP
+  LISTENER1522:
+    parameter:
+      - param: LOG_FILE_NUM
+        value: 3
+      - param: LOG_FILE_SIZE
+        value: 100
+    address:
+      - host: "{{ inventory_hostname }}"
+        port: 1521
+        protocol: TCP
+
+sqlnet_config:
+  sqlnetgi:
+    - {name: "ADR_BASE", value: "/u01/app/grid/base"}
+
+sqlnet_installed:
+  - use_gi_home: true
+    sqlnet: sqlnetgi
+    state: present
