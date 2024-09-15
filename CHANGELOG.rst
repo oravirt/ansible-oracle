@@ -4,6 +4,36 @@ opitzconsulting.ansible\_oracle Release Notes
 
 .. contents:: Topics
 
+v4.11.0
+=======
+
+Release Summary
+---------------
+
+Roles for APEX and ORDS have been added in experimental state.
+The old issue with missing support for listener configuration in Oracle GI/Restart has been fixed.
+A new Playbook manage_sqlnet.ora has been added for easier configuration of listener.ora, sqlnet.ora and tnsnames.ora.
+
+Minor Changes
+-------------
+
+- ORDS: new experimental role to install and configure ORDS on OracleLinux (oravirt#473)
+- ansible-oracle Documentation fixes (oravirt#473)
+- beginner_patching: Inventory for ORDS + APEX (oravirt#473)
+- example rac: create multiple listener as example (oravirt#475)
+- galaxy: added new collection as dependency for RAC/Restart listener configuration (oravirt#475)
+- molecule: Added APEX and ORDS to dbfs-ol9 (oravirt#473)
+- molecule: added 2nd listener for testing (oravirt#475)
+- oraapex: New role to install APEX in databases - experimental (oravirt#473)
+- oradb_manage_db: Configure sqlnet.ora, listener.ora and tnsnames.ora wirh playbook manage_sqlnet.yml (oravirt#475)
+- orasw_download_patches: added support for downloading apex installation archives (oravirt#473)
+- orasw_meta: changed assert for playbook manage_sqlnet.yml on RAC/Restart (oravirt#475)
+
+Bugfixes
+--------
+
+- oraswgi_install: documentation changes for ansible-doctor make happy again (oravirt#474)
+
 v4.10.0
 =======
 
@@ -21,7 +51,7 @@ Minor Changes
 - ansible-builder: moved to new base image (oravirt#470)
 - ansible-lint: Update ansible-lint to 24.7.0 (oravirt#471)
 - ansible-lint: fqcn[action-core] for ansible.builtin.yum due to OL7 compatibility (oravirt#471)
-- antsibull-changelog: Upgrade version 0.29.0 (oravirt#472)
+- antsibull-changelog: Upgrade version 0.29.0
 - beginner_patching: updated example to ansible-oracle 4.x (oravirt#469)
 - molecule: changes to dbfs for new dbfs-ol9 szenario (oravirt#469)
 - molecule: dbfs-ol9 for RDBMS prepatch testing (oravirt#469)
