@@ -93,5 +93,7 @@
 # Kernelsettings are not availible in molecule
 - name: Calculate kernel.sem
   ansible.builtin.include_tasks: calculate_kernel_semaphores.yml
+  when:
+    - oracle_databases | default([]) | length > 0
   tags:
     - molecule-notest
