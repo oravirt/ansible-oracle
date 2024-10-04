@@ -6,4 +6,26 @@
 #
 # /home/oracle/.ssh/{{ orahost_ssh_keyname }}
 # @end
-orahost_ssh_keyname: id_ed25519
+orahost_ssh_keyname: "id_{{ orahost_ssh_key_type }}"
+
+# @var orahost_ssh_key_type:description: >
+# SSH key type for oracle and grid users' SSH Keypairs
+# Please note, ed25519 and dsa are not supported on FIPS enabled systems. Used here for backward compatibility only.
+# @end
+# @var orahost_ssh_key_type:example: orahost_ssh_key_type: ecdsa
+orahost_ssh_key_type: ed25519
+
+# @var orahost_ssh_key_size:description: >
+# SSH key size of {{ orahost_ssh_key_type }}
+# Check "man ssh-keygen" for valid keysizes
+# @end
+# @var orahost_ssh_key_size:example: orahost_ssh_key_size: 521
+orahost_ssh_key_size: 0
+
+# @var orahost_ssh_hostkeytypes:description: >
+# SSH host key types to collect/deploy among hosts
+# Please note, ed25519 and dsa are not supported on FIPS enabled systems and thus better skipped
+# @end
+orahost_ssh_hostkeytypes:
+  - rsa
+  - ecdsa

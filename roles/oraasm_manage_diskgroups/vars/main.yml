@@ -1,18 +1,19 @@
 ---
 _oraasm_manage_diskgroups_asmdevice_list: |-
-  {% if device_persistence == 'asmlib' %}
-  {%- for disk in ad_loop.disk %}{{ _oracle_asm_disk_prefix }}{{ disk.asmlabel | upper }}
+  {%- for disk in ad_loop.disk -%}
+  {%- if device_persistence == 'asmlib' -%}
+  {device:'{{ _oracle_asm_disk_prefix }}{{ disk.asmlabel | upper }}'
+  {%- elif device_persistence == 'asmfd' -%}
+  {device:'AFD:{{ disk.asmlabel | upper }}'
+  {%- elif device_persistence == 'udev' -%}
+  {device:'{{ _oracle_asm_disk_prefix }}{{ disk.asmlabel }}'
+  {%- elif device_persistence == '' -%}
+  {device:'{{ disk.device }}'
+  {%- endif %}
+  {%- if disk.failure_group is defined -%},failure_group:'{{ disk.failure_group }}'{%- endif %}
+  {%- if disk.quorum is defined -%},quorum:{{ disk.quorum }}{%- endif %}}
   {%- if not loop.last -%},{%- endif %}
   {%- endfor %}
-  {%- elif device_persistence == 'asmfd' %}
-  {%- for disk in ad_loop.disk -%}AFD:{{ disk.asmlabel | upper }}
-  {%- if not loop.last -%},{%- endif -%}
-  {%- endfor %}
-  {%- elif device_persistence == 'udev' %}
-  {%- for disk in ad_loop.disk -%}{{ _oracle_asm_disk_prefix }}{{ disk.asmlabel }}
-  {%- if not loop.last -%},{%- endif -%}
-  {%- endfor %}
-  {%- endif %}
 
 _oraasm_manage_diskgroups_attr_name: |-
   {% if ad_loop.attributes is defined %}

@@ -37,29 +37,38 @@
           {{ (__orahost_kdump_state.status.ActiveState == 'active') | ternary(0, 1) }}
 
 - name: Calculate SGA aggregates
-  ansible.builtin.include_tasks: aggregate_sgas.yml
-  loop: |
-    {{ (( oracle_databases | default ([]) | selectattr('init_parameters','defined') )
-    + ( oracle_asm_instance | default ([]) )) | lower }}
-  loop_control:
-    loop_var: __orahost_oracle_database
-    label: >-
-      oracle_db_name: {{ __orahost_oracle_database.oracle_db_name | default('') }}
-  when:
-    "'sga_target' in __orahost_oracle_database.init_parameters | map(attribute='name') or
-    'sga_max_size' in __orahost_oracle_database.init_parameters | map(attribute='name') "
+  block:
+    - name: Extract SGA parameters, choose sga_max_size over sga_target if both are definied
+      ansible.builtin.set_fact:
+        __orahost_oracle_database_sgas: >-
+          {{ (__orahost_oracle_database_sgas | default([])) +
+          (( __orahost_oracle_database_init_parameter | selectattr('name', 'match', '^(?i)sga_max_size$') ) | length > 0 )
+          | ternary(__orahost_oracle_database_init_parameter | selectattr('name', 'match', '^(?i)sga_max_size$'),
+                    __orahost_oracle_database_init_parameter | selectattr('name', 'match', '^(?i)sga_target$')) }}
+      loop: >-
+        {{ ((oracle_databases | default([])) + (oracle_asm_instance | default([])))
+        | map(attribute='init_parameters', default=[]) }}
+      loop_control:
+        loop_var: __orahost_oracle_database_init_parameter
+      when: (__orahost_oracle_database_init_parameter | selectattr('name', 'match', '^(?i)(sga_target|sga_max_size)$')) | length > 0
+
+    - name: Aggregate SGAs
+      ansible.builtin.include_tasks: aggregate_sgas.yml
+      loop: "{{ __orahost_oracle_database_sgas }}"
+      loop_control:
+        loop_var: __orahost_oracle_database_sga
+        label: "{{ __orahost_oracle_database_sga.name + ': ' + __orahost_oracle_database_sga.value }}"
 
 - name: Calculate processes aggregates
   ansible.builtin.include_tasks: aggregate_processes.yml
-  loop: |
-    {{ (( oracle_databases | default ([]) | selectattr('init_parameters','defined') )
-    + ( oracle_asm_instance | default ([]) )) | lower }}
+  loop: >-
+    {{ ((oracle_databases | default([])) + (oracle_asm_instance | default([])))
+    | map(attribute='init_parameters', default=[])
+    | flatten
+    | selectattr('name', 'match', '^(?i)processes$') }}
   loop_control:
-    loop_var: __orahost_oracle_database
-    label: >-
-      oracle_db_name: {{ __orahost_oracle_database.oracle_db_name | default('') }}
-  when:
-    "'processes' in __orahost_oracle_database.init_parameters | map(attribute='name')"
+    loop_var: __orahost_oracle_database_processes
+    label: "{{ __orahost_oracle_database_processes.name + ': ' + __orahost_oracle_database_processes.value | string }}"
 
 - name: Count number of instances (including ASM)
   ansible.builtin.set_fact:

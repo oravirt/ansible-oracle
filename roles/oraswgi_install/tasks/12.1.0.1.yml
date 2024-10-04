@@ -25,13 +25,8 @@
   when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and not oracle_sw_copy and oracle_sw_unpack
 
 - name: install_home_gi | Install cvuqdisk rpm
-  # noqa ignore-errors
-  ansible.builtin.yum:  # noqa fqcn[action-core]
-    name: "{{ oracle_stage_install }}/{{ oracle_install_version_gi }}/grid/rpm/{{ cvuqdisk_rpm }}"
-    state: present
-  when: _oraswgi_meta_configure_cluster
+  ansible.builtin.include_tasks: "install_cvuqdisk.yml"
   tags: cvuqdisk
-  ignore_errors: true
 
 - name: install_home_gi | Setup response file for install (GI)
   ansible.builtin.template:

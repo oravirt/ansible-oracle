@@ -1,15 +1,10 @@
 ---
-- name: aggregate_processes | Pick processes parameter
-  ansible.builtin.set_fact:
-    __orahost_oracle_database_processes: |
-      {{ (__orahost_oracle_database.init_parameters | selectattr('name', 'equalto', 'processes'))[0].value }}
-
 - name: aggregate_processes | Sum up processes
   ansible.builtin.set_fact:
     oracle_databases_processes_sum: |
-      {{ (oracle_databases_processes_sum | default(0) | int) + (__orahost_oracle_database_processes | int) }}
+      {{ (oracle_databases_processes_sum | default(0) | int) + (__orahost_oracle_database_processes.value | int) }}
 
 - name: aggregate_processes | Calc max processes
   ansible.builtin.set_fact:
     oracle_databases_processes_max: >-
-      {{ [(oracle_databases_processes_max | default(0) | int), (__orahost_oracle_database_processes | int)] | max }}
+      {{ [(oracle_databases_processes_max | default(0) | int), (__orahost_oracle_database_processes.value | int)] | max }}

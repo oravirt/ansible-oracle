@@ -29,7 +29,7 @@
   block:
     - name: db_opatch | Copy oracle opatch to server (www)
       ansible.builtin.get_url:
-        url: "{{ oracle_sw_source_www }}/{{ oop_loop.filename }}"
+        url: "{{ oop_loop.filesource | default(oracle_sw_source_www + '/' + oop_loop.filename, true) }}"
         dest: "{{ oracle_stage }}"
         mode: "0644"
         force: true
@@ -49,7 +49,7 @@
 
     - name: db_opatch | Copy oracle opatch to server (local)
       ansible.builtin.copy:
-        src: "{{ oracle_sw_source_local }}/{{ item.filename }}"
+        src: "{{ item.filesource | default(oracle_sw_source_local + '/' + item.filename, true) }}"
         dest: "{{ oracle_stage }}"
         mode: "0644"
         force: true

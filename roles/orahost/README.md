@@ -51,6 +51,9 @@ Role to configure the hostsystem for ansible-oracle
   - [oracle_sysctl](#oracle_sysctl)
   - [oracle_sysctl_file](#oracle_sysctl_file)
   - [oracle_users](#oracle_users)
+  - [orahost_ssh_hostkeytypes](#orahost_ssh_hostkeytypes)
+  - [orahost_ssh_key_size](#orahost_ssh_key_size)
+  - [orahost_ssh_key_type](#orahost_ssh_key_type)
   - [os_family_supported](#os_family_supported)
   - [os_min_supported_version](#os_min_supported_version)
   - [percent_hugepages](#percent_hugepages)
@@ -745,6 +748,40 @@ oracle_users:
     primgroup: '{{ oracle_group }}'
     othergroups: '{{ dba_group }},{{ asmadmin_group }},{{ asmdba_group }},{{ asmoper_group
       }},backupdba,dgdba,kmdba,{{ oper_group }}'
+```
+
+### orahost_ssh_hostkeytypes
+
+SSH host key types to collect/deploy among hosts
+Please note, ed25519 are not supported on FIPS enabled systems and though better not collected
+
+#### Default value
+
+```YAML
+orahost_ssh_hostkeytypes:
+  - dsa
+  - rsa
+  - ecdsa
+```
+
+### orahost_ssh_key_size
+
+SSH key size of {{ orahost_ssh_key_type }}
+
+#### Default value
+
+```YAML
+orahost_ssh_key_size: 4096
+```
+
+### orahost_ssh_key_type
+
+SSH key type for oracle and grid users' SSH Keys
+
+#### Default value
+
+```YAML
+orahost_ssh_key_type: rsa
 ```
 
 ### os_family_supported

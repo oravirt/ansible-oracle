@@ -1,0 +1,66 @@
+---
+- name: "ssh-keys | Ensure SSH key directory exists"
+  ansible.builtin.file:
+    path: "{{ _orahost_equivalence_user.home | default(oracle_user_home | regex_replace('[^/]+$', '') + _orahost_equivalence_user.username) }}/.ssh"
+    state: directory
+    mode: "0700"
+    owner: "{{ _orahost_equivalence_user.username }}"
+    group: "{{ _orahost_equivalence_user.primgroup }}"
+  loop: "{{ _orahost_equivalence_users }}"
+  loop_control:
+    loop_var: _orahost_equivalence_user
+
+- name: "ssh-keys | Ensure SSH key exists {{ orahost_ssh_key_type }}"
+  community.crypto.openssh_keypair:
+    force: false
+    mode: "0600"
+    owner: "{{ _orahost_equivalence_user.username }}"
+    group: "{{ _orahost_equivalence_user.primgroup }}"
+    path: "{{ _orahost_equivalence_user.home | default(oracle_user_home | regex_replace('[^/]+$', '') + _orahost_equivalence_user.username) }}/.ssh/id_{{ orahost_ssh_key_type }}"
+    size: "{{ orahost_ssh_key_size }}"
+    type: "{{ orahost_ssh_key_type }}"
+  loop: "{{ _orahost_equivalence_users }}"
+  loop_control:
+    loop_var: _orahost_equivalence_user
+
+- name: "ssh-keys | Collect ssh keys"
+  ansible.builtin.slurp:
+    src: "{{ _orahost_equivalence_user.home | default(oracle_user_home | regex_replace('[^/]+$', '') + _orahost_equivalence_user.username) }}/.ssh/id_{{ orahost_ssh_key_type }}.pub"
+  loop: "{{ _orahost_equivalence_users }}"
+  loop_control:
+    loop_var: _orahost_equivalence_user
+  register: _orahost_ssh_pubkeys
+
+- name: "ssh-keys | Authorize keys among users"
+  ansible.posix.authorized_key:
+    key: "{{ _orahost_ssh_pubkey_of_user[0][0].content | b64decode }}"
+    user: "{{ _orahost_ssh_pubkey_of_user[0][1] }}"
+    comment: "{{ _orahost_ssh_pubkey_of_user[0][0]._orahost_equivalence_user.username }}@{{ ansible_hostname }}"
+  delegate_to: "{{ _orahost_ssh_pubkey_of_user[1] }}"
+  loop: "{{ (_orahost_ssh_pubkeys.results |
+    product(_orahost_equivalence_users | map(attribute='username'))) |
+    product(ansible_play_hosts) }}"
+  loop_control:
+    loop_var: _orahost_ssh_pubkey_of_user
+  throttle: 1
+
+- name: ssh-keys | Collect hostkeys
+  ansible.builtin.command: "ssh-keyscan -p {{ ansible_ssh_port | default(22) }} -t {{ _orahost_source_host[1] }} -4 -H {{ _orahost_source_host[0] }}"
+  failed_when: false
+  changed_when: false
+  loop: "{{ [ansible_hostname, ansible_fqdn, ansible_default_ipv4.address] | product(orahost_ssh_hostkeytypes) }}"
+  loop_control:
+    loop_var: _orahost_source_host
+  register: _orahost_hostkeys
+
+- name: ssh-keys | Deploy hostkeys among hosts
+  ansible.builtin.known_hosts:
+    name: "{{ _orahost_ssh_hostkeys_targets[0][0]._orahost_source_host[0] }}"
+    key: "{{ _orahost_ssh_hostkeys_targets[0][0].stdout }}"
+    path: "{{ _orahost_ssh_hostkeys_targets[1].home | default(oracle_user_home | regex_replace('[^/]+$', '') + _orahost_ssh_hostkeys_targets[1].username) }}/.ssh/known_hosts"
+  delegate_to: "{{ _orahost_ssh_hostkeys_targets[0][1] }}"
+  loop: "{{ _orahost_hostkeys.results | product(ansible_play_hosts) | product(_orahost_equivalence_users) }}"
+  loop_control:
+    loop_var: _orahost_ssh_hostkeys_targets
+  when: _orahost_ssh_hostkeys_targets[0][0].rc == 0
+  throttle: 1

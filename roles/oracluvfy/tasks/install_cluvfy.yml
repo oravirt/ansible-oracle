@@ -14,8 +14,8 @@
   block:
     - name: install_cluvfy | download cluvfy (copy)
       ansible.builtin.copy:
-        src: "{{ oracle_sw_source_local }}/{{ oracluvfy_archive }}"
-        dest: "{{ oracle_stage }}"
+        src: "{{ oracluvfy_archive_filesource | default(oracle_sw_source_local + '/' + oracluvfy_archive, true) }}"
+        dest: "{{ oracle_stage }}/{{ oracluvfy_archive }}"
         mode: 0664
         force: false
         remote_src: false
@@ -26,8 +26,8 @@
 
     - name: install_cluvfy | download cluvfy (www)
       ansible.builtin.get_url:
-        url: "{{ oracle_sw_source_www }}/{{ oracluvfy_archive }}"
-        dest: "{{ oracle_stage }}"
+        url: "{{ oracluvfy_archive_filesource | default(oracle_sw_source_www + '/' + oracluvfy_archive, true) }}"
+        dest: "{{ oracle_stage }}/{{ oracluvfy_archive }}"
         mode: 0644
         force: false
       when:
