@@ -4,6 +4,16 @@ opitzconsulting.ansible\_oracle Release Notes
 
 .. contents:: Topics
 
+v4.11.1
+=======
+
+Bugfixes
+--------
+
+- devsec: changed hosts=all to hosts={{ hostgroup | default('all') }} (oravirt#479)
+- orasw_download_patches: bugfix for empty oracle_databases or oracle_pdbs (oravirt#480)
+- orasw_meta: empty oracle_databases broke orasw_download_patches (oravirt#480)
+
 v4.11.0
 =======
 
