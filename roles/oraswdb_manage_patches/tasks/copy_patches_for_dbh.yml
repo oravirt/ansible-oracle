@@ -12,7 +12,7 @@
 - name: copy_patches_for_dbh | Work on oracle_sw_patches
   ansible.builtin.include_tasks: loop_opatch_apply.yml
   vars:
-    __sw_patches_filename_creates: "{{ osp_loop.creates | default((dhc_opatch.patchid | string) + '/README.txt') }}"
+    __sw_patches_filename_creates: "{{ osp_loop.creates | default(dhc_opatch.patchid | string) }}"
     __patch_unarchive_dir: "{{ oracle_patch_stage }}/{{ db_version }}/{{ __patch_upisubdir }}/"
     __patch_upisubdir: >-
       {{ osp_loop.unique_patchid is defined
