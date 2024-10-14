@@ -5,7 +5,7 @@ Welcome to {{ ansible_hostname }}
 
 FQDN: {{ ansible_fqdn }}
 IP's:
-{% for a in  ansible_interfaces %}
+{% if a != 'lo' and hostvars[inventory_hostname]['ansible_'~a]['ipv4']['address'] is defined %}
 {% if a != 'lo' %}
 {{a}}: {{ hostvars[inventory_hostname]['ansible_'~a]['ipv4']['address'] }}
 {% endif %}
