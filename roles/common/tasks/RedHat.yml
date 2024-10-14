@@ -1,7 +1,7 @@
 ---
 - name: Install EPEL Repo
   when:
-    - configure_epel_repo
+    - configure_epel_repo | bool
   tags:
     - epelrepo
   block:
@@ -22,7 +22,7 @@
     path: /usr/bin/ol_yum_configure.sh
   register: olyumconfigfile
   when:
-    - configure_public_yum_repo
+    - configure_public_yum_repo | bool
     - ansible_distribution == 'OracleLinux'
   tags:
     - olrepo
@@ -36,7 +36,7 @@
     mode: 0644
   when:
     - not olyumconfigfile.stat.exists | default(false)
-    - configure_public_yum_repo
+    - configure_public_yum_repo | bool
     - ansible_distribution == 'OracleLinux'
     - ansible_distribution_major_version is version('7', '=')
   tags:
@@ -47,7 +47,7 @@
     name: "{{ common_packages }}"
     state: installed
   when:
-    - install_os_packages
+    - install_os_packages | bool
   tags:
     - commonpackages
   notify: Reboot concerning package updates

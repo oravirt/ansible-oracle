@@ -13,7 +13,7 @@
     name: "{{ ntp_type }}d"
     state: started
     enabled: true
-  when: configure_ntp
+  when: configure_ntp | bool
 
 - name: Add motd
   ansible.builtin.template:
@@ -21,4 +21,4 @@
     dest: /etc/motd
     mode: 0644
   tags: motd
-  when: configure_motd
+  when: configure_motd | bool
