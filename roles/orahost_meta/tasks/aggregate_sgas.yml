@@ -1,30 +1,10 @@
 ---
-- name: aggregate_sgas | Reset __orahost_oracle_database_sga
-  ansible.builtin.set_fact:
-    __orahost_oracle_database_sga: "0"
-
-- name: aggregate_sgas | sga_max_size preceeds sga_target
-  block:
-    - name: aggregate_sgas | Derive SGA size from sga_max_size
-      ansible.builtin.set_fact:
-        __orahost_oracle_database_sga: |
-          {{ (__orahost_oracle_database.init_parameters
-          | selectattr('name','equalto', 'sga_max_size'))[0].value | default(0) | human_to_bytes }}
-
-    - name: aggregate_sgas | Derive SGA size from sga_target
-      ansible.builtin.set_fact:
-        __orahost_oracle_database_sga: |
-          {{ (__orahost_oracle_database.init_parameters
-          | selectattr('name','equalto', 'sga_target'))[0].value | default(0) | human_to_bytes }}
-      when:
-        - __orahost_oracle_database_sga == "0"
-
 - name: aggregate_sgas | Sum up SGAs
   ansible.builtin.set_fact:
     oracle_databases_sga_sum: |
-      {{ (oracle_databases_sga_sum | default(0) | int) + (__orahost_oracle_database_sga | int) }}
+      {{ (oracle_databases_sga_sum | default(0) | int) + (__orahost_oracle_database_sga.value | human_to_bytes | int) }}
 
 - name: aggregate_sgas | Calc max SGA
   ansible.builtin.set_fact:
     oracle_databases_sga_max: |
-      {{ [(oracle_databases_sga_max | default(0) | int), (__orahost_oracle_database_sga | int)] | max }}"
+      {{ [(oracle_databases_sga_max | default(0) | int), (__orahost_oracle_database_sga.value | human_to_bytes | int)] | max }}"
