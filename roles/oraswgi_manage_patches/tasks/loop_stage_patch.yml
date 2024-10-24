@@ -23,7 +23,7 @@
       {{ _oraswgi_manage_patches_sw_patch_dict.unique_patchid | default(_oraswgi_manage_patches_sw_patch_dict.patchid) }}
     _oraswgi_manage_patches_unarchive_dir: "{{ oracle_patch_stage }}/{{ _oraswgi_manage_patches_sw_patch_dict.version }}/{{ _oraswgi_manage_patches_unique_patchid }}"
     _oraswgi_manage_patches_creates: >-
-      {{ _oraswgi_manage_patches_unarchive_dir }}/{{ _oraswgi_manage_patches_sw_patch_dict.creates | default((_oraswgi_manage_patches_sw_patch_dict.patchid | string) + '/README.txt') }}
+      {{ _oraswgi_manage_patches_unarchive_dir }}/{{ _oraswgi_manage_patches_sw_patch_dict.creates | default(_oraswgi_manage_patches_sw_patch_dict.patchid | string) }}
 
   block:
     - name: Loop_stage_patch | State data for loop_stage_patch.yml
