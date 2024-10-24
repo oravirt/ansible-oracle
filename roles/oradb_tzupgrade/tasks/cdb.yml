@@ -35,14 +35,14 @@
 
 - name: oradb_tzupgrade | Set facts for pdbs_info
   ansible.builtin.set_fact:
-    candidate_pdbs: "{{ pdbs_info.state.ROW[0].PDB_LIST | default('') }}"
+    _oradb_tzupgrade_candidate_pdbs: "{{ pdbs_info.state.ROW[0].PDB_LIST | default('') }}"
 
 - name: oradb_tzupgrade | Show facts for pdbs_info
   ansible.builtin.debug:
     msg: "Candidate PDBs: {{ _oradb_tzupgrade_candidate_pdbs }}"
 
 - name: oradb_tzupgrade | Upgrade timezone
-  when: candidate_pdbs != ""
+  when: _oradb_tzupgrade_candidate_pdbs != ""
   block:
 
     - name: oradb_tzupgrade | Perform timezone checks for the candidate PDBs
