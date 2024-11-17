@@ -58,6 +58,7 @@
       loop_control:
         loop_var: __orahost_oracle_database_sga
         label: "{{ __orahost_oracle_database_sga.name + ': ' + __orahost_oracle_database_sga.value }}"
+      when: __orahost_oracle_database_sga is defined
 
 - name: Calculate processes aggregates
   ansible.builtin.include_tasks: aggregate_processes.yml
