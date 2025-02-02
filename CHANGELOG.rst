@@ -4,6 +4,27 @@ opitzconsulting.ansible\_oracle Release Notes
 
 .. contents:: Topics
 
+v4.12.0
+=======
+
+Minor Changes
+-------------
+
+- ansible-lint: more excludes (oravirt#505)
+- common: remove screen from default rhel8,9 package list (oravirt#496)
+- orahost: firewall_service should default to firewalld on OL/EL 8 (oravirt#499)
+
+Bugfixes
+--------
+
+- common: Exclude alias interfaces when templating motd.j2 (oravirt#486)
+- common: force bool type in certain conditionals
+- fix for re global flags when extracting sga/processes parameters in orahost_meta (oravirt#493)
+- orahost_meta: Aggregate SGAs fails if no sga_target or sga_max_size is defined (oravirt#498)
+- orahost_meta: Applying 'lower' filter to oracle_databases+oracle_asm_instance converts list to string (oravirt#484)
+- oraswdb_manage_patches, oraswgi_manage_patches: make unarchive check work for combo patches too (oravirt#482)
+- set and check _oradb_tzupgrade_candidate_pdbs fact when upgrading timezone for a CDB database (oravirt#490)
+
 v4.11.1
 =======
 
