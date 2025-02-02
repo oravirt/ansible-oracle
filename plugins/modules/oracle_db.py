@@ -160,6 +160,13 @@ options:
         Default: false
         type: bool
         choices: ['true', 'false']
+    omf:
+        description: >
+            Should Oracle Managed Files be used
+        required: false
+        Default: false
+        type: bool
+        choices: ['true', 'false']
     initparams:
         description: >
             List of dict for init.ora parameter.
@@ -472,6 +479,7 @@ def create_db(
     customscripts,
     datapatch,
     domain,
+    omf,
 ):
     initparam = ' -initParams '
     paramslist = ''
@@ -601,6 +609,13 @@ def create_db(
             # paramslist = ",".join(initparams)
             # initparam += ' %s' % (paramslist)
             initparam += ' %s' % (initparams)
+
+    if omf is not None:
+        if major_version >= '18.4':
+            if omf is True:
+                command += ' -useOMF true '
+            else:
+                command += ' -useOMF false '
 
     if initparam != ' -initParams ' or paramslist != "":
         command += initparam
@@ -1260,6 +1275,7 @@ def main():
             state               = dict(default="present", choices = ["present", "absent", "started", "restarted"]), # noqa E231
             hostname            = dict(required=False, default = 'localhost', aliases = ['host']), # noqa E231
             port                = dict(required=False, default = 1521), # noqa E231
+            omf                 = dict(required=False, type='bool', default=False), #noqa E231
         ),
         mutually_exclusive=[['memory_percentage', 'memory_totalmb']],
     )
@@ -1305,6 +1321,7 @@ def main():
     state               = module.params["state"] # noqa E221
     hostname            = module.params["hostname"] # noqa E221
     port                = module.params["port"] # noqa E221
+    omf                 = module.params["omf"] # noqa E221
     # fmt: on
 
     # ld_library_path = '%s/lib' % (oracle_home)
@@ -1432,6 +1449,7 @@ def main():
                 customscripts,
                 datapatch,
                 domain,
+                omf,
             ):
                 newdb = True
                 ensure_db_state(
