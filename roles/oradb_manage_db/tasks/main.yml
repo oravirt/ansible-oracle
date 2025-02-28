@@ -70,6 +70,8 @@
     group: "{{ oracle_group }}"
     mode: 0644
   tags: sql_script
+  when: 
+    - oracle_pdbs is defined
 
 - name: Create/Modify database
   ansible.builtin.include_tasks: manage-db.yml
