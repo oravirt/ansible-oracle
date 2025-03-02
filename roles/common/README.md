@@ -25,6 +25,7 @@ sets up the host generic stuff
   - [ntp_type](#ntp_type)
   - [ol6_repo_file](#ol6_repo_file)
   - [ol7_repo_file](#ol7_repo_file)
+  - [scripts_folder](#scripts_folder)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -392,6 +393,16 @@ The variable is used to cleanup the yum repolist for old installations.
 
 ```YAML
 ol7_repo_file: public-yum-ol7.repo
+```
+
+### scripts_folder
+
+Folder under Oracle user home dir to place scripts in
+
+#### Default value
+
+```YAML
+scripts_folder: .Scripts
 ```
 
 ## Discovered Tags
