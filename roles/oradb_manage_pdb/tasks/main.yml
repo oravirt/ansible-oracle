@@ -27,7 +27,7 @@
       environment: "{{ _oracle_env }}"
       with_nested:
         - "{{ oracle_databases }}"
-        - "{{ oracle_pdbs }}"
+        - "{{ oracle_pdbs | default([]) }}"
       become: true
       become_user: "{{ oracle_user }}"
       loop_control:
