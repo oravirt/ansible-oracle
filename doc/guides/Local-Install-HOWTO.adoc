@@ -12,9 +12,9 @@ toc::[]
 
 This guide will show you how to get Ansible-Oracle up and running with a local installation (as opposed to a container or Vagrant setup).
 
-It is assumed that the server doesn't have Internet access and therefore it's demonstrated how to install all necessary binaries manually.
+It is assumed that the server is airgapped and doesn't have Internet access and therefore it's demonstrated how to install all necessary binaries manually.
 
-To enable you to run the Ansible-Oracle environment independently of other versions of Ansible, Python and Galaxy modules, everything will be encapsulated within a Python Virtual Environment (venv). If you prefer to install everything globally, you'll find info on how to do so below.
+NOTE: This guide aims at developers who want to test different setups with different dependencies. To enable you to run the Ansible-Oracle environment independently of other versions of Ansible, Python and Galaxy modules, everything will be encapsulated within a Python Virtual Environment (venv). If you prefer to install everything globally, you'll find info on how to do so below.
 
 The steps in this guide were tested with OL9.5, Python 3.9, Ansible 2.14 and Ansible-Oracle 4.11.1.
 
@@ -104,9 +104,10 @@ pip install /tmp/python-packages/cx_Oracle-*.whl
 #pip install /tmp/python-packages/oracledb
 ----
 
-Install packages in the virtual environment; omit the ``-p
-~/ansible/ansible-oracle/.venv/lib/collections'' to install for the user
-``ansible'':
+Install packages in the virtual environment:
+
+NOTE: If you don't want the dependencies within the venv, change the `-p
+~/ansible/ansible-oracle/.venv/lib/collections` to `-p ~/ansible/ansible-oracle/playbooks/collections`. This is the default path for Ansible Navigator.
 
 [source,bash]
 ----
