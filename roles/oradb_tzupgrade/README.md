@@ -21,6 +21,7 @@ Manage timezone upgrades for an Oracle Database
 ## Dependencies
 
 - orahost_meta
+- orasw_meta_internal
 
 ## License
 
