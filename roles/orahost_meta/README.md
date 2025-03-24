@@ -26,6 +26,7 @@ Meta role used by other roles to share variable defaults.
   - [oracle_tmp_stage](#oracle_tmp_stage)
   - [oracle_user](#oracle_user)
   - [oracle_user_home](#oracle_user_home)
+  - [scripts_folder](#scripts_folder)
   - [orahost_meta_cv_assume_distid](#orahost_meta_cv_assume_distid)
   - [orahost_meta_java_options](#orahost_meta_java_options)
   - [orahost_meta_tmpdir](#orahost_meta_tmpdir)
@@ -317,6 +318,10 @@ home directory for `oracle_user`.
 ```YAML
 oracle_user_home: /home/oracle
 ```
+
+### scripts_folder
+
+Folder under Oracle user home dir to place scripts in
 
 ### orahost_meta_cv_assume_distid
 
