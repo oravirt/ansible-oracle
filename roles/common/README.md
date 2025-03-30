@@ -394,12 +394,6 @@ The variable is used to cleanup the yum repolist for old installations.
 ol7_repo_file: public-yum-ol7.repo
 ```
 
-#### Default value
-
-```YAML
-scripts_folder: .Scripts
-```
-
 ## Discovered Tags
 
 **_common_assert_**
