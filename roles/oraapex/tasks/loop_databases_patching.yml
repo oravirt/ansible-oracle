@@ -47,7 +47,7 @@
       ansible.builtin.unarchive:
         src: "{{ oracle_sw_source_local }}/{{ _oraapex_patch_archive }}"
         dest: "{{ _oraapex_homedir }}"
-        copy: true
+        remote_src: "{{ not is_sw_source_local | bool }}"
         include: >-
           {{ apex_loop.apex_patchid }}/README.txt
 
@@ -90,7 +90,7 @@
           ansible.builtin.unarchive:
             src: "{{ oracle_sw_source_local }}/{{ _oraapex_patch_archive }}"
             dest: "{{ _oraapex_homedir }}"
-            copy: true
+            remote_src: "{{ not is_sw_source_local | bool }}"
             creates: "{{ _oraapex_homedir }}/{{ apex_loop.apex_patchid }}/catpatch.sql"
 
         - name: loop_databases_patching | copy APEX Patch into APEX installation
