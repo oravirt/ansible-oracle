@@ -4,6 +4,26 @@ opitzconsulting.ansible\_oracle Release Notes
 
 .. contents:: Topics
 
+v4.13.0
+=======
+
+Minor Changes
+-------------
+
+- Added a guide on how to install Ansible-Oracle manually on a server without Internet access. (oravirt#506)
+- Fix typo for sql_zauberkasten (oravirt#509)
+- ansible-lint: more excludes (oravirt#505)
+- create OMF enabled databases using dbca's -useOMF flag (oravirt#507)
+- manage_pdb: Enter nested loop only when oracle_pdbs has an entry (oravirt#507)
+- oraapex: Added missing option to copy source from remote or local host (oravirt#512)
+- oradb_manage_db: make hard coded folder .Scripts configurable (oravirt#511)
+- oradb_tzupgrade: Add orasw_meta_internal as a dependent role (oravirt#510)
+
+Bugfixes
+--------
+
+- orahost_meta: move scripts_folder variable from common to orahost_meta (oravirt#504)
+
 v4.12.0
 =======
 
