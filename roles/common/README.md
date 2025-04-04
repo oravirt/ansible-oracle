@@ -88,12 +88,7 @@ common_packages_el6:
   - autofs
   - parted
   - mlocate
-  - ntp
   - ksh
-  - lvm2
-  - xfsprogs
-  - btrfs-progs
-  - procps
   - psmisc
 ```
 
@@ -135,12 +130,7 @@ common_packages_el7:
   - autofs
   - parted
   - mlocate
-  - ntp
   - ksh
-  - lvm2
-  - xfsprogs
-  - btrfs-progs
-  - procps
   - psmisc
   - grubby
 ```
@@ -153,7 +143,6 @@ List of RPMs for RHEL8 or OL8
 
 ```YAML
 common_packages_el8:
-  - screen
   - facter
   - procps
   - module-init-tools
@@ -198,9 +187,6 @@ common_packages_el8:
   - autofs
   - parted
   - mlocate
-  - ksh
-  - lvm2
-  - xfsprogs
   - psmisc
   - python3
   - python3-pip
@@ -213,7 +199,6 @@ common_packages_el8:
 
 ```YAML
 common_packages_el9:
-  - screen
   - facter
   - lsof
   - nc
@@ -225,7 +210,6 @@ common_packages_el9:
   - autofs
   - parted
   - mlocate
-  - lvm2
   - python3
   - python3-pip
   - bind-utils

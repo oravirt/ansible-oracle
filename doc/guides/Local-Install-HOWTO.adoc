@@ -1,0 +1,193 @@
+:toc:
+:toc-placement!:
+:toclevels: 4
+toc::[]
+
+:sectnums:
+:sectnumlevels: 4
+
+= HOWTO: Local Installation of Ansible-Oracle
+
+== Intro
+
+This guide will show you how to get Ansible-Oracle up and running with a local installation (as opposed to a container or Vagrant setup).
+
+It is assumed that the server is airgapped and doesn't have Internet access and therefore it's demonstrated how to install all necessary binaries manually.
+
+NOTE: This guide aims at developers who want to test different setups with different dependencies. To enable you to run the Ansible-Oracle environment independently of other versions of Ansible, Python and Galaxy modules, everything will be encapsulated within a Python Virtual Environment (venv). If you prefer to install everything globally, you'll find info on how to do so below.
+
+The steps in this guide were tested with OL9.5, Python 3.9, Ansible 2.14 and Ansible-Oracle 4.11.1.
+
+== What you need
+
+=== Server and OS
+
+* Oracle Linux 9 or RHEL 9 (this guide was tested with OL 9.5)
+* OS install DVD or ISO attached to your machine.
+* At least 50 MB free space in the /home filesystem.
+
+=== Mandatory RPMs
+
+These RPMs can be installed from the OS install image (DVD ISO).
+
+* git
+* ansible-core
+* python3-pip
+
+=== Other mandatory files
+
+Download these files on a device with Internet access and transfer them to the target server's /tmp directory.
+
+* ansible-oracle zip file from GitHub (this very repository)
+* Ansible Collections: The versions mentioned here are specific for Ansible-Oracle 4.11 and Ansible 2.14. For other versions, check the dependency list in the file "galaxy.yml" in the root directory of this repository. When downloading from Ansible Galaxy, make sure to select modules for your version Ansible.
+** https://galaxy.ansible.com/ui/repo/published/opitzconsulting/ansible_oracle/
+** https://galaxy.ansible.com/ui/repo/published/ansible/posix/ 1.5.4
+** https://galaxy.ansible.com/ui/repo/published/ansible/utils/ 5.1.0
+** https://galaxy.ansible.com/ui/repo/published/community/general/?version=9.5.4
+(for Ansible 2.14)
+** https://galaxy.ansible.com/ui/repo/published/community/crypto/
+** https://galaxy.ansible.com/ui/repo/published/ibre5041/ansible_oracle_modules/
+3.2.3
+** https://galaxy.ansible.com/ui/repo/published/devsec/hardening/ 8.8.0
+** https://galaxy.ansible.com/ui/repo/published/community/mysql/
+(Dependency for Hardening)
+* Python Packages (for `pip install`): Get them via `pip download <package>`
+** cx_Oracle OR:
+** oracledb; If you `pip download` this, you’ll also get:
+*** pycparser
+*** cffi
+*** cryptography
+
+==== Optional:
+
+* https://yum.oracle.com/repo/OracleLinux/OL9/developer/EPEL/x86_64/getPackage/tig-2.5.5-1.el9.x86_64.rpm[tig], for easier navigation of git repos.
+
+== Setup Ansible
+
+=== User
+
+[source,bash]
+----
+dnf install -y git ansible-core python3-pip
+useradd ansible
+
+su - ansible
+mkdir .ssh
+cd .ssh/
+vi authorized_keys
+ssh-keygen -t ed25519
+## No password
+## Paste the contents of id_ecdsa.pub into /root/.ssh/authorized_keys on target machine
+----
+
+=== Python Virtual Environment and Ansible Collections
+
+[source,bash]
+----
+# As ansible user
+mkdir -p /home/ansible/ansible/inventory
+cd ~/ansible
+unzip /tmp/ansible-oracle-4.11.1.zip
+mv ansible-oracle-4.11.1 ansible-oracle
+cd ansible-oracle
+echo ".venv/" >> .gitignore
+python3 -m venv .venv
+
+# Install Python Packages for this virtual environment
+source .venv/bin/activate
+pip install /tmp/python-packages/cx_Oracle-*.whl
+
+# If you want to use the newer python-oracledb instead of cx_Oracle, uncomment:
+#pip install /tmp/python-packages/pycparser
+#pip install /tmp/python-packages/cffi
+#pip install /tmp/python-packages/cryptography
+#pip install /tmp/python-packages/oracledb
+----
+
+Install packages in the virtual environment:
+
+NOTE: If you don't want the dependencies within the venv, change the `-p
+~/ansible/ansible-oracle/.venv/lib/collections` to `-p ~/ansible/ansible-oracle/playbooks/collections`. This is the default path for Ansible Navigator.
+
+[source,bash]
+----
+ansible-galaxy collection install /tmp/ansible_collections/ansible-posix-1.5.4.tar.gz -p ~/ansible/ansible-oracle/.venv/lib/collections
+ansible-galaxy collection install /tmp/ansible_collections/ansible-utils-5.1.0.tar.gz -p ~/ansible/ansible-oracle/.venv/lib/collections
+ansible-galaxy collection install /tmp/ansible_collections/community-general-9.5.4.tar.gz -p ~/ansible/ansible-oracle/.venv/lib/collections
+ansible-galaxy collection install /tmp/ansible_collections/community-crypto-2.24.0.tar.gz -p ~/ansible/ansible-oracle/.venv/lib/collections
+ansible-galaxy collection install /tmp/ansible_collections/community-mysql-3.12.0.tar.gz -p ~/ansible/ansible-oracle/.venv/lib/collections
+ansible-galaxy collection install /tmp/ansible_collections/devsec-hardening-8.8.0.tar.gz -p ~/ansible/ansible-oracle/.venv/lib/collections
+ansible-galaxy collection install /tmp/ansible_collections/ibre5041-ansible_oracle_modules-3.2.3.tar.gz -p ~/ansible/ansible-oracle/.venv/lib/collections
+ansible-galaxy collection install /tmp/ansible_collections/opitzconsulting-ansible_oracle-4.11.1.tar.gz -p ~/ansible/ansible-oracle/.venv/lib/collections
+----
+
+....
+Starting galaxy collection install process
+[WARNING]: The specified collections path '/home/ansible/ansible/ansible-oracle/collections' is not part of the configured Ansible collections paths
+'/home/ansible/.ansible/collections:/usr/share/ansible/collections'. The installed collection will not be picked up in an Ansible run, unless within a
+playbook-adjacent collections directory.
+....
+
+For background info on Ansible in a Python venv, see: https://www.redhat.com/en/blog/python-venv-ansible[How to set up and use Python virtual environments for Ansible]
+
+=== Shell Alias
+
+This alias for Bash sets the environment and jumps to the ansible-oracle directory.
+
+`alias aov='cd ~/ansible/ansible-oracle ; source .venv/bin/activate ; export ANSIBLE_COLLECTIONS_PATHS=".venv/lib/collections:$ANSIBLE_COLLECTIONS_PATHS"'`
+
+You could also define the path to the ansible collections in `ansible.cfg`:
+
+[source,ini]
+----
+[defaults]
+collections_paths = .venv/lib/collections
+----
+
+
+=== SSH Key
+
+For passwordless login, the ansible user needs a SSH key. This is optional, if you run on local connections or if you prefer to provide a password.
+
+[source,bash]
+----
+ssh-keygen -q -t ed25519 -N '' <<< $'\ny' >/dev/null 2>&1
+----
+
+Copy the contents of `id_ed25519.pub` to the target host’s root user
+into `~/.ssh/authorized_keys`.
+
+== Target Host
+
+=== cx_Oracle
+
+The target (database) host needs `cx_Oracle` installed. Ansible-Oracle
+uses this module to issue database queries. The Playbook `os.yml`
+installs this package, when it can be downloaded or when you point it to the package from your inventory, e.g., `cx_oracle_source: "file:///tmp/cx_Oracle-7.3.0-cp27-cp27mu-manylinux1_x86_64.whl"`.
+
+Otherwise, the package must be manually installed as root.
+
+==== _Optional_: install cx_Oracle manually
+
+As shown above, on the _target_ machine:
+
+[source,bash]
+----
+pip install /tmp/python-packages/cx_Oracle-*.whl
+----
+
+==== _Optional_: use python-oracledb instead
+
+The newer python-oracledb RPM is available on yum.oracle.com For OL9,
+download:
+https://yum.oracle.com/repo/OracleLinux/OL9/developer/EPEL/x86_64/getPackage/python3-oracledb-1.2.2-1.el9.x86_64.rpm
+
+[source,bash]
+----
+dnf localinstall python3-oracledb-1.2.2-1.el9.x86_64.rpm
+----
+
+== Ready to go!
+
+Activate the virtual environment by issuing `aov`.
+Then, run your playbooks as usual.

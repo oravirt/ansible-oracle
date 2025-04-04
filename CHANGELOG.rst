@@ -4,6 +4,57 @@ opitzconsulting.ansible\_oracle Release Notes
 
 .. contents:: Topics
 
+v4.13.0
+=======
+
+Minor Changes
+-------------
+
+- Added a guide on how to install Ansible-Oracle manually on a server without Internet access. (oravirt#506)
+- Fix typo for sql_zauberkasten (oravirt#509)
+- ansible-lint: more excludes (oravirt#505)
+- create OMF enabled databases using dbca's -useOMF flag (oravirt#507)
+- manage_pdb: Enter nested loop only when oracle_pdbs has an entry (oravirt#507)
+- oraapex: Added missing option to copy source from remote or local host (oravirt#512)
+- oradb_manage_db: make hard coded folder .Scripts configurable (oravirt#511)
+- oradb_tzupgrade: Add orasw_meta_internal as a dependent role (oravirt#510)
+
+Bugfixes
+--------
+
+- orahost_meta: move scripts_folder variable from common to orahost_meta (oravirt#504)
+
+v4.12.0
+=======
+
+Minor Changes
+-------------
+
+- ansible-lint: more excludes (oravirt#505)
+- common: remove screen from default rhel8,9 package list (oravirt#496)
+- orahost: firewall_service should default to firewalld on OL/EL 8 (oravirt#499)
+
+Bugfixes
+--------
+
+- common: Exclude alias interfaces when templating motd.j2 (oravirt#486)
+- common: force bool type in certain conditionals
+- fix for re global flags when extracting sga/processes parameters in orahost_meta (oravirt#493)
+- orahost_meta: Aggregate SGAs fails if no sga_target or sga_max_size is defined (oravirt#498)
+- orahost_meta: Applying 'lower' filter to oracle_databases+oracle_asm_instance converts list to string (oravirt#484)
+- oraswdb_manage_patches, oraswgi_manage_patches: make unarchive check work for combo patches too (oravirt#482)
+- set and check _oradb_tzupgrade_candidate_pdbs fact when upgrading timezone for a CDB database (oravirt#490)
+
+v4.11.1
+=======
+
+Bugfixes
+--------
+
+- devsec: changed hosts=all to hosts={{ hostgroup | default('all') }} (oravirt#479)
+- orasw_download_patches: bugfix for empty oracle_databases or oracle_pdbs (oravirt#480)
+- orasw_meta: empty oracle_databases broke orasw_download_patches (oravirt#480)
+
 v4.11.0
 =======
 

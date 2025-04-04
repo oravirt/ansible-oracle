@@ -788,7 +788,7 @@ def main():
     elif (state == 'absent' or state == 'REMOVEALL') and schema:
         # module.exit_json(msg='absent & schema', changed=False)
         if check_user_exists(module, msg, cursor, schema):
-            if remove_grants(module, msg, cursor, schema, grants, state):
+            if remove_grants(module, msg, cursor, schema, grants, object_privs, state):
                 # msg = 'The schema %s has been dropped successfully' % schema
                 module.exit_json(msg=msg, changed=True)
         else:
@@ -799,7 +799,7 @@ def main():
     elif (state == 'absent' or state == 'REMOVEALL') and role:
         # module.exit_json(msg='absent & role', changed=False)
         if check_role_exists(module, msg, cursor, role):
-            if remove_grants(module, msg, cursor, role, grants, state):
+            if remove_grants(module, msg, cursor, role, grants, object_privs, state):
                 # msg = 'The schema %s has been dropped successfully' % schema
                 module.exit_json(msg=msg, changed=True)
         else:

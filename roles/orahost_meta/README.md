@@ -30,6 +30,7 @@ Meta role used by other roles to share variable defaults.
   - [orahost_meta_java_options](#orahost_meta_java_options)
   - [orahost_meta_tmpdir](#orahost_meta_tmpdir)
   - [role_separation](#role_separation)
+  - [scripts_folder](#scripts_folder)
   - [sysctl_kernel_sem_force](#sysctl_kernel_sem_force)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
@@ -379,6 +380,16 @@ See `grid_user` and `oracle_user` for Grid-Infrastructure user.
 
 ```YAML
 role_separation: false
+```
+
+### scripts_folder
+
+Folder under Oracle user home dir to place scripts in
+
+#### Default value
+
+```YAML
+scripts_folder: .Scripts
 ```
 
 ### sysctl_kernel_sem_force

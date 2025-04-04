@@ -65,11 +65,13 @@
 - name: manage_db | Add change-pdb script
   ansible.builtin.template:
     src: pdb.sql.j2
-    dest: "{{ oracle_user_home }}/.Scripts/chpdb.sql"
+    dest: "{{ oracle_user_home }}/{{ scripts_folder }}/chpdb.sql"
     owner: "{{ oracle_user }}"
     group: "{{ oracle_group }}"
     mode: 0644
   tags: sql_script
+  when:
+    - oracle_pdbs is defined
 
 - name: Create/Modify database
   ansible.builtin.include_tasks: manage-db.yml

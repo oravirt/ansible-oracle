@@ -42,15 +42,15 @@
       ansible.builtin.set_fact:
         __orahost_oracle_database_sgas: >-
           {{ (__orahost_oracle_database_sgas | default([])) +
-          (( __orahost_oracle_database_init_parameter | selectattr('name', 'match', '^(?i)sga_max_size$') ) | length > 0 )
-          | ternary(__orahost_oracle_database_init_parameter | selectattr('name', 'match', '^(?i)sga_max_size$'),
-                    __orahost_oracle_database_init_parameter | selectattr('name', 'match', '^(?i)sga_target$')) }}
+          (( __orahost_oracle_database_init_parameter | selectattr('name', 'match', '(?i)^sga_max_size$') ) | length > 0 )
+          | ternary(__orahost_oracle_database_init_parameter | selectattr('name', 'match', '(?i)^sga_max_size$'),
+                    __orahost_oracle_database_init_parameter | selectattr('name', 'match', '(?i)^sga_target$')) }}
       loop: >-
         {{ ((oracle_databases | default([])) + (oracle_asm_instance | default([])))
         | map(attribute='init_parameters', default=[]) }}
       loop_control:
         loop_var: __orahost_oracle_database_init_parameter
-      when: (__orahost_oracle_database_init_parameter | selectattr('name', 'match', '^(?i)(sga_target|sga_max_size)$')) | length > 0
+      when: (__orahost_oracle_database_init_parameter | selectattr('name', 'match', '(?i)^(sga_target|sga_max_size)$')) | length > 0
 
     - name: Aggregate SGAs
       ansible.builtin.include_tasks: aggregate_sgas.yml
@@ -58,6 +58,7 @@
       loop_control:
         loop_var: __orahost_oracle_database_sga
         label: "{{ __orahost_oracle_database_sga.name + ': ' + __orahost_oracle_database_sga.value }}"
+      when: __orahost_oracle_database_sga is defined
 
 - name: Calculate processes aggregates
   ansible.builtin.include_tasks: aggregate_processes.yml
@@ -65,7 +66,7 @@
     {{ ((oracle_databases | default([])) + (oracle_asm_instance | default([])))
     | map(attribute='init_parameters', default=[])
     | flatten
-    | selectattr('name', 'match', '^(?i)processes$') }}
+    | selectattr('name', 'match', '(?i)^processes$') }}
   loop_control:
     loop_var: __orahost_oracle_database_processes
     label: "{{ __orahost_oracle_database_processes.name + ': ' + __orahost_oracle_database_processes.value | string }}"
@@ -102,5 +103,7 @@
 # Kernelsettings are not availible in molecule
 - name: Calculate kernel.sem
   ansible.builtin.include_tasks: calculate_kernel_semaphores.yml
+  when:
+    - oracle_databases | default([]) | length > 0
   tags:
     - molecule-notest

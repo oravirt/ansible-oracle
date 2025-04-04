@@ -39,7 +39,7 @@
       ansible.builtin.unarchive:
         src: "{{ oracle_sw_source_local }}/{{ _oraapex_archive }}"
         dest: "{{ _oraapex_homedir }}"
-        copy: true
+        remote_src: "{{ not is_sw_source_local | bool }}"
         creates: "{{ _oraapex_homedir }}/META-INF"
 
     - name: loop_databases | install APEX in PDB
