@@ -107,7 +107,7 @@
 
 - name: install_home_db | Transfer oracle installfiles to server (local)
   ansible.builtin.copy:
-    src: "{{ oracle_sw_source_local }}/{{ _local_oracle_sw_image_db }}"
+    src: "{{ _local_oracle_sw_absolute_image_db | default(oracle_sw_source_local + '/' + _local_oracle_sw_image_db, true) }}"
     dest: "{{ oracle_stage }}"
     mode: 0664
     force: false
@@ -131,7 +131,7 @@
 
 - name: install_home_db | Transfer oracle installfiles to server (www)
   ansible.builtin.get_url:
-    url: "{{ oracle_sw_source_www }}/{{ _local_oracle_sw_image_db }}"
+    url: "{{ _local_oracle_sw_absolute_image_db | default(oracle_sw_source_www + '/' + _local_oracle_sw_image_db, true) }}"
     dest: "{{ oracle_stage }}"
     mode: 0644
     force: false

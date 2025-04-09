@@ -75,3 +75,26 @@ glogin_default_cdb:
   - "set heading on"
   - "set termout on"
   - "set time on"
+
+# @var oracle_sw_image_db:description: >
+# Mapping for installation media for Oracle
+# image files are expected to be found by their `filename` under `oracle_sw_source_local`, or `oracle_sw_source_www` respectively,
+# unless a `filesource` dict element provides a full path / complete URL to the patch file.
+#
+# Formerly, this dict was defined directly as vars/_oraswdb_install_oracle_sw_image_db, where it still will be copied to for compatibility reasons
+# @end
+oracle_sw_image_db:
+  - {filename: LINUX.X64_213000_db_home.zip, version: 21.3.0.0, creates: 'install/.img.bin'}
+  - {filename: LINUX.X64_193000_db_home.zip, version: 19.3.0.0, creates: 'install/.img.bin', filesource: /mnt/software/LINUX.X64_193000_db_home.zip}
+  - {filename: LINUX.X64_180000_db_home.zip, version: 18.3.0.0, creates: 'install/.img.bin', filesource: "https://downloadserver/dbsw?version=18.3.0.0"}
+  - {filename: linuxx64_12201_database.zip, version: 12.2.0.1, creates: 'database/runInstaller'}
+  - {filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2, creates: 'database/stage/sizes/oracle.server.Custom.sizes.properties'}
+  - {filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2, creates: 'database/install/.oui'}
+  - {filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1, creates: 'database/runInstaller'}
+  - {filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1, creates: 'database/runInstaller'}
+  - {filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4, creates: 'database/install/resource/cons_zh_TW.nls'}
+  - {filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4, creates: 'database/stage/Components/oracle.db/11.2.0.4.0/1/DataFiles/filegroup18.jar'}
+  - {filename: p10404530_112030_Linux-x86-64_1of7.zip, version: 11.2.0.3, creates: 'database/readme.html'}
+  - filename: p10404530_112030_Linux-x86-64_2of7.zip
+    version: 11.2.0.3
+    creates: 'database/stage/Components/oracle.sysman.console.db/11.2.0.3.0/1/DataFiles/filegroup2.jar'

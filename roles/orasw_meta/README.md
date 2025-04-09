@@ -126,6 +126,7 @@ The dictionary holds data for:
 | Attribute | Description |
 | --- | --- |
 | imagename | Set an optional name for a golden Image to install from. The archiv is read from same directory as the normal installation medias from Oracle. |
+| filesource | `imagename` can be replaced/overridden by `filesource` to provide an absolute path/url to the golden image (when not available in the normal installation place) |
 | edition | allowed values: `SE`, `SE2`, `EE`. default value: <todo> |
 | opatch_minversion | Is needed for patching. Automatically installs a new version of OPatch, when existing version is older then `opatch_minversion` |
 | oracle_home | |
@@ -807,9 +808,12 @@ oracle_stage_remote: '{{ oracle_stage }}'
 
 Defines the list of known Patches in `ansible-oracle`.
 
+Patch files are expected to be found by their `filename` under `oracle_sw_source_local`, or `oracle_sw_source_www` respectively,
+unless a `filesource` dict element provides a full path / complete URL to the patch file.
+
 Usage of this variable:
 
-If a complete software repository with pathches is used with a nfs-mount, this variable is not needed.
+If a complete software repository with patches is used with a nfs-mount, this variable is not needed.
 
 #### Default value
 
@@ -822,12 +826,14 @@ oracle_sw_patches: []
 ```YAML
 oracle_sw_patches:
   - filename: p28183653_122010_Linux-x86-64.zip
+    filesource: /mnt/patches/p28183653_122010_Linux-x86-64.zip
     patchid: 28183653
     version: 12.2.0.1
     patchversion: 12.2.0.1.180717
     description: GI-RU-July-2018
     creates: 28183653/28163133/files/suptools/orachk.zip
   - filename: p27468969_122010_Linux-x86-64.zip
+    filesource: https://downloadserver/patches?id=27468969
     patchid: 27468969
     version: 12.2.0.1
     patchversion: 12.2.0.1.180417

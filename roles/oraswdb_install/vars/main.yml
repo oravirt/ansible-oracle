@@ -40,23 +40,7 @@ _oraswdb_install_patch_upisubdir: >-
   | ternary(osp_loop.unique_patchid,
   |  osp_loop.patchid) }}/
 
-
-# Mapping for installation media for Oracle
-_oraswdb_install_oracle_sw_image_db:
-  - {filename: LINUX.X64_213000_db_home.zip, version: 21.3.0.0, creates: 'install/.img.bin'}
-  - {filename: LINUX.X64_193000_db_home.zip, version: 19.3.0.0, creates: 'install/.img.bin'}
-  - {filename: LINUX.X64_180000_db_home.zip, version: 18.3.0.0, creates: 'install/.img.bin'}
-  - {filename: linuxx64_12201_database.zip, version: 12.2.0.1, creates: 'database/runInstaller'}
-  - {filename: linuxamd64_12102_database_1of2.zip, version: 12.1.0.2, creates: 'database/stage/sizes/oracle.server.Custom.sizes.properties'}
-  - {filename: linuxamd64_12102_database_2of2.zip, version: 12.1.0.2, creates: 'database/install/.oui'}
-  - {filename: linuxamd64_12c_database_1of2.zip, version: 12.1.0.1, creates: 'database/runInstaller'}
-  - {filename: linuxamd64_12c_database_2of2.zip, version: 12.1.0.1, creates: 'database/runInstaller'}
-  - {filename: p13390677_112040_Linux-x86-64_1of7.zip, version: 11.2.0.4, creates: 'database/install/resource/cons_zh_TW.nls'}
-  - {filename: p13390677_112040_Linux-x86-64_2of7.zip, version: 11.2.0.4, creates: 'database/stage/Components/oracle.db/11.2.0.4.0/1/DataFiles/filegroup18.jar'}
-  - {filename: p10404530_112030_Linux-x86-64_1of7.zip, version: 11.2.0.3, creates: 'database/readme.html'}
-  - filename: p10404530_112030_Linux-x86-64_2of7.zip
-    version: 11.2.0.3
-    creates: 'database/stage/Components/oracle.sysman.console.db/11.2.0.3.0/1/DataFiles/filegroup2.jar'
+_oraswdb_install_oracle_sw_image_db: "{{ oracle_sw_image_db }}"
 
 _oraswdb_install_oracle_directories:
   - {name: "{{ oracle_stage }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: 775}
@@ -85,4 +69,11 @@ _local_oracle_sw_image_db: >-
       | default((_oraswdb_install_oracle_sw_image_db
         | selectattr('version', 'equalto', db_homes_config[dbh.home]['version'])
         | list)[0]['filename']
+      ) }}
+
+_local_oracle_sw_absolute_image_db: >-
+  {{ db_homes_config[dbh.home].filesource
+      | default((_oraswdb_install_oracle_sw_image_db
+        | selectattr('version', 'equalto', db_homes_config[dbh.home]['version'])
+        | list)[0]['filesource']
       ) }}

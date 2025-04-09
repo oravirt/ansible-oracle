@@ -56,7 +56,7 @@
 
         - name: Loop_stage_patch | Copy oracle GI patch (opatch) to server (local)
           ansible.builtin.copy:
-            src: "{{ oracle_sw_source_local }}/{{ osp_loop.filename }}"
+            src: "{{ osp_loop.filesource | default(oracle_sw_source_local + '/' + osp_loop.filename, true) }}"
             dest: "{{ oracle_stage }}/{{ osp_loop.filename }}"
             mode: "0644"
             force: false
@@ -66,7 +66,7 @@
 
         - name: Loop_stage_patch | Copy oracle GI patch (opatch) to server (www)
           ansible.builtin.get_url:
-            url: "{{ oracle_sw_source_www }}/{{ osp_loop.filename }}"
+            url: "{{ osp_loop.filesource | default(oracle_sw_source_www + '/' + osp_loop.filename, true) }}"
             dest: "{{ oracle_stage }}/{{ osp_loop.filename }}"
             mode: "0644"
             force: false

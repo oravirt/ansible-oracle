@@ -1,6 +1,6 @@
 ---
 - name: install_home_gi | Copy oracle installfiles to server (GI) (web - curl)
-  ansible.builtin.shell: "curl -o {{ oracle_stage }}/{{ item.filename }} {{ oracle_sw_source_www }}/{{ item.filename }}"
+  ansible.builtin.shell: "curl -o {{ oracle_stage }}/{{ item.filename }} {{ item.filesource | default(oracle_sw_source_www + '/' + item.filename, true) }}"
   # noqa command-instead-of-shell command-instead-of-module
   with_items: "{{ oracle_sw_image_gi }}"
   become: true
