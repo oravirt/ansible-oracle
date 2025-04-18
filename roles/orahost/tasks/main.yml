@@ -85,9 +85,6 @@
     uid: "{{ item.uid | default(omit) }}"
     home: "{{ item.home | default(omit) }}"
     generate_ssh_key: true
-    ssh_key_type: "{{ orahost_ssh_key_type }}"
-    ssh_key_bits: "{{ orahost_ssh_key_size }}"
-    ssh_key_file: ".ssh/id_{{ orahost_ssh_key_type }}"
     append: true
     state: present
     password: "{{ item.passwd | default(omit) }}"
@@ -103,9 +100,6 @@
     uid: "{{ item.uid | default(omit) }}"
     home: "{{ item.home | default(omit) }}"
     generate_ssh_key: true
-    ssh_key_type: "{{ orahost_ssh_key_type }}"
-    ssh_key_bits: "{{ orahost_ssh_key_size }}"
-    ssh_key_file: ".ssh/id_{{ orahost_ssh_key_type }}"
     append: true
     state: present
     password: "{{ item.passwd | default(omit) }}"
@@ -139,26 +133,137 @@
   tags:
     - sudoadd
 
-- name: SSH key setup
+- name: ssh-keys | Generate SSH keys
+  local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys  # noqa yaml no-handler deprecated-local-action ignore-errors no-changed-when fqcn[action-core]
+  ignore_errors: true
   when:
     - configure_ssh
     - _oraswgi_meta_configure_cluster
+    - old_ssh_config
+    - _orasw_meta_primary_node | bool
+  become: false
   tags:
     - sshkeys
-  block:
-    - name: ssh-keys | Setup ssh user equivalence for oracle users
-      ansible.builtin.include_tasks: ssh_user_equivalence.yml
-      vars:
-        _orahost_equivalence_users: "{{ oracle_users }}"
-      when:
-        - not role_separation   # TODO: or RAC option in use
 
-    - name: ssh-keys | Setup ssh user equivalence for grid users
-      ansible.builtin.include_tasks: ssh_user_equivalence.yml
-      vars:
-        _orahost_equivalence_users: "{{ grid_users }}"
-      when:
-        - role_separation
+- name: ssh-keys | Add ssh-keys & authorized_keys to oracle user
+  ansible.builtin.copy:
+    src: "{{ item[1] }}"
+    dest: "{{ item[0].home | default(oracle_user_home | regex_replace('[^/]+$', '') + item[0].username) }}/.ssh"
+    owner: "{{ item[0].username }}"
+    group: "{{ item[0].primgroup }}"
+    force: true
+    mode: "0600"
+  when:
+    - configure_ssh
+    - _oraswgi_meta_configure_cluster
+    - old_ssh_config
+  with_nested:
+    - "{{ oracle_users }}"
+    - "{{ ssh_keys }}"
+  tags:
+    - sshkeys
+
+- name: ssh-keys | Add ssh-keys & authorized_keys to grid user
+  ansible.builtin.copy:
+    src: "{{ item[1] }}"
+    dest: "{{ item[0].home | default(oracle_user_home | regex_replace('[^/]+$', '') + item[0].username) }}/.ssh"
+    owner: "{{ item[0].username }}"
+    group: "{{ item[0].primgroup }}"
+    force: true
+    mode: 0600
+  when:
+    - configure_ssh
+    - _oraswgi_meta_configure_cluster
+    - role_separation
+    - old_ssh_config
+  with_nested:
+    - "{{ grid_users }}"
+    - "{{ ssh_keys }}"
+  tags:
+    - sshkeys
+
+- name: ssh-keys | Add short name to known_hosts
+  local_action: shell ssh-keyscan -p {{ ansible_ssh_port | default(22) }} -H {{ ansible_hostname }} 2> /dev/null >> {{ keyfile }}  # noqa deprecated-local-action ignore-errors
+  # noqa fqcn[action-core] no-changed-when
+  ignore_errors: true
+  become: false
+  when:
+    - configure_ssh
+    - _oraswgi_meta_configure_cluster
+    - old_ssh_config
+  tags:
+    - sshkeys
+
+- name: ssh-keys | Add FQDN to known_hosts
+  local_action: shell ssh-keyscan -p {{ ansible_ssh_port | default(22) }} -H {{ ansible_fqdn }} 2> /dev/null >> {{ keyfile }}  # noqa yaml ignore-errors deprecated-local-action
+  # noqa fqcn[action-core] no-changed-when
+  ignore_errors: true
+  become: false
+  when:
+    - configure_ssh
+    - _oraswgi_meta_configure_cluster
+    - old_ssh_config
+  tags:
+    - sshkeys
+
+- name: ssh-keys | Add IPv4 to known_hosts
+  local_action: shell ssh-keyscan -p {{ ansible_ssh_port | default(22) }} -H {{ ansible_default_ipv4.address }} 2> /dev/null >> {{ keyfile }}  # noqa ignore-errors deprecated-local-action
+  # noqa fqcn[action-core] no-changed-when
+  ignore_errors: true
+  become: false
+  when:
+    - configure_ssh
+    - _oraswgi_meta_configure_cluster
+    - old_ssh_config
+  tags:
+    - sshkeys
+
+- name: ssh-keys | Copy known_hosts to oracle user
+  ansible.builtin.copy:
+    src: "{{ keyfile }}"
+    dest: "{{ item.home | default(oracle_user_home | regex_replace('[^/]+$', '') + item.username) }}/.ssh/known_hosts"
+    owner: "{{ item.username }}"
+    group: "{{ item.primgroup }}"
+    mode: "0644"
+  with_items: "{{ oracle_users }}"
+  when:
+    - configure_ssh
+    - _oraswgi_meta_configure_cluster
+    - old_ssh_config
+  tags:
+    - sshkeys
+
+- name: ssh-keys | Copy known_hosts to grid user
+  ansible.builtin.copy:
+    src: "{{ keyfile }}"
+    dest: "{{ item.home | default(oracle_user_home | regex_replace('[^/]+$', '') + item.username) }}/.ssh/known_hosts"
+    owner: "{{ item.username }}"
+    group: "{{ item.primgroup }}"
+    mode: "0644"
+  with_items: "{{ grid_users }}"
+  when:
+    - configure_ssh
+    - _oraswgi_meta_configure_cluster
+    - role_separation
+    - old_ssh_config
+  tags:
+    - sshkeys
+
+- name: ssh-keys | Remove generated keys from control machine
+  local_action: file path="{{ item }}" state=absent  # noqa deprecated-local-action ignore-errors
+  # noqa fqcn[action-core]
+  with_items:
+    - "{{ ssh_keys }}"
+    - "{{ keyfile }}"
+  when:
+    - configure_ssh
+    - _oraswgi_meta_configure_cluster
+    - old_ssh_config
+    - _orasw_meta_primary_node | bool
+  ignore_errors: true
+  become: false
+  tags:
+    - sshkeys
 
 - name: filesystem | configure hostfs
   when:
