@@ -24,7 +24,7 @@
 - name: oradb_tzupgrade | Get all open PDBs
   opitzconsulting.ansible_oracle.oracle_sqldba:
     sqlselect: >-
-      select listagg(name, ' ') within group (order by name) pdb_list
+      select name pdb_list
       from v$pdbs
       where open_mode in ('READ WRITE', 'MIGRATE')
     oracle_home: "{{ _oracle_home_db }}"
@@ -32,10 +32,10 @@
   become_user: "{{ oracle_user }}"
   become: true
   register: pdbs_info
-
+ 
 - name: oradb_tzupgrade | Set facts for pdbs_info
   ansible.builtin.set_fact:
-    _oradb_tzupgrade_candidate_pdbs: "{{ pdbs_info.state.ROW[0].PDB_LIST | default('') }}"
+    _oradb_tzupgrade_candidate_pdbs: "{{ pdbs_info.state.ROW | map(attribute='PDB_LIST') | list | join(' ') }}"
 
 - name: oradb_tzupgrade | Show facts for pdbs_info
   ansible.builtin.debug:
