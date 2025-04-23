@@ -1,5 +1,5 @@
 ---
-- name: oradb_tzupgrade | Perform timezone checks for a non-CDB database
+- name: non_cdb | Perform timezone checks for a non-CDB database
   opitzconsulting.ansible_oracle.oracle_sqldba:
     sql: "@?/rdbms/admin/utltz_upg_check.sql"
     creates_sql: "{{ _oradb_tzupgrade_tz_check_query }}"
@@ -8,7 +8,7 @@
   become: true
   become_user: "{{ oracle_user }}"
 
-- name: oradb_tzupgrade | Apply the timezone upgrade for the non-CDB database
+- name: non_cdb | Apply the timezone upgrade for the non-CDB database
   opitzconsulting.ansible_oracle.oracle_sqldba:
     sql: "@?/rdbms/admin/utltz_upg_apply.sql"
     creates_sql: "{{ _oradb_tzupgrade_tz_check_query }}"
@@ -17,7 +17,7 @@
   become: true
   become_user: "{{ oracle_user }}"
 
-- name: oradb_tzupgrade | Get post upgrade timezone status info
+- name: non_cdb | Get post upgrade timezone status info
   opitzconsulting.ansible_oracle.oracle_sqldba:
     sql: |
       set lines 200
@@ -35,6 +35,6 @@
   changed_when: false
   register: post_status_info
 
-- name: oradb_tzupgrade | Show post upgrade timezone status info
+- name: non_cdb | Show post upgrade timezone status info
   ansible.builtin.debug:
     msg: "{{ post_status_info.msg | split('\n') }}"
