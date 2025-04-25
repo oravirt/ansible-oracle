@@ -32,7 +32,7 @@
   become_user: "{{ oracle_user }}"
   become: true
   register: pdbs_info
- 
+
 - name: cdb | Set facts for pdbs_info
   ansible.builtin.set_fact:
     _oradb_tzupgrade_candidate_pdbs: "{{ pdbs_info.state.ROW | map(attribute='PDB_LIST') | list | join(' ') }}"
