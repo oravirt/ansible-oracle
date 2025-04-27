@@ -4,6 +4,27 @@ opitzconsulting.ansible\_oracle Release Notes
 
 .. contents:: Topics
 
+v4.13.1
+=======
+
+Minor Changes
+-------------
+
+- Upgrade ansible-doctor 6.0.5 and pre-commit (oravirt#517)
+- ansible-lint upgrade to 25.2.1 (oravirt#517)
+- helper script for building releases (oravirt#518)
+- nix: Adding direnv and nix configuration for easy setup of dev environment via nix-shell (oravirt#517)
+
+Security Fixes
+--------------
+
+- ansible-core: Upgrade versions due to security alerts from dependbot (oravirt#517)
+
+Bugfixes
+--------
+
+- oradb_tzupgrade_pdbs: compose the list of PDBs in Ansible (oravirt#516)
+
 v4.13.0
 =======
 
