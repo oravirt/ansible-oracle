@@ -146,7 +146,6 @@ sysasmpassword: '{{ default_gipass }}'
 
 **_assert_ansible_oracle_**
 
-
 ## Dependencies
 
 None.

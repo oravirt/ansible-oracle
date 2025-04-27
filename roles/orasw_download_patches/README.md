@@ -133,8 +133,6 @@ Enable Proxy for Download
 use_proxy: false
 ```
 
-
-
 ## Dependencies
 
 - orasw_meta

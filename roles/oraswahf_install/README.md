@@ -16,8 +16,6 @@ Install Oracle Autonomous Health Framework
 - Minimum Ansible version: `2.14.0`
 
 
-
-
 ## Dependencies
 
 - orasw_meta

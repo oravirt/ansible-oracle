@@ -36,7 +36,6 @@ cron_config:
 
 **_cron_**
 
-
 ## Dependencies
 
 None.

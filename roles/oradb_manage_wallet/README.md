@@ -78,7 +78,6 @@ oracle_wallet_show_password: false
 
 **_always_**
 
-
 ## Dependencies
 
 - orasw_meta

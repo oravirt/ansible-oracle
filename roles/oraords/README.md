@@ -135,8 +135,9 @@ APEX context path for Images.
 
 ## Discovered Tags
 
-**_ords_config_**
+**_always_**
 
+**_ords_config_**
 
 ## Dependencies
 

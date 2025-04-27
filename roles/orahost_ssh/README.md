@@ -33,8 +33,6 @@ Example for oracle:
 orahost_ssh_keyname: id_ed25519
 ```
 
-
-
 ## Dependencies
 
 - orahost_meta

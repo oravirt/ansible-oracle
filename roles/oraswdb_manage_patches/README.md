@@ -64,7 +64,6 @@ oraswdb_manage_patches_force_opatch_upgrade: false
 
 **_ocmconfig_**
 
-
 ## Dependencies
 
 - orasw_meta

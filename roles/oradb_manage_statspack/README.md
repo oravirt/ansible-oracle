@@ -87,7 +87,6 @@ snaplevel: 7
 **_statspack_**\
 &emsp;Do all Tasks for Statspack
 
-
 ## Dependencies
 
 - orasw_meta

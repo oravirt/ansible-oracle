@@ -16,8 +16,6 @@ Manage timezone upgrades for an Oracle Database
 - Minimum Ansible version: `2.14.0`
 
 
-
-
 ## Dependencies
 
 - orahost_meta

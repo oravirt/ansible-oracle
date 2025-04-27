@@ -99,7 +99,6 @@ unarchive apex.zip in RAC only on 1st node or on all nodes?
 This is only true, when ORDS runs on RAC nodes as well, because we need
 the images for ORDS. This should not be done on production setups!
 
-
 ## Open Tasks
 
 - (information): oraapex_rac_primary_only not implemented yet.

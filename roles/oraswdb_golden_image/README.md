@@ -43,7 +43,6 @@ oraswdb_golden_image_create: false
 
 **_golden_image_db_**
 
-
 ## Dependencies
 
 - orasw_meta

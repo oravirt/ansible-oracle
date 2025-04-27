@@ -21,7 +21,6 @@ Manage database profiles in Oracle
 
 **_dbprofiles_**
 
-
 ## Dependencies
 
 - orasw_meta

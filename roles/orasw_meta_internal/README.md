@@ -541,8 +541,6 @@ oracle_sw_extract_path: "{%- if '18' in db_version -%}{{ oracle_home_db }}{%- el
 oracle_sw_unpack: '{% if install_from_nfs %}false{% else %}true{% endif %}'
 ```
 
-
-
 ## Dependencies
 
 None.

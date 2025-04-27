@@ -25,7 +25,6 @@ Install/Remove Patches from Oracle Database Homes
 
 **_current_opatch_version_**
 
-
 ## Dependencies
 
 - orahost_meta

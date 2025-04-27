@@ -211,7 +211,6 @@ oradb_rman_wallet_password: "{{ rman_wallet_password | default('oracleWallet1') 
 
 **_wallet_contents_**
 
-
 ## Dependencies
 
 - orasw_meta

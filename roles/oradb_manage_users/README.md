@@ -21,7 +21,6 @@ Manage Users in Oracle
 
 **_users_**
 
-
 ## Dependencies
 
 - orasw_meta

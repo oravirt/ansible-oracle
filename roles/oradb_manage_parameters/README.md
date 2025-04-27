@@ -50,7 +50,6 @@ restart_spparameter_changed: false
 **_spfile_bounce_**\
 &emsp;Bounce database when changed parameter need a restart.
 
-
 ## Dependencies
 
 - orasw_meta
