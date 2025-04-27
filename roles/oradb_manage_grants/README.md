@@ -27,7 +27,6 @@ Manage grants for users in Oracle Databases
 
 **_users_**
 
-
 ## Dependencies
 
 - orasw_meta

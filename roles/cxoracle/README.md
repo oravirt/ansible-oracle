@@ -87,7 +87,6 @@ use_proxy: false
 
 **_cx_oracle_**
 
-
 ## Dependencies
 
 None.

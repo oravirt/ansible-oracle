@@ -118,7 +118,6 @@ Setup of logrotate/cleanup is optional
 orahost_logrotate_setup_logrotate: true
 ```
 
-
 ## Open Tasks
 
 - (bug): oracle_home_gi variables require a central meta role

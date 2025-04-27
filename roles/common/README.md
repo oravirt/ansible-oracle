@@ -406,7 +406,6 @@ ol7_repo_file: public-yum-ol7.repo
 
 **_olrepo_**
 
-
 ## Dependencies
 
 - global_handlers

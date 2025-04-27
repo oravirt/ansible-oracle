@@ -56,7 +56,6 @@ oracluvfy_home: '{{ oracle_base }}/product/cluvfy'
 
 **_assert_**
 
-
 ## Dependencies
 
 - orasw_meta

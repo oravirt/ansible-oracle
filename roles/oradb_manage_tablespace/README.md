@@ -21,7 +21,6 @@ Manage Tablespaces in Oracle
 
 **_tablespace_**
 
-
 ## Dependencies
 
 - orasw_meta

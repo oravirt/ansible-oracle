@@ -35,8 +35,6 @@ or just displays a reboot advice (false)
 restart_on_requirement: false
 ```
 
-
-
 ## Dependencies
 
 None.

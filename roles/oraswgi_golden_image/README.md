@@ -57,7 +57,6 @@ oraswgi_golden_image_filename: >-
 
 **_golden_image_gi_**
 
-
 ## Dependencies
 
 - orasw_meta

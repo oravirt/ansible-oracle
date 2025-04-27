@@ -50,7 +50,6 @@ pdbadmin_user: >-
 
 **_pdb_**
 
-
 ## Dependencies
 
 - orasw_meta

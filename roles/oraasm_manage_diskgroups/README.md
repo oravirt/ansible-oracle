@@ -26,7 +26,6 @@ Do not set them in inventory!
 
 **_diskgroup_**
 
-
 ## Dependencies
 
 - orasw_meta

@@ -411,7 +411,6 @@ sysctl_kernel_sem_force: false
 
 **_molecule-notest_**
 
-
 ## Dependencies
 
 - oraswgi_meta
