@@ -53,13 +53,8 @@
     - _orasw_meta_primary_node | bool
 
 - name: install_home_gi | Install cvuqdisk rpm
-  ansible.builtin.yum:  # noqa fqcn[action-core]
-    name: "{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}"
-    state: present
-  # noqa ignore-errors
-  when: _oraswgi_meta_configure_cluster
+  ansible.builtin.include_tasks: "install_cvuqdisk.yml"
   tags: cvuqdisk
-  ignore_errors: true
 
 - name: install_home_gi | Recreate ORACLE_HOME (gi) on other nodes
   ansible.builtin.file:

@@ -1,0 +1,23 @@
+---
+- name: install_home_gi | Install cvuqdisk rpm
+  # noqa ignore-errors
+  when:
+    - _oraswgi_meta_configure_cluster
+  tags: cvuqdisk
+  ignore_errors: true
+  block:
+    - name: install_home_gi | Install cvuqdisk rpm (non-FIPS)
+      ansible.builtin.yum:  # noqa fqcn[action-core]
+        name: "{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}"
+        state: present
+      when:
+        - not ansible_fips
+
+    - name: install_home_gi | Install cvuqdisk rpm (FIPS)
+      # noqa command-instead-of-module
+      ansible.builtin.command:
+        "rpm --upgrade --nodigest --nofiledigest {{ oracle_rsp_stage }}/{{ cvuqdisk_rpm }}"
+      register: _oraswgi_install_cvuqdisk_result
+      changed_when: _oraswgi_install_cvuqdisk_result.rc == 0
+      when:
+        - ansible_fips
