@@ -98,10 +98,7 @@
       tags: cvuqdisk
 
     - name: include 19c/21c | Install cvuqdisk rpm
-      ansible.builtin.yum:  # noqa fqcn[action-core]
-        name: "{{ oracle_rsp_stage }}/{{ cvuqdisk_rpm }}"
-        state: present
-        disable_gpg_check: true
+      ansible.builtin.include_tasks: "install_cvuqdisk.yml"
       tags: cvuqdisk
 
 # @todo information: add selectattr to asm_diskgroups
