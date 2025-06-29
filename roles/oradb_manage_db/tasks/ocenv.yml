@@ -18,6 +18,11 @@
         group: "{{ oracle_group }}"
         mode: '0644'
 
+    - name: manage_db | Check if .bashrc exists
+      ansible.builtin.stat:
+        path: "{{ oracle_user_home }}/.bashrc"
+      register: bashrc_status
+
     # OUI in RAC mode has issues with echo in '.bashrc'
     # Move the echo to .bash_profile
     # This task should be removed in a later Release of ansible-oracle
@@ -27,6 +32,7 @@
         marker: "# {mark} ocenv ANSIBLE MANAGED BLOCK"
         backup: false
         state: absent
+      when: bashrc_status.stat.exists
 
     - name: manage_db | add ocenv to .bash_profile  # noqa: args[module]
       ansible.builtin.blockinfile:
