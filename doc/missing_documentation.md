@@ -16,7 +16,7 @@
    -- operations with ansible-oracle
 - explain concepts around ansible collection
 - meaning of files and directories
-- venv, differnt versions of python / ansible
+- venv, different versions of python / ansible
 - ansible controller
 - why rendanic Linux, why not standard OL? (security concerns)
 
@@ -54,7 +54,7 @@ ansible-oracle currently works for OL7/8, RHEL7/8
 
 
 ## logging
-- first beginner installation, runing from ansible-container to OL VM took 7 hours
+- first beginner installation, running from ansible-container to OL VM took 7 hours
 - no timing in log on-screen
 - where can I find the log files?
 
@@ -146,7 +146,7 @@ create a new directory under inventory (e.g. copy the existing "dbfs" directory 
 1. software_src.yml choose e.g. source directory, local or nfs, unzip (Y/N), etc.
 1. dev_sec.yml choose hardening options
 in directory "has", you can see other possibilities
-1. database.yml, exact sizing of Tablepsaces, memory, etc.
+1. database.yml, exact sizing of Tablespaces, memory, etc.
 1. asm.yml (setup ASM disks)
 
 
