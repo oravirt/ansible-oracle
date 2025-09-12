@@ -71,10 +71,12 @@
     state: directory
   with_items:
     - "{{ db_homes_installed }}"
+  loop_control:
+    loop_var: dbh
   when:
-    - _orasw_meta_primary_node | bool
+    - _orasw_meta_primary_node | bool or _oraswdb_install_home_type=='SI'
     - db_homes_installed is defined
-    - item.state | lower == 'present'
+    - dbh.state | lower == 'present'
   tags:
     - directoriesdb
 
@@ -86,9 +88,11 @@
     group: "{{ oracle_group }}"
     state: directory
   with_items: "{{ db_homes_installed }}"
+  loop_control:
+    loop_var: dbh
   when:
-    - db_homes_config[item.home] is defined
-    - item.state|lower == 'present'
+    - db_homes_config[dbh.home] is defined
+    - dbh.state|lower == 'present'
   tags:
     - directoriesdb
 
@@ -121,7 +125,7 @@
       home: "{{ dbh.home }}"
       imgname: "{{ _local_oracle_sw_image_db | default('') }}"
   when:
-    - _orasw_meta_primary_node | bool
+    - _orasw_meta_primary_node | bool or _oraswdb_install_home_type=='SI'
     - dbh.state == 'present'
     - is_sw_source_local
     - oracle_sw_copy
@@ -145,6 +149,7 @@
       home: "{{ dbh.home }}"
       imgname: "{{ _local_oracle_sw_image_db | default('') }}"
   when:
+    - _orasw_meta_primary_node | bool or _oraswdb_install_home_type=='SI'
     - dbh.state == 'present'
     - not is_sw_source_local
     - oracle_sw_copy

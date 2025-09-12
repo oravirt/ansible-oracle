@@ -86,3 +86,10 @@ _local_oracle_sw_image_db: >-
         | selectattr('version', 'equalto', db_homes_config[dbh.home]['version'])
         | list)[0]['filename']
       ) }}
+
+_oraswdb_install_home_type: >-
+  {{ (oracle_databases
+      | selectattr('home','equalto',dbh.home)
+      | selectattr('state','equalto','present')
+      | map(attribute='oracle_db_type',default='SI')
+      | unique)[0] }}
