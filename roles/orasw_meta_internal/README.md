@@ -21,6 +21,7 @@ This will create issues and problems in `ansible-oracle` and is not supported.
   - [_odb_loop_helper](#_odb_loop_helper)
   - [_opdb_home](#_opdb_home)
   - [_opdb_loop_helper](#_opdb_loop_helper)
+  - [_oracle_all_editions_options](#_oracle_all_editions_options)
   - [_oracle_db_instance_name](#_oracle_db_instance_name)
   - [_oracle_db_unique_name](#_oracle_db_unique_name)
   - [_oracle_ee_opiton_dict](#_oracle_ee_opiton_dict)
@@ -39,6 +40,7 @@ This will create issues and problems in `ansible-oracle` and is not supported.
   - [listener_port_template](#listener_port_template)
   - [listener_protocols](#listener_protocols)
   - [ocm_response_file](#ocm_response_file)
+  - [oracle_all_editions_options](#oracle_all_editions_options)
   - [oracle_env](#oracle_env)
   - [oracle_env_lsnrctl](#oracle_env_lsnrctl)
   - [oracle_home_db](#oracle_home_db)
@@ -199,6 +201,13 @@ Do not set it in inventory!
 ```YAML
 _opdb_loop_helper: _internal_used_
 ```
+
+### _oracle_all_editions_options
+
+Defines linkable options available for all editions of oracle database (e.g. Unified auditing, DirectNFS)
+Dictionary key (dnfs, uniaud, etc.), suffixed by _on/_off, must match the make target in {{ oracle_home_db }}/rdbms/lib/ins_rdbms.mk
+match_file: File relative to {{ oracle_home_db }} where to grep for current state of the option
+enabled_matches: Pattern that matches in match_file if option currently is enabled
 
 ### _oracle_db_instance_name
 
@@ -412,6 +421,37 @@ listener_protocols: TCP
 
 ```YAML
 ocm_response_file: '{{ oracle_patch_stage }}/{{ db_version }}/ocm.rsp'
+```
+
+### oracle_all_editions_options
+
+#### Default value
+
+```YAML
+oracle_all_editions_options:
+  21.3.0.0: &213_all_editions_options
+    dnfs:
+      match_file: rdbms/lib/odm/libnfsodm??.so
+      enabled_matches: .*
+    uniaud:
+      match_file: rdbms/lib/libknlopt.a
+      enabled_matches: \bkzaiang\.
+  19.3.0.0:
+    <<: *213_all_editions_options
+  18.3.0.0:
+    <<: *213_all_editions_options
+  12.2.0.1:
+    <<: *213_all_editions_options
+  12.1.0.2:
+    <<: *213_all_editions_options
+  12.1.0.1:
+    <<: *213_all_editions_options
+  11.2.0.4: &1124_all_editions_options
+    dnfs:
+      match_file: rdbms/lib/odm/libnfsodm??.so
+      enabled_matches: .*
+  11.2.0.3:
+    <<: *1124_all_editions_options
 ```
 
 ### oracle_env
