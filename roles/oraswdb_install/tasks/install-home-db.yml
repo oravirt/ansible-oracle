@@ -90,46 +90,102 @@
 
 - ansible.builtin.include_tasks: "{{ db_version }}.yml"  # noqa name[missing]
 
-# oracle_ee_options = '' => Nothing to do
-# licence options in 11.2+ must be changed by chopt
-# => use this method for all >= 11.2 (Doc ID 948061.1)
-# touch a statefile instead checking the logfile from chopt
-# we cannot use default/main.yml here. => complicated structure for 'enabled' 'disabled'...
-# check for running processes on $ORACLE_HOME/bin/oracle
-# 1st check for installed lsof, because systems could miss it...
-- name: install_home_db | Change Database options with chopt
-  ansible.builtin.shell: |
-    set -eu
-    if lsof > /dev/null  2>&1 ; then
-      if lsof {{ oracle_home_db }}/bin/oracle > /dev/null 2>&1 ; then
-        echo "running Oracle processes found. Aborting chopt!"
-        exit 10
-      fi
-    else
-      echo "Please install lsof"
-      exit 9
-    fi
-    {{ oracle_home_db }}/bin/chopt {{ item.state | replace(true, 'enable') | replace(false, 'disable') }} {{ item.option }} \
-    && touch {{ oracle_home_db }}/install/chopt_{{ item.option }}_{{ item.state }}.state
-  args:
-    creates: "{{ oracle_home_db }}/install/chopt_{{ item.option }}_{{ item.state }}.state{{ _oraswdb_install_choptcheck }}"
-  with_items:
-    - "{{ oracle_ee_options }}"
+- name: install_home_db | Handle linkable database options
   become: true
   become_user: "{{ oracle_user }}"
-  register: choptout
-  changed_when: '"Writing" in choptout.stdout'
-  when:
-    - db_homes_config[dbh.home]['edition'] == 'EE'
-    - oracle_ee_options is defined
-    - disable_ee_options
-  loop_control:
-    label: >-
-      {{ oracle_home_db }}
-      {{ item.state | replace(true, 'enable') | replace(false, 'disable') }}
-      {{ item.option }}
   tags:
     - dbchopt
+  block:
+
+    - name: install_home_db | Check for running processes on $ORACLE_HOME/bin/oracle
+      # check for running processes on $ORACLE_HOME/bin/oracle
+      # 1st check for installed lsof, because systems could miss it...
+      ansible.builtin.shell: |
+        set -eu
+        if lsof > /dev/null  2>&1 ; then
+          if lsof {{ oracle_home_db }}/bin/oracle > /dev/null 2>&1 ; then
+            echo "running Oracle processes found. Aborting chopt!"
+            exit 10
+          fi
+        else
+          echo "Please install lsof"
+          exit 9
+        fi
+      changed_when: false
+      failed_when: false
+      register: oracle_binary_in_use
+
+    - name: install_home_db | oracle binary in use
+      ansible.builtin.debug:
+        msg: "Cannot chopt, {{ oracle_home_db }}/bin/oracle in use"
+      when: oracle_binary_in_use.rc == 10
+
+    - name: install_home_db | lsof missing
+      ansible.builtin.debug:
+        msg: "Cannot chopt, please install lsof first"
+      when: oracle_binary_in_use.rc == 9
+
+    - name: install_home_db | Ensure state of linkable database options
+      when: oracle_binary_in_use.rc == 0
+      block:
+        # oracle_ee_options = '' => Nothing to do
+        # licence options in 11.2+ must be changed by chopt
+        # => use this method for all >= 11.2 (Doc ID 948061.1)
+        # touch a statefile instead checking the logfile from chopt
+        # we cannot use default/main.yml here. => complicated structure for 'enabled' 'disabled'...
+        - name: install_home_db | Change Database options with chopt
+          ansible.builtin.shell: |
+            {{ oracle_home_db }}/bin/chopt {{ item.state | replace(true, 'enable') | replace(false, 'disable') }} {{ item.option }} \
+            && touch {{ oracle_home_db }}/install/chopt_{{ item.option }}_{{ item.state }}.state
+          args:
+            creates: "{{ oracle_home_db }}/install/chopt_{{ item.option }}_{{ item.state }}.state{{ _oraswdb_install_choptcheck }}"
+          with_items:
+            - "{{ oracle_ee_options }}"
+          register: choptout
+          changed_when: '"Writing" in choptout.stdout'
+          when:
+            - db_homes_config[dbh.home]['edition'] == 'EE'
+            - oracle_ee_options is defined
+            - disable_ee_options
+          loop_control:
+            label: >-
+              {{ oracle_home_db }}
+              {{ item.state | replace(true, 'enable') | replace(false, 'disable') }}
+              {{ item.option }}
+
+        - name: install_home_db | Change Database options with make
+          when:
+            - set_oracle_all_editions_options_state | bool
+          block:
+            - name: install_home_db | Determine current state of all-editions options  # noqa command-instead-of-shell
+              ansible.builtin.shell:
+                cmd: "grep -Pqa '{{ oracle_all_editions_options[db_version][ae_option.option]['enabled_matches'] }}' {{ oracle_all_editions_options[db_version][ae_option.option]['match_file'] | basename }}"
+                chdir: "{{ oracle_home_db }}/{{ oracle_all_editions_options[db_version][ae_option.option]['match_file'] | dirname }}"
+              loop: "{{ oracle_all_editions_options_state }}"
+              loop_control:
+                loop_var: ae_option
+                label: "{{ ae_option.option }}"
+              failed_when: false
+              changed_when: false
+              register: ae_options_state
+
+            - name: install_home_db | Ensure intended state of all-editions options  # noqa no-changed-when
+              ansible.builtin.command:
+                cmd: "make -f ins_rdbms.mk {{ ae_option_state['ae_option']['option'] }}_{{ (ae_option_state['ae_option']['enabled'] | bool) | ternary('on', 'off') }} ioracle"
+                chdir: "{{ oracle_home_db }}/rdbms/lib"
+              when:
+                ae_option_state['rc'] != 0 and (ae_option_state['ae_option']['enabled'] | bool)
+                or
+                ae_option_state['rc'] == 0 and not (ae_option_state['ae_option']['enabled'] | bool)
+              environment:
+                ORACLE_HOME: "{{ oracle_home_db }}"
+              loop: "{{ ae_options_state['results'] }}"
+              loop_control:
+                loop_var: ae_option_state
+                label: >-
+                  {{ oracle_home_db }}
+                  {{ ae_option_state['ae_option']['enabled'] | bool | ternary('enable', 'disable') }}
+                  {{ ae_option_state['ae_option']['option'] }}
 
 - name: install_home_db | Run root script after installation
   ansible.builtin.shell: "{{ oracle_home_db }}/root.sh"

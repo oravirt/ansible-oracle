@@ -36,6 +36,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [nfs_server_sw_path](#nfs_server_sw_path)
   - [ocenv_bashrc_init](#ocenv_bashrc_init)
   - [ocenv_bashrc_init_section](#ocenv_bashrc_init_section)
+  - [oracle_all_editions_options_state](#oracle_all_editions_options_state)
   - [oracle_asm_disk_string](#oracle_asm_disk_string)
   - [oracle_base](#oracle_base)
   - [oracle_databases](#oracle_databases)
@@ -63,6 +64,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [oracle_sw_source_www](#oracle_sw_source_www)
   - [orasw_meta_assert_oracle_databases](#orasw_meta_assert_oracle_databases)
   - [orasw_meta_cluster_hostgroup](#orasw_meta_cluster_hostgroup)
+  - [set_oracle_all_editions_options_state](#set_oracle_all_editions_options_state)
   - [shell_aliases](#shell_aliases)
   - [shell_ps1](#shell_ps1)
 - [Discovered Tags](#discovered-tags)
@@ -398,6 +400,18 @@ Define the conntents to add to `.bashr` when `ocenv_bashrc_init: true`.
 ocenv_bashrc_init_section: |
   echo "execute ocenv to source Oracle Environment"
   alias ocenv='. "{{ dbenvdir }}/ocenv"'
+```
+
+### oracle_all_editions_options_state
+
+Intended state of edition independent database options, as defined in {{ oracle_all_editions_options }}
+
+#### Default value
+
+```YAML
+oracle_all_editions_options_state:
+  - {option: dnfs, enabled: false}
+  - {option: uniaud, enabled: false}
 ```
 
 ### oracle_asm_disk_string
@@ -910,6 +924,16 @@ Ansible Inventory hostgroup for RAC-Cluster.
 
 ```YAML
 orasw_meta_cluster_hostgroup: ''
+```
+
+### set_oracle_all_editions_options_state
+
+Switch to globally enable/disable linking of edition independent database options
+
+#### Default value
+
+```YAML
+set_oracle_all_editions_options_state: true
 ```
 
 ### shell_aliases
