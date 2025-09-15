@@ -12,6 +12,8 @@
       register: current_opatch_version
       tags: current_opatch_version
       when: db_homes_config[dbh.home]['opatch_minversion'] is defined
+      become: true
+      become_user: "{{ oracle_user }}"
 
     - name: Output
       ansible.builtin.debug:  # noqa: no-handler
@@ -32,6 +34,8 @@
         url: "{{ oracle_sw_source_www }}/{{ oop_loop.filename }}"
         dest: "{{ oracle_stage }}"
         mode: "0644"
+        owner: "{{ oracle_user }}"
+        group: "{{ oracle_group }}"
         force: true
         client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
         client_key: "{{ get_url_ssl_client_key | default(omit) }}"
@@ -44,8 +48,6 @@
         - apply_patches_db
         - oracle_sw_copy
         - not is_sw_source_local
-      become: true
-      become_user: "{{ oracle_user }}"
       tags:
         - oragridopatchget
 
@@ -54,34 +56,15 @@
         src: "{{ oracle_sw_source_local }}/{{ item.filename }}"
         dest: "{{ oracle_stage }}"
         mode: "0644"
+        owner: "{{ oracle_user }}"
+        group: "{{ oracle_group }}"
         force: true
       with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', db_version) }}"
       when:
         - oracle_sw_copy
         - is_sw_source_local
-      become: true
-      become_user: "{{ oracle_user }}"
       tags:
         - oragridpatchpush
-
-    # - name: db_opatch | Copy oracle opatch to server (www)
-    #   ansible.builtin.get_url:
-    #     url: "{{ oracle_sw_source_www }}/{{ osp_loop.filename }}"
-    #     dest: "{{ oracle_stage }}"
-    #     mode: "0644"
-    #     force: true
-    #   with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', db_version) }}"
-    #   loop_control:
-    #     loop_var: oop_loop
-    #     label: >-
-    #       filename: {{ oop_loop.filename | default('') }}
-    #   when:
-    #     - oracle_sw_copy
-    #     - not is_sw_source_local
-    #   become: true
-    #   become_user: "{{ oracle_user }}"
-    #   tags:
-    #     - oragridpatchpush
 
     - name: db_opatch | Extract OPatch to DB Home
       ansible.builtin.unarchive:
@@ -90,7 +73,6 @@
         copy: false
         owner: "{{ oracle_user }}"
         group: "{{ oracle_group }}"
-      become: true
       with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', db_version) }}"
       when:
         - oracle_sw_copy
@@ -104,7 +86,6 @@
         copy: false
         owner: "{{ oracle_user }}"
         group: "{{ oracle_group }}"
-      become: true
       with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', db_version) }}"
       when:
         - not oracle_sw_copy
@@ -122,6 +103,8 @@
             state: opatchversion
           register: current_opatch_version2
           tags: current_opatch_version
+          become: true
+          become_user: "{{ oracle_user }}"
 
         - name: Output
           ansible.builtin.debug:  # noqa: no-handler

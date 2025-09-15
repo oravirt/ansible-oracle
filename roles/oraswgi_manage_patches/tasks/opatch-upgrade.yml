@@ -39,6 +39,8 @@
         url: "{{ oracle_sw_source_www }}/{{ oop_loop.filename }}"
         dest: "{{ oracle_stage }}"
         mode: "0644"
+        owner: "{{ _grid_install_user }}"
+        group: "{{ oracle_group }}"
         force: true
         client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
         client_key: "{{ get_url_ssl_client_key | default(omit) }}"
@@ -50,8 +52,6 @@
       when:
         - oracle_sw_copy
         - not is_sw_source_local
-      become: true
-      become_user: "{{ oracle_user }}"
       tags:
         - oragridopatchget
 
@@ -60,6 +60,8 @@
         src: "{{ oracle_sw_source_local }}/{{ item.filename }}"
         dest: "{{ oracle_stage }}"
         mode: "0644"
+        owner: "{{ _grid_install_user }}"
+        group: "{{ oracle_group }}"
         force: true
       with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) }}"
       when:
@@ -68,25 +70,6 @@
       tags:
         - oragridpatchpush
 
-    # - name: Opatch-upgrade | Copy oracle opatch to server (www)
-    #   ansible.builtin.get_url:
-    #     url: "{{ oracle_sw_source_www }}/{{ osp_loop.filename }}"
-    #     dest: "{{ oracle_stage }}"
-    #     mode: "0644"
-    #     force: true
-    #   with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', db_version) }}"
-    #   loop_control:
-    #     loop_var: oop_loop
-    #     label: >-
-    #       filename: {{ oop_loop.filename | default('') }}
-    #   when:
-    #     - oracle_sw_copy
-    #     - not is_sw_source_local
-    #   become: true
-    #   become_user: "{{ oracle_user }}"
-    #   tags:
-    #     - oragridpatchpush
-
     - name: Opatch-upgrade | Extract OPatch to GI/Restart Home
       ansible.builtin.unarchive:
         src: "{{ oracle_stage }}/{{ item.filename }}"
@@ -94,8 +77,6 @@
         copy: false
         owner: "{{ _grid_install_user }}"
         group: "{{ oracle_group }}"
-      become: true
-      become_user: "{{ _grid_install_user }}"
       with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) }}"
       when:
         - oracle_sw_copy
@@ -109,8 +90,6 @@
         copy: false
         owner: "{{ _grid_install_user }}"
         group: "{{ oracle_group }}"
-      become: true
-      become_user: "{{ _grid_install_user }}"
       with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) }}"
       when:
         - not oracle_sw_copy
