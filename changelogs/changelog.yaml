@@ -764,6 +764,19 @@ releases:
     - oradb_tzupgrade_pdbs.yml
     - release-scripts.yml
     release_date: '2025-04-27'
+  4.13.2:
+    changes:
+      bugfixes:
+      - 'oradb_manage_db: check if .bashrc exists before trying to disable ocenv'
+      - 'oraswgi_install: ansible.builtin.yum fails installing cvuqdisk on FIPS-enabled
+        hosts due to missing package digest'
+      - 'oraswgi_manage_patches: roothas_prepatch.yml and roothas_postpatch.yml check
+        wrong directory to determine if GI is locked/unlocked (oravirt#530)'
+    fragments:
+    - bashrc_check_fix.yml
+    - cvuqdisk-on-fips.yml
+    - gi_locked_check.yml
+    release_date: '2025-10-25'
   4.2.0:
     changes:
       breaking_changes:
