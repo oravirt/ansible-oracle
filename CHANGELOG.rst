@@ -4,6 +4,16 @@ opitzconsulting.ansible\_oracle Release Notes
 
 .. contents:: Topics
 
+v4.13.2
+=======
+
+Bugfixes
+--------
+
+- oradb_manage_db: check if .bashrc exists before trying to disable ocenv
+- oraswgi_install: ansible.builtin.yum fails installing cvuqdisk on FIPS-enabled hosts due to missing package digest
+- oraswgi_manage_patches: roothas_prepatch.yml and roothas_postpatch.yml check wrong directory to determine if GI is locked/unlocked (oravirt#530)
+
 v4.13.1
 =======
 
