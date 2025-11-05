@@ -166,6 +166,8 @@
         # owner: "{{ oracle_user }}"   # not always ansible contorller knows this user
         # group: "{{ oracle_group }}"  # not always ansible contorller knows this group
         mode: "0644"
+        client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
+        client_key: "{{ get_url_ssl_client_key | default(omit) }}"
       environment: "{{ proxy_env }}"
       register: download_patches
       with_items:

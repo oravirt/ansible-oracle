@@ -50,6 +50,8 @@
     url: "{{ _oraapex_url_prefix }}/{{ _oraapex_archive }}"
     dest: "{{ oracle_sw_source_local }}/{{ _oraapex_archive }}"
     mode: '0644'
+    client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
+    client_key: "{{ get_url_ssl_client_key | default(omit) }}"
   with_dict: "{{ _orasw_download_patches_apex_versions }}"
   loop_control:
     label: >-

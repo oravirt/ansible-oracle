@@ -70,6 +70,8 @@
             dest: "{{ oracle_stage }}/{{ osp_loop.filename }}"
             mode: "0644"
             force: false
+            client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
+            client_key: "{{ get_url_ssl_client_key | default(omit) }}"
           when:
             - not is_sw_source_local | bool
             - not __checkpatcharchiveres.stat.exists | bool

@@ -30,6 +30,8 @@
         dest: "{{ oracle_stage }}"
         mode: 0644
         force: false
+        client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
+        client_key: "{{ get_url_ssl_client_key | default(omit) }}"
       when:
         - not is_sw_source_local
         - oracle_sw_copy

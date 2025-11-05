@@ -33,6 +33,8 @@
         dest: "{{ oracle_stage }}"
         mode: "0644"
         force: true
+        client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
+        client_key: "{{ get_url_ssl_client_key | default(omit) }}"
       with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', db_version) }}"
       loop_control:
         loop_var: oop_loop
