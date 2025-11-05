@@ -135,6 +135,8 @@
     dest: "{{ oracle_stage }}"
     mode: 0644
     force: false
+    client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
+    client_key: "{{ get_url_ssl_client_key | default(omit) }}"
   with_items:
     - "{{ db_homes_installed }}"
   become: true

@@ -25,6 +25,8 @@ There are a lot of variables who are used by `orasw_meta`
   - [default_dbpass](#default_dbpass)
   - [deploy_ocenv](#deploy_ocenv)
   - [disable_ee_options](#disable_ee_options)
+  - [get_url_ssl_client_cert](#get_url_ssl_client_cert)
+  - [get_url_ssl_client_key](#get_url_ssl_client_key)
   - [grid_base](#grid_base)
   - [hostgroup](#hostgroup)
   - [install_from_nfs](#install_from_nfs)
@@ -264,6 +266,30 @@ disable_ee_options: 'true'
 ```YAML
 disable_ee_options: true # change options in binary
 disable_ee_options: false # do not change options in binary
+```
+
+### get_url_ssl_client_cert
+
+PEM formatted certificate chain file to be used for SSL client authentication with ansible.builtin.get_url
+
+**_Type:_** path<br />
+
+#### Example usage
+
+```YAML
+/etc/pki/ca-trust/source/anchors/client-certchain.pem
+```
+
+### get_url_ssl_client_key
+
+PEM formatted file that contains your private key to be used for SSL client authentication with ansible.builtin.get_url
+
+**_Type:_** path<br />
+
+#### Example usage
+
+```YAML
+/etc/pki/tls/private/client-cert.pem
 ```
 
 ### grid_base
