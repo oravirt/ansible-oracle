@@ -44,9 +44,9 @@ if [[ $scsiid != "" ]]; then
    {% endif %}
    {% elif not use_partition_devices %}
    {% if ansible_distribution_major_version == '6' %}
-   echo "KERNEL==\"sd*\", BUS==\"scsi\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", NAME=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+   echo "KERNEL==\"sd*\", BUS==\"scsi\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$kernel\", RESULT==\"$scsiid\", NAME=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
    {% elif ansible_distribution_major_version >= '7' %}
-   echo "KERNEL==\"sd*\", SUBSYSTEM==\"block\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+   echo "KERNEL==\"sd*\", SUBSYSTEM==\"block\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$kernel\", RESULT==\"$scsiid\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
    {% endif %}
    {% endif %}
 fi
