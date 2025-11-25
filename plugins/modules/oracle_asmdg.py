@@ -266,6 +266,12 @@ def ensure_diskgroup_state(
         attribute_value = [y.lower() for y in attribute_value]
         wanted_attributes = zip(attribute_name, attribute_value)
 
+        # Zip object type apparently changed from list (python2) to iterator (python3)
+        # We convert it to list because otherwise we'd loose it's content with the first
+        # iteration
+        if not isinstance(wanted_attributes, list):
+            wanted_attributes = list(wanted_attributes)
+
         # Make sure we don't try to modify read only attributes. Removing them
         # from the wanted_attributes list
         for a in wanted_attributes:
@@ -282,7 +288,7 @@ def ensure_diskgroup_state(
                 cursor, module, msg, name, attribute_names_
             )
             # Convert to dict and compare current with wanted
-            if current_properties != wanted_attributes:
+            if sorted(current_properties) != sorted(wanted_attributes):
                 change_attr = True
                 for i in wanted_attributes:
                     total_sql.append(
@@ -351,6 +357,7 @@ def get_current_properties(cursor, module, msg, name, attribute_names_):
     sql = 'select lower(a.name),lower(a.value) '
     sql += 'from v$asm_attribute a, v$asm_diskgroup dg '
     sql += 'where dg.group_number = a.group_number '
+    sql += 'and a.read_only = \'N\' '
     sql += 'and upper(dg.name) = \'%s\' ' % (name.upper())
     sql += 'and a.name in (%s) ' % (attribute_names_.lower())
 
