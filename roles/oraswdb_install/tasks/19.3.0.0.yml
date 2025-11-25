@@ -12,7 +12,7 @@
       ansible.builtin.assert:
         quiet: true
         that:
-          - ansible_memory_mb.swap.total > 16384
+          - ansible_memory_mb.swap.total >= {{ orahost_min_swap_mb }}
       tags:
         - assertswap
         - molecule-notest

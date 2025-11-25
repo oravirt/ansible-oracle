@@ -29,6 +29,7 @@ Meta role used by other roles to share variable defaults.
   - [orahost_meta_cv_assume_distid](#orahost_meta_cv_assume_distid)
   - [orahost_meta_java_options](#orahost_meta_java_options)
   - [orahost_meta_tmpdir](#orahost_meta_tmpdir)
+  - [orahost_min_swap_mb](#orahost_min_swap_mb)
   - [role_separation](#role_separation)
   - [scripts_folder](#scripts_folder)
   - [sysctl_kernel_sem_force](#sysctl_kernel_sem_force)
@@ -369,6 +370,20 @@ orahost_meta_java_options: >-
 
 ```YAML
 orahost_meta_tmpdir: '{{ oracle_tmp_stage }}'
+```
+
+### orahost_min_swap_mb
+
+Minimum amount of swap space (in MB) required for DB server.
+Note: We observed ansible_memory_mb.swap.total is 1MB less than configured
+swap (e.g. 16383 instead of 16384 for 16GB)
+
+**_Type:_** integer<br />
+
+#### Default value
+
+```YAML
+orahost_min_swap_mb: 16383
 ```
 
 ### role_separation
