@@ -62,30 +62,44 @@ asm_diskgroups: []
 asm_diskgroups:
  - diskgroup: crs
    properties:
-     - {redundancy: normal, ausize: 4}
+     - {redundancy: normal}
    attributes:
-     - {name: 'compatible.rdbms', value: 11.2.0.4.0}
-     - {name: 'compatible.asm', value: 12.1.0.2.0}
+     - {name: compatible.asm, value: 12.1.0.2.0}
+     - {name: compatible.rdbms, value: 11.2.0.4.0}
+     - {name: au_size, value: 4m}
    disk:
      - {device: /dev/sdc, asmlabel: crs01}
      - {device: /dev/sdd, asmlabel: crs02}
      - {device: /dev/sde, asmlabel: crs03}
  - diskgroup: data
    properties:
-     - {redundancy: external, ausize: 4}
+     - {redundancy: external}
    attributes:
-     - {name: compatible.rdbms, value: 11.2.0.4.0}
      - {name: compatible.asm, value: 12.1.0.2.0}
+     - {name: compatible.rdbms, value: 11.2.0.4.0}
+     - {name: au_size, value: 4m}
    disk:
      - {device: /dev/sdf, asmlabel: data01}
  - diskgroup: fra
    properties:
-    - {redundancy: external, ausize: 4}
-  attributes:
-     - {name: compatible.rdbms, value: 11.2.0.4.0}
+    - {redundancy: external}
+   attributes:
      - {name: compatible.asm, value: 12.1.0.2.0}
+     - {name: compatible.rdbms, value: 11.2.0.4.0}
+     - {name: au_size, value: 4m}
    disk:
      - {device: /dev/sdg, asmlabel: fra01}
+
+# Defining ausize in `properties` is still supported for backward compatibility.
+# But, except for initial ASM diskgroup, it still won't be considered when creating the diskgroup, though.
+asm_diskgroups:
+ - diskgroup: crs
+   properties:
+     - {redundancy: normal, ausize: 4}
+   attributes:
+     - {name: compatible.asm, value: 12.1.0.2.0}
+     - {name: compatible.rdbms, value: 11.2.0.4.0}
+   ...
 ```
 
 ### asmadmin_group
