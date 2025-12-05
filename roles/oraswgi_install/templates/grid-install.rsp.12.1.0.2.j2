@@ -319,7 +319,15 @@ oracle.install.asm.diskGroup.redundancy={% for a in item.properties %}{{ a.redun
 # size unit is MB
 #
 #-------------------------------------------------------------------------------
-oracle.install.asm.diskGroup.AUSize={% for a in item.properties %}{{ a.ausize }}{% endfor %}
+oracle.install.asm.diskGroup.AUSize={%- if item.properties is defined
+      and item.properties | length > 0
+      and item.properties[0].ausize is defined -%}
+    {{ item.properties[0].ausize }}
+  {%- elif item.attributes is defined
+      and item.attributes | selectattr('name', 'equalto', 'au_size') is defined
+      and item.attributes | selectattr('name', 'equalto', 'au_size') | length > 0 -%}
+    {{ (item.attributes | selectattr('name', 'equalto', 'au_size'))[0]['value'] | regex_replace('[a-z]', '', ignorecase=true) }}
+  {%- endif %}
 
 #-------------------------------------------------------------------------------
 # List of disks to create a ASM DiskGroup
