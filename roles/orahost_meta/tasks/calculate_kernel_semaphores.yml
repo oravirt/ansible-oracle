@@ -27,9 +27,9 @@
   # SEMOPM: min(SEMMSL,1000)
   # SEMMNI: SEMMNS/SEMMSL rounded up to the nearest multiple of 1024
   ansible.builtin.set_fact:
-    __orahost_kernel_semopm: |
+    __orahost_kernel_semopm: >-
       {{ [__orahost_kernel_semmsl | int, 1000] | min }}
-    __orahost_kernel_semmni: |
+    __orahost_kernel_semmni: >-
       {{ ((__orahost_kernel_semmns | int / __orahost_kernel_semmsl | int / 1024) | round(0, 'ceil') * 1024) | int }}
 
 - name: calculate_kernel_semaphores | Increase kernel.sem, if set too low
