@@ -1,28 +1,28 @@
 ---
-- name: roothas_prepatch | Get owner of ORACLE_HOME
+- name: rootscript_postpatch | Get owner of ORACLE_HOME
   ansible.builtin.stat:
     path: "{{ oracle_home_gi }}"
   become: true
   become_user: "{{ _grid_install_user }}"
   register: oraclehomegi_stat
 
-- name: roothas_prepatch | Execute roothas.sh -prepatch
+- name: "rootscript_prepatch | Execute root{{ _oraswgi_manage_patches_crstype }}.sh -prepatch"
   when:
     - oraclehomegi_stat.stat.exists
     - oraclehomegi_stat.stat.pw_name == 'root'
   block:
-    - name: roothas_prepatch | Execute roothas.sh -prepatch  # noqa no-changed-when
+    - name: "rootscript_prepatch | Execute root{{ _oraswgi_manage_patches_crstype }}.sh -prepatch"  # noqa no-changed-when
       ansible.builtin.command: >-
-        {{ oracle_home_gi }}/crs/install/roothas.sh -prepatch
+        {{ oracle_home_gi }}/crs/install/root{{ _oraswgi_manage_patches_crstype }}.sh -prepatch
       become: true
       become_user: root
-      register: roothasprepatchres
+      register: rootscriptprepatchres
 
     - name: Info
       ansible.builtin.debug:
-        var: roothasprepatchres.stdout_lines
+        var: rootscriptprepatchres.stdout_lines
 
-- name: roothas_prepatch | Check for running Stack  # noqa no-changed-when
+- name: rootscript_postpatch | Check for running Stack  # noqa no-changed-when
   ansible.builtin.command: >-
     {{ oracle_home_gi }}/bin/crsctl
     check
