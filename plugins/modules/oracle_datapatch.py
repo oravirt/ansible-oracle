@@ -78,21 +78,18 @@ options:
             The listener port to connect to the database
         required: false
         default: 1521
-notes:
-    - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
 EXAMPLES = '''
 '''
 
-try:
-    import cx_Oracle
-except ImportError:
-    cx_oracle_exists = False
-else:
-    cx_oracle_exists = True
+# try:
+#     import cx_Oracle
+# except ImportError:
+#     cx_oracle_exists = False
+# else:
+#     cx_oracle_exists = True
 
 
 def get_version(module, msg, oracle_home):
@@ -236,19 +233,19 @@ def run_datapatch(module, msg, hostname, oracle_home, db_name, sid):
             #     module.exit_json(msg=msg, changed=False)
 
 
-def execute_sql_get(module, msg, cursor, sql):
-    try:
-        cursor.execute(sql)
-        result = cursor.fetchall()
-    except cx_Oracle.DatabaseError as exc:
-        (error,) = exc.args
-        msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
-            error.message,
-            sql,
-        )
-        module.fail_json(msg=msg, changed=False)
-        return False
-    return result
+# def execute_sql_get(module, msg, cursor, sql):
+#     try:
+#         cursor.execute(sql)
+#         result = cursor.fetchall()
+#     except cx_Oracle.DatabaseError as exc:
+#         (error,) = exc.args
+#         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
+#             error.message,
+#             sql,
+#         )
+#         module.fail_json(msg=msg, changed=False)
+#         return False
+#     return result
 
 
 # def execute_sql(module, msg, cursor, sql):
@@ -264,37 +261,37 @@ def execute_sql_get(module, msg, cursor, sql):
 #     return True
 
 
-def getconn(module, msg, hostname):
-    if not hostname:
-        hostname = os.uname()[1]
-    wallet_connect = '/@%s' % service_name
-    try:
-        if not user and not password:
-            # If neither user or password is supplied, the use of
-            # an oracle wallet is assumed
-            connect = wallet_connect
-            conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
-        elif user and password:
-            dsn = cx_Oracle.makedsn(
-                host=hostname,
-                port=port,
-                service_name=service_name,
-            )
-            connect = dsn
-            conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
-        elif not (user) or not (password):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
+# def getconn(module, msg, hostname):
+#     if not hostname:
+#         hostname = os.uname()[1]
+#     wallet_connect = '/@%s' % service_name
+#     try:
+#         if not user and not password:
+#             # If neither user or password is supplied, the use of
+#             # an oracle wallet is assumed
+#             connect = wallet_connect
+#             conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+#         elif user and password:
+#             dsn = cx_Oracle.makedsn(
+#                 host=hostname,
+#                 port=port,
+#                 service_name=service_name,
+#             )
+#             connect = dsn
+#             conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+#         elif not (user) or not (password):
+#             module.fail_json(msg='Missing username or password for cx_Oracle')
 
-    except cx_Oracle.DatabaseError as exc:
-        (error,) = exc.args
-        msg = 'Could not connect to database - %s, connect descriptor: %s' % (
-            error.message,
-            connect,
-        )
-        module.fail_json(msg=msg, changed=False)
+#     except cx_Oracle.DatabaseError as exc:
+#         (error,) = exc.args
+#         msg = 'Could not connect to database - %s, connect descriptor: %s' % (
+#             error.message,
+#             connect,
+#         )
+#         module.fail_json(msg=msg, changed=False)
 
-    cursor = conn.cursor()
-    return cursor
+#     cursor = conn.cursor()
+#     return cursor
 
 
 def main():
@@ -356,14 +353,14 @@ def main():
     else:
         gimanaged = False
 
-    if not cx_oracle_exists:
-        msg = (
-            "The cx_Oracle module is required. "
-            "'pip install cx_Oracle' should do the trick. "
-            "If cx_Oracle is installed, make sure "
-            "ORACLE_HOME & LD_LIBRARY_PATH is set"
-        )
-        module.fail_json(msg=msg)
+    # if not cx_oracle_exists:
+    #     msg = (
+    #         "The cx_Oracle module is required. "
+    #         "'pip install cx_Oracle' should do the trick. "
+    #         "If cx_Oracle is installed, make sure "
+    #         "ORACLE_HOME & LD_LIBRARY_PATH is set"
+    #     )
+    #     module.fail_json(msg=msg)
 
     # Connection details for database
     if service_name is not None:
