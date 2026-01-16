@@ -6,6 +6,7 @@ Meta role used by other roles to share variable defaults.
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
+  - [_orasw_meta_primary_node](#_orasw_meta_primary_node)
   - [asm_diskgroups](#asm_diskgroups)
   - [asmadmin_group](#asmadmin_group)
   - [asmdba_group](#asmdba_group)
@@ -45,6 +46,29 @@ Meta role used by other roles to share variable defaults.
 - Minimum Ansible version: `2.14.0`
 
 ## Default Variables
+
+### _orasw_meta_primary_node
+
+The state of _orasw_meta_primary_node is:
+Single-Instance / Oracle Restart: true
+Cluster 1st Node: true
+Cluster other Nodes: false
+
+**_Type:_** boolean<br />
+
+#### Default value
+
+```YAML
+_orasw_meta_primary_node: >
+  {%- if oracle_install_option_gi | default('') | upper != 'CRS_CONFIG' -%}
+    {%- set __orasw_meta_primary_node = true -%}
+  {%- elif groups[orasw_meta_cluster_hostgroup][0] == inventory_hostname -%}
+    {%- set __orasw_meta_primary_node = true -%}
+  {%- else -%}
+    {%- set __orasw_meta_primary_node = false -%}
+  {%- endif -%}
+  {{ __orasw_meta_primary_node }}
+```
 
 ### asm_diskgroups
 
