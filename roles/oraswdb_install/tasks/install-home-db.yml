@@ -40,7 +40,7 @@
     group: "{{ oracle_group }}"
     mode: 0600
   when:
-    - _orasw_meta_primary_node | bool
+    - _orasw_meta_primary_node | bool or _oraswdb_install_home_type=='SI'
     - oracle_home_db not in existing_dbhome.stdout_lines
   tags: responsefileswdb
 
@@ -48,7 +48,7 @@
 - name: install_home_db
   when:
     - db_homes_config[dbh.home]['version'] is version('12.2', '>=')
-    - _orasw_meta_primary_node | bool
+    - _orasw_meta_primary_node | bool or _oraswdb_install_home_type=='SI'
   block:
     - name: install_home_db | Extract files
       ansible.builtin.unarchive:
@@ -135,7 +135,7 @@
   ansible.builtin.shell: "{{ oracle_home_db }}/root.sh"
   # noqa command-instead-of-shell no-handler no-changed-when
   when:
-    - _orasw_meta_primary_node | bool
+    - _orasw_meta_primary_node | bool or _oraswdb_install_home_type=='SI'
     - oradbinstall.changed
   tags:
     - runroot
@@ -157,7 +157,7 @@
   become: true
   become_user: "{{ oracle_user }}"
   when:
-    - _orasw_meta_primary_node | bool
+    - _orasw_meta_primary_node | bool or _oraswdb_install_home_type=='SI'
     - oradbinstall is defined
   changed_when: false
   register: opatchls
