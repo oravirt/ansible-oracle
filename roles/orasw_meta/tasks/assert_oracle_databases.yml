@@ -57,18 +57,36 @@
             msg: "See previous debug task for assertation failure"
 
     - name: assert db_homes_installed
-      ansible.builtin.assert:
-        quiet: true
-        that:
-          - ass_dbh.home is defined
-          - db_homes_config[ass_dbh.home] is defined
-      with_items:
-        - "{{ db_homes_installed }}"
-      loop_control:
-        label: "{{ ass_dbh.home | default('') }}"
-        loop_var: ass_dbh
       when:
         - db_homes_installed is defined
+      block:
+        - name: assert db_homes_installed home definition
+          ansible.builtin.assert:
+            quiet: true
+            that:
+              - ass_dbh.home is defined
+              - db_homes_config[ass_dbh.home] is defined
+          with_items:
+            - "{{ db_homes_installed }}"
+          loop_control:
+            label: "{{ ass_dbh.home | default('') }}"
+            loop_var: ass_dbh
+
+        - name: assert db_homes_installed home type
+          ansible.builtin.assert:
+            quiet: true
+            fail_msg: "oracle_db_type must be unique over databases of the same home"
+            that: >-
+              (oracle_databases
+                | selectattr('home','equalto',ass_dbh.home)
+                | selectattr('state','equalto','present')
+                | map(attribute='oracle_db_type',default='SI')
+                | unique | length) == 1
+          loop: "{{ db_homes_installed }}"
+          loop_control:
+            label: "{{ ass_dbh.home | default('') }}"
+            loop_var: ass_dbh
+          when: oracle_databases is defined
 
     - name: Check switch for  orasw_meta_assert_oracle_databases
       ansible.builtin.debug:
@@ -102,7 +120,7 @@
               - ass_odb.statspack | default({}) | type_debug == 'dict'
               - ass_odb.tablespaces | default([]) | type_debug == 'list'
               - ass_odb.users | default([]) | type_debug == 'list'
-              - ass_odb.oracle_db_type | default('SI2') in ('SI', 'RAC', 'RACONENODE')
+              - ass_odb.oracle_db_type | default('SI') in ('SI', 'RAC', 'RACONENODE')
               - ass_odb.storage_type | default('FS') in ('FS', 'ASM')
               - >-
                 (ass_odb.oracle_db_mem_totalmb is defined
