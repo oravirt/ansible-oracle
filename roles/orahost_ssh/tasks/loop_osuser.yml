@@ -7,7 +7,8 @@
   ansible.builtin.file:
     path: "{{ _key_owner_home }}/.ssh"
     owner: "{{ _key_owner }}"
-    mode: 0700
+    group: "{{ _key_group }}"
+    mode: "0700"
     state: directory
 
 # Keys are only created when not existing.
@@ -15,7 +16,11 @@
   community.crypto.openssh_keypair:
     path: "{{ _key_owner_home }}/.ssh/{{ orahost_ssh_keyname }}"
     owner: "{{ _key_owner }}"
-    type: ed25519
+    group: "{{ _key_group }}"
+    force: false
+    mode: "0600"
+    size: "{{ orahost_ssh_key_size }}"
+    type: "{{ orahost_ssh_key_type }}"
 
 - name: Read public key from remote host for user {{ _key_owner }}
   ansible.builtin.slurp:
@@ -32,17 +37,30 @@
     state: present
   with_items: "{{ groups[orasw_meta_cluster_hostgroup] }}"
 
-- name: Read host key from remote host with ssh-keyscan
-  ansible.builtin.command: ssh-keyscan -t ecdsa-sha2-nistp256 {{ ansible_hostname }}
+- name: Read host keys from remote host with ssh-keyscan
+  ansible.builtin.command: ssh-keyscan -t {{ orahost_ssh_hostkeytypes | join(',') }} {{ ansible_hostname }}
   register: ssh_hostkey_res
   changed_when: ssh_hostkey_res.rc == 0
 
+- name: Ensure known_hosts file exists with right permissions
+  ansible.builtin.file:
+    path: "{{ _key_owner_home }}/.ssh/known_hosts"
+    state: touch
+    owner: "{{ _key_owner }}"
+    group: "{{ _key_group }}"
+    mode: "0600"
+  register: _known_hosts_state
+  changed_when: _known_hosts_state.diff.before.state == 'absent'
+
 - name: Add hostkeys to user {{ _key_owner }}
   ansible.builtin.known_hosts:
-    name: "{{ _hostkey_line | split(' ') | first }}"
-    key: "{{ _hostkey_line }}"
+    name: "{{ _hostkey_for_host[0] | split(' ') | first }}"
+    key: "{{ _hostkey_for_host[0] }}"
     path: "{{ _key_owner_home }}/.ssh/known_hosts"
     state: present
-  with_items: "{{ groups[orasw_meta_cluster_hostgroup] }}"
-  vars:
-    _hostkey_line: "{{ hostvars[item]['ssh_hostkey_res']['stdout_lines'] | first }}"
+  delegate_to: "{{ _hostkey_for_host[1] }}"
+  loop: "{{ ssh_hostkey_res.stdout_lines | product(groups[orasw_meta_cluster_hostgroup]) }}"
+  loop_control:
+    loop_var: _hostkey_for_host
+    label: "{{ (_hostkey_for_host[0] | split(' '))[0] }} {{ (_hostkey_for_host[0] | split(' '))[1] }}"
+  throttle: 1
