@@ -48,6 +48,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [oracle_ee_options_183](#oracle_ee_options_183)
   - [oracle_ee_options_193](#oracle_ee_options_193)
   - [oracle_ee_options_213](#oracle_ee_options_213)
+  - [oracle_ee_options_261](#oracle_ee_options_261)
   - [oracle_home_gi_cl](#oracle_home_gi_cl)
   - [oracle_home_gi_so](#oracle_home_gi_so)
   - [oracle_hostname](#oracle_hostname)
@@ -654,6 +655,18 @@ Define the enabled/disabled options for 21c binaries.
 oracle_ee_options_213:
   - {option: oaa, state: false}
   - {option: olap, state: false}
+  - {option: partitioning, state: false}
+  - {option: rat, state: false}
+```
+
+### oracle_ee_options_261
+
+Define the enabled/disabled options for 26ai binaries.
+
+#### Default value
+
+```YAML
+oracle_ee_options_261:
   - {option: partitioning, state: false}
   - {option: rat, state: false}
 ```

@@ -252,6 +252,7 @@ _oracle_ee_opiton_dict:
   18.3.0.0: '{{ oracle_ee_options_183 }}'
   19.3.0.0: '{{ oracle_ee_options_193 }}'
   21.3.0.0: '{{ oracle_ee_options_213 }}'
+  26.1.0.0: '{{ oracle_ee_options_261 }}'
 ```
 
 ### _oracle_env
@@ -429,23 +430,25 @@ ocm_response_file: '{{ oracle_patch_stage }}/{{ db_version }}/ocm.rsp'
 
 ```YAML
 oracle_all_editions_options:
-  21.3.0.0: &213_all_editions_options
+  26.1.0.0: &261_all_editions_options
     dnfs:
       match_file: rdbms/lib/odm/libnfsodm??.so
       enabled_matches: .*
     uniaud:
       match_file: rdbms/lib/libknlopt.a
       enabled_matches: \bkzaiang\.
+  21.3.0.0:
+    <<: *261_all_editions_options
   19.3.0.0:
-    <<: *213_all_editions_options
+    <<: *261_all_editions_options
   18.3.0.0:
-    <<: *213_all_editions_options
+    <<: *261_all_editions_options
   12.2.0.1:
-    <<: *213_all_editions_options
+    <<: *261_all_editions_options
   12.1.0.2:
-    <<: *213_all_editions_options
+    <<: *261_all_editions_options
   12.1.0.1:
-    <<: *213_all_editions_options
+    <<: *261_all_editions_options
   11.2.0.4: &1124_all_editions_options
     dnfs:
       match_file: rdbms/lib/odm/libnfsodm??.so
