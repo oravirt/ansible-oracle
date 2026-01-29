@@ -675,16 +675,16 @@ def ensure_tablespace_attributes(
        -- runtime
        v_nextsize_suffix varchar2(1);
        v_maxsize_suffix varchar2(1);
-       v_divisor_nextsize number(20);
-       v_divisor_maxsize number(20);
+       v_divisor_nextsize number(30);
+       v_divisor_maxsize number(30);
        v_next_change number;
        v_max_change number;
        v_autoextend_ varchar2(3);
        v_autoextend_sql varchar2(30);
-       v_nextsize_current varchar2(20) ;
-       v_maxsize_current varchar2(20) ;
-       v_nextsize_wanted varchar2(20) ;
-       v_maxsize_wanted varchar2(20) ;
+       v_nextsize_current varchar2(30) ;
+       v_maxsize_current varchar2(30) ;
+       v_nextsize_wanted varchar2(30) ;
+       v_maxsize_wanted varchar2(30) ;
        v_content varchar2(30) ;
        v_tbs_source varchar2(30);
        v_df_source varchar2(50);
@@ -764,7 +764,7 @@ def ensure_tablespace_attributes(
                                 and dt.tablespace_name = upper(''||v_tablespace||''))
 
                     LOOP
-                        v_nextsize_current := (
+                        v_nextsize_current := round(
                             (rec.block_size*rec.increment_by)/v_divisor_nextsize);
                         v_maxsize_current := ((rec.maxbytes)/v_divisor_maxsize);
 
@@ -802,7 +802,7 @@ def ensure_tablespace_attributes(
                                         upper('' || v_tablespace || ''))
 
                         LOOP
-                            v_nextsize_current := (
+                            v_nextsize_current := round(
                                 (rec.block_size*rec.increment_by)/v_divisor_nextsize);
                             v_maxsize_current := ((rec.maxbytes)/v_divisor_maxsize);
 
