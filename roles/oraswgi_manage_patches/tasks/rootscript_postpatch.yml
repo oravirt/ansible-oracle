@@ -6,12 +6,12 @@
   become_user: "{{ _grid_install_user }}"
   register: oraclehomegi_stat
 
-- name: "rootscript_postpatch | Execute root{{ _oraswgi_manage_patches_crstype }}.sh -postpatch"
+- name: "rootscript_postpatch | Execute root{{ _oraswgi_manage_patches_crstype }}"
   when:
     - oraclehomegi_stat.stat.exists
     - oraclehomegi_stat.stat.pw_name != 'root'
   block:
-    - name: "rootscript_postpatch | Execute root{{ _oraswgi_manage_patches_crstype }}.sh -postpatch"  # noqa no-changed-when
+    - name: "rootscript_postpatch | Execute root{{ _oraswgi_manage_patches_crstype }}"  # noqa no-changed-when
       ansible.builtin.command: >-
         {{ oracle_home_gi }}/crs/install/root{{ _oraswgi_manage_patches_crstype }}.sh -postpatch
       become: true
