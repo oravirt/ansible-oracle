@@ -1078,7 +1078,17 @@ def start_instance(
                     instance_name,
                 )
             else:
-                command = '%s/bin/srvctl start database -d %s ' % (oracle_home, db_name)
+                if is_cluster:
+                    command = '%s/bin/srvctl start database -d %s -node %s ' % (
+                        oracle_home,
+                        db_name,
+                        os.uname()[1].split('.')[0],
+                    )
+                else:
+                    command = '%s/bin/srvctl start database -d %s ' % (
+                        oracle_home,
+                        db_name,
+                    )
             if open_mode is not None:
                 command += ' -o %s ' % (open_mode)
             (rc, stdout, stderr) = module.run_command(command)
@@ -1224,6 +1234,7 @@ def main():
     global verboselist
     global domain
     global cursor
+    global is_cluster
 
     cursor = None
 
@@ -1275,7 +1286,7 @@ def main():
             state               = dict(default="present", choices = ["present", "absent", "started", "restarted"]), # noqa E231
             hostname            = dict(required=False, default = 'localhost', aliases = ['host']), # noqa E231
             port                = dict(required=False, default = 1521), # noqa E231
-            omf                 = dict(required=False, type='bool', default=False), #noqa E231
+            omf                 = dict(required=False, type='bool', default=False), # noqa E231
         ),
         mutually_exclusive=[['memory_percentage', 'memory_totalmb']],
     )
@@ -1347,6 +1358,15 @@ def main():
         if not cx_oracle_exists:
             msg = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH are set"  # noqa E501
             module.fail_json(msg=msg)
+
+    # If gimanaged, check whether it's Oracle Restart or Oracle Clusterware
+    is_cluster = False
+    ocr_loc = '/etc/oracle/ocr.loc'
+    if gimanaged and os.path.exists(ocr_loc):
+        ocr_grep = subprocess.run(
+            ['grep', '-Piq', '^\\s*local_only\\s*=\\s*false', ocr_loc]
+        )
+        is_cluster = not bool(ocr_grep.returncode)
 
     # Connection details for database
     user = 'sys'
