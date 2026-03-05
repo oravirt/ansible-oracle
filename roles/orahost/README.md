@@ -614,6 +614,8 @@ oracle_packages:
   - elfutils-libelf-devel
   - cpp
   - lsof
+  - compat-openssl11
+  - fontconfig
 ```
 
 ### oracle_packages_sles_multi

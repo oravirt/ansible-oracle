@@ -777,6 +777,72 @@ releases:
     - cvuqdisk-on-fips.yml
     - gi_locked_check.yml
     release_date: '2025-10-25'
+  4.14.0:
+    changes:
+      bugfixes:
+      - ASM disk's au_size setting not considered, except for initial diskgroup (oravirt#538)
+      - One-off-patching of clusterware fails because roothas_prepatch is used (oravirt#546)
+      - 'oracle_asmdg.py: compare sorted current_properties to sorted wanted_attributes,
+        because we shouldn''t rely on the list order of asm_diskgroups'' attributes
+        list is the same as querying v$asm_attribute returns (oravirt#534)'
+      - 'oracle_asmdg.py: exclude read_only attributes when building current_properties
+        from v$asm_attribute as they''re also removed from wanted_attributes (oravirt#534)'
+      - 'oracle_asmdg.py: wanted_attributes casted to list to reflect change in zip
+        object type (oravirt#534)'
+      - 'oracle_tablespace.py: Bugfix for Oracle 26ai (oravirt#567)'
+      - 'orahost_storage: Ensure `oracle_asm_disk_string` directory exists in udev.yml
+        (oravirt#555)'
+      - 'orahost_storage: Get scsi id of unpartitioned devices from device itself
+        instead of parent device in setup-udev.sh.j2 (oravirt#555)'
+      - 'orasw_meta, oraswdb_install: Fix setup of SI database homes on cluster (oravirt#558)'
+      - 'oraswgi_install: With udev device persistence, grid-install templates shouldn''t
+        build asm diskgroups from the devices but from their device mapper aliases
+        instead (which reflect oracle_asm_disk_string) (oravirt#555)'
+      - 'oraswgi_install: cvuqdisk was installed from oracle_home_gi, where it wasn''t
+        available on non-first nodes; changed file source to oracle_rsp_stage (oravirt#552)'
+      - 'os.yml: We only restart autofs.service if it actually exists and is unmasked
+        (oravirt#563)'
+      - 'plugins/modules/oracle_datapatch.py: Removed cx_oracle requirement and check.
+        It''s actually not used there (oravirt#545)'
+      - wrong block operator caused newline to be appended to __orahost_kernel_semopm
+        and __orahost_kernel_semmni (oravirt#541)
+      major_changes:
+      - support for linking of edition independent options, like DirectNFS and Unified
+        Auditing (oravirt#^551)
+      minor_changes:
+      - introduced new variables get_url_ssl_client_cert and get_url_ssl_client_key
+        to submit client certs in get_url module  (oravirt#554)
+      - 'oraasm_manage_diskgroups: Support for empty `device_persistence` added to
+        `_oraasm_manage_diskgroups_asmdevice_list`, e.g. if Oracle files are on NFS
+        (oravirt#555)'
+      - 'oradb_manage_db: add support for Oracle 26ai (oravirt#568)'
+      - 'orahost: added compat-openssl11 and fontconfig rpms for 26ai on RHEL/OL (oravirt#568)'
+      - 'orahost_storage: Added support for unpartitioned dm-devices and partitions
+        to setup-udev.sh.j2. Both don''t have scsi ids. (oravirt#555)'
+      - 'orasw_meta: add support for Oracle 26ai (oravirt#568)'
+      - 'oraswdb_install: add support for Oracle 26ai (oravirt#568)'
+      - 'oraswdb_install: make minimum required swap space a variable (and consider
+        rounding) (oravirt#536)'
+      - 'oraswgi_install: Added support for empty `device_persistence` to grid-install
+        templates (oravirt#555)'
+      - 'oraswgi_meta: Assert extended by `device_persistence: udev` and empty `device_persistence`
+        (oravirt#555)'
+    fragments:
+    - 26ai-install.yml
+    - 26ai-tablespace.yml
+    - all-editions-options.yml
+    - asm_ausize.yml
+    - check-for-existing-autofs.yml
+    - config_min_swap.yml
+    - cvuqdisk-wrong-source-directory.yml
+    - cx_oracle-check-issues.yml
+    - device_persistence-issues.yml
+    - get_url-client-cert.yml
+    - newline-in-kernel-sem.yml
+    - oracle_asmdg-issues.yml
+    - rootcrs-missing.yml
+    - seha-home-installation.yml
+    release_date: '2026-01-31'
   4.2.0:
     changes:
       breaking_changes:

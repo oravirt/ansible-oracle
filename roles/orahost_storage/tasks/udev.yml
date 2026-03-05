@@ -25,6 +25,14 @@
         dest: "{{ oracle_rsp_stage }}/setup-udev-rules.sh"
         mode: "0755"
 
+    - name: udev | Ensure oracle_asm_disk_string's directory exists
+      ansible.builtin.file:
+        path: "{{ oracle_asm_disk_string | dirname }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
     - name: udev | Run script to create udev rules
       ansible.builtin.shell: "{{ oracle_rsp_stage }}/setup-udev-rules.sh"
       # noqa command-instead-of-shell no-changed-when

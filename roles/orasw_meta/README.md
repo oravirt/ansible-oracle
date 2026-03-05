@@ -25,6 +25,8 @@ There are a lot of variables who are used by `orasw_meta`
   - [default_dbpass](#default_dbpass)
   - [deploy_ocenv](#deploy_ocenv)
   - [disable_ee_options](#disable_ee_options)
+  - [get_url_ssl_client_cert](#get_url_ssl_client_cert)
+  - [get_url_ssl_client_key](#get_url_ssl_client_key)
   - [grid_base](#grid_base)
   - [hostgroup](#hostgroup)
   - [install_from_nfs](#install_from_nfs)
@@ -34,6 +36,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [nfs_server_sw_path](#nfs_server_sw_path)
   - [ocenv_bashrc_init](#ocenv_bashrc_init)
   - [ocenv_bashrc_init_section](#ocenv_bashrc_init_section)
+  - [oracle_all_editions_options_state](#oracle_all_editions_options_state)
   - [oracle_asm_disk_string](#oracle_asm_disk_string)
   - [oracle_base](#oracle_base)
   - [oracle_databases](#oracle_databases)
@@ -45,6 +48,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [oracle_ee_options_183](#oracle_ee_options_183)
   - [oracle_ee_options_193](#oracle_ee_options_193)
   - [oracle_ee_options_213](#oracle_ee_options_213)
+  - [oracle_ee_options_261](#oracle_ee_options_261)
   - [oracle_home_gi_cl](#oracle_home_gi_cl)
   - [oracle_home_gi_so](#oracle_home_gi_so)
   - [oracle_hostname](#oracle_hostname)
@@ -61,6 +65,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [oracle_sw_source_www](#oracle_sw_source_www)
   - [orasw_meta_assert_oracle_databases](#orasw_meta_assert_oracle_databases)
   - [orasw_meta_cluster_hostgroup](#orasw_meta_cluster_hostgroup)
+  - [set_oracle_all_editions_options_state](#set_oracle_all_editions_options_state)
   - [shell_aliases](#shell_aliases)
   - [shell_ps1](#shell_ps1)
 - [Discovered Tags](#discovered-tags)
@@ -266,6 +271,30 @@ disable_ee_options: true # change options in binary
 disable_ee_options: false # do not change options in binary
 ```
 
+### get_url_ssl_client_cert
+
+PEM formatted certificate chain file to be used for SSL client authentication with ansible.builtin.get_url
+
+**_Type:_** path<br />
+
+#### Example usage
+
+```YAML
+/etc/pki/ca-trust/source/anchors/client-certchain.pem
+```
+
+### get_url_ssl_client_key
+
+PEM formatted file that contains your private key to be used for SSL client authentication with ansible.builtin.get_url
+
+**_Type:_** path<br />
+
+#### Example usage
+
+```YAML
+/etc/pki/tls/private/client-cert.pem
+```
+
 ### grid_base
 
 `ORACLE_BASE` for Grid Infrastructure/Restart
@@ -372,6 +401,18 @@ Define the conntents to add to `.bashr` when `ocenv_bashrc_init: true`.
 ocenv_bashrc_init_section: |
   echo "execute ocenv to source Oracle Environment"
   alias ocenv='. "{{ dbenvdir }}/ocenv"'
+```
+
+### oracle_all_editions_options_state
+
+Intended state of edition independent database options, as defined in {{ oracle_all_editions_options }}
+
+#### Default value
+
+```YAML
+oracle_all_editions_options_state:
+  - {option: dnfs, enabled: false}
+  - {option: uniaud, enabled: false}
 ```
 
 ### oracle_asm_disk_string
@@ -614,6 +655,18 @@ Define the enabled/disabled options for 21c binaries.
 oracle_ee_options_213:
   - {option: oaa, state: false}
   - {option: olap, state: false}
+  - {option: partitioning, state: false}
+  - {option: rat, state: false}
+```
+
+### oracle_ee_options_261
+
+Define the enabled/disabled options for 26ai binaries.
+
+#### Default value
+
+```YAML
+oracle_ee_options_261:
   - {option: partitioning, state: false}
   - {option: rat, state: false}
 ```
@@ -884,6 +937,16 @@ Ansible Inventory hostgroup for RAC-Cluster.
 
 ```YAML
 orasw_meta_cluster_hostgroup: ''
+```
+
+### set_oracle_all_editions_options_state
+
+Switch to globally enable/disable linking of edition independent database options
+
+#### Default value
+
+```YAML
+set_oracle_all_editions_options_state: true
 ```
 
 ### shell_aliases

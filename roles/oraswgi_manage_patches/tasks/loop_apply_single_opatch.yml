@@ -1,7 +1,7 @@
 ---
 # loop for GI opatch apply of OneOff Patches
-- name: loop_apply_single_opatch | include_tasks roothas_prepatch.yml
-  ansible.builtin.include_tasks: roothas_prepatch.yml
+- name: loop_apply_single_opatch | include_tasks rootscript_prepatch.yml
+  ansible.builtin.include_tasks: rootscript_prepatch.yml
 
 - name: loop_apply_single_opatch | Manage non opatchauto patches for GI
   opitzconsulting.ansible_oracle.oracle_opatch:
@@ -14,7 +14,7 @@
     ocm_response_file: "{{ _oraswgi_manage_patches_ocm_response_file | default(omit) }}"
     output: verbose
     state: "{{ item.state }}"
-  notify: roothas_postpatch
+  notify: rootscript_postpatch
   vars:
     __opatchauto_patchtype: false  # opatch apply
   become: true

@@ -1,5 +1,5 @@
 ####################################################################
-## Copyright(c) Oracle Corporation 1998,2019. All rights reserved.##
+## Copyright(c) Oracle Corporation 1998,2025. All rights reserved.##
 ##                                                                ##
 ## Specify values for the variables listed below to customize     ##
 ## your installation.                                             ##
@@ -14,22 +14,23 @@
 ##                                                                ##
 ####################################################################
 
-
 #------------------------------------------------------------------------------
-# Do not change the following system generated value.
+# Do not change the following system generated value. 
 #------------------------------------------------------------------------------
-oracle.install.responseFileVersion=/oracle/install/rspfmt_dbinstall_response_schema_v19.0.0
+oracle.install.responseFileVersion=/oracle/install/rspfmt_dbinstall_response_schema_v23.0.0
 
 #-------------------------------------------------------------------------------
 # Specify the installation option.
 # It can be one of the following:
 #   - INSTALL_DB_SWONLY
 #   - INSTALL_DB_AND_CONFIG
+#
+# Deprecated: oracle.install.option
 #-------------------------------------------------------------------------------
-oracle.install.option=INSTALL_DB_SWONLY
+installOption=INSTALL_DB_SWONLY
 
 #-------------------------------------------------------------------------------
-# Specify the Unix group to be set for the inventory directory.
+# Specify the Unix group to be set for the inventory directory.  
 #-------------------------------------------------------------------------------
 UNIX_GROUP_NAME={{ oracle_group }}
 
@@ -39,27 +40,26 @@ UNIX_GROUP_NAME={{ oracle_group }}
 # Windows based Operating System.
 #-------------------------------------------------------------------------------
 INVENTORY_LOCATION={{ oracle_inventory_loc }}
+
 #-------------------------------------------------------------------------------
-# Specify the complete path of the Oracle Home.
+# Specify the complete path of the Oracle Home. 
 #-------------------------------------------------------------------------------
 ORACLE_HOME={{ oracle_home_db }}
 
 #-------------------------------------------------------------------------------
-# Specify the complete path of the Oracle Base.
+# Specify the complete path of the Oracle Base. 
 #-------------------------------------------------------------------------------
 ORACLE_BASE={{ oracle_base }}
 
 #-------------------------------------------------------------------------------
-# Specify the installation edition of the component.
+# Specify the installation edition of the component.                     
+#                                                             
+# The value should contain only one of these choices.  
+#   - EE     : Enterprise Edition 
 #
-# The value should contain only one of these choices.
-#   - EE     : Enterprise Edition
-#   - SE2     : Standard Edition 2
-
-
+# Deprecated: oracle.install.db.InstallEdition
 #-------------------------------------------------------------------------------
-
-oracle.install.db.InstallEdition={{ db_homes_config[dbh.home]['edition'] | default ('EE') }}
+installEdition={{ db_homes_config[dbh.home]['edition'] | default ('EE') }}
 
 ###############################################################################
 #                                                                             #
@@ -73,52 +73,65 @@ oracle.install.db.InstallEdition={{ db_homes_config[dbh.home]['edition'] | defau
 # Operating System.                                                           #
 #                                                                             #
 ###############################################################################
-
 #------------------------------------------------------------------------------
-# The OSDBA_GROUP is the OS group which is to be granted SYSDBA privileges.
+# The OSDBA is the OS group which is to be granted SYSDBA privileges.
+#
+# Deprecated: oracle.install.db.OSDBA_GROUP
 #-------------------------------------------------------------------------------
-oracle.install.db.OSDBA_GROUP={{ dba_group }}
+OSDBA={{ dba_group }}
 
 #------------------------------------------------------------------------------
-# The OSOPER_GROUP is the OS group which is to be granted SYSOPER privileges.
+# The OSOPER is the OS group which is to be granted SYSOPER privileges.
 # The value to be specified for OSOPER group is optional.
+#
+# Deprecated: oracle.install.db.OSOPER_GROUP
 #------------------------------------------------------------------------------
-oracle.install.db.OSOPER_GROUP={{ dba_group }}
+OSOPER={{ dba_group }}
 
 #------------------------------------------------------------------------------
-# The OSBACKUPDBA_GROUP is the OS group which is to be granted SYSBACKUP privileges.
+# The OSBACKUPDBA is the OS group which is to be granted SYSBACKUP privileges.
+#
+# Deprecated: oracle.install.db.OSBACKUPDBA_GROUP
 #------------------------------------------------------------------------------
-oracle.install.db.OSBACKUPDBA_GROUP={{ dba_group }}
+OSBACKUPDBA={{ dba_group }}
 
 #------------------------------------------------------------------------------
-# The OSDGDBA_GROUP is the OS group which is to be granted SYSDG privileges.
+# The OSDGDBA is the OS group which is to be granted SYSDG privileges.
+#
+# Deprecated: oracle.install.db.OSDGDBA_GROUP
 #------------------------------------------------------------------------------
-oracle.install.db.OSDGDBA_GROUP={{ dba_group }}
+OSDGDBA={{ dba_group }}
 
 #------------------------------------------------------------------------------
-# The OSKMDBA_GROUP is the OS group which is to be granted SYSKM privileges.
+# The OSKMDBA is the OS group which is to be granted SYSKM privileges.
+#
+# Deprecated: oracle.install.db.OSKMDBA_GROUP
 #------------------------------------------------------------------------------
-oracle.install.db.OSKMDBA_GROUP={{ dba_group }}
+OSKMDBA={{ dba_group }}
 
 #------------------------------------------------------------------------------
-# The OSRACDBA_GROUP is the OS group which is to be granted SYSRAC privileges.
+# The OSRACDBA is the OS group which is to be granted SYSRAC privileges.
+#
+# Deprecated: oracle.install.db.OSRACDBA_GROUP
 #------------------------------------------------------------------------------
-oracle.install.db.OSRACDBA_GROUP={{ dba_group }}
+OSRACDBA={{ dba_group }}
+
 ################################################################################
 #                                                                              #
 #                      Root script execution configuration                     #
 #                                                                              #
 ################################################################################
-
 #-------------------------------------------------------------------------------------------------------
 # Specify the root script execution mode.
 #
-#   - true  : To execute the root script automatically by using the appropriate configuration methods.
-#   - false : To execute the root script manually.
+#   - true  : To run the root script automatically by using the appropriate configuration methods.
+#   - false : To run the root script manually.
 #
 # If this option is selected, password should be specified on the console.
+#
+# Deprecated: oracle.install.db.rootconfig.executeRootScript
 #-------------------------------------------------------------------------------------------------------
-oracle.install.db.rootconfig.executeRootScript=false
+executeRootScript=false
 
 #--------------------------------------------------------------------------------------
 # Specify the configuration method to be used for automatic root script execution.
@@ -126,47 +139,52 @@ oracle.install.db.rootconfig.executeRootScript=false
 # Following are the possible choices:
 #   - ROOT
 #   - SUDO
+#
+# Deprecated: oracle.install.db.rootconfig.configMethod
 #--------------------------------------------------------------------------------------
-oracle.install.db.rootconfig.configMethod=
+configMethod=
+
 #--------------------------------------------------------------------------------------
 # Specify the absolute path of the sudo program.
 #
 # Applicable only when SUDO configuration method was chosen.
+#
+# Deprecated: oracle.install.db.rootconfig.sudoPath
 #--------------------------------------------------------------------------------------
-oracle.install.db.rootconfig.sudoPath=
+sudoPath=
 
 #--------------------------------------------------------------------------------------
-# Specify the name of the user who is in the sudoers list.
+# Specify the name of the user who is in the sudoers list. 
 # Applicable only when SUDO configuration method was chosen.
 # Note:For Single Instance database installations,the sudo user name must be the username of the user installing the database.
+#
+# Deprecated: oracle.install.db.rootconfig.sudoUserName
 #--------------------------------------------------------------------------------------
-oracle.install.db.rootconfig.sudoUserName=
+sudoUserName=
 
 ###############################################################################
 #                                                                             #
 #                               Grid Options                                  #
 #                                                                             #
 ###############################################################################
-
 #------------------------------------------------------------------------------
 # Value is required only if the specified install option is INSTALL_DB_SWONLY
+# 
+# Specify the cluster nodes to deploy Enterprise Edition Real Application
+# Cluster Database Oracle Home software.
+# 
+# Example : clusterNodes=node1,node2
 #
-# Specify the cluster node names selected during the installation.
-#
-# Example : oracle.install.db.CLUSTER_NODES=node1,node2
+# Deprecated: oracle.install.db.CLUSTER_NODES
 #------------------------------------------------------------------------------
-{% if _oraswdb_install_home_type == 'SI' %}
-oracle.install.db.CLUSTER_NODES=
-{% else %}
 {% if _oraswgi_meta_configure_cluster %}
 {% if oracle_gi_cluster_type |upper == 'FLEX' %}
-oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
+clusterNodes={% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% else %}
-oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
+clusterNodes={% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% endif %}
+{% else %}
 {% endif %}
-{% endif %}
-
 
 ###############################################################################
 #                                                                             #
@@ -177,38 +195,39 @@ oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host |reg
 #-------------------------------------------------------------------------------
 # Specify the type of database to create.
 # It can be one of the following:
-#   - GENERAL_PURPOSE
-#   - DATA_WAREHOUSE
+#   - GENERAL_PURPOSE                       
+#   - DATA_WAREHOUSE 
 # GENERAL_PURPOSE: A starter database designed for general purpose use or transaction-heavy applications.
 # DATA_WAREHOUSE : A starter database optimized for data warehousing applications.
+#
+# Deprecated: oracle.install.db.config.starterdb.type
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.type=
+dbType=
 
 #-------------------------------------------------------------------------------
-# Specify the Starter Database Global Database Name.
+# Specify the Starter Database Global Database Name. 
+#
+# Deprecated: oracle.install.db.config.starterdb.globalDBName
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.globalDBName=
+gdbName=
 
 #-------------------------------------------------------------------------------
 # Specify the Starter Database SID.
+#
+# Deprecated: oracle.install.db.config.starterdb.SID
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.SID=
+dbSID=
 
 #-------------------------------------------------------------------------------
-# Specify whether the database should be configured as a Container database.
-# The value can be either "true" or "false". If left blank it will be assumed
-# to be "false".
+# Specify the Pluggable Database name for the pluggable database in Container Database.
+#
+# Deprecated: oracle.install.db.config.PDBName
 #-------------------------------------------------------------------------------
-oracle.install.db.ConfigureAsContainerDB=
-
-#-------------------------------------------------------------------------------
-# Specify the  Pluggable Database name for the pluggable database in Container Database.
-#-------------------------------------------------------------------------------
-oracle.install.db.config.PDBName=
+pdbName=
 
 #-------------------------------------------------------------------------------
 # Specify the Starter Database character set.
-#
+#                                               
 #  One of the following
 #  AL32UTF8, WE8ISO8859P15, WE8MSWIN1252, EE8ISO8859P2,
 #  EE8MSWIN1250, NE8ISO8859P10, NEE8ISO8859P4, BLT8MSWIN1257,
@@ -217,152 +236,181 @@ oracle.install.db.config.PDBName=
 #  IW8MSWIN1255, JA16EUC, JA16EUCTILDE, JA16SJIS, JA16SJISTILDE,
 #  KO16MSWIN949, ZHS16GBK, TH8TISASCII, ZHT32EUC, ZHT16MSWIN950,
 #  ZHT16HKSCS, WE8ISO8859P9, TR8MSWIN1254, VN8MSWIN1258
+#
+# Deprecated: oracle.install.db.config.starterdb.characterSet
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.characterSet=
+charSet=
 
 #------------------------------------------------------------------------------
-# This variable should be set to true if Automatic Memory Management
+# This variable should be set to true if Automatic Memory Management 
 # in Database is desired.
 # If Automatic Memory Management is not desired, and memory allocation
 # is to be done manually, then set it to false.
+#
+# Deprecated: oracle.install.db.config.starterdb.memoryOption
 #------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.memoryOption=
+enableAutoMemoryManagement=
 
 #-------------------------------------------------------------------------------
 # Specify the total memory allocation for the database. Value(in MB) should be
-# at least 256 MB, and should not exceed the total physical memory available
+# at least 256 MB, and should not exceed the total physical memory available 
 # on the system.
-# Example: oracle.install.db.config.starterdb.memoryLimit=512
+# Example: memoryLimit=512
+#
+# Deprecated: oracle.install.db.config.starterdb.memoryLimit
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.memoryLimit=
-
-#-------------------------------------------------------------------------------
-# This variable controls whether to load Example Schemas onto
-# the starter database or not.
-# The value can be either "true" or "false". If left blank it will be assumed
-# to be "false".
-#-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.installExampleSchemas=
+memoryLimit=
 
 ###############################################################################
 #                                                                             #
-# Passwords can be supplied for the following four schemas in the	      #
-# starter database:      						      #
+# Passwords can be supplied for the following four system accounts in the     #
+# starter database:                                                           #
 #   SYS                                                                       #
 #   SYSTEM                                                                    #
 #   DBSNMP (used by Enterprise Manager)                                       #
+#   PDBADMIN                                                                  #
 #                                                                             #
-# Same password can be used for all accounts (not recommended) 		      #
+# Same password can be used for all accounts (not recommended)                #
 # or different passwords for each account can be provided (recommended)       #
 #                                                                             #
 ###############################################################################
-
 #------------------------------------------------------------------------------
 # This variable holds the password that is to be used for all schemas in the
 # starter database.
+#
+# Deprecated: oracle.install.db.config.starterdb.password.ALL
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.password.ALL=
+allSchemaPassword=
 
 #-------------------------------------------------------------------------------
 # Specify the SYS password for the starter database.
+#
+# Deprecated: oracle.install.db.config.starterdb.password.SYS
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.password.SYS=
+sysPassword=
 
 #-------------------------------------------------------------------------------
 # Specify the SYSTEM password for the starter database.
+#
+# Deprecated: oracle.install.db.config.starterdb.password.SYSTEM
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.password.SYSTEM=
+systemPassword=
 
 #-------------------------------------------------------------------------------
 # Specify the DBSNMP password for the starter database.
-# Applicable only when oracle.install.db.config.starterdb.managementOption=CLOUD_CONTROL
+# Applicable only when managementOption=CLOUD_CONTROL
+#
+# Deprecated: oracle.install.db.config.starterdb.password.DBSNMP
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.password.DBSNMP=
+dbsnmpPassword=
 
 #-------------------------------------------------------------------------------
 # Specify the PDBADMIN password required for creation of Pluggable Database in the Container Database.
+#
+# Deprecated: oracle.install.db.config.starterdb.password.PDBADMIN
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.password.PDBADMIN=
+pdbadminPassword=
 
 #-------------------------------------------------------------------------------
 # Specify the management option to use for managing the database.
 # Options are:
-# 1. CLOUD_CONTROL - If you want to manage your database with Enterprise Manager Cloud Control along with Database Express.
-# 2. DEFAULT   -If you want to manage your database using the default Database Express option.
+# 1. CLOUD_CONTROL - If you want to manage your database with Enterprise Manager Cloud Control.
+# 2. NONE   -If you do not want to manage your database with Enterprise Manager Cloud Control.
+#
+# Deprecated: oracle.install.db.config.starterdb.managementOption
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.managementOption=
+managementOption=
 
 #-------------------------------------------------------------------------------
 # Specify the OMS host to connect to Cloud Control.
-# Applicable only when oracle.install.db.config.starterdb.managementOption=CLOUD_CONTROL
+# Applicable only when managementOption=CLOUD_CONTROL
+#
+# Deprecated: oracle.install.db.config.starterdb.omsHost
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.omsHost=
+omsHost=
 
 #-------------------------------------------------------------------------------
 # Specify the OMS port to connect to Cloud Control.
-# Applicable only when oracle.install.db.config.starterdb.managementOption=CLOUD_CONTROL
+# Applicable only when managementOption=CLOUD_CONTROL
+#
+# Deprecated: oracle.install.db.config.starterdb.omsPort
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.omsPort=
+omsPort=
 
 #-------------------------------------------------------------------------------
 # Specify the EM Admin user name to use to connect to Cloud Control.
-# Applicable only when oracle.install.db.config.starterdb.managementOption=CLOUD_CONTROL
+# Applicable only when managementOption=CLOUD_CONTROL
+#
+# Deprecated: oracle.install.db.config.starterdb.emAdminUser
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.emAdminUser=
+emAdminUser=
 
 #-------------------------------------------------------------------------------
 # Specify the EM Admin password to use to connect to Cloud Control.
-# Applicable only when oracle.install.db.config.starterdb.managementOption=CLOUD_CONTROL
+# Applicable only when managementOption=CLOUD_CONTROL
+#
+# Deprecated: oracle.install.db.config.starterdb.emAdminPassword
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.emAdminPassword=
+emAdminPassword=
 
 ###############################################################################
 #                                                                             #
-# SPECIFY RECOVERY OPTIONS                                 	              #
-# ------------------------------------		                              #
+# SPECIFY RECOVERY OPTIONS                                 	                  #
+# ------------------------------------		                                  #
 # Recovery options for the database can be mentioned using the entries below  #
 #                                                                             #
 ###############################################################################
-
 #------------------------------------------------------------------------------
-# This variable is to be set to false if database recovery is not required. Else
+# This variable is to be set to false if database recovery is not required. Else 
 # this can be set to true.
+#
+# Deprecated: oracle.install.db.config.starterdb.enableRecovery
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.enableRecovery=
+enableRecovery=
 
 #-------------------------------------------------------------------------------
 # Specify the type of storage to use for the database.
 # It can be one of the following:
 #   - FILE_SYSTEM_STORAGE
 #   - ASM_STORAGE
+#
+# Deprecated: oracle.install.db.config.starterdb.storageType
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.storageType=
+storageType=
 
 #-------------------------------------------------------------------------------
 # Specify the database file location which is a directory for datafiles, control
-# files, redo logs.
+# files, redo logs.         
 #
-# Applicable only when oracle.install.db.config.starterdb.storage=FILE_SYSTEM_STORAGE
+# Applicable only when storageType=FILE_SYSTEM_STORAGE 
+#
+# Deprecated: oracle.install.db.config.starterdb.fileSystemStorage.dataLocation
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.fileSystemStorage.dataLocation=
+dataLocation=
 
 #-------------------------------------------------------------------------------
 # Specify the recovery location.
 #
-# Applicable only when oracle.install.db.config.starterdb.storage=FILE_SYSTEM_STORAGE
+# Applicable only when storageType=FILE_SYSTEM_STORAGE 
+#
+# Deprecated: oracle.install.db.config.starterdb.fileSystemStorage.recoveryLocation
 #-------------------------------------------------------------------------------
-oracle.install.db.config.starterdb.fileSystemStorage.recoveryLocation=
+recoveryLocation=
 
 #-------------------------------------------------------------------------------
 # Specify the existing ASM disk groups to be used for storage.
 #
-# Applicable only when oracle.install.db.config.starterdb.storageType=ASM_STORAGE
+# Applicable only when storageType=ASM_STORAGE
+#
+# Deprecated: oracle.install.db.config.asm.diskGroup
 #-------------------------------------------------------------------------------
-oracle.install.db.config.asm.diskGroup=
+diskGroup=
 
 #-------------------------------------------------------------------------------
-# Specify the password for ASMSNMP user of the ASM instance.
+# Specify the password for ASMSNMP user of the ASM instance.                 
 #
-# Applicable only when oracle.install.db.config.starterdb.storage=ASM_STORAGE
+# Applicable only when storageType=ASM_STORAGE
+#
+# Deprecated: oracle.install.db.config.asm.ASMSNMPPassword 
 #-------------------------------------------------------------------------------
-oracle.install.db.config.asm.ASMSNMPPassword=
+asmsnmpPassword=

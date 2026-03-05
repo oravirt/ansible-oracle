@@ -8,7 +8,8 @@
   block:
     - name: install_home_gi | Install cvuqdisk rpm (non-FIPS)
       ansible.builtin.yum:  # noqa fqcn[action-core]
-        name: "{{ oracle_home_gi }}/cv/rpm/{{ cvuqdisk_rpm }}"
+        name: "{{ oracle_rsp_stage }}/{{ cvuqdisk_rpm }}"
+        disable_gpg_check: true
         state: present
       when:
         - not ansible_fips
