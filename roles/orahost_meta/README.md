@@ -30,6 +30,7 @@ Meta role used by other roles to share variable defaults.
   - [orahost_meta_java_options](#orahost_meta_java_options)
   - [orahost_meta_tmpdir](#orahost_meta_tmpdir)
   - [orahost_min_swap_mb](#orahost_min_swap_mb)
+  - [orasw_meta_primary_node](#orasw_meta_primary_node)
   - [role_separation](#role_separation)
   - [scripts_folder](#scripts_folder)
   - [sysctl_kernel_sem_force](#sysctl_kernel_sem_force)
@@ -384,6 +385,29 @@ swap (e.g. 16383 instead of 16384 for 16GB)
 
 ```YAML
 orahost_min_swap_mb: 16383
+```
+
+### orasw_meta_primary_node
+
+The state of orasw_meta_primary_node is:
+Single-Instance / Oracle Restart: true
+Cluster 1st node: true
+Cluster other nodes: false
+
+**_Type:_** boolean<br />
+
+#### Default value
+
+```YAML
+orasw_meta_primary_node: >
+  {%- if oracle_install_option_gi | default('') | upper != 'CRS_CONFIG' -%}
+    {%- set orasw_meta_primary_node = true -%}
+  {%- elif groups[orasw_meta_cluster_hostgroup][0] == inventory_hostname -%}
+    {%- set orasw_meta_primary_node = true -%}
+  {%- else -%}
+    {%- set orasw_meta_primary_node = false -%}
+  {%- endif -%}
+  {{ orasw_meta_primary_node }}
 ```
 
 ### role_separation

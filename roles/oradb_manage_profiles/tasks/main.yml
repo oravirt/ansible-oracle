@@ -37,7 +37,7 @@
           attributes: {{ odb.1.attributes }}
           db_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
       when:
-        - _orasw_meta_primary_node | bool
+        - orasw_meta_primary_node | bool
         - oracle_databases is defined
         - odb.0.state == 'present'
         - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
@@ -88,7 +88,7 @@
           attributes: {{ opdb.1.attributes }}
           cdb_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
       when:
-        - _orasw_meta_primary_node | bool
+        - orasw_meta_primary_node | bool
         - oracle_pdbs is defined
         - opdb.0 is defined
         - opdb.0.state == 'present'

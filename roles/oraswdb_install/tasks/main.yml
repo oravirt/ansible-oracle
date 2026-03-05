@@ -72,7 +72,7 @@
   with_items:
     - "{{ db_homes_installed }}"
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - db_homes_installed is defined
     - item.state | lower == 'present'
   tags:
@@ -121,7 +121,7 @@
       home: "{{ dbh.home }}"
       imgname: "{{ _local_oracle_sw_image_db | default('') }}"
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - dbh.state == 'present'
     - is_sw_source_local
     - oracle_sw_copy

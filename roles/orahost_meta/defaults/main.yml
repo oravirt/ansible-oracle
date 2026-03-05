@@ -212,3 +212,20 @@ sysctl_kernel_sem_force: false
 # @end
 # @var orahost_min_swap_mb:type: integer
 orahost_min_swap_mb: 16383
+
+# @var orasw_meta_primary_node:description: >
+# The state of orasw_meta_primary_node is:
+# Single-Instance / Oracle Restart: true
+# Cluster 1st node: true
+# Cluster other nodes: false
+# @end
+# @var orasw_meta_primary_node:type: boolean
+orasw_meta_primary_node: >
+  {%- if oracle_install_option_gi | default('') | upper != 'CRS_CONFIG' -%}
+    {%- set orasw_meta_primary_node = true -%}
+  {%- elif groups[orasw_meta_cluster_hostgroup][0] == inventory_hostname -%}
+    {%- set orasw_meta_primary_node = true -%}
+  {%- else -%}
+    {%- set orasw_meta_primary_node = false -%}
+  {%- endif -%}
+  {{ orasw_meta_primary_node }}

@@ -64,7 +64,7 @@
           {{ oracle_listeners_config[lsnrinst.listener_name]['address'][0] | default({}) }}
       when:
         - oracle_install_option_gi in ('CRS_CONFIG', 'HA_CONFIG')
-        - _orasw_meta_primary_node | default(true) | bool
+        - orasw_meta_primary_node | default(true) | bool
         - oracle_listeners_config[lsnrinst.listener_name]['listener_type'] | default('NORMAL') == 'NORMAL'
       tags:
         - listener
