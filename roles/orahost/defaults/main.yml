@@ -76,11 +76,19 @@ nr_hugepages_percent: |-
   {{ ((((percent_hugepages / 100) * ansible_memtotal_mb) * 1024**2 / hugepage_size_bytes | int)
   + (oracle_nr_instances | int * 2)) | round | int }}
 
+# @var extra_hugepages_per_instance:description: >
+# According to MOS KB151310's hugepages_settings.sh we've to add 1 page per shm segment.
+# Empirically, instances allocate 4 segments each on Linux.
+# This overhead is considered when computing `nr_hugepages_memory`
+# @end
+# @var extra_hugepages_per_instance:type: integer
+extra_hugepages_per_instance: 4
+
 # @var nr_hugepages_memory:description: This is an internal variable only. Do not define it!
 # @var nr_hugepages_memory: $ "_unset_"
 nr_hugepages_memory: |-
   {{ ((([ size_in_gb_hugepages | int, max_size_in_gb_hugepages | int ] | min | int ) * 1024**3 / hugepage_size_bytes | int)
-  + (oracle_nr_instances | int * 2)) | int }}
+  + (oracle_nr_instances | int * extra_hugepages_per_instance)) | int }}
 
 # @var nr_hugepages:description: >
 # This is an internal variable only. Do not define it!
