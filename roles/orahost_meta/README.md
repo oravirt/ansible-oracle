@@ -415,13 +415,13 @@ Cluster other nodes: false
 ```YAML
 orasw_meta_primary_node: >
   {%- if oracle_install_option_gi | default('') | upper != 'CRS_CONFIG' -%}
-    {%- set orasw_meta_primary_node = true -%}
+    {%- set _orasw_meta_primary_node = true -%}
   {%- elif groups[orasw_meta_cluster_hostgroup][0] == inventory_hostname -%}
-    {%- set orasw_meta_primary_node = true -%}
+    {%- set _orasw_meta_primary_node = true -%}
   {%- else -%}
-    {%- set orasw_meta_primary_node = false -%}
+    {%- set _orasw_meta_primary_node = false -%}
   {%- endif -%}
-  {{ orasw_meta_primary_node }}
+  {{ _orasw_meta_primary_node }}
 ```
 
 ### role_separation

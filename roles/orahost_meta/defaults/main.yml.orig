@@ -236,10 +236,10 @@ orahost_min_swap_mb: 16383
 # @var orasw_meta_primary_node:type: boolean
 orasw_meta_primary_node: >
   {%- if oracle_install_option_gi | default('') | upper != 'CRS_CONFIG' -%}
-    {%- set _orasw_meta_primary_node = true -%}
+    {%- set orasw_meta_primary_node = true -%}
   {%- elif groups[orasw_meta_cluster_hostgroup][0] == inventory_hostname -%}
-    {%- set _orasw_meta_primary_node = true -%}
+    {%- set orasw_meta_primary_node = true -%}
   {%- else -%}
-    {%- set _orasw_meta_primary_node = false -%}
+    {%- set orasw_meta_primary_node = false -%}
   {%- endif -%}
-  {{ _orasw_meta_primary_node }}
+  {{ orasw_meta_primary_node }}
