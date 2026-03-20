@@ -44,7 +44,7 @@
     patch_version: "{{ item.patchversion | default(omit) }}"
     exclude_upi: "{{ item.excludeUPI | default(omit) }}"
     opatchauto: false
-    conflict_check: true
+    conflict_check: "{{ opatch_db_conflict_check }}"
     stop_processes: "{{ item.stop_processes | default(False) }}"
     ocm_response_file: "{{ ocm_response_file | default(omit) }}"
     output: verbose
@@ -68,7 +68,7 @@
     patch_id: "{{ item.1 }}"
     patch_version: "{{ item.1.patchversion | default(omit) }}"
     opatchauto: false
-    conflict_check: true
+    conflict_check: "{{ opatch_db_conflict_check }}"
     ocm_response_file: "{{ ocm_response_file | default(omit) }}"
     output: verbose
     state: "{{ item.0.state }}"

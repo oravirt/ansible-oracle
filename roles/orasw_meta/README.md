@@ -36,6 +36,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [nfs_server_sw_path](#nfs_server_sw_path)
   - [ocenv_bashrc_init](#ocenv_bashrc_init)
   - [ocenv_bashrc_init_section](#ocenv_bashrc_init_section)
+  - [opatch_conflict_check](#opatch_conflict_check)
   - [oracle_all_editions_options_state](#oracle_all_editions_options_state)
   - [oracle_asm_disk_string](#oracle_asm_disk_string)
   - [oracle_base](#oracle_base)
@@ -401,6 +402,20 @@ Define the conntents to add to `.bashr` when `ocenv_bashrc_init: true`.
 ocenv_bashrc_init_section: |
   echo "execute ocenv to source Oracle Environment"
   alias ocenv='. "{{ dbenvdir }}/ocenv"'
+```
+
+### opatch_conflict_check
+
+When calling oracle_opatch for DB or GI, decide if analyze stage of
+opatch/opatchauto should be executed.
+Will be overridden by opatch_db_conflict_check and ppatch_gi_conflict_check.
+
+**_Type:_** boolean<br />
+
+#### Default value
+
+```YAML
+opatch_conflict_check: true
 ```
 
 ### oracle_all_editions_options_state
