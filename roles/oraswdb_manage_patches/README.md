@@ -6,6 +6,7 @@ Manage Patch Installation in Database ORACLE_HOMEs.
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
+  - [opatch_db_conflict_check](#opatch_db_conflict_check)
   - [oraswdb_manage_patches_cleanup_staging](#oraswdb_manage_patches_cleanup_staging)
   - [oraswdb_manage_patches_force_opatch_upgrade](#oraswdb_manage_patches_force_opatch_upgrade)
 - [Discovered Tags](#discovered-tags)
@@ -20,6 +21,19 @@ Manage Patch Installation in Database ORACLE_HOMEs.
 - Minimum Ansible version: `2.14.0`
 
 ## Default Variables
+
+### opatch_db_conflict_check
+
+When calling oracle_opatch for DB, decide if analyze stage of
+opatch/opatchauto should be executed.
+
+**_Type:_** boolean<br />
+
+#### Default value
+
+```YAML
+opatch_db_conflict_check: '{{ opatch_conflict_check | bool }}'
+```
 
 ### oraswdb_manage_patches_cleanup_staging
 
