@@ -74,7 +74,7 @@
   loop_control:
     loop_var: dbh
   when:
-    - orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool or _oraswdb_install_home_type=='SI'
     - db_homes_installed is defined
     - dbh.state | lower == 'present'
   tags:
@@ -125,7 +125,7 @@
       home: "{{ dbh.home }}"
       imgname: "{{ _local_oracle_sw_image_db | default('') }}"
   when:
-    - orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool or _oraswdb_install_home_type=='SI'
     - dbh.state == 'present'
     - is_sw_source_local
     - oracle_sw_copy
