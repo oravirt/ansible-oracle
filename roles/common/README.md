@@ -195,6 +195,8 @@ common_packages_el8:
 
 ### common_packages_el9
 
+List of RPMs for RHEL9 or OL9
+
 #### Default value
 
 ```YAML
