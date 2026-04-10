@@ -13,7 +13,7 @@
   tags:
     - oragridswunpack
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
     - oracle_install_version_gi == item.version
     - oracle_sw_copy and oracle_sw_unpack
@@ -31,7 +31,7 @@
   tags:
     - oragridswunpack
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
     - oracle_install_version_gi == item.version
     - not oracle_sw_copy
@@ -43,14 +43,14 @@
     path: "{{ oracle_home_gi }}/gridSetup.sh"
   register: stat_gridsetup_result
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
 
 - name: install_home_gi | State of GridSetup.sh
   ansible.builtin.assert:
     that: "stat_gridsetup_result.stat.exists == True"
     msg: "Cannot find {{ oracle_home_gi }}/gridSetup.sh }}"
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
 
 - name: install_home_gi | Install cvuqdisk rpm
   ansible.builtin.include_tasks: "install_cvuqdisk.yml"
@@ -83,7 +83,7 @@
   tags:
     - responsefilegi
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
     - item.diskgroup == oracle_asm_init_dg
 
@@ -114,7 +114,7 @@
   tags:
     - oragridinstall
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
   register: giinstall
   failed_when: giinstall.rc = not in [0, 6]
@@ -122,7 +122,7 @@
 - ansible.builtin.debug:  # noqa name[missing]
     var: giinstall.stdout_lines
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
     - giinstall.changed
 
@@ -146,14 +146,14 @@
   tags:
     - runroot
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
   register: rootmaster
 
 - ansible.builtin.debug:  # noqa name[missing]
     var: rootmaster.stdout_lines
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Run root script after installation (Other Nodes)
@@ -181,7 +181,7 @@
   tags:
     - runconfigtool
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - run_configtoolallcommand
     - oracle_home_gi not in checkgiinstall.stdout
   ignore_errors: true
