@@ -35,7 +35,7 @@
       {{ hostvars[item]['ssh_pubkey_res']['content'] | b64decode | split('\n') | first }}
     user: "{{ _key_owner }}"
     state: present
-  with_items: "{{ groups[orasw_meta_cluster_hostgroup] }}"
+  with_items: "{{ groups[orasw_meta_cluster_hostgroup] | intersect(ansible_play_hosts) }}"
 
 - name: Read host keys from remote host with ssh-keyscan
   ansible.builtin.command: ssh-keyscan -t {{ orahost_ssh_hostkeytypes | join(',') }} {{ ansible_hostname }}
@@ -59,7 +59,7 @@
     path: "{{ _key_owner_home }}/.ssh/known_hosts"
     state: present
   delegate_to: "{{ _hostkey_for_host[1] }}"
-  loop: "{{ ssh_hostkey_res.stdout_lines | product(groups[orasw_meta_cluster_hostgroup]) }}"
+  loop: "{{ ssh_hostkey_res.stdout_lines | product(groups[orasw_meta_cluster_hostgroup] | intersect(ansible_play_hosts)) }}"
   loop_control:
     loop_var: _hostkey_for_host
     label: "{{ (_hostkey_for_host[0] | split(' '))[0] }} {{ (_hostkey_for_host[0] | split(' '))[1] }}"
