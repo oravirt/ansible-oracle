@@ -20,11 +20,16 @@ sets up the host generic stuff
   - [epel7_rpm](#epel7_rpm)
   - [epel8_rpm](#epel8_rpm)
   - [epel9_rpm](#epel9_rpm)
+  - [http_proxy](#http_proxy)
+  - [https_proxy](#https_proxy)
   - [install_os_packages](#install_os_packages)
   - [motd_template](#motd_template)
+  - [no_proxy](#no_proxy)
   - [ntp_type](#ntp_type)
   - [ol6_repo_file](#ol6_repo_file)
   - [ol7_repo_file](#ol7_repo_file)
+  - [proxy_env](#proxy_env)
+  - [use_proxy](#use_proxy)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -348,6 +353,26 @@ Url for epel-release-latest-8.noarch.rpm
 epel9_rpm: oracle-epel-release-el9
 ```
 
+### http_proxy
+
+Define the http proxy for downloads
+
+#### Default value
+
+```YAML
+http_proxy: ''
+```
+
+### https_proxy
+
+Define the https proxy for downloads
+
+#### Default value
+
+```YAML
+https_proxy: ''
+```
+
 ### install_os_packages
 
 #### Default value
@@ -364,6 +389,16 @@ Used templatename for Message of the day
 
 ```YAML
 motd_template: motd.j2
+```
+
+### no_proxy
+
+Define no_proxy list für downlads.
+
+#### Default value
+
+```YAML
+no_proxy: ''
 ```
 
 ### ntp_type
@@ -394,6 +429,30 @@ The variable is used to cleanup the yum repolist for old installations.
 
 ```YAML
 ol7_repo_file: public-yum-ol7.repo
+```
+
+### proxy_env
+
+This is an internal variable for downloading patches.
+Usually no need to change it.
+
+#### Default value
+
+```YAML
+proxy_env:
+  http_proxy: '{{ http_proxy }}'
+  https_proxy: '{{ https_proxy }}'
+  no_proxy: '{{ no_proxy }}'
+```
+
+### use_proxy
+
+Enable Proxy for Download
+
+#### Default value
+
+```YAML
+use_proxy: false
 ```
 
 ## Discovered Tags

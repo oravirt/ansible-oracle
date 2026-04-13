@@ -652,10 +652,31 @@ orasw_meta_assert_oracle_databases: true
 # @end
 orasw_meta_cluster_hostgroup: ""
 
+# @var use_proxy:description: Enable Proxy for Download
+use_proxy: false
+
+# @var http_proxy:description: Define the http proxy for downloads
+http_proxy: ""
+
+# @var https_proxy:description: Define the https proxy for downloads
+https_proxy: ""
+
+# @var no_proxy:description: Define no_proxy list für downlads.
+no_proxy: ""
+
+# @var proxy_env:description: >
+# This is an internal variable for downloading patches.
+# Usually no need to change it.
+# @end
+proxy_env:
+  http_proxy: "{{ http_proxy }}"
+  https_proxy: "{{ https_proxy }}"
+  no_proxy: "{{ no_proxy }}"
+
 # @var opatch_conflict_check:description: >
 # When calling oracle_opatch for DB or GI, decide if analyze stage of
 # opatch/opatchauto should be executed.
-# Will be overridden by opatch_db_conflict_check and ppatch_gi_conflict_check.
+# Will be overridden by opatch_db_conflict_check and opatch_gi_conflict_check.
 # @end
 # @var opatch_conflict_check:type: boolean
 opatch_conflict_check: true

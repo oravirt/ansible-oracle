@@ -7,6 +7,7 @@
     force: false
     client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
     client_key: "{{ get_url_ssl_client_key | default(omit) }}"
+  environment: "{{ proxy_env }}"
   with_items: "{{ oracle_sw_image_gi }}"
   become: true
   become_user: "{{ _grid_install_user }}"
