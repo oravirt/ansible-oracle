@@ -29,11 +29,14 @@ There are a lot of variables who are used by `orasw_meta`
   - [get_url_ssl_client_key](#get_url_ssl_client_key)
   - [grid_base](#grid_base)
   - [hostgroup](#hostgroup)
+  - [http_proxy](#http_proxy)
+  - [https_proxy](#https_proxy)
   - [install_from_nfs](#install_from_nfs)
   - [is_sw_source_local](#is_sw_source_local)
   - [listener_port](#listener_port)
   - [nfs_server_sw](#nfs_server_sw)
   - [nfs_server_sw_path](#nfs_server_sw_path)
+  - [no_proxy](#no_proxy)
   - [ocenv_bashrc_init](#ocenv_bashrc_init)
   - [ocenv_bashrc_init_section](#ocenv_bashrc_init_section)
   - [opatch_conflict_check](#opatch_conflict_check)
@@ -66,9 +69,11 @@ There are a lot of variables who are used by `orasw_meta`
   - [oracle_sw_source_www](#oracle_sw_source_www)
   - [orasw_meta_assert_oracle_databases](#orasw_meta_assert_oracle_databases)
   - [orasw_meta_cluster_hostgroup](#orasw_meta_cluster_hostgroup)
+  - [proxy_env](#proxy_env)
   - [set_oracle_all_editions_options_state](#set_oracle_all_editions_options_state)
   - [shell_aliases](#shell_aliases)
   - [shell_ps1](#shell_ps1)
+  - [use_proxy](#use_proxy)
 - [Discovered Tags](#discovered-tags)
 - [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
@@ -326,6 +331,26 @@ The variable needs a refactoring.
 hostgroup: '{{ group_names[0] }}'
 ```
 
+### http_proxy
+
+Define the http proxy for downloads
+
+#### Default value
+
+```YAML
+http_proxy: ''
+```
+
+### https_proxy
+
+Define the https proxy for downloads
+
+#### Default value
+
+```YAML
+https_proxy: ''
+```
+
 ### install_from_nfs
 
 Mount NFS-Server for installation media?
@@ -380,6 +405,16 @@ _Important_
 nfs_server_sw_path: /orasw
 ```
 
+### no_proxy
+
+Define no_proxy list für downlads.
+
+#### Default value
+
+```YAML
+no_proxy: ''
+```
+
 ### ocenv_bashrc_init
 
 Add `ocenv.sh` to `bashrc` of oracle user?
@@ -408,7 +443,7 @@ ocenv_bashrc_init_section: |
 
 When calling oracle_opatch for DB or GI, decide if analyze stage of
 opatch/opatchauto should be executed.
-Will be overridden by opatch_db_conflict_check and ppatch_gi_conflict_check.
+Will be overridden by opatch_db_conflict_check and opatch_gi_conflict_check.
 
 **_Type:_** boolean<br />
 
@@ -954,6 +989,20 @@ Ansible Inventory hostgroup for RAC-Cluster.
 orasw_meta_cluster_hostgroup: ''
 ```
 
+### proxy_env
+
+This is an internal variable for downloading patches.
+Usually no need to change it.
+
+#### Default value
+
+```YAML
+proxy_env:
+  http_proxy: '{{ http_proxy }}'
+  https_proxy: '{{ https_proxy }}'
+  no_proxy: '{{ no_proxy }}'
+```
+
 ### set_oracle_all_editions_options_state
 
 Switch to globally enable/disable linking of edition independent database options
@@ -1000,6 +1049,16 @@ Configure shell prompt for OS-User oracle
 
 ```YAML
 shell_ps1: "'[$LOGNAME'@'$ORACLE_SID `basename $PWD`]$'"
+```
+
+### use_proxy
+
+Enable Proxy for Download
+
+#### Default value
+
+```YAML
+use_proxy: false
 ```
 
 ## Discovered Tags

@@ -44,6 +44,7 @@
         force: true
         client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
         client_key: "{{ get_url_ssl_client_key | default(omit) }}"
+      environment: "{{ proxy_env }}"
       with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) }}"
       loop_control:
         loop_var: oop_loop
