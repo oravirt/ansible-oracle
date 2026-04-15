@@ -1,0 +1,214 @@
+:toc:
+:toc-placement!:
+:toclevels: 4
+toc::[]
+
+:sectnums:
+:sectnumlevels: 4
+
+= Installation & Patching Settings for the Inventory
+
+== Introduction
+
+This guide explains the variables used in the inventory to configure RDBMS installation and patching. Usually, both are done at the same time, because for most scenarios you wouldn't install just the base release of the Oracle RDBMS.
+
+_Not_ described are the details of patch provisioning, e. g., how to obtain the patch files and how to find and enter patch IDs in the inventory.
+
+== Typical Scenarios
+
+Let's look at some typical setups concerning where the Oracle software and patch binaries are placed and how they should be processed:
+
+1. The binaries are stored locally on the Ansible control node. From there they are copied over to the target, where they get unpacked and installed.
+2. The binaries are stored in compressed form on NFS and should be copied over to the target, where they get unpacked and installed.
+3. The binaries are stored in compressed form on NFS. The NFS share will be mounted on the target host and the files will be unpacked from there to /tmp on the target host, then installed from the temp directory.
+4. The binaries are stored uncompressed on NFS. The NFS share will be mounted on the target host and the files will be installed from there.
+
+Here is how the inventory variables interact and what to set for each scenario.
+
+== Variable Reference
+
+[cols="1,1,2", options="header"]
+|===
+| Variable | Default | Role
+
+| `is_sw_source_local`
+| `true`
+| `true` = copy from control node; `false` = download via HTTP
+
+| `oracle_sw_copy`
+| `false` if `install_from_nfs`, else `true`
+| Transfer archive to `oracle_stage` on the target
+
+| `oracle_sw_unpack`
+| `false` if `install_from_nfs`, else `true`
+| Unpack archive on the target
+
+| `oracle_sw_source_local`
+| `/tmp`
+| Path on the Ansible control node where archives are read from
+
+| `install_from_nfs`
+| `false`
+| Mount NFS on the target; sets both copy/unpack flags to `false` by default
+
+| `oracle_stage`
+| `/u01/stage`
+| Local staging directory on the target
+
+| `oracle_stage_remote`
+| `{{ oracle_stage }}`
+| NFS mount point on the target
+
+| `oracle_patch_stage`
+| `{{ oracle_stage }}/patches`
+| Local patch staging directory on the target
+
+| `oracle_patch_stage_remote`
+| `{{ oracle_stage_remote }}/patches`
+| Patch directory on the NFS share
+
+|===
+
+== Scenario Comparison Table
+
+[cols="2,1,1,1,1", options="header"]
+|===
+| Setting
+| Sc. 1: Local control node
+| Sc. 2: NFS via control node
+| Sc. 3: NFS on target, unpack first
+| Sc. 4: NFS on target, direct install
+
+| `install_from_nfs`       | `false`               | `false`                       | `true`                  | `true`
+| `is_sw_source_local`     | `true`                | `true`                        | n/a                     | n/a
+| `oracle_sw_copy`         | `true`                | `true`                        | `false`                 | `false`
+| `oracle_sw_unpack`       | `true`                | `true`                        | `false` ^(*)^           | `false`
+| `oracle_sw_source_local` | path on control node  | NFS mount on control node     | —                       | —
+| `oracle_stage_remote`    | —                     | —                             | NFS mount on target     | NFS mount on target
+| `oracle_sw_patches` (patching) | *required*      | *required*                    | not needed              | not needed
+| Patches pre-extracted on NFS | no                | no                            | *yes*                   | *yes*
+|===
+
+(\*) For Sc. 3 (installation only): set `oracle_sw_unpack: true` to unpack from the NFS mount to
+`oracle_stage`. For *patching*, this override has no effect — the unpack block requires
+`oracle_sw_copy: true` as well, so patches must be pre-extracted on NFS regardless.
+
+== Scenario Configurations
+
+=== Scenario 1 — Binaries on the Ansible control node
+
+[source,yaml]
+----
+# Installation + Patching
+is_sw_source_local: true
+oracle_sw_copy: true
+oracle_sw_unpack: true
+oracle_sw_source_local: /path/to/archives   # must contain RDBMS ZIP, patch ZIPs, OPatch ZIP
+install_from_nfs: false
+
+# Patching only
+oracle_sw_patches:
+  - filename: pXXXXXXXX_190000_Linux-x86-64.zip
+    patchid: XXXXXXXX
+    version: 19.3.0.0
+    description: Database Release Update 19.30
+
+db_homes_config:
+  db19-si-ee:
+    opatch:
+      - patchid: XXXXXXXX
+        patchversion: 19.30.0.0.260120
+        stop_processes: true
+        state: present
+----
+
+=== Scenario 2 — Compressed archives on NFS, copied via control node
+
+Identical to Scenario 1. `oracle_sw_source_local` points to the NFS mount point on the control node.
+
+[source,yaml]
+----
+is_sw_source_local: true
+oracle_sw_copy: true
+oracle_sw_unpack: true
+oracle_sw_source_local: /mnt/nfs/orasw      # NFS mount point on the control node
+install_from_nfs: false
+
+oracle_sw_patches:
+  - filename: pXXXXXXXX_190000_Linux-x86-64.zip
+    patchid: XXXXXXXX
+    version: 19.3.0.0
+----
+
+=== Scenario 3 — NFS mounted on target, unpack to local stage (installation), pre-extracted (patching)
+
+[source,yaml]
+----
+install_from_nfs: true
+oracle_sw_copy: false
+oracle_sw_unpack: true          # installation only: unpack from NFS to oracle_stage
+                                # patching: has no effect; patches must be pre-extracted on NFS
+nfs_server_sw: nfs-server.example.com
+nfs_server_sw_path: /orasw
+oracle_stage_remote: /mnt/nfs  # oracle_patch_stage_remote = /mnt/nfs/patches
+
+# oracle_sw_patches is NOT required
+# Required NFS structure for patching:
+#   /mnt/nfs/patches/19.3.0.0/XXXXXXXX/        <- extracted patch
+#   /mnt/nfs/p6880880_190000_Linux-x86-64.zip  <- OPatch ZIP
+----
+
+=== Scenario 4 — Uncompressed binaries on NFS, install and patch directly from NFS
+
+[source,yaml]
+----
+install_from_nfs: true
+oracle_sw_copy: false           # default when install_from_nfs: true
+oracle_sw_unpack: false         # default when install_from_nfs: true
+nfs_server_sw: nfs-server.example.com
+nfs_server_sw_path: /orasw
+oracle_stage_remote: /mnt/nfs  # oracle_patch_stage_remote = /mnt/nfs/patches
+
+# oracle_sw_patches is NOT required
+# Required NFS structure for patching:
+#   /mnt/nfs/patches/19.3.0.0/XXXXXXXX/        <- extracted patch
+#   /mnt/nfs/p6880880_190000_Linux-x86-64.zip  <- OPatch ZIP
+----
+
+Note that the `opatch` part of the db home to be patched doesn't need a path to be set when the required NFS path structure is as above. The `patchid` is enough in this case. Here's an example of the settings for the DBRU 19.25:
+
+[source,yaml]
+----
+apply_patches_db: true
+db_homes_config:
+  db1925-si-ee:
+    version: 19.3.0.0
+    oracle_home: /u01/app/oracle/product/19/dbhome_1
+    edition: EE
+    opatch_minversion: 12.2.0.1.44
+    state: present
+    opatchauto: []
+    opatch:
+      - patchid: 36912597
+        # Database Release Update 19.25.0.0.240716
+        patchversion: 19.25.0.0.241015
+        stop_processes: true
+        state: present
+      - patchid: 36878697
+        # Oracle JavaVM Component Release Update (OJVM RU) 19.25.0.0.241015
+        stop_processes: true
+        state: present
+----
+
+However, you could set a `path` attribute for each `patchid` if you want to deviate from the standard setups. This might be necessary when you use a "combo patch" instead of separate patch archives for DBRU, OJVM RU et al.
+
+== Key Behavioral Differences: Installation vs. Patching
+
+For *installation*, setting `oracle_sw_copy: false` + `oracle_sw_unpack: true` (Scenario 3) causes
+the installer to read the archive from `oracle_stage_remote` (NFS) and extract directly to
+`oracle_home_db`.
+
+For *patching*, the unpack block unconditionally requires `oracle_sw_copy: true`. When
+`oracle_sw_copy: false`, no copy or unpack step runs at all — the patch must already be extracted
+on the NFS share at `oracle_patch_stage_remote/<version>/<patchid>/`. **Scenarios 3 and 4 are
+therefore identical from a patching perspective.**
