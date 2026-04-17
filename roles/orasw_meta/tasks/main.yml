@@ -12,6 +12,19 @@
     - always
     - assert_ansible
 
+# @tag assert_python:description: Assert minimum Python version
+- name: Assert minimum python version
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - ansible_python_version is version(_ao_python_min_version , '>=')
+    fail_msg: "Found version {{ ansible_python_version }} expected {{ _ao_python_min_version }} or newer"
+  vars:
+    _ao_python_min_version : 3.9
+  tags:
+    - always
+    - assert_python
+
 - name: Import assert_variable_types.yml
   ansible.builtin.import_tasks: assert_variable_types.yml
 
