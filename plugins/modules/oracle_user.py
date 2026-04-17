@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 import hashlib
@@ -89,8 +88,8 @@ options:
         default: present
         choices: ['present','absent','locked','unlocked']
 notes:
-    - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+    - python-oracledb needs to be installed
+requirements: [ "oracledb" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
@@ -132,11 +131,11 @@ oracle_user:
 
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
 
 
 def clean_string(item):
@@ -173,7 +172,7 @@ def check_user_exists(module, msg, cursor, schema):
     try:
         cursor.execute(sql)
         result = cursor.fetchone()[0]
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = error.message + 'sql: ' + sql
         module.fail_json(msg=msg)
@@ -208,7 +207,7 @@ def create_user(
     if not (schema_password) and authentication_type == 'password':
         if not (schema_password_hash):
             msg = 'Error: Missing schema password or password hash'
-            module.fail_json(msg=msg, Changed=False)
+            module.fail_json(msg=msg, changed=False)
 
     if authentication_type == 'password':
         if schema_password_hash:
@@ -267,7 +266,7 @@ def get_user_password_hash(module, cursor, schema):
     try:
         cursor.execute(sql)
         pwhashresult = cursor.fetchone()[0]
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = error.message + ': sql: ' + sql
         module.fail_json(msg=msg)
@@ -410,7 +409,7 @@ def modify_user(
 def execute_sql(module, cursor, sql):
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Blergh, something went wrong while executing sql - %s sql: %s' % (
             error.message,
@@ -425,7 +424,7 @@ def execute_sql_get(module, cursor, sql):
     try:
         cursor.execute(sql)
         result = cursor.fetchall()
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = error.message + ': sql: ' + sql
         module.fail_json(msg=msg)
@@ -444,7 +443,7 @@ def drop_user(module, cursor, schema):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Blergh, something went wrong while dropping the schema - %s sql: %s' % (
             error.message,
@@ -517,13 +516,11 @@ def main():
     container_data = module.params["container_data"]
     grants = module.params["grants"]
 
-    if not cx_oracle_exists:
+    if not oracledb_exists:
         module.fail_json(
             msg=(
-                "The cx_Oracle module is required. "
-                "'pip install cx_Oracle' should do the trick. "
-                "If cx_Oracle is installed, make sure ORACLE_HOME "
-                "& LD_LIBRARY_PATH is set"
+                "The oracledb module is required. "
+                "'pip install oracledb' should do the trick. "
             )
         )
 
@@ -534,35 +531,48 @@ def main():
         oracle_home = os.environ['ORACLE_HOME']
 
     wallet_connect = '/@%s' % service_name
+    connect = wallet_connect
     try:
+        if oracle_home is not None or (not user and not password):
+            oracledb.init_oracle_client()
+
         if not user and not password:
             # If neither user or password is supplied, the use of an
             # oracle wallet is assumed
             if mode == 'sysdba':
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(
+                    dsn=wallet_connect,
+                    mode=oracledb.AUTH_MODE_SYSDBA,
+                    externalauth=True,
+                )
             else:
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
+                conn = oracledb.connect(dsn=wallet_connect, externalauth=True)
 
         elif user and password:
             if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(
+                dsn = oracledb.makedsn(
                     host=hostname, port=port, service_name=service_name
                 )
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(
+                    user=user,
+                    password=password,
+                    dsn=dsn,
+                    mode=oracledb.AUTH_MODE_SYSDBA,
+                )
             else:
-                dsn = cx_Oracle.makedsn(
+                dsn = oracledb.makedsn(
                     host=hostname, port=port, service_name=service_name
                 )
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
+                conn = oracledb.connect(user=user, password=password, dsn=dsn)
 
         elif not (user) or not (password):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
+            module.fail_json(msg='Missing username or password for oracledb')
 
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.Error as exc:
         (error,) = exc.args
         msg = 'Could not connect to database - %s, connect descriptor: %s' % (
             error.message,
@@ -608,14 +618,14 @@ def main():
             )
 
     # elif state in ('unlocked','locked', ''):
-    # 	if not check_user_exists(module, msg, cursor, schema):
-    # 		# if create_user(module, cursor, schema, schema_password, schema_password_hash,
+    #     if not check_user_exists(module, msg, cursor, schema):
+    #         # if create_user(module, cursor, schema, schema_password, schema_password_hash,
     #       # default_tablespace, default_temp_tablespace, profile,
     #       # authentication_type, state, container, grants):
-    # 		msg = 'The schema %s doesn\'t exist' % schema
-    # 		module.fail_json(msg=msg, changed=False)
-    # 	else:
-    # 		modify_user(
+    #         msg = 'The schema %s doesn\'t exist' % schema
+    #         module.fail_json(msg=msg, changed=False)
+    #     else:
+    #         modify_user(
     #           module, cursor, schema, schema_password, schema_password_hash,
     #           default_tablespace, default_temp_tablespace, update_password, profile,
     #           authentication_type, state)

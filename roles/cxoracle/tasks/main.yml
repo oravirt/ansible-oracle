@@ -1,13 +1,23 @@
 # cxoracle-install playbook
 ---
-# The ansible-oracle modules are using Python3 only
-# => Install cx_Oracle for Python3 only
-- name: Install cx_oracle for Python3
-  ansible.builtin.pip:
-    name: "{{ cx_oracle3_source | default(cx_oracle_source) | default('cx_oracle') }}"
-    executable: pip3
-    extra_args: "{{ extra_args }}"
-    umask: "{{ cx_oracle_umask | default(omit) }}"
-    state: present
-  when: install_cx_oracle
-  tags: cx_oracle
+- name: Notify user of role deprecation
+  ansible.builtin.debug:
+    msg: 
+      - "****************************************************************"
+      - "DEPRECATION WARNING: The 'cxoracle' role is deprecated."
+      - "REASON: cx_Oracle is replaced by python-oracledb."
+      - "****************************************************************"
+  failed_when: true
+  ignore_errors: true
+  tags: [always, cx_oracle]
+# # The ansible-oracle modules are using Python3 only
+# # => Install cx_Oracle for Python3 only
+# - name: Install cx_oracle for Python3
+#   ansible.builtin.pip:
+#     name: "{{ cx_oracle3_source | default(cx_oracle_source) | default('cx_oracle') }}"
+#     executable: pip3
+#     extra_args: "{{ extra_args }}"
+#     umask: "{{ cx_oracle_umask | default(omit) }}"
+#     state: present
+#   when: install_cx_oracle
+#   tags: cx_oracle

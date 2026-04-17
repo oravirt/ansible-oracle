@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 import os
@@ -44,10 +43,10 @@ options:
         description: The script you want to execute. Doesn't handle selects
         required: false
 notes:
-    - cx_Oracle needs to be installed
-    - Oracle client libraries need to be installed along with ORACLE_HOME and
-      LD_LIBRARY_PATH settings.
-requirements: [ "cx_Oracle" ]
+    - python-oracledb needs to be installed
+    - Oracle client libraries are optional. They are needed if you want to use
+      python-oracledb in Thick mode.
+requirements: [ "oracledb" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
@@ -73,21 +72,25 @@ EXAMPLES = '''
 '''
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
+
+
+def _get_error_message(exc):
+    error = exc.args[0] if exc.args else exc
+    return getattr(error, 'message', str(error))
 
 
 def execute_sql_get(module, cursor, sql):
     try:
         cursor.execute(sql)
         result = cursor.fetchall()
-    except cx_Oracle.DatabaseError as exc:
-        (error,) = exc.args
+    except oracledb.DatabaseError as exc:
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
-            error.message,
+            _get_error_message(exc),
             sql,
         )
         module.fail_json(msg=msg, changed=False)
@@ -96,7 +99,7 @@ def execute_sql_get(module, cursor, sql):
 
 
 def execute_sql(module, cursor, conn, sql):
-    if 'insert' or 'delete' or 'update' in sql.lower():
+    if any(keyword in sql.lower() for keyword in ('insert', 'delete', 'update')):
         docommit = True
     else:
         docommit = False
@@ -104,10 +107,9 @@ def execute_sql(module, cursor, conn, sql):
     try:
         # module.exit_json(msg=sql.strip())
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
-        (error,) = exc.args
+    except oracledb.DatabaseError as exc:
         msg = 'Something went wrong while executing sql - %s sql: %s' % (
-            error.message,
+            _get_error_message(exc),
             sql,
         )
         module.fail_json(msg=msg, changed=False)
@@ -161,8 +163,8 @@ def main():
     sql = module.params["sql"]
     script = module.params["script"]
 
-    if not cx_oracle_exists:
-        msg = "The cx_Oracle module is required. Also set LD_LIBRARY_PATH & ORACLE_HOME"
+    if not oracledb_exists:
+        msg = "The oracledb module is required. Oracle Client libraries are optional unless Thick mode is needed"
         module.fail_json(msg=msg)
 
     wallet_connect = '/@%s' % service_name
@@ -173,41 +175,50 @@ def main():
             # oracle wallet is assumed
             if mode == 'sysdba':
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(wallet_connect, mode=oracledb.SYSDBA)
             elif mode == 'sysasm':
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSASM)
+                conn = oracledb.connect(wallet_connect, mode=oracledb.SYSASM)
             else:
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
+                conn = oracledb.connect(wallet_connect)
 
         elif user and password:
             if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(
+                dsn = oracledb.makedsn(
                     host=hostname, port=port, service_name=service_name
                 )
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(
+                    user=user,
+                    password=password,
+                    dsn=dsn,
+                    mode=oracledb.SYSDBA,
+                )
             elif mode == 'sysasm':
-                dsn = cx_Oracle.makedsn(
+                dsn = oracledb.makedsn(
                     host=hostname, port=port, service_name=service_name
                 )
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSASM)
+                conn = oracledb.connect(
+                    user=user,
+                    password=password,
+                    dsn=dsn,
+                    mode=oracledb.SYSASM,
+                )
             else:
-                dsn = cx_Oracle.makedsn(
+                dsn = oracledb.makedsn(
                     host=hostname, port=port, service_name=service_name
                 )
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
+                conn = oracledb.connect(user=user, password=password, dsn=dsn)
 
         elif not user or not password:
-            module.fail_json(msg='Missing username or password for cx_Oracle')
+            module.fail_json(msg='Missing username or password for oracledb')
 
-    except cx_Oracle.DatabaseError as exc:
-        (error,) = exc.args
+    except oracledb.DatabaseError as exc:
         msg = 'Could not connect to database - %s, connect descriptor: %s' % (
-            error.message,
+            _get_error_message(exc),
             connect,
         )
         module.fail_json(msg=msg, changed=False)

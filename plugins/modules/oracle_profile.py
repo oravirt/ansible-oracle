@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 import os
@@ -61,8 +60,8 @@ options:
         aliases: ['oh']
 
 notes:
-    - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+    - python-oracledb needs to be installed
+requirements: [ "oracledb" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
@@ -106,11 +105,11 @@ EXAMPLES = '''
 '''
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
 
 
 # Check if the profile exists
@@ -173,7 +172,11 @@ def ensure_profile_state(
         # Make sure attributes are lower case
         attribute_name = [x.lower() for x in attribute_name]
         attribute_value = [str(y).lower() for y in attribute_value]
-        wanted_attributes = zip(attribute_name, attribute_value)
+
+
+        ### wanted_attributes = zip(attribute_name, attribute_value)
+        ### required Python 3 compatibility correction
+        wanted_attributes = list(zip(attribute_name, attribute_value))
 
         # Check the current attributes
         attribute_names_ = ','.join(['\'' + n[0] + '\'' for n in (wanted_attributes)])
@@ -220,7 +223,7 @@ def execute_sql_get(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
         result = cursor.fetchall()
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
             error.message,
@@ -235,7 +238,7 @@ def execute_sql_get(module, msg, cursor, sql):
 def execute_sql(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Something went wrong while executing sql - %s sql: %s' % (
             error.message,
@@ -278,12 +281,10 @@ def main():
     service_name = module.params["service_name"]
     oracle_home = module.params["oracle_home"]
 
-    if not cx_oracle_exists:
+    if not oracledb_exists:
         msg = (
-            "The cx_Oracle module is required. "
-            "'pip install cx_Oracle' should do the trick. "
-            "If cx_Oracle is installed, make sure ORACLE_HOME "
-            "& LD_LIBRARY_PATH is set"
+            "The python-oracledb module is required. "
+            "'pip install oracledb' should do the trick. "
         )
         module.fail_json(msg=msg)
 
@@ -294,20 +295,25 @@ def main():
             # oracle wallet is assumed
             connect = wallet_connect
             if mode == 'sysdba':
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(wallet_connect, mode=oracledb.AUTH_MODE_SYSDBA)
             else:
-                conn = cx_Oracle.connect(wallet_connect)
+                conn = oracledb.connect(wallet_connect)
         elif user and password:
-            dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+            dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
             connect = dsn
             if mode == 'sysdba':
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(
+                    user=user,
+                    password=password,
+                    dsn=dsn,
+                    mode=oracledb.AUTH_MODE_SYSDBA,
+                )
             else:
-                conn = cx_Oracle.connect(user, password, dsn)
+                conn = oracledb.connect(user=user, password=password, dsn=dsn)
         elif not (user) or not (password):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
+            module.fail_json(msg='Missing username or password for python-oracledb')
 
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = (
             'Could not connect to DB: %s, connect descriptor: %s, '

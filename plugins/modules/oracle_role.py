@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 from ansible.module_utils.basic import AnsibleModule
@@ -52,8 +51,8 @@ options:
         default: present
         choices: ['present','absent','REMOVEALL']
 notes:
-    - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+    - python-oracledb needs to be installed
+requirements: [ "oracledb" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
@@ -90,11 +89,11 @@ oracle_role:
 '''
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
 
 
 def clean_string(item):
@@ -136,7 +135,7 @@ def check_role_exists(module, msg, cursor, role, auth):
     try:
         cursor.execute(sql)
         result = cursor.fetchone()
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg[0] = error.message + 'sql: ' + sql
         return False
@@ -181,7 +180,7 @@ def create_role(module, msg, cursor, role, auth, auth_conf):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg[0] = 'Blergh, something went wrong while creating the role - %s sql: %s' % (
             error.message,
@@ -239,7 +238,7 @@ def modify_role(module, msg, cursor, role, auth, auth_conf):
 
         try:
             cursor.execute(sql)
-        except cx_Oracle.DatabaseError as exc:
+        except oracledb.DatabaseError as exc:
             (error,) = exc.args
             msg[
                 0
@@ -265,7 +264,7 @@ def get_role_specs(module, msg, cursor, role):
     try:
         cursor.execute(sql)
         result = cursor.fetchall()[0][0]
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg[0] = (
             'Blergh, something went wrong while getting the role auth scheme '
@@ -288,7 +287,7 @@ def drop_role(module, msg, cursor, role):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg[0] = 'Blergh, something went wrong while dropping the role - %s sql: %s' % (
             error.message,
@@ -331,13 +330,11 @@ def main():
     auth = module.params["auth"]
     auth_conf = module.params["auth_conf"]
 
-    if not cx_oracle_exists:
+    if not oracledb_exists:
         module.fail_json(
             msg=(
-                "The cx_Oracle module is required. "
-                "'pip install cx_Oracle' should do the trick. "
-                "If cx_Oracle is installed, make sure ORACLE_HOME "
-                "& LD_LIBRARY_PATH is set"
+                "The oracledb module is required. "
+                "'pip install oracledb' should do the trick. "
             )
         )
 
@@ -348,29 +345,29 @@ def main():
             # oracle wallet is assumed
             if mode == 'sysdba':
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(wallet_connect, mode=oracledb.SYSDBA)
             else:
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
+                conn = oracledb.connect(wallet_connect)
 
         elif user and password:
             if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(
+                dsn = oracledb.makedsn(
                     host=hostname, port=port, service_name=service_name
                 )
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(user=user, password=password, dsn=dsn, mode=oracledb.SYSDBA)
             else:
-                dsn = cx_Oracle.makedsn(
+                dsn = oracledb.makedsn(
                     host=hostname, port=port, service_name=service_name
                 )
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
+                conn = oracledb.connect(user=user, password=password, dsn=dsn)
 
         elif not (user) or not (password):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
+            module.fail_json(msg='Missing username or password for oracledb')
 
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (
             error.message,

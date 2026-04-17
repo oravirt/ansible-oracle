@@ -1,0 +1,78 @@
+---
+# molecule.yml
+
+dependency:
+  name: galaxy
+
+driver:
+  name: docker
+
+platforms:
+  - name: oracle-free
+    image: container-registry.oracle.com/database/free:latest
+    pre_build_image: true
+    privileged: true
+    command: ""
+    env:
+      ORACLE_PWD: "YourPassword123"
+    published_ports:
+      - 0.0.0.0:1521:1521/tcp
+
+# Tell molecule to run prepare.yml before converge.
+provisioner:
+  name: ansible
+  playbooks:
+    prepare: prepare.yml
+    converge: converge.yml
+    verify: verify.yml
+  env:
+    ANSIBLE_LIBRARY: ../../../plugins/modules
+  config_options:
+    defaults:
+      collections_path: ../../../..
+      library: ../../../plugins/modules
+  inventory:
+    group_vars:
+      all:
+        # Use "docker" connection so Ansible talks to the container
+        # directly. No need to hardcode the container's IP address,
+        # which changes on every "molecule create".
+        ansible_connection: community.docker.docker
+        # Use the Python that is already in the Oracle Free image.
+        # oracle_role module runs on localhost, not in this container.
+        ansible_python_interpreter: /usr/bin/python3
+
+        # DB connection vars used in converge / verify
+        # oracle_host is "localhost" as seen from the controller,
+        # because port 1521 is published to the host's loopback.
+        # Inside Docker-in-Docker use the gateway IP (172.17.0.1) or
+        # "host-gateway" if your runner supports it.
+        oracle_host: "172.17.0.1"
+        oracle_port: 1521
+        oracle_service: FREEPDB1
+        oracle_user: system
+        oracle_pw: "YourPassword123"
+
+        
+        # Optional overrides for modules that require CDB/SYSDBA
+        oracle_service_cdb: FREE
+        oracle_user_sys: sys
+
+        
+        #mode: sysdba
+        oracle_datafile_dir: "/opt/oracle/oradata/FREE/FREEPDB1"
+        
+        # OMF base path for online redo log creation
+        oracle_omf_redo_dest: "/opt/oracle/oradata/FREE"
+
+        
+        # Molecule scenario helpers
+        oracle_test_pdb: "MOLPDB1"
+        oracle_container_name: "oracle-free"
+        oracle_home_dummy: "/tmp/oracle-home-dummy"
+
+
+
+
+verifier:
+  name: ansible
