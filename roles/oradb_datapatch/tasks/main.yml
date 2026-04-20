@@ -23,6 +23,8 @@
     db_unique_name: "{{ odb.oracle_db_unique_name | default(omit) }}"
     sid: "{{ odb.oracle_db_instance_name | default(omit) }}"
     state: started
+    script_env:
+      LANG: "{{ orasw_meta_forced_lang }}"
   become: true
   become_user: "{{ oracle_user }}"
   with_items: "{{ oracle_databases | selectattr('state', 'equalto', 'present') }}"
@@ -50,6 +52,8 @@
     hostname: "{{ ansible_fqdn }}"
     service_name: "{{ _db_service_name }}"
     port: "{{ _listener_port_cdb }}"
+    script_env:
+      LANG: "{{ orasw_meta_forced_lang }}"
   loop: "{{ oracle_databases | selectattr('state', 'equalto', 'present') }}"
   become: true
   become_user: "{{ oracle_user }}"
