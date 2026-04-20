@@ -41,6 +41,8 @@
     ocm_response_file: "{{ _oraswgi_manage_patches_ocm_response_file | default(omit) }}"
     output: verbose
     state: absent
+    script_env:
+      LANG: "{{ orasw_meta_forced_lang }}"
   with_items:
     - "{{ gi_patches[oracle_install_version_gi]['opatchauto'] | selectattr('state', 'equalto', 'absent') }}"
   loop_control:
