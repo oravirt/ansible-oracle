@@ -631,6 +631,7 @@ oracle_packages:
   - lsof
   - compat-openssl11
   - fontconfig
+  - glibc-langpack-en
 ```
 
 ### oracle_packages_sles_multi
