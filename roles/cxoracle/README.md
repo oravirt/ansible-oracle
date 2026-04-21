@@ -86,6 +86,8 @@ use_proxy: false
 
 ## Discovered Tags
 
+**_always_**
+
 **_cx_oracle_**
 
 ## Dependencies
