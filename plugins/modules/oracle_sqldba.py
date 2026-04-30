@@ -220,6 +220,8 @@ def sqlplus():
 def conn(username, password):
     if username is None:
         return "conn / as sysdba\n"
+    elif username.lower() == "sys":
+        return "conn " + "/".join([username, password]) + " as sysdba\n"
     else:
         return "conn " + "/".join([username, password]) + "\n"
 
