@@ -102,6 +102,10 @@ options:
         description: set NLS_LANG to the given value
     chdir:
         description: Working directory for SQL/script execution
+    ignorable_err:
+        description: Optional list of ORA, TNS, PLS or SP2 errors.
+        required: false
+        default: None
 
 author: Dietmar Uhlig, Robotron (www.robotron.de)
 '''
@@ -171,6 +175,8 @@ db_postinstall:
     sqlselect: "select value from gv$parameter where name = 'job_queue_processes'"
     oracle_home: "{{ oracle_db_home }}"
     oracle_db_name: "{{ oracle_db_name }}"
+    ignorable_err:
+      - "ORA-01555"
   register: jqpresult
 
 - name: Store job_queue_processes
@@ -186,6 +192,7 @@ err_msg = None
 oracle_home = ""
 pdb_list = ""
 sql_process = None
+ignorable_err = ""
 
 # Maximum runtime for sqlplus and catcon.pl in seconds. 0 means no timeout.
 timeout = 0
@@ -248,20 +255,20 @@ def kill_process():
     err_msg = "Timeout occured after %d seconds. " % timeout
 
 
-def run_sql_p(sql, username, password, scope, pdb_list):
+def run_sql_p(sql, username, password, scope, pdb_list, ignorable_err):
     global changed, err_msg, sql_process
 
     err_msg = ""
     result = ""
     if scope == 'pdbs':
         for pdb in pdb_list.split():
-            result += run_sql(sql, username, password, pdb)
+            result += run_sql(sql, username, password, pdb, ignorable_err)
     else:
-        result = run_sql(sql, username, password, None)
+        result = run_sql(sql, username, password, None, ignorable_err)
     return result
 
 
-def run_sql(sql, username, password, pdb):
+def run_sql(sql, username, password, pdb, ignorable_err):
     global changed, err_msg, sql_process
 
     t = None
@@ -289,30 +296,34 @@ def run_sql(sql, username, password, pdb):
             serr,
         )
         return "[ERR]"
-    sqlerr_pat = re.compile("^(ORA|TNS|SP2)-[0-9]+", re.MULTILINE)
-    sqlplus_err = sqlerr_pat.search(sout.decode())
-    if sqlplus_err:
-        err_msg += "[ERR] sqlplus: %s\nERR Code: %s.\n" % (sql_cmd, sqlplus_err.group())
-        return "[ERR]\n%s\n" % sout.strip()
-
+    sqlerr_pat = re.compile(r"^\s*((?:ORA|PLS|TNS|SP2)-\d+)", re.MULTILINE)
+    sqlplus_err = sqlerr_pat.findall(sout.decode())
+    if len(sqlplus_err) > 0:
+        if ignorable_err is None:
+            ignorable_err = []
+        relevant_errs = [x for x in sqlplus_err if x not in ignorable_err]
+        for relevant_err in relevant_errs:
+            err_msg += "[ERR] sqlplus: %s\nERR Code: %s.\n" % (sql_cmd, relevant_err)
+        if relevant_errs:
+            return "[ERR]\n%s\n" % sout.strip()
     changed = True
     return sout.decode('utf-8').strip()
 
 
-def check_creates_sql(sql, scope):
+def check_creates_sql(sql, scope, ignorable_err):
     global pdb_list, err_msg
 
     err_msg = ""
     if not sql.endswith(";"):
         sql += ";"
-    if scope == 'cdb':
-        res = run_sql(sql, None, None, None)
+    if scope == "cdb":
+        res = run_sql(sql, None, None, None, ignorable_err)
         # error handling see call of check_creates_sql
         return False if not res or res == "0" else True
     else:
         checked_pdb_list = ""
         for pdb in pdb_list.split():
-            res = run_sql(sql, None, None, pdb)
+            res = run_sql(sql, None, None, pdb, ignorable_err)
             # error handling see call of check_creates_sql
             if not res or res == "0":
                 checked_pdb_list += " " + pdb
@@ -321,7 +332,7 @@ def check_creates_sql(sql, scope):
 
 
 def is_container():
-    return run_sql("select cdb from gv$database;", None, None, None) == 'YES'
+    return run_sql("select cdb from gv$database;", None, None, None, []) == "YES"
 
 
 def get_all_pdbs():
@@ -331,7 +342,7 @@ def get_all_pdbs():
         "select listagg(pdb_name, ' ') within group (order by pdb_name) "
         "Sfrom dba_pdbs where status = 'NORMAL' and pdb_name <> 'PDB$SEED';"
     )
-    pdb_list = 'CDB$ROOT ' + run_sql(sql, None, None, None)
+    pdb_list = "CDB$ROOT " + run_sql(sql, None, None, None, [])
 
 
 def run_catcon_pl(catcon_pl):
@@ -390,8 +401,7 @@ def run_catcon_pl(catcon_pl):
 
 
 def main():
-    global oracle_home, changed, result, err_msg, pdb_list
-
+    global oracle_home, changed, result, err_msg, pdb_list, ignorable_err
     module = AnsibleModule(
         argument_spec=dict(
             sql=dict(required=False),
@@ -411,6 +421,9 @@ def main():
             oracle_db_name=dict(required=True),
             nls_lang=dict(required=False),
             chdir=dict(required=False),
+            ignorable_err=dict(
+                required=False,
+            ),
         ),
         mutually_exclusive=[
             ['sql', 'sqlscript', 'catcon_pl', 'sqlselect'],
@@ -431,6 +444,7 @@ def main():
     oracle_db_name = module.params["oracle_db_name"]
     nls_lang = module.params["nls_lang"]
     workdir = module.params["chdir"]
+    ignorable_err = module.params["ignorable_err"]
 
     os.environ["ORACLE_HOME"] = oracle_home
     os.environ["ORACLE_SID"] = oracle_db_name
@@ -464,7 +478,7 @@ def main():
             )
 
     if creates_sql is not None:
-        already_done = check_creates_sql(creates_sql, scope)
+        already_done = check_creates_sql(creates_sql, scope, ignorable_err)
         if err_msg:
             module.fail_json(msg="%s\n%s" % (result, err_msg), changed=False)
         else:
@@ -477,21 +491,17 @@ def main():
     if sqlselect is not None:
         if sqlselect.endswith(";"):
             sqlselect.rstrip(";")
-        sqlselect = (
-            "select dbms_xmlgen.getxml('"
-            + sqlselect.replace("'", "''")
-            + "') from dual;"
-        )
-        result = run_sql_p(sqlselect, username, password, scope, pdb_list)
+        sqlselect = "select dbms_xmlgen.getxml('" + sqlselect.replace("'", "''") + "') from dual;"
+        result = run_sql_p(sqlselect, username, password, scope, pdb_list, ignorable_err)
     elif sql is not None:
         sql = os.linesep.join([s for s in sql.splitlines() if s.strip()])
         if not sql.endswith(";") and not sql.endswith("/"):
             sql += ";"
-        result += run_sql_p(sql, username, password, scope, pdb_list)
+        result += run_sql_p(sql, username, password, scope, pdb_list, ignorable_err)
     elif sqlscript is not None:
         if not sqlscript.startswith("@"):
             sqlscript = "@" + sqlscript
-        result += run_sql_p(sqlscript, username, password, scope, pdb_list)
+        result += run_sql_p(sqlscript, username, password, scope, pdb_list, ignorable_err)
     elif catcon_pl is not None:
         run_catcon_pl(catcon_pl)
 
