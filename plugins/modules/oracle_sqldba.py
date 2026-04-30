@@ -233,6 +233,9 @@ def sql_input(sql, username, password, pdb):
 
     if pdb is not None:
         sql_scr += "alter session set container = " + pdb + ";\n"
+    # Sometimes the previous settings are lost after connecting, so setting it again
+    sql_scr += "set heading off echo off feedback off termout on\n"
+    sql_scr += "set long 1000000 pagesize 0 linesize 1000 trimspool on\n"
     sql_scr += sql + "\n"
     sql_scr += "exit;\n"
     return sql_scr
