@@ -7,15 +7,15 @@ import re
 import shlex
 import shutil
 import tempfile
+from subprocess import Popen, PIPE
+from threading import Timer
+from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils._text import to_native
 import xml.etree.ElementTree as ET
 from copy import copy
-from subprocess import PIPE, Popen
-from threading import Timer
 
-from ansible.module_utils._text import to_native
-from ansible.module_utils.basic import AnsibleModule
 
-DOCUMENTATION = """
+DOCUMENTATION = '''
 ---
 module: oracle_sqldba
 short_description: Execute sql (scripts) using sqlplus (BEQ) or catcon.pl
@@ -108,9 +108,9 @@ options:
         default: None
 
 author: Dietmar Uhlig, Robotron (www.robotron.de)
-"""
+'''
 
-EXAMPLES = """
+EXAMPLES = '''
 # Example 1, mixed post installation tasks
 # from inventory:
 
@@ -184,7 +184,7 @@ db_postinstall:
     job_queue_processes: "{{ jqpresult.state.ROW[0].VALUE }}"
     # Use all uppercase for "ROW" and for column names!
 
-"""
+'''
 
 changed = False
 result = ""
@@ -260,7 +260,7 @@ def run_sql_p(sql, username, password, scope, pdb_list, ignorable_err):
 
     err_msg = ""
     result = ""
-    if scope == "pdbs":
+    if scope == 'pdbs':
         for pdb in pdb_list.split():
             result += run_sql(sql, username, password, pdb, ignorable_err)
     else:
@@ -270,6 +270,7 @@ def run_sql_p(sql, username, password, scope, pdb_list, ignorable_err):
 
 def run_sql(sql, username, password, pdb, ignorable_err):
     global changed, err_msg, sql_process
+
     t = None
     try:
         sql_cmd = sql_input(sql, username, password, pdb)
@@ -279,7 +280,7 @@ def run_sql(sql, username, password, pdb, ignorable_err):
             t.start()
         [sout, serr] = sql_process.communicate(input=sql_cmd.encode())
     except Exception as e:
-        err_msg += "Could not call sqlplus. %s. called: %s." % (
+        err_msg += 'Could not call sqlplus. %s. called: %s.' % (
             to_native(e),
             " ".join(sqlplus()),
         )
@@ -306,7 +307,7 @@ def run_sql(sql, username, password, pdb, ignorable_err):
         if relevant_errs:
             return "[ERR]\n%s\n" % sout.strip()
     changed = True
-    return sout.decode("utf-8").strip()
+    return sout.decode('utf-8').strip()
 
 
 def check_creates_sql(sql, scope, ignorable_err):
@@ -374,7 +375,7 @@ def run_catcon_pl(catcon_pl):
             t.start()
         [sout, serr] = sql_process.communicate()
     except Exception as e:
-        err_msg += "Could not call perl. %s. called: %s." % (
+        err_msg += 'Could not call perl. %s. called: %s.' % (
             to_native(e),
             " ".join(catcon_cmd),
         )
@@ -395,7 +396,7 @@ def run_catcon_pl(catcon_pl):
             serr,
         )
         return
-    result += sout.decode("utf-8")
+    result += sout.decode('utf-8')
     changed = True
 
 
@@ -413,7 +414,7 @@ def main():
             scope=dict(
                 required=False,
                 choices=["default", "db", "cdb", "pdbs", "all_pdbs"],
-                default="default",
+                default='default',
             ),
             pdb_list=dict(required=False),
             oracle_home=dict(required=True),
@@ -425,8 +426,8 @@ def main():
             ),
         ),
         mutually_exclusive=[
-            ["sql", "sqlscript", "catcon_pl", "sqlselect"],
-            ["sqlselect", "creates_sql"],
+            ['sql', 'sqlscript', 'catcon_pl', 'sqlselect'],
+            ['sqlselect', 'creates_sql'],
         ],
     )
 
@@ -451,28 +452,28 @@ def main():
     if nls_lang is not None:
         os.environ["NLS_LANG"] = nls_lang
 
-    if scope == "db":
-        scope = "cdb"
-    if scope == "default":
+    if scope == 'db':
+        scope = 'cdb'
+    if scope == 'default':
         scope = "all_pdbs" if catcon_pl is not None else "cdb"
-    if scope == "pdbs" and (pdb_list is None or pdb_list.strip() == ""):
+    if scope == 'pdbs' and (pdb_list is None or pdb_list.strip() == ""):
         module.exit_json(msg="scope = pdbs, but pdb_list is empty", changed=False)
-    if scope == "cdb" and catcon_pl is not None:
-        scope = "pdbs"
-        pdb_list = "CDB$ROOT"
-    if scope == "all_pdbs" and (catcon_pl is None or creates_sql is not None):
+    if scope == 'cdb' and catcon_pl is not None:
+        scope = 'pdbs'
+        pdb_list = 'CDB$ROOT'
+    if scope == 'all_pdbs' and (catcon_pl is None or creates_sql is not None):
         if is_container():
-            scope = "pdbs"
+            scope = 'pdbs'
             get_all_pdbs()
         else:
-            scope = "cdb"
+            scope = 'cdb'
 
     if workdir is not None:
         try:
             os.chdir(workdir)
         except Exception as e:
             module.fail_json(
-                msg="Could not chdir to %s: %s." % (workdir, to_native(e)),
+                msg='Could not chdir to %s: %s.' % (workdir, to_native(e)),
                 changed=False,
             )
 
@@ -514,5 +515,5 @@ def main():
         module.fail_json(msg="%s\n%s" % (result, err_msg), changed=changed)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
