@@ -1,0 +1,4652 @@
+---
+# converge.yml 
+#
+# IMPORTANT:
+#   oracle_xxxxx is a "library module" that runs on the Ansible CONTROLLER and
+#   opens a TCP connection to port 1521 on the Oracle DB.
+#   It does NOT execute inside the Oracle DB container.
+#   Therefore:
+#     - We do NOT need Python 3.11/3.12/3.13 or oracledb inside the container.
+#     - We DO need oracledb on the controller (installed in prepare.yml).
+#     - Tasks that call oracle_role use: delegate_to: localhost
+
+- name: Converge Oracle Plugins
+  hosts: all
+  gather_facts: false
+
+  vars:
+    mol_tablespace: "MOL_TEST_TBS"
+    mol_datafile_01: "{{ oracle_datafile_dir }}/mol_test_tbs01.dbf"
+    test_preference_name: TABLE_CACHED_BLOCKS
+    test_preference_value: "16"
+    molecule_test_table: MOLECULE_ORACLE_SQL
+    molecule_test_script: /tmp/molecule_oracle_sql_script.sql
+    molecule_test_service_name: molecule_test_service
+    molecule_test_oracle_home: /tmp
+    test_consumer_group: MOL_RSRC_CG_1
+    test_user_1: MOL_RSRC_U1
+    test_user_2: MOL_RSRC_U2
+    test_user_password: Welcome123
+    test_profile_name: molecule_profile_test
+    oracle_parameter_name: open_cursors
+    molecule_ldap_fixture: "{{ playbook_dir }}/ldap_users.json"
+    molecule_pythonpath: "{{ playbook_dir }}/fixtures"
+    jobwindow_name: MOLECULE_JOBWINDOW_TEST
+    jobwindow_interval_initial: "freq=daily;byday=MON;byhour=1;byminute=0;bysecond=0"
+    jobwindow_interval_updated: "freq=daily;byday=TUE;byhour=2;byminute=15;bysecond=0"
+    jobwindow_comments_initial: "Created by Molecule"
+    jobwindow_comments_updated: "Updated by Molecule"
+    molecule_schedule_name: system.mol_jobschedule_test
+    molecule_repeat_interval_1: "FREQ=HOURLY;INTERVAL=1"
+    molecule_repeat_interval_2: "FREQ=DAILY;BYHOUR=1;BYMINUTE=0;BYSECOND=0"
+    molecule_jobclass_name: MOLECULE_JOBCLASS
+    test_job_owner: SYSTEM
+    test_job_name: MOLECULE_ORACLE_JOB
+    test_job_fqname: "{{ test_job_owner }}.{{ test_job_name }}"
+    test_user: MOL_GRANTS_USER
+    test_role: MOL_GRANTS_ROLE
+    test_owner: MOL_OWNER
+    test_password: "YourPassword123"
+    test_table: T_GRANTS
+    molecule_directory_name: MOLECULE_TEST_DIR
+    molecule_directory_path_1: "{{ oracle_datafile_dir }}"
+    molecule_directory_path_2: "/tmp/molecule_oracle_directory"
+    molecule_result_dir: /tmp/ansible_oracle-molecule
+    molecule_asmvol_result_file: "{{ molecule_result_dir }}/oracle_asmvol_result.json"
+
+  tasks:
+
+    # ── Step 1: Wait for Oracle listener ──────────────────────────────────────
+    - name: Wait for Oracle port 1521 to be available
+      ansible.builtin.wait_for:
+        host: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        timeout: 600
+        sleep: 10
+        msg: "Timed out waiting for Oracle listener on {{ oracle_host }}:{{ oracle_port }}"
+      # Runs on the controller (delegate_to: localhost is implicit for wait_for
+      # when ansible_connection is docker and host is a remote address)
+      delegate_to: localhost
+      run_once: true
+
+    # =========================================================================
+    # BLOCK 1 – oracle_role tests
+    # =========================================================================
+    # ── Step 2: Create a role (CREATE test) ───────────────────────────────────
+    - name: Create TEST_DYNAMICS_ROLE via oracle_role module
+      opitzconsulting.ansible_oracle.oracle_role:
+        hostname:     "{{ oracle_host }}"
+        port:         "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user:         "{{ oracle_user }}"
+        password:     "{{ oracle_pw }}"
+        role:         "TEST_DYNAMICS_ROLE"
+        state:        present
+        auth:         password
+        auth_conf:    "Secret123"
+      delegate_to: localhost  # module runs on controller, not inside the container
+      register: result
+
+    - name: Assert that the role was created (changed == true)
+      ansible.builtin.assert:
+        that:
+          - result.changed == true
+        fail_msg: "Module failed to create the role or did not report a change. Result: {{ result }}"
+
+    # ── Step 3: Idempotency check ─────────────────────────────────────────────
+    - name: Idempotency - run oracle_role again (should NOT change)
+      opitzconsulting.ansible_oracle.oracle_role:
+        hostname:     "{{ oracle_host }}"
+        port:         "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user:         "{{ oracle_user }}"
+        password:     "{{ oracle_pw }}"
+        role:         "TEST_DYNAMICS_ROLE"
+        state:        present
+        auth:         password
+        auth_conf:    "Secret123"
+      delegate_to: localhost
+      register: idempotency_result
+
+    - name: Assert idempotency (changed == false on second run)
+      ansible.builtin.assert:
+        that:
+          - idempotency_result.changed == false
+        fail_msg: "Idempotency test failed! Module reported a change on the second run."
+
+    
+    - name: TEST_DYNAMICS_ROLE exists before removal test
+      opitzconsulting.ansible_oracle.oracle_role:
+        hostname:     "{{ oracle_host }}"
+        port:         "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user:         "{{ oracle_user }}"
+        password:     "{{ oracle_pw }}"
+        role:         "TEST_DYNAMICS_ROLE"
+        state:        present
+        auth:         password
+        auth_conf:    "Secret123"
+      delegate_to: localhost
+      register: ensure_present_result
+
+    # ── Remove existing role (DELETE test) ───────────────────────────
+    - name: Remove existing TEST_DYNAMICS_ROLE via oracle_role module
+      opitzconsulting.ansible_oracle.oracle_role:
+        hostname:     "{{ oracle_host }}"
+        port:         "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user:         "{{ oracle_user }}"
+        password:     "{{ oracle_pw }}"
+        role:         "TEST_DYNAMICS_ROLE"
+        state:        absent
+      delegate_to: localhost
+      register: remove_existing_result
+
+    - name: Assert that removing an existing role reports changed == true
+      ansible.builtin.assert:
+        that:
+          - remove_existing_result.changed == true
+        fail_msg: >-
+          Module failed to remove an existing role or did not report a change.
+          Result: {{ remove_existing_result }}
+
+    # ── Remove non-existing role (idempotent DELETE test) ────────────
+    - name: Remove non-existing TEST_DYNAMICS_ROLE via oracle_role module
+      opitzconsulting.ansible_oracle.oracle_role:
+        hostname:     "{{ oracle_host }}"
+        port:         "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user:         "{{ oracle_user }}"
+        password:     "{{ oracle_pw }}"
+        role:         "TEST_DYNAMICS_ROLE"
+        state:        absent
+      delegate_to: localhost
+      register: remove_nonexisting_result
+
+    - name: Assert that removing a non-existing role reports changed == false
+      ansible.builtin.assert:
+        that:
+          - remove_nonexisting_result.changed == false
+        fail_msg: >-
+          Idempotency test for delete failed! Module reported a change while
+          removing a role that does not exist. Result: {{ remove_nonexisting_result }}
+
+
+    # =========================================================================
+    # BLOCK 2 – oracle_user tests 
+    # =========================================================================
+    # --- 2.0  Ensure user is absent before create test -----------------------
+    - name: "[oracle_user] Ensure MOL_TEST_USER is absent before create test"
+      opitzconsulting.ansible_oracle.oracle_user:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        schema: "MOL_TEST_USER"
+        state: absent
+      delegate_to: localhost
+
+    # --- 2.1  Create a new schema (state: present) ---------------------------
+    - name: "[oracle_user] Create schema MOL_TEST_USER (expect change)"
+      opitzconsulting.ansible_oracle.oracle_user:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        schema: "MOL_TEST_USER"
+        schema_password: "TestPass#2024"
+        default_tablespace: USERS
+        default_temp_tablespace: TEMP
+        state: present
+      register: user_create_result
+      delegate_to: localhost
+    - name: "[oracle_user] Assert schema was created"
+      assert:
+        that:
+          - user_create_result.changed == true
+        fail_msg: "oracle_user module failed to create schema MOL_TEST_USER."
+      delegate_to: localhost
+
+    # --- 2.2  Idempotency: same call, same state, no change expected ----------
+    - name: "[oracle_user] Idempotency check – create again (expect no change)"
+      opitzconsulting.ansible_oracle.oracle_user:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        schema: "MOL_TEST_USER"
+        schema_password: "TestPass#2024"
+        default_tablespace: USERS
+        default_temp_tablespace: TEMP
+        state: present
+        update_password: on_create
+      register: user_idempotency_result
+      delegate_to: localhost
+    - name: "[oracle_user] Assert second run made no changes"
+      assert:
+        that:
+          - user_idempotency_result.changed == false
+        fail_msg: "Idempotency test failed! oracle_user reported a change on the second run."
+      delegate_to: localhost
+
+    # --- 2.3  Lock the schema -------------------------------------------------
+    - name: "[oracle_user] Lock schema MOL_TEST_USER (expect change)"
+      opitzconsulting.ansible_oracle.oracle_user:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        schema: "MOL_TEST_USER"
+        schema_password: "TestPass#2024"
+        state: locked
+        update_password: on_create
+      register: user_lock_result
+      delegate_to: localhost
+    - name: "[oracle_user] Assert schema was locked"
+      assert:
+        that:
+          - user_lock_result.changed == true
+        fail_msg: "oracle_user module failed to lock schema MOL_TEST_USER."
+      delegate_to: localhost
+
+    # --- 2.4  Unlock the schema -----------------------------------------------
+    - name: "[oracle_user] Unlock schema MOL_TEST_USER (expect change)"
+      opitzconsulting.ansible_oracle.oracle_user:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        schema: "MOL_TEST_USER"
+        schema_password: "TestPass#2024"
+        state: unlocked
+        update_password: on_create
+      register: user_unlock_result
+      delegate_to: localhost
+    - name: "[oracle_user] Assert schema was unlocked"
+      assert:
+        that:
+          - user_unlock_result.changed == true
+        fail_msg: "oracle_user module failed to unlock schema MOL_TEST_USER."
+      delegate_to: localhost
+
+    # # --- 2.5  Password update (update_password: always) ----------------------
+    # - name: "[oracle_user] Change password for MOL_TEST_USER (expect change)"
+    #   opitzconsulting.ansible_oracle.oracle_user:
+    #     hostname: "{{ oracle_host }}"
+    #     service_name: "{{ oracle_service }}"
+    #     user: "{{ oracle_user }}"
+    #     password: "{{ oracle_pw }}"
+    #     schema: "MOL_TEST_USER"
+    #     schema_password: "NewPass#9999"
+    #     state: present
+    #     update_password: always
+    #   register: user_pw_change_result
+    #   delegate_to: localhost
+    # - name: "[oracle_user] Assert password change was applied"
+    #   assert:
+    #     that:
+    #       - user_pw_change_result.changed == true
+    #     fail_msg: "oracle_user module failed to update the password for MOL_TEST_USER."
+    #   delegate_to: localhost
+
+    # --- 2.6  Drop a non-existent schema (state: absent, no change) -----------
+    - name: "[oracle_user] Drop non-existent schema MOL_GHOST_USER (expect no change)"
+      opitzconsulting.ansible_oracle.oracle_user:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        schema: "MOL_GHOST_USER"
+        state: absent
+      register: user_absent_noexist_result
+      delegate_to: localhost
+    - name: "[oracle_user] Assert no change for absent on non-existent schema"
+      assert:
+        that:
+          - user_absent_noexist_result.changed == false
+        fail_msg: "oracle_user incorrectly reported a change when dropping a non-existent schema."
+      delegate_to: localhost
+
+    # --- 2.7  Drop the schema (state: absent, expect change) -----------------
+    - name: "[oracle_user] Drop schema MOL_TEST_USER (expect change)"
+      opitzconsulting.ansible_oracle.oracle_user:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        schema: "MOL_TEST_USER"
+        state: absent
+      register: user_drop_result
+      delegate_to: localhost
+    - name: "[oracle_user] Assert schema was dropped"
+      assert:
+        that:
+          - user_drop_result.changed == true
+        fail_msg: "oracle_user module failed to drop schema MOL_TEST_USER."
+      delegate_to: localhost
+
+    # --- 2.8  Idempotency of drop: schema already gone, no change ------------
+    - name: "[oracle_user] Drop schema again – already absent (expect no change)"
+      opitzconsulting.ansible_oracle.oracle_user:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        schema: "MOL_TEST_USER"
+        state: absent
+      register: user_drop_idempotency_result
+      delegate_to: localhost
+    - name: "[oracle_user] Assert no change on second drop"
+      assert:
+        that:
+          - user_drop_idempotency_result.changed == false
+        fail_msg: "Idempotency test failed! oracle_user reported a change on second drop attempt."
+      delegate_to: localhost
+
+    # =========================================================================
+    # BLOCK 3 – oracle_tablespace tests
+    # =========================================================================
+    # --- 3.0 Safety cleanup -------------------------------------------------
+    - name: "[oracle_tablespace] Ensure MOL_TEST_TBS is absent before test run"
+      opitzconsulting.ansible_oracle.oracle_tablespace:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        tablespace: "{{ mol_tablespace }}"
+        state: absent
+      delegate_to: localhost
+
+    # --- 3.1  Create a new permanent tablespace -------------------------------
+    - name: "[oracle_tablespace] Create tablespace MOL_TEST_TBS (expect change)"
+      opitzconsulting.ansible_oracle.oracle_tablespace:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        tablespace: "{{ mol_tablespace }}"
+        state: present
+        content: permanent
+        bigfile: false
+        datafile:
+          - "{{ mol_datafile_01 }}"
+        size: 100M
+        autoextend: false
+      register: tbs_create_result
+      delegate_to: localhost
+
+    - name: "[oracle_tablespace] Assert tablespace was created"
+      assert:
+        that:
+          - tbs_create_result.changed == true
+        fail_msg: "oracle_tablespace module failed to create MOL_TEST_TBS."
+      delegate_to: localhost
+
+    # --- 3.2  Idempotence check ----------------------------------------------
+    - name: "[oracle_tablespace] Re-run same create (expect no change)"
+      opitzconsulting.ansible_oracle.oracle_tablespace:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        tablespace: "{{ mol_tablespace }}"
+        state: present
+        content: permanent
+        bigfile: false
+        datafile:
+          - "{{ mol_datafile_01 }}"
+        size: 100M
+        autoextend: false
+      register: tbs_idempotent_result
+      delegate_to: localhost
+
+    - name: "[oracle_tablespace] Assert create is idempotent"
+      assert:
+        that:
+          - tbs_idempotent_result.changed == false
+        fail_msg: "oracle_tablespace module is not idempotent for an existing tablespace."
+      delegate_to: localhost
+
+    # --- 3.3  Change state to read_only --------------------------------------
+    - name: "[oracle_tablespace] Set MOL_TEST_TBS to read_only (expect change)"
+      opitzconsulting.ansible_oracle.oracle_tablespace:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        tablespace: "{{ mol_tablespace }}"
+        state: read_only
+        content: permanent
+        datafile:
+          - "{{ mol_datafile_01 }}"
+        size: 100M
+      register: tbs_read_only_result
+      delegate_to: localhost
+
+    - name: "[oracle_tablespace] Assert tablespace changed to read_only"
+      assert:
+        that:
+          - tbs_read_only_result.changed == true
+        fail_msg: "oracle_tablespace module failed to set MOL_TEST_TBS to read_only."
+      delegate_to: localhost
+
+    # --- 3.4  Change state to read_write -------------------------------------
+    - name: "[oracle_tablespace] Set MOL_TEST_TBS to read_write (expect change)"
+      opitzconsulting.ansible_oracle.oracle_tablespace:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        tablespace: "{{ mol_tablespace }}"
+        state: read_write
+        content: permanent
+        datafile:
+          - "{{ mol_datafile_01 }}"
+        size: 100M
+      register: tbs_read_write_result
+      delegate_to: localhost
+
+    - name: "[oracle_tablespace] Assert tablespace changed to read_write"
+      assert:
+        that:
+          - tbs_read_write_result.changed == true
+        fail_msg: "oracle_tablespace module failed to set MOL_TEST_TBS to read_write."
+      delegate_to: localhost
+
+    # --- 3.5  Change state to offline ----------------------------------------
+    - name: "[oracle_tablespace] Set MOL_TEST_TBS offline (expect change)"
+      opitzconsulting.ansible_oracle.oracle_tablespace:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        tablespace: "{{ mol_tablespace }}"
+        state: offline
+        content: permanent
+        datafile:
+          - "{{ mol_datafile_01 }}"
+        size: 100M
+      register: tbs_offline_result
+      delegate_to: localhost
+
+    - name: "[oracle_tablespace] Assert tablespace changed to offline"
+      assert:
+        that:
+          - tbs_offline_result.changed == true
+        fail_msg: "oracle_tablespace module failed to set MOL_TEST_TBS offline."
+      delegate_to: localhost
+
+    # --- 3.6  Change state to online -----------------------------------------
+    - name: "[oracle_tablespace] Set MOL_TEST_TBS online (expect change)"
+      opitzconsulting.ansible_oracle.oracle_tablespace:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        tablespace: "{{ mol_tablespace }}"
+        state: online
+        content: permanent
+        datafile:
+          - "{{ mol_datafile_01 }}"
+        size: 100M
+      register: tbs_online_result
+      delegate_to: localhost
+
+    - name: "[oracle_tablespace] Assert tablespace changed to online"
+      assert:
+        that:
+          - tbs_online_result.changed == true
+        fail_msg: "oracle_tablespace module failed to set MOL_TEST_TBS online."
+      delegate_to: localhost
+
+    
+    # --- 3.7  Reset autoextend to off so the next test is deterministic ----------
+    - name: "[oracle_tablespace] Reset autoextend to off on MOL_TEST_TBS"
+      opitzconsulting.ansible_oracle.oracle_tablespace:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        tablespace: "{{ mol_tablespace }}"
+        state: present
+        content: permanent
+        bigfile: false
+        datafile:
+          - "{{ mol_datafile_01 }}"
+        size: 100M
+        autoextend: false
+      register: tbs_autoextend_reset_result
+      delegate_to: localhost
+
+    # --- 3.8  Enable autoextend --------------------------------------------------
+    - name: "[oracle_tablespace] Enable autoextend on MOL_TEST_TBS (expect change)"
+      opitzconsulting.ansible_oracle.oracle_tablespace:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        tablespace: "{{ mol_tablespace }}"
+        state: present
+        content: permanent
+        bigfile: false
+        datafile:
+          - "{{ mol_datafile_01 }}"
+        size: 100M
+        autoextend: true
+        nextsize: 10M
+        maxsize: 500M
+      register: tbs_autoextend_result
+      delegate_to: localhost
+
+    - name: "[oracle_tablespace] Assert autoextend was enabled"
+      assert:
+        that:
+          - tbs_autoextend_result.changed == true
+        fail_msg: "oracle_tablespace module failed to enable autoextend on MOL_TEST_TBS."
+      delegate_to: localhost
+
+    # --- 3.9  Autoextend idempotence ---------------------------------------------
+    - name: "[oracle_tablespace] Re-run autoextend config (expect no change)"
+      opitzconsulting.ansible_oracle.oracle_tablespace:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        tablespace: "{{ mol_tablespace }}"
+        state: present
+        content: permanent
+        bigfile: false
+        datafile:
+          - "{{ mol_datafile_01 }}"
+        size: 100M
+        autoextend: true
+        nextsize: 10M
+        maxsize: 500M
+      register: tbs_autoextend_idempotent_result
+      delegate_to: localhost
+
+    - name: "[oracle_tablespace] Assert autoextend config is idempotent"
+      assert:
+        that:
+          - tbs_autoextend_idempotent_result.changed == false
+        fail_msg: "oracle_tablespace module is not idempotent for autoextend settings."
+      delegate_to: localhost
+
+    # --- 3.10  Drop tablespace -----------------------------------------------
+    - name: "[oracle_tablespace] Drop MOL_TEST_TBS (expect change)"
+      opitzconsulting.ansible_oracle.oracle_tablespace:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        tablespace: "{{ mol_tablespace }}"
+        state: absent
+      register: tbs_drop_result
+      delegate_to: localhost
+
+    - name: "[oracle_tablespace] Assert tablespace was dropped"
+      assert:
+        that:
+          - tbs_drop_result.changed == true
+        fail_msg: "oracle_tablespace module failed to drop MOL_TEST_TBS."
+      delegate_to: localhost
+
+    # --- 3.11  Idempotent absent ---------------------------------------------
+    - name: "[oracle_tablespace] Re-run absent for MOL_TEST_TBS (expect no change)"
+      opitzconsulting.ansible_oracle.oracle_tablespace:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        tablespace: "{{ mol_tablespace }}"
+        state: absent
+      register: tbs_absent_idempotent_result
+      delegate_to: localhost
+
+    - name: "[oracle_tablespace] Assert absent is idempotent"
+      assert:
+        that:
+          - tbs_absent_idempotent_result.changed == false
+        fail_msg: "oracle_tablespace module is not idempotent for absent state."
+      delegate_to: localhost
+
+
+    # =========================================================================
+    # BLOCK 4 – DBMS_STATS tests
+    # =========================================================================
+    
+    - name: Set DBMS_STATS preference for Molecule test
+      opitzconsulting.ansible_oracle.oracle_stats_prefs:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        pname: "{{ test_preference_name }}"
+        pvalue: "{{ test_preference_value }}"
+        state: present
+      delegate_to: localhost
+      register: stats_pref_present
+      run_once: true
+      no_log: false
+
+    - name: Show initial module result
+      ansible.builtin.debug:
+        var: stats_pref_present
+      run_once: true
+
+
+    # =========================================================================
+    # BLOCK 5 – oracle_sql
+    # =========================================================================
+
+    # Cleanup from any previous failed run
+    - name: Drop leftover test table if it exists
+      opitzconsulting.ansible_oracle.oracle_sql:
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        service_name: "{{ oracle_service }}"
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        sql: |
+          begin
+             execute immediate 'drop table {{ molecule_test_table }} purge';
+          exception
+             when others then
+                if sqlcode != -942 then
+                   raise;
+                end if;
+          end;
+      changed_when: false
+      delegate_to: localhost
+
+    # ──  Test simple SELECT ────────────────────────────────────────────
+    - name: Execute simple SELECT
+      opitzconsulting.ansible_oracle.oracle_sql:
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        service_name: "{{ oracle_service }}"
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        sql: "select 'OK' from dual"
+      register: oracle_sql_select_result
+      delegate_to: localhost
+
+    - name: Assert simple SELECT result is correct
+      ansible.builtin.assert:
+        that:
+          - oracle_sql_select_result is succeeded
+          - not oracle_sql_select_result.changed
+          - oracle_sql_select_result.msg | length == 1
+          - oracle_sql_select_result.msg[0][0] == 'OK'
+        fail_msg: "oracle_sql SELECT test failed"
+        success_msg: "oracle_sql SELECT test passed"
+
+    # ── Test CREATE TABLE ─────────────────────────────────────────────
+    - name: Create test table
+      opitzconsulting.ansible_oracle.oracle_sql:
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        service_name: "{{ oracle_service }}"
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        sql: "create table {{ molecule_test_table }} (id number primary key, val varchar2(30))"
+      register: oracle_sql_create_table_result
+      delegate_to: localhost
+
+    - name: Assert CREATE TABLE succeeded
+      ansible.builtin.assert:
+        that:
+          - oracle_sql_create_table_result is succeeded
+          - oracle_sql_create_table_result.changed
+        fail_msg: "oracle_sql CREATE TABLE test failed"
+        success_msg: "oracle_sql CREATE TABLE test passed"
+
+    # ── Test INSERT ───────────────────────────────────────────────────
+    - name: Insert first row
+      opitzconsulting.ansible_oracle.oracle_sql:
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        service_name: "{{ oracle_service }}"
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        sql: "insert into {{ molecule_test_table }} (id, val) values (1, 'A')"
+      register: oracle_sql_insert_result
+      delegate_to: localhost
+
+    - name: Assert INSERT succeeded
+      ansible.builtin.assert:
+        that:
+          - oracle_sql_insert_result is succeeded
+          - oracle_sql_insert_result.changed
+        fail_msg: "oracle_sql INSERT test failed"
+        success_msg: "oracle_sql INSERT test passed"
+
+    - name: Verify inserted row count
+      opitzconsulting.ansible_oracle.oracle_sql:
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        service_name: "{{ oracle_service }}"
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        sql: "select count(*) from {{ molecule_test_table }}"
+      register: oracle_sql_count_result
+      delegate_to: localhost
+
+    - name: Assert row count is 1
+      ansible.builtin.assert:
+        that:
+          - oracle_sql_count_result is succeeded
+          - not oracle_sql_count_result.changed
+          - oracle_sql_count_result.msg[0][0] == 1
+        fail_msg: "oracle_sql row count after INSERT is incorrect"
+        success_msg: "oracle_sql row count after INSERT is correct"
+
+    # ── Test script execution ─────────────────────────────────────────
+    - name: Create temporary SQL script file on localhost
+      ansible.builtin.tempfile:
+        state: file
+        suffix: .sql
+      register: oracle_sql_tempfile
+      delegate_to: localhost
+
+    - name: Write SQL script content to temporary file on localhost
+      ansible.builtin.copy:
+        dest: "{{ oracle_sql_tempfile.path }}"
+        mode: "0644"
+        content: |
+          insert into {{ molecule_test_table }} (id, val) values (2, 'B');
+          update {{ molecule_test_table }} set val = 'AA' where id = 1;
+      delegate_to: localhost
+
+    - name: Check SQL script file exists on localhost
+      ansible.builtin.stat:
+        path: "{{ oracle_sql_tempfile.path }}"
+      register: oracle_sql_tempfile_stat
+      delegate_to: localhost
+
+    - name: Assert SQL script file exists
+      ansible.builtin.assert:
+        that:
+          - oracle_sql_tempfile_stat.stat.exists
+          - oracle_sql_tempfile_stat.stat.isreg
+        fail_msg: "Temporary SQL script file was not created on localhost"
+        success_msg: "Temporary SQL script file exists on localhost"
+
+    - name: Execute SQL script
+      opitzconsulting.ansible_oracle.oracle_sql:
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        service_name: "{{ oracle_service }}"
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        script: "{{ oracle_sql_tempfile.path }}"
+      register: oracle_sql_script_result
+      delegate_to: localhost
+
+    - name: Assert script execution succeeded
+      ansible.builtin.assert:
+        that:
+          - oracle_sql_script_result is succeeded
+          - oracle_sql_script_result.changed
+        fail_msg: "oracle_sql script execution test failed"
+        success_msg: "oracle_sql script execution test passed"
+
+    # ── Final verification ────────────────────────────────────────────
+    - name: Verify final table contents
+      opitzconsulting.ansible_oracle.oracle_sql:
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        service_name: "{{ oracle_service }}"
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        sql: "select id, val from {{ molecule_test_table }} order by id"
+      register: oracle_sql_final_result
+      delegate_to: localhost
+
+    - name: Assert final table contents are correct
+      ansible.builtin.assert:
+        that:
+          - oracle_sql_final_result is succeeded
+          - not oracle_sql_final_result.changed
+          - oracle_sql_final_result.msg | length == 2
+          - oracle_sql_final_result.msg[0][0] == 1
+          - oracle_sql_final_result.msg[0][1] == 'AA'
+          - oracle_sql_final_result.msg[1][0] == 2
+          - oracle_sql_final_result.msg[1][1] == 'B'
+        fail_msg: "oracle_sql final data verification failed"
+        success_msg: "oracle_sql final data verification passed"
+
+    # ── Cleanup ───────────────────────────────────────────────────────
+    - name: Remove temporary SQL script
+      ansible.builtin.file:
+        path: "{{ molecule_test_script }}"
+        state: absent
+
+    - name: Drop test table
+      opitzconsulting.ansible_oracle.oracle_sql:
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        service_name: "{{ oracle_service }}"
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        sql: "drop table {{ molecule_test_table }} purge"
+      register: oracle_sql_drop_table_result
+      delegate_to: localhost
+
+    - name: Assert DROP TABLE succeeded
+      ansible.builtin.assert:
+        that:
+          - oracle_sql_drop_table_result is succeeded
+          - oracle_sql_drop_table_result.changed
+        fail_msg: "oracle_sql DROP TABLE cleanup failed"
+        success_msg: "oracle_sql DROP TABLE cleanup passed"
+    
+    # =========================================================================
+    # BLOCK 5 – oracle_services
+    # =========================================================================
+    - name: Skip oracle_services lifecycle test in Oracle Free scenario
+      ansible.builtin.debug:
+        msg: >
+          Skipping opitzconsulting.ansible_oracle.oracle_services lifecycle test
+          in this Oracle Free Molecule scenario because the module selects the
+          srvctl code path when executed on localhost in this environment.
+
+
+    # =========================================================================
+    # BLOCK 6 – oracle_rsrc_consgroup
+    # =========================================================================
+    - name: Ensure dedicated test users exist
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import oracledb
+
+        users = ["{{ test_user_1 }}", "{{ test_user_2 }}"]
+
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn="{{ oracle_host }}:{{ oracle_port }}/{{ oracle_service }}"
+        )
+        cur = conn.cursor()
+
+        for username in users:
+            try:
+                cur.execute(f"drop user {username} cascade")
+            except oracledb.DatabaseError as exc:
+                err = exc.args[0]
+                if err.code != 1918:
+                    raise
+
+            cur.execute(f"create user {username} identified by {{ test_user_password }}")
+            cur.execute(f"grant create session to {username}")
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("USERS_READY")
+        PY
+      args:
+        executable: /bin/bash
+      register: test_users_ready
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    # ──  Create consumer group ─────────────────────────────────────────
+    - name: Create consumer group
+      opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        state: present
+        name: "{{ test_consumer_group }}"
+        comments: "molecule create"
+        mgmt_mth: round-robin
+        category: other
+        map_oracle_user:
+          - "{{ test_user_1 }}"
+        map_client_machine:
+          - APPHOST1
+        grant_name:
+          - "{{ test_user_1 }}"
+      register: cg_create
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert consumer group creation changed state
+      ansible.builtin.assert:
+        that:
+          - cg_create.changed
+      delegate_to: localhost
+      run_once: true
+
+    # ── Idempotence check ─────────────────────────────────────────────
+    - name: Re-run creation to verify idempotence
+      opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        state: present
+        name: "{{ test_consumer_group }}"
+        comments: "molecule create"
+        mgmt_mth: round-robin
+        category: other
+        map_oracle_user:
+          - "{{ test_user_1 }}"
+        map_client_machine:
+          - APPHOST1
+        grant_name:
+          - "{{ test_user_1 }}"
+      register: cg_create_idempotent
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert consumer group creation is idempotent
+      ansible.builtin.assert:
+        that:
+          - not cg_create_idempotent.changed
+      delegate_to: localhost
+      run_once: true
+
+    # ── Query DB after initial create ─────────────────────────────────
+    - name: Query consumer group after create
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import json
+        import oracledb
+
+        name = "{{ test_consumer_group }}".upper()
+
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn="{{ oracle_host }}:{{ oracle_port }}/{{ oracle_service }}"
+        )
+        cur = conn.cursor()
+
+        result = {
+            "exists": False,
+            "mgmt_mth": None,
+            "comments": None,
+            "category": None,
+            "grants": [],
+            "mappings": {}
+        }
+
+        cur.execute(
+            """
+            select mgmt_method, comments, category
+            from dba_rsrc_consumer_groups
+            where consumer_group = :name
+            """,
+            {"name": name}
+        )
+        row = cur.fetchone()
+        if row:
+            result["exists"] = True
+            result["mgmt_mth"] = row[0]
+            result["comments"] = row[1]
+            result["category"] = row[2]
+
+            cur.execute(
+                """
+                select grantee
+                from dba_rsrc_consumer_group_privs
+                where granted_group = :name
+                order by grantee
+                """,
+                {"name": name}
+            )
+            result["grants"] = [r[0] for r in cur.fetchall()]
+
+            cur.execute(
+                """
+                select attribute, value
+                from dba_rsrc_group_mappings
+                where consumer_group = :name
+                order by attribute, value
+                """,
+                {"name": name}
+            )
+            for attr, value in cur.fetchall():
+                result["mappings"].setdefault(attr, []).append(value)
+
+        cur.close()
+        conn.close()
+        print(json.dumps(result, sort_keys=True))
+        PY
+      args:
+        executable: /bin/bash
+      register: cg_state_after_create_raw
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    - name: Parse consumer group state after create
+      ansible.builtin.set_fact:
+        cg_state_after_create: "{{ cg_state_after_create_raw.stdout | from_json }}"
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert consumer group state after create
+      ansible.builtin.assert:
+        that:
+          - cg_state_after_create.exists
+          - cg_state_after_create.comments == "molecule create"
+          - cg_state_after_create.mgmt_mth == "ROUND-ROBIN"
+          - cg_state_after_create.category == "OTHER"
+          - test_user_1 in cg_state_after_create.grants
+          - "'ORACLE_USER' in cg_state_after_create.mappings"
+          - test_user_1 in cg_state_after_create.mappings['ORACLE_USER']
+          - "'CLIENT_MACHINE' in cg_state_after_create.mappings"
+          - "'APPHOST1' in cg_state_after_create.mappings['CLIENT_MACHINE']"
+      delegate_to: localhost
+      run_once: true
+
+    # ── Modify consumer group ─────────────────────────────────────────
+    - name: Modify consumer group
+      opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        state: present
+        name: "{{ test_consumer_group }}"
+        comments: "molecule update"
+        mgmt_mth: round-robin
+        category: other
+        map_oracle_user:
+          - "{{ test_user_2 }}"
+        map_client_machine:
+          - APPHOST2
+        grant_name:
+          - "{{ test_user_2 }}"
+      register: cg_modify
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert consumer group modification changed state
+      ansible.builtin.assert:
+        that:
+          - cg_modify.changed
+      delegate_to: localhost
+      run_once: true
+
+    # ── Query DB after modification ───────────────────────────────────
+    - name: Query consumer group after modify
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import json
+        import oracledb
+
+        name = "{{ test_consumer_group }}".upper()
+
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn="{{ oracle_host }}:{{ oracle_port }}/{{ oracle_service }}"
+        )
+        cur = conn.cursor()
+
+        result = {
+            "exists": False,
+            "mgmt_mth": None,
+            "comments": None,
+            "category": None,
+            "grants": [],
+            "mappings": {}
+        }
+
+        cur.execute(
+            """
+            select mgmt_method, comments, category
+            from dba_rsrc_consumer_groups
+            where consumer_group = :name
+            """,
+            {"name": name}
+        )
+        row = cur.fetchone()
+        if row:
+            result["exists"] = True
+            result["mgmt_mth"] = row[0]
+            result["comments"] = row[1]
+            result["category"] = row[2]
+
+            cur.execute(
+                """
+                select grantee
+                from dba_rsrc_consumer_group_privs
+                where granted_group = :name
+                order by grantee
+                """,
+                {"name": name}
+            )
+            result["grants"] = [r[0] for r in cur.fetchall()]
+
+            cur.execute(
+                """
+                select attribute, value
+                from dba_rsrc_group_mappings
+                where consumer_group = :name
+                order by attribute, value
+                """,
+                {"name": name}
+            )
+            for attr, value in cur.fetchall():
+                result["mappings"].setdefault(attr, []).append(value)
+
+        cur.close()
+        conn.close()
+        print(json.dumps(result, sort_keys=True))
+        PY
+      args:
+        executable: /bin/bash
+      register: cg_state_after_modify_raw
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    - name: Parse consumer group state after modify
+      ansible.builtin.set_fact:
+        cg_state_after_modify: "{{ cg_state_after_modify_raw.stdout | from_json }}"
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert consumer group state after modify
+      ansible.builtin.assert:
+        that:
+          - cg_state_after_modify.exists
+          - cg_state_after_modify.comments == "molecule update"
+          - cg_state_after_modify.mgmt_mth == "ROUND-ROBIN"
+          - cg_state_after_modify.category == "OTHER"
+          - test_user_2 in cg_state_after_modify.grants
+          - test_user_1 not in cg_state_after_modify.grants
+          - "'ORACLE_USER' in cg_state_after_modify.mappings"
+          - test_user_2 in cg_state_after_modify.mappings['ORACLE_USER']
+          - test_user_1 not in cg_state_after_modify.mappings['ORACLE_USER']
+          - "'CLIENT_MACHINE' in cg_state_after_modify.mappings"
+          - "'APPHOST2' in cg_state_after_modify.mappings['CLIENT_MACHINE']"
+          - "'APPHOST1' not in cg_state_after_modify.mappings['CLIENT_MACHINE']"
+      delegate_to: localhost
+      run_once: true
+
+    # ── Remove consumer group ─────────────────────────────────────────
+    - name: Remove consumer group
+      opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        state: absent
+        name: "{{ test_consumer_group }}"
+      register: cg_remove
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert consumer group removal changed state
+      ansible.builtin.assert:
+        that:
+          - cg_remove.changed
+      delegate_to: localhost
+      run_once: true
+
+    # ── Idempotent removal ───────────────────────────────────────────
+    - name: Re-run removal to verify idempotence
+      opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        state: absent
+        name: "{{ test_consumer_group }}"
+      register: cg_remove_idempotent
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert consumer group removal is idempotent
+      ansible.builtin.assert:
+        that:
+          - not cg_remove_idempotent.changed
+      delegate_to: localhost
+      run_once: true
+
+
+    
+    # =========================================================================
+    # BLOCK 7 – oracle_redo
+    # =========================================================================
+    - name: Define effective Oracle connection variables for oracle_redo
+      ansible.builtin.set_fact:
+        oracle_redo_service: "{{ oracle_service_cdb | default('FREE') }}"
+        oracle_redo_user: "{{ oracle_user_sys | default('sys') }}"
+        oracle_redo_pw: "{{ oracle_pw }}"
+        oracle_redo_omf_dest: "{{ oracle_omf_redo_dest | default('/opt/oracle/oradata/FREE') }}"
+      run_once: true
+
+    - name: Show Oracle connection variables used for oracle_redo
+      ansible.builtin.debug:
+        msg:
+          - "oracle_redo_service={{ oracle_redo_service }}"
+          - "oracle_redo_user={{ oracle_redo_user }}"
+          - "oracle_redo_omf_dest={{ oracle_redo_omf_dest }}"
+      run_once: true
+
+    - name: Check whether sqlplus exists inside Oracle container
+      ansible.builtin.shell: |
+        set -eu
+        if [ -n "${ORACLE_HOME:-}" ] && [ -x "${ORACLE_HOME}/bin/sqlplus" ]; then
+          echo "${ORACLE_HOME}/bin/sqlplus"
+        else
+          command -v sqlplus
+        fi
+      register: sqlplus_check
+      changed_when: false
+
+    - name: Show sqlplus path inside Oracle container
+      ansible.builtin.debug:
+        msg: "sqlplus path: {{ sqlplus_check.stdout | trim }}"
+
+    # ── Step 3: Wait until the root/CDB service is reachable ──────────────────
+    - name: Wait until Oracle root service is reachable
+      ansible.builtin.shell: |
+        "{{ sqlplus_check.stdout | trim }}" -s "sys/{{ oracle_redo_pw }}@//localhost:1521/{{ oracle_redo_service }} as sysdba" <<'SQL'
+        set pages 0 feedback off heading off verify off echo off
+        select 'READY' from dual;
+        exit
+        SQL
+      register: root_ready
+      retries: 30
+      delay: 10
+      until: "'READY' in root_ready.stdout"
+      changed_when: false
+
+    # ── Step 4: Configure OMF destination for online redo logs ────────────────
+    - name: Configure OMF destination for redo log creation
+      ansible.builtin.shell: |
+        "{{ sqlplus_check.stdout | trim }}" -s "sys/{{ oracle_redo_pw }}@//localhost:1521/{{ oracle_redo_service }} as sysdba" <<'SQL'
+        alter system set db_create_online_log_dest_1='{{ oracle_redo_omf_dest }}' scope=both;
+        exit
+        SQL
+      register: set_redo_dest
+      changed_when: "'System altered.' in set_redo_dest.stdout"
+
+    - name: Query configured redo OMF destination
+      ansible.builtin.shell: |
+        "{{ sqlplus_check.stdout | trim }}" -s "sys/{{ oracle_redo_pw }}@//localhost:1521/{{ oracle_redo_service }} as sysdba" <<'SQL'
+        set pages 0 feedback off heading off verify off echo off
+        select value from v$parameter where name = 'db_create_online_log_dest_1';
+        exit
+        SQL
+      register: redo_dest_value
+      changed_when: false
+
+    - name: Show configured redo OMF destination
+      ansible.builtin.debug:
+        msg: "db_create_online_log_dest_1={{ redo_dest_value.stdout | trim }}"
+
+    # ── Step 5: Run oracle_redo from the controller (real test) ───────────────
+    - name: Manage redo logs using oracle_redo module (first run)
+      opitzconsulting.ansible_oracle.oracle_redo:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_redo_service }}"
+        user: "{{ oracle_redo_user }}"
+        password: "{{ oracle_redo_pw }}"
+        mode: sysdba
+        size: 50M
+        groups: 3
+      delegate_to: localhost
+      register: redo_first
+      run_once: true
+
+    - name: Show oracle_redo first run result
+      ansible.builtin.debug:
+        var: redo_first
+      run_once: true
+
+    # ── Step 6: Run again for idempotency ─────────────────────────────────────
+    - name: Manage redo logs using oracle_redo module (second run)
+      opitzconsulting.ansible_oracle.oracle_redo:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_redo_service }}"
+        user: "{{ oracle_redo_user }}"
+        password: "{{ oracle_redo_pw }}"
+        mode: sysdba
+        size: 50M
+        groups: 3
+      delegate_to: localhost
+      register: redo_second
+      run_once: true
+
+    - name: Show oracle_redo second run result
+      ansible.builtin.debug:
+        var: redo_second
+      run_once: true
+
+    # =========================================================================
+    # BLOCK 8 – oracle_profile
+    # =========================================================================
+    # ── Create profile (should change) ────────────────────────────────
+    - name: Create test profile
+      opitzconsulting.ansible_oracle.oracle_profile:
+        name: "{{ test_profile_name }}"
+        state: present
+        attribute_name:
+          - password_reuse_max
+          - password_reuse_time
+          - sessions_per_user
+        attribute_value:
+          - 6
+          - 20
+          - 5
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        oracle_home: "/opt/oracle"
+      register: profile_create
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert profile creation changed something
+      ansible.builtin.assert:
+        that:
+          - profile_create is changed
+        fail_msg: "Creating the profile should report changed=true"
+        success_msg: "Profile creation correctly reported changed=true"
+      run_once: true
+
+    # ── Re-run with same desired state (should be idempotent) ─────────
+    - name: Re-run profile creation to verify idempotency
+      opitzconsulting.ansible_oracle.oracle_profile:
+        name: "{{ test_profile_name }}"
+        state: present
+        attribute_name:
+          - password_reuse_max
+          - password_reuse_time
+          - sessions_per_user
+        attribute_value:
+          - 6
+          - 20
+          - 5
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        oracle_home: "/opt/oracle"
+      register: profile_create_idempotent
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert profile creation is idempotent
+      ansible.builtin.assert:
+        that:
+          - not profile_create_idempotent.changed
+        fail_msg: "Re-running the same profile definition should report changed=false"
+        success_msg: "Profile present-state is idempotent"
+      run_once: true
+
+    # ── Modify one attribute (should change) ──────────────────────────
+    - name: Modify test profile
+      opitzconsulting.ansible_oracle.oracle_profile:
+        name: "{{ test_profile_name }}"
+        state: present
+        attribute_name:
+          - password_reuse_max
+          - password_reuse_time
+          - sessions_per_user
+        attribute_value:
+          - 10
+          - 30
+          - 3
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        oracle_home: "/opt/oracle"
+      register: profile_modify
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert profile modification changed something
+      ansible.builtin.assert:
+        that:
+          - profile_modify is changed
+        fail_msg: "Changing profile attributes should report changed=true"
+        success_msg: "Profile modification correctly reported changed=true"
+      run_once: true
+
+    # ── Re-run modified state (should be idempotent) ──────────────────
+    - name: Re-run modified profile state to verify idempotency
+      opitzconsulting.ansible_oracle.oracle_profile:
+        name: "{{ test_profile_name }}"
+        state: present
+        attribute_name:
+          - password_reuse_max
+          - password_reuse_time
+          - sessions_per_user
+        attribute_value:
+          - 10
+          - 30
+          - 3
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        oracle_home: "/opt/oracle"
+      register: profile_modify_idempotent
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert modified profile state is idempotent
+      ansible.builtin.assert:
+        that:
+          - not profile_modify_idempotent.changed
+        fail_msg: "Re-running the modified profile definition should report changed=false"
+        success_msg: "Modified profile state is idempotent"
+      run_once: true
+
+    # ── Remove profile (should change) ────────────────────────────────
+    - name: Remove test profile
+      opitzconsulting.ansible_oracle.oracle_profile:
+        name: "{{ test_profile_name }}"
+        state: absent
+        attribute_name:
+          - password_reuse_max
+        attribute_value:
+          - 10
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        oracle_home: "/opt/oracle"
+      register: profile_remove
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert profile removal changed something
+      ansible.builtin.assert:
+        that:
+          - profile_remove is changed
+        fail_msg: "Removing the profile should report changed=true"
+        success_msg: "Profile removal correctly reported changed=true"
+      run_once: true
+
+    # ── Re-run removal (should be idempotent) ─────────────────────────
+    - name: Re-run profile removal to verify idempotency
+      opitzconsulting.ansible_oracle.oracle_profile:
+        name: "{{ test_profile_name }}"
+        state: absent
+        attribute_name:
+          - password_reuse_max
+        attribute_value:
+          - 10
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        oracle_home: "/opt/oracle"
+      register: profile_remove_idempotent
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert profile absent-state is idempotent
+      ansible.builtin.assert:
+        that:
+          - not profile_remove_idempotent.changed
+        fail_msg: "Re-running profile removal should report changed=false"
+        success_msg: "Profile absent-state is idempotent"
+      run_once: true
+
+
+    # =========================================================================
+    # BLOCK 8 – oracle_pdb
+    # =========================================================================
+
+    - name: Ensure disposable PDB directory exists inside the container
+      community.docker.docker_container_exec:
+        container: "{{ oracle_container_name }}"
+        command: >-
+          bash -lc "mkdir -p /opt/oracle/oradata/FREE/{{ oracle_test_pdb | lower }}"
+      delegate_to: localhost
+      run_once: true
+      changed_when: false
+
+    - name: Create disposable PDB via collection module
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ oracle_test_pdb }}"
+        oracle_home: "{{ oracle_home_dummy }}"
+        sourcedb: "{{ oracle_service_cdb }}"
+        state: present
+        user: "{{ oracle_user_sys }}"
+        password: "{{ oracle_pw }}"
+        mode: sysdba
+        service_name: "{{ oracle_service_cdb }}"
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        file_name_convert: "/opt/oracle/oradata/FREE/pdbseed,/opt/oracle/oradata/FREE/{{ oracle_test_pdb | lower }}"
+      register: oracle_pdb_create
+      delegate_to: localhost
+      run_once: true
+      failed_when: not oracle_pdb_create.changed
+
+    - name: Re-run create to verify idempotence
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ oracle_test_pdb }}"
+        oracle_home: "{{ oracle_home_dummy }}"
+        sourcedb: "{{ oracle_service_cdb }}"
+        state: present
+        user: "{{ oracle_user_sys }}"
+        password: "{{ oracle_pw }}"
+        mode: sysdba
+        service_name: "{{ oracle_service_cdb }}"
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        file_name_convert: "/opt/oracle/oradata/FREE/pdbseed,/opt/oracle/oradata/FREE/{{ oracle_test_pdb | lower }}"
+      register: oracle_pdb_create_again
+      delegate_to: localhost
+      run_once: true
+      failed_when: oracle_pdb_create_again.changed
+
+    - name: Query disposable PDB status via collection module
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ oracle_test_pdb }}"
+        oracle_home: "{{ oracle_home_dummy }}"
+        sourcedb: "{{ oracle_service_cdb }}"
+        state: status
+        user: "{{ oracle_user_sys }}"
+        password: "{{ oracle_pw }}"
+        mode: sysdba
+        service_name: "{{ oracle_service_cdb }}"
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+      register: oracle_pdb_status
+      delegate_to: localhost
+      run_once: true
+      failed_when:
+        - oracle_pdb_status.changed
+        - "'pdb name: {{ oracle_test_pdb | lower }}' not in (oracle_pdb_status.msg | lower)"
+
+    - name: Remove disposable PDB via collection module
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ oracle_test_pdb }}"
+        oracle_home: "{{ oracle_home_dummy }}"
+        sourcedb: "{{ oracle_service_cdb }}"
+        state: absent
+        user: "{{ oracle_user_sys }}"
+        password: "{{ oracle_pw }}"
+        mode: sysdba
+        service_name: "{{ oracle_service_cdb }}"
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+      register: oracle_pdb_remove
+      delegate_to: localhost
+      run_once: true
+      failed_when: not oracle_pdb_remove.changed
+
+    - name: Re-run remove to verify idempotence
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ oracle_test_pdb }}"
+        oracle_home: "{{ oracle_home_dummy }}"
+        sourcedb: "{{ oracle_service_cdb }}"
+        state: absent
+        user: "{{ oracle_user_sys }}"
+        password: "{{ oracle_pw }}"
+        mode: sysdba
+        service_name: "{{ oracle_service_cdb }}"
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+      register: oracle_pdb_remove_again
+      delegate_to: localhost
+      run_once: true
+      failed_when: oracle_pdb_remove_again.changed
+
+    # =========================================================================
+    # BLOCK 9 – oracle_parameter
+    # =========================================================================
+    - name: Read current parameter value before test
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import oracledb
+
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn=oracledb.makedsn(
+                "{{ oracle_host }}",
+                {{ oracle_port }},
+                service_name="{{ oracle_service }}"
+            ),
+        )
+        cur = conn.cursor()
+        cur.execute(
+            "select lower(display_value) "
+            "from v$parameter "
+            "where name = lower('{{ oracle_parameter_name }}')"
+        )
+        row = cur.fetchone()
+        print("" if row is None or row[0] is None else row[0])
+        cur.close()
+        conn.close()
+        PY
+      args:
+        executable: /bin/bash
+      register: oracle_parameter_original
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert original parameter value was read
+      ansible.builtin.assert:
+        that:
+          - oracle_parameter_original.stdout | trim | length > 0
+        fail_msg: "Could not read original value of {{ oracle_parameter_name }}"
+      delegate_to: localhost
+      run_once: true
+
+    - name: Calculate a new test value
+      ansible.builtin.set_fact:
+        oracle_parameter_test_value: "{{ (oracle_parameter_original.stdout | trim | int) + 17 }}"
+      run_once: true
+
+    # ── Set the parameter ─────────────────────────────────────────────
+    - name: Set parameter to a new value
+      opitzconsulting.ansible_oracle.oracle_parameter:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        name: "{{ oracle_parameter_name }}"
+        value: "{{ oracle_parameter_test_value }}"
+        state: present
+        scope: both
+        sid: "*"
+      register: oracle_parameter_set
+      delegate_to: localhost
+      run_once: true
+
+    - name: Read parameter value after set
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import oracledb
+
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn=oracledb.makedsn(
+                "{{ oracle_host }}",
+                {{ oracle_port }},
+                service_name="{{ oracle_service }}"
+            ),
+        )
+        cur = conn.cursor()
+        cur.execute(
+            "select lower(display_value) "
+            "from v$parameter "
+            "where name = lower('{{ oracle_parameter_name }}')"
+        )
+        row = cur.fetchone()
+        print("" if row is None or row[0] is None else row[0])
+        cur.close()
+        conn.close()
+        PY
+      args:
+        executable: /bin/bash
+      register: oracle_parameter_after_set
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert parameter was changed
+      ansible.builtin.assert:
+        that:
+          - oracle_parameter_set is changed
+          - oracle_parameter_after_set.stdout | trim == oracle_parameter_test_value | string
+        fail_msg: >-
+          Expected {{ oracle_parameter_name }} to be set to
+          {{ oracle_parameter_test_value }}, got
+          {{ oracle_parameter_after_set.stdout | trim }}
+      delegate_to: localhost
+      run_once: true
+
+    # ── Run again to test idempotence ─────────────────────────────────
+    - name: Set parameter again to the same value
+      opitzconsulting.ansible_oracle.oracle_parameter:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        name: "{{ oracle_parameter_name }}"
+        value: "{{ oracle_parameter_test_value }}"
+        state: present
+        scope: both
+        sid: "*"
+      register: oracle_parameter_set_again
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert setting the same value is idempotent
+      ansible.builtin.assert:
+        that:
+          - not oracle_parameter_set_again is changed
+        fail_msg: >-
+          Expected second run of oracle_parameter with same value to be idempotent
+      delegate_to: localhost
+      run_once: true
+
+    # ── Reset the parameter ───────────────────────────────────────────
+    - name: Reset parameter to default/original state
+      opitzconsulting.ansible_oracle.oracle_parameter:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        name: "{{ oracle_parameter_name }}"
+        state: reset
+        scope: both
+        sid: "*"
+      register: oracle_parameter_reset
+      delegate_to: localhost
+      run_once: true
+
+    - name: Read parameter value after reset
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import oracledb
+
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn=oracledb.makedsn(
+                "{{ oracle_host }}",
+                {{ oracle_port }},
+                service_name="{{ oracle_service }}"
+            ),
+        )
+        cur = conn.cursor()
+        cur.execute(
+            "select lower(display_value) "
+            "from v$parameter "
+            "where name = lower('{{ oracle_parameter_name }}')"
+        )
+        row = cur.fetchone()
+        print("" if row is None or row[0] is None else row[0])
+        cur.close()
+        conn.close()
+        PY
+      args:
+        executable: /bin/bash
+      register: oracle_parameter_after_reset
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert parameter was reset to original value
+      ansible.builtin.assert:
+        that:
+          - oracle_parameter_reset is changed
+          - oracle_parameter_after_reset.stdout | trim == oracle_parameter_original.stdout | trim
+        fail_msg: >-
+          Expected {{ oracle_parameter_name }} after reset to be
+          {{ oracle_parameter_original.stdout | trim }}, got
+          {{ oracle_parameter_after_reset.stdout | trim }}
+      delegate_to: localhost
+      run_once: true
+
+    # ── Reset again and verify value is still correct ─────────────────
+    - name: Reset parameter again
+      opitzconsulting.ansible_oracle.oracle_parameter:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        name: "{{ oracle_parameter_name }}"
+        state: reset
+        scope: both
+        sid: "*"
+      register: oracle_parameter_reset_again
+      delegate_to: localhost
+      run_once: true
+
+    - name: Read parameter value after second reset
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import oracledb
+
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn=oracledb.makedsn(
+                "{{ oracle_host }}",
+                {{ oracle_port }},
+                service_name="{{ oracle_service }}"
+            ),
+        )
+        cur = conn.cursor()
+        cur.execute(
+            "select lower(display_value) "
+            "from v$parameter "
+            "where name = lower('{{ oracle_parameter_name }}')"
+        )
+        row = cur.fetchone()
+        print("" if row is None or row[0] is None else row[0])
+        cur.close()
+        conn.close()
+        PY
+      args:
+        executable: /bin/bash
+      register: oracle_parameter_after_reset_again
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert parameter value is still original after second reset
+      ansible.builtin.assert:
+        that:
+          - oracle_parameter_after_reset_again.stdout | trim == oracle_parameter_original.stdout | trim
+        fail_msg: >-
+          Expected {{ oracle_parameter_name }} after second reset to remain
+          {{ oracle_parameter_original.stdout | trim }}, got
+          {{ oracle_parameter_after_reset_again.stdout | trim }}
+      delegate_to: localhost
+      run_once: true
+
+
+    # =========================================================================
+    # BLOCK 10 – oracle_ldapuser
+    # =========================================================================
+    - name: Prepare Oracle objects for oracle_ldapuser test
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import oracledb
+
+        dsn = "{{ oracle_host }}:{{ oracle_port }}/{{ oracle_service }}"
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn=dsn,
+        )
+        cur = conn.cursor()
+
+        statements = [
+            "DROP USER ALICE_LDAP CASCADE",
+            "DROP USER BOB_LDAP CASCADE",
+            "DROP PROFILE LDAP_USER CASCADE",
+            "DROP ROLE PROD_DB_READER",
+            "DROP ROLE PROD_DB_WRITER",
+        ]
+
+        for stmt in statements:
+            try:
+                cur.execute(stmt)
+            except oracledb.DatabaseError:
+                pass
+
+        cur.execute("CREATE PROFILE LDAP_USER LIMIT SESSIONS_PER_USER UNLIMITED")
+        cur.execute("CREATE ROLE PROD_DB_READER")
+        cur.execute("CREATE ROLE PROD_DB_WRITER")
+
+        conn.commit()
+        conn.close()
+        PY
+      args:
+        executable: /bin/bash
+      delegate_to: localhost
+      changed_when: true
+
+    - name: Write initial fake LDAP fixture
+      ansible.builtin.copy:
+        dest: "{{ molecule_ldap_fixture }}"
+        mode: "0644"
+        content: |
+          [
+            {
+              "dn": "CN=Alice LDAP,OU=Users,DC=domain,DC=int",
+              "attributes": {
+                "sAMAccountName": ["alice_ldap"],
+                "memberOf": ["CN=prod_db_reader,OU=Security Groups,DC=domain,DC=int"]
+              }
+            },
+            {
+              "dn": "CN=Bob LDAP,OU=Users,DC=domain,DC=int",
+              "attributes": {
+                "sAMAccountName": ["bob_ldap"],
+                "memberOf": ["CN=prod_db_writer,OU=Security Groups,DC=domain,DC=int"]
+              }
+            }
+          ]
+      delegate_to: localhost
+
+    - name: Synchronise LDAP users into Oracle - first run
+      opitzconsulting.ansible_oracle.oracle_ldapuser:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+
+        user_default_tablespace: USERS
+        user_temp_tablespace: TEMP
+        user_profile: LDAP_USER
+        user_default_password: "TempPassword123"
+        user_grants:
+          - create session
+
+        ldap_connect: "ldap://fake.example.test:389"
+        ldap_binddn: "cn=reader,dc=domain,dc=int"
+        ldap_bindpassword: "dummy"
+        ldap_user_basedn: "OU=Users,DC=domain,DC=int"
+        ldap_user_subtree: true
+        ldap_user_filter: "(objectClass=user)"
+        ldap_username_attribute: sAMAccountName
+
+        deleted_user_mode: lock
+        group_role_map:
+          - dn: "CN=prod_db_reader,OU=Security Groups,DC=domain,DC=int"
+            group: "prod_db_reader"
+          - dn: "CN=prod_db_writer,OU=Security Groups,DC=domain,DC=int"
+            group: "prod_db_writer"
+      environment:
+        PYTHONPATH: "{{ molecule_pythonpath }}"
+        MOLECULE_LDAP_FIXTURE: "{{ molecule_ldap_fixture }}"
+      delegate_to: localhost
+      register: ldap_sync_first
+
+    - name: Assert first sync changed something
+      ansible.builtin.assert:
+        that:
+          - ldap_sync_first is changed
+
+    - name: Read Oracle state after first sync
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import json
+        import oracledb
+
+        dsn = "{{ oracle_host }}:{{ oracle_port }}/{{ oracle_service }}"
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn=dsn,
+        )
+        cur = conn.cursor()
+
+        data = {}
+
+        cur.execute("""
+            select username, account_status, profile, default_tablespace, temporary_tablespace
+            from dba_users
+            where username in ('ALICE_LDAP', 'BOB_LDAP')
+            order by username
+        """)
+        data["users"] = [
+            {
+                "username": r[0],
+                "account_status": r[1],
+                "profile": r[2],
+                "default_tablespace": r[3],
+                "temporary_tablespace": r[4],
+            }
+            for r in cur
+        ]
+
+        cur.execute("""
+            select grantee, granted_role
+            from dba_role_privs
+            where grantee in ('ALICE_LDAP', 'BOB_LDAP')
+            order by grantee, granted_role
+        """)
+        data["roles"] = [[r[0], r[1]] for r in cur]
+
+        cur.execute("""
+            select grantee, privilege
+            from dba_sys_privs
+            where grantee in ('ALICE_LDAP', 'BOB_LDAP')
+            order by grantee, privilege
+        """)
+        data["sys_privs"] = [[r[0], r[1]] for r in cur]
+
+        conn.close()
+        print(json.dumps(data, sort_keys=True))
+        PY
+      args:
+        executable: /bin/bash
+      delegate_to: localhost
+      changed_when: false
+      register: oracle_state_first
+
+    - name: Assert Oracle state after first sync
+      ansible.builtin.assert:
+        that:
+          - "(oracle_state_first.stdout | from_json).users | length == 2"
+          - >
+            ((oracle_state_first.stdout | from_json).users
+            | selectattr('username', 'equalto', 'ALICE_LDAP')
+            | list | first).profile == 'LDAP_USER'
+          - >
+            ((oracle_state_first.stdout | from_json).users
+            | selectattr('username', 'equalto', 'ALICE_LDAP')
+            | list | first).default_tablespace == 'USERS'
+          - >
+            ((oracle_state_first.stdout | from_json).users
+            | selectattr('username', 'equalto', 'ALICE_LDAP')
+            | list | first).temporary_tablespace == 'TEMP'
+          - >
+            ((oracle_state_first.stdout | from_json).users
+            | selectattr('username', 'equalto', 'BOB_LDAP')
+            | list | first).profile == 'LDAP_USER'
+          - >
+            ['ALICE_LDAP', 'PROD_DB_READER'] in ((oracle_state_first.stdout | from_json).roles)
+          - >
+            ['BOB_LDAP', 'PROD_DB_WRITER'] in ((oracle_state_first.stdout | from_json).roles)
+          - >
+            ['ALICE_LDAP', 'CREATE SESSION'] in ((oracle_state_first.stdout | from_json).sys_privs)
+          - >
+            ['BOB_LDAP', 'CREATE SESSION'] in ((oracle_state_first.stdout | from_json).sys_privs)
+
+    - name: Synchronise LDAP users into Oracle - second run must be idempotent
+      opitzconsulting.ansible_oracle.oracle_ldapuser:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+
+        user_default_tablespace: USERS
+        user_temp_tablespace: TEMP
+        user_profile: LDAP_USER
+        user_default_password: "TempPassword123"
+        user_grants:
+          - create session
+
+        ldap_connect: "ldap://fake.example.test:389"
+        ldap_binddn: "cn=reader,dc=domain,dc=int"
+        ldap_bindpassword: "dummy"
+        ldap_user_basedn: "OU=Users,DC=domain,DC=int"
+        ldap_user_subtree: true
+        ldap_user_filter: "(objectClass=user)"
+        ldap_username_attribute: sAMAccountName
+
+        deleted_user_mode: lock
+        group_role_map:
+          - dn: "CN=prod_db_reader,OU=Security Groups,DC=domain,DC=int"
+            group: "prod_db_reader"
+          - dn: "CN=prod_db_writer,OU=Security Groups,DC=domain,DC=int"
+            group: "prod_db_writer"
+      environment:
+        PYTHONPATH: "{{ molecule_pythonpath }}"
+        MOLECULE_LDAP_FIXTURE: "{{ molecule_ldap_fixture }}"
+      delegate_to: localhost
+      register: ldap_sync_second
+
+    - name: Assert second sync is idempotent
+      ansible.builtin.assert:
+        that:
+          - ldap_sync_second is not changed
+
+    - name: Update fake LDAP fixture so Bob disappears
+      ansible.builtin.copy:
+        dest: "{{ molecule_ldap_fixture }}"
+        mode: "0644"
+        content: |
+          [
+            {
+              "dn": "CN=Alice LDAP,OU=Users,DC=domain,DC=int",
+              "attributes": {
+                "sAMAccountName": ["alice_ldap"],
+                "memberOf": ["CN=prod_db_reader,OU=Security Groups,DC=domain,DC=int"]
+              }
+            }
+          ]
+      delegate_to: localhost
+
+    - name: Synchronise LDAP users into Oracle - Bob must be locked
+      opitzconsulting.ansible_oracle.oracle_ldapuser:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+
+        user_default_tablespace: USERS
+        user_temp_tablespace: TEMP
+        user_profile: LDAP_USER
+        user_default_password: "TempPassword123"
+        user_grants:
+          - create session
+
+        ldap_connect: "ldap://fake.example.test:389"
+        ldap_binddn: "cn=reader,dc=domain,dc=int"
+        ldap_bindpassword: "dummy"
+        ldap_user_basedn: "OU=Users,DC=domain,DC=int"
+        ldap_user_subtree: true
+        ldap_user_filter: "(objectClass=user)"
+        ldap_username_attribute: sAMAccountName
+
+        deleted_user_mode: lock
+        group_role_map:
+          - dn: "CN=prod_db_reader,OU=Security Groups,DC=domain,DC=int"
+            group: "prod_db_reader"
+          - dn: "CN=prod_db_writer,OU=Security Groups,DC=domain,DC=int"
+            group: "prod_db_writer"
+      environment:
+        PYTHONPATH: "{{ molecule_pythonpath }}"
+        MOLECULE_LDAP_FIXTURE: "{{ molecule_ldap_fixture }}"
+      delegate_to: localhost
+      register: ldap_sync_third
+
+    - name: Assert third sync changed something
+      ansible.builtin.assert:
+        that:
+          - ldap_sync_third is changed
+
+    - name: Read final Oracle state
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import json
+        import oracledb
+
+        dsn = "{{ oracle_host }}:{{ oracle_port }}/{{ oracle_service }}"
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn=dsn,
+        )
+        cur = conn.cursor()
+
+        data = {}
+
+        cur.execute("""
+            select username, account_status, profile
+            from dba_users
+            where username in ('ALICE_LDAP', 'BOB_LDAP')
+            order by username
+        """)
+        data["users"] = [
+            {
+                "username": r[0],
+                "account_status": r[1],
+                "profile": r[2],
+            }
+            for r in cur
+        ]
+
+        cur.execute("""
+            select grantee, granted_role
+            from dba_role_privs
+            where grantee in ('ALICE_LDAP', 'BOB_LDAP')
+            order by grantee, granted_role
+        """)
+        data["roles"] = [[r[0], r[1]] for r in cur]
+
+        cur.execute("""
+            select grantee, privilege
+            from dba_sys_privs
+            where grantee in ('ALICE_LDAP', 'BOB_LDAP')
+            order by grantee, privilege
+        """)
+        data["sys_privs"] = [[r[0], r[1]] for r in cur]
+
+        conn.close()
+        print(json.dumps(data, sort_keys=True))
+        PY
+      args:
+        executable: /bin/bash
+      delegate_to: localhost
+      changed_when: false
+      register: oracle_state_final
+
+    
+    - name: Assert final Oracle state
+      ansible.builtin.assert:
+        that:
+          - "(oracle_state_final.stdout | from_json).users | length == 2"
+          - >
+            ((oracle_state_final.stdout | from_json).users
+            | selectattr('username', 'equalto', 'ALICE_LDAP')
+            | list | first).account_status == 'EXPIRED'
+          - >
+            'LOCKED' in (((oracle_state_final.stdout | from_json).users
+            | selectattr('username', 'equalto', 'BOB_LDAP')
+            | list | first).account_status)
+          - >
+            ['ALICE_LDAP', 'PROD_DB_READER'] in ((oracle_state_final.stdout | from_json).roles)
+          - >
+            ['BOB_LDAP', 'PROD_DB_WRITER'] in ((oracle_state_final.stdout | from_json).roles)
+          - >
+            ['ALICE_LDAP', 'CREATE SESSION'] in ((oracle_state_final.stdout | from_json).sys_privs)
+          - >
+            ['BOB_LDAP', 'CREATE SESSION'] in ((oracle_state_final.stdout | from_json).sys_privs)
+
+
+
+
+    # =========================================================================
+    # BLOCK 10 – oracle_jobwindow
+    # =========================================================================
+    # ── Ensure the test window is absent before starting ──────────────
+    - name: Ensure test scheduler window is absent before test
+      opitzconsulting.ansible_oracle.oracle_jobwindow:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: sys
+        password: "{{ oracle_pw }}"
+        mode: sysdba
+        state: absent
+        name: "{{ jobwindow_name }}"
+        interval: "{{ jobwindow_interval_initial }}"
+        duration_hour: 1
+      register: jobwindow_absent_pre
+      delegate_to: localhost
+      run_once: true
+
+    # ── Create enabled window ─────────────────────────────────────────
+    - name: Create enabled scheduler window
+      opitzconsulting.ansible_oracle.oracle_jobwindow:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: sys
+        password: "{{ oracle_pw }}"
+        mode: sysdba
+        state: enabled
+        name: "{{ jobwindow_name }}"
+        interval: "{{ jobwindow_interval_initial }}"
+        comments: "{{ jobwindow_comments_initial }}"
+        duration_hour: 2
+        resource_plan: DEFAULT_MAINTENANCE_PLAN
+        priority: high
+      register: jobwindow_create
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert create changed
+      ansible.builtin.assert:
+        that:
+          - jobwindow_create is changed
+      run_once: true
+
+    - name: Query scheduler window after create
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import json
+        import oracledb
+
+        conn = oracledb.connect(
+            user="sys",
+            password={{ oracle_pw | to_json }},
+            dsn="{{ oracle_host }}:{{ oracle_port }}/{{ oracle_service }}",
+            mode=oracledb.AUTH_MODE_SYSDBA,
+        )
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT resource_plan,
+                   EXTRACT(DAY FROM duration) * 24 * 60
+                     + EXTRACT(HOUR FROM duration) * 60
+                     + EXTRACT(MINUTE FROM duration) AS duration_min,
+                   window_priority,
+                   enabled,
+                   repeat_interval,
+                   comments
+            FROM all_scheduler_windows
+            WHERE owner = 'SYS'
+              AND window_name = :name
+            """,
+            name={{ jobwindow_name | to_json }},
+        )
+        row = cur.fetchone()
+        if row is None:
+            print(json.dumps({"exists": False}))
+        else:
+            print(json.dumps({
+                "exists": True,
+                "resource_plan": row[0],
+                "duration_min": int(row[1]),
+                "window_priority": row[2],
+                "enabled": (row[3] == "TRUE"),
+                "repeat_interval": row[4],
+                "comments": row[5],
+            }))
+        cur.close()
+        conn.close()
+        PY
+      register: jobwindow_state_create_raw
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    - name: Parse scheduler window after create
+      ansible.builtin.set_fact:
+        jobwindow_state_create: "{{ jobwindow_state_create_raw.stdout | from_json }}"
+      run_once: true
+
+    - name: Assert scheduler window after create
+      ansible.builtin.assert:
+        that:
+          - jobwindow_state_create.exists
+          - jobwindow_state_create.enabled
+          - jobwindow_state_create.repeat_interval == jobwindow_interval_initial
+          - jobwindow_state_create.comments == jobwindow_comments_initial
+          - jobwindow_state_create.resource_plan == "DEFAULT_MAINTENANCE_PLAN"
+          - jobwindow_state_create.window_priority == "HIGH"
+          - jobwindow_state_create.duration_min == 120
+      run_once: true
+
+    # ── Idempotence for same desired state ────────────────────────────
+    - name: Create enabled scheduler window again (idempotence)
+      opitzconsulting.ansible_oracle.oracle_jobwindow:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: sys
+        password: "{{ oracle_pw }}"
+        mode: sysdba
+        state: enabled
+        name: "{{ jobwindow_name }}"
+        interval: "{{ jobwindow_interval_initial }}"
+        comments: "{{ jobwindow_comments_initial }}"
+        duration_hour: 2
+        resource_plan: DEFAULT_MAINTENANCE_PLAN
+        priority: high
+      register: jobwindow_create_again
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert create is idempotent
+      ansible.builtin.assert:
+        that:
+          - not jobwindow_create_again.changed
+      run_once: true
+
+    # ── Update attributes and disable ─────────────────────────────────
+    - name: Update scheduler window and disable it
+      opitzconsulting.ansible_oracle.oracle_jobwindow:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: sys
+        password: "{{ oracle_pw }}"
+        mode: sysdba
+        state: disabled
+        name: "{{ jobwindow_name }}"
+        interval: "{{ jobwindow_interval_updated }}"
+        comments: "{{ jobwindow_comments_updated }}"
+        duration_min: 90
+        priority: low
+      register: jobwindow_update_disable
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert update/disable changed
+      ansible.builtin.assert:
+        that:
+          - jobwindow_update_disable is changed
+      run_once: true
+
+    - name: Query scheduler window after update/disable
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import json
+        import oracledb
+
+        conn = oracledb.connect(
+            user="sys",
+            password={{ oracle_pw | to_json }},
+            dsn="{{ oracle_host }}:{{ oracle_port }}/{{ oracle_service }}",
+            mode=oracledb.AUTH_MODE_SYSDBA,
+        )
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT resource_plan,
+                   EXTRACT(DAY FROM duration) * 24 * 60
+                     + EXTRACT(HOUR FROM duration) * 60
+                     + EXTRACT(MINUTE FROM duration) AS duration_min,
+                   window_priority,
+                   enabled,
+                   repeat_interval,
+                   comments
+            FROM all_scheduler_windows
+            WHERE owner = 'SYS'
+              AND window_name = :name
+            """,
+            name={{ jobwindow_name | to_json }},
+        )
+        row = cur.fetchone()
+        if row is None:
+            print(json.dumps({"exists": False}))
+        else:
+            print(json.dumps({
+                "exists": True,
+                "resource_plan": row[0],
+                "duration_min": int(row[1]),
+                "window_priority": row[2],
+                "enabled": (row[3] == "TRUE"),
+                "repeat_interval": row[4],
+                "comments": row[5],
+            }))
+        cur.close()
+        conn.close()
+        PY
+      register: jobwindow_state_update_raw
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    - name: Parse scheduler window after update/disable
+      ansible.builtin.set_fact:
+        jobwindow_state_update: "{{ jobwindow_state_update_raw.stdout | from_json }}"
+      run_once: true
+
+    - name: Assert scheduler window after update/disable
+      ansible.builtin.assert:
+        that:
+          - jobwindow_state_update.exists
+          - not jobwindow_state_update.enabled
+          - jobwindow_state_update.repeat_interval == jobwindow_interval_updated
+          - jobwindow_state_update.comments == jobwindow_comments_updated
+          - jobwindow_state_update.resource_plan == None
+          - jobwindow_state_update.window_priority == "LOW"
+          - jobwindow_state_update.duration_min == 90
+      run_once: true
+
+    # ── Enable existing disabled window ───────────────────────────────
+    - name: Enable existing scheduler window
+      opitzconsulting.ansible_oracle.oracle_jobwindow:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: sys
+        password: "{{ oracle_pw }}"
+        mode: sysdba
+        state: enabled
+        name: "{{ jobwindow_name }}"
+        interval: "{{ jobwindow_interval_updated }}"
+        comments: "{{ jobwindow_comments_updated }}"
+        duration_min: 90
+        priority: low
+      register: jobwindow_enable
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert enable changed
+      ansible.builtin.assert:
+        that:
+          - jobwindow_enable is changed
+      run_once: true
+
+    - name: Query scheduler window after enable
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import json
+        import oracledb
+
+        conn = oracledb.connect(
+            user="sys",
+            password={{ oracle_pw | to_json }},
+            dsn="{{ oracle_host }}:{{ oracle_port }}/{{ oracle_service }}",
+            mode=oracledb.AUTH_MODE_SYSDBA,
+        )
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT resource_plan,
+                   EXTRACT(DAY FROM duration) * 24 * 60
+                     + EXTRACT(HOUR FROM duration) * 60
+                     + EXTRACT(MINUTE FROM duration) AS duration_min,
+                   window_priority,
+                   enabled,
+                   repeat_interval,
+                   comments
+            FROM all_scheduler_windows
+            WHERE owner = 'SYS'
+              AND window_name = :name
+            """,
+            name={{ jobwindow_name | to_json }},
+        )
+        row = cur.fetchone()
+        if row is None:
+            print(json.dumps({"exists": False}))
+        else:
+            print(json.dumps({
+                "exists": True,
+                "resource_plan": row[0],
+                "duration_min": int(row[1]),
+                "window_priority": row[2],
+                "enabled": (row[3] == "TRUE"),
+                "repeat_interval": row[4],
+                "comments": row[5],
+            }))
+        cur.close()
+        conn.close()
+        PY
+      register: jobwindow_state_enable_raw
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    - name: Parse scheduler window after enable
+      ansible.builtin.set_fact:
+        jobwindow_state_enable: "{{ jobwindow_state_enable_raw.stdout | from_json }}"
+      run_once: true
+
+    - name: Assert scheduler window after enable
+      ansible.builtin.assert:
+        that:
+          - jobwindow_state_enable.exists
+          - jobwindow_state_enable.enabled
+          - jobwindow_state_enable.repeat_interval == jobwindow_interval_updated
+          - jobwindow_state_enable.comments == jobwindow_comments_updated
+          - jobwindow_state_enable.resource_plan == None
+          - jobwindow_state_enable.window_priority == "LOW"
+          - jobwindow_state_enable.duration_min == 90
+      run_once: true
+
+    # ── Drop window ───────────────────────────────────────────────────
+    - name: Drop scheduler window
+      opitzconsulting.ansible_oracle.oracle_jobwindow:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: sys
+        password: "{{ oracle_pw }}"
+        mode: sysdba
+        state: absent
+        name: "{{ jobwindow_name }}"
+        interval: "{{ jobwindow_interval_updated }}"
+        duration_min: 90
+      register: jobwindow_drop
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert drop changed
+      ansible.builtin.assert:
+        that:
+          - jobwindow_drop is changed
+      run_once: true
+
+    - name: Drop scheduler window again (idempotence)
+      opitzconsulting.ansible_oracle.oracle_jobwindow:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: sys
+        password: "{{ oracle_pw }}"
+        mode: sysdba
+        state: absent
+        name: "{{ jobwindow_name }}"
+        interval: "{{ jobwindow_interval_updated }}"
+        duration_min: 90
+      register: jobwindow_drop_again
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert drop is idempotent
+      ansible.builtin.assert:
+        that:
+          - not jobwindow_drop_again.changed
+      run_once: true
+
+    # =========================================================================
+    # BLOCK 11 – oracle_jobschedule
+    # =========================================================================
+
+    # ── Ensure clean start ────────────────────────────────────────────
+    - name: Ensure test schedule is absent before starting
+      opitzconsulting.ansible_oracle.oracle_jobschedule:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: absent
+        name: "{{ molecule_schedule_name }}"
+        repeat_interval: "{{ molecule_repeat_interval_1 }}"
+      delegate_to: localhost
+      run_once: true
+
+    # ── Create schedule ───────────────────────────────────────────────
+    - name: Create job schedule
+      opitzconsulting.ansible_oracle.oracle_jobschedule:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: present
+        name: "{{ molecule_schedule_name }}"
+        repeat_interval: "{{ molecule_repeat_interval_1 }}"
+        comments: "Created by Molecule"
+      register: create_schedule_result
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert schedule creation changed state
+      ansible.builtin.assert:
+        that:
+          - create_schedule_result is changed
+      run_once: true
+
+    # ── Idempotency after create ──────────────────────────────────────
+    - name: Create job schedule again (idempotency)
+      opitzconsulting.ansible_oracle.oracle_jobschedule:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: present
+        name: "{{ molecule_schedule_name }}"
+        repeat_interval: "{{ molecule_repeat_interval_1 }}"
+        comments: "Created by Molecule"
+      register: create_schedule_again_result
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert second create is idempotent
+      ansible.builtin.assert:
+        that:
+          - not create_schedule_again_result.changed
+      run_once: true
+
+    # ── Update schedule (interval + null comments path) ──────────────
+    - name: Update job schedule
+      opitzconsulting.ansible_oracle.oracle_jobschedule:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: present
+        name: "{{ molecule_schedule_name }}"
+        repeat_interval: "{{ molecule_repeat_interval_2 }}"
+        comments: null
+      register: update_schedule_result
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert schedule update changed state
+      ansible.builtin.assert:
+        that:
+          - update_schedule_result is changed
+      run_once: true
+
+    # ── Idempotency after update ──────────────────────────────────────
+    - name: Update job schedule again (idempotency)
+      opitzconsulting.ansible_oracle.oracle_jobschedule:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: present
+        name: "{{ molecule_schedule_name }}"
+        repeat_interval: "{{ molecule_repeat_interval_2 }}"
+        comments: null
+      register: update_schedule_again_result
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert second update is idempotent
+      ansible.builtin.assert:
+        that:
+          - not update_schedule_again_result.changed
+      run_once: true
+
+    # ── Drop schedule ─────────────────────────────────────────────────
+    - name: Drop job schedule
+      opitzconsulting.ansible_oracle.oracle_jobschedule:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: absent
+        name: "{{ molecule_schedule_name }}"
+        repeat_interval: "{{ molecule_repeat_interval_2 }}"
+      register: drop_schedule_result
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert schedule drop changed state
+      ansible.builtin.assert:
+        that:
+          - drop_schedule_result is changed
+      run_once: true
+
+    # ── Idempotency after drop ────────────────────────────────────────
+    - name: Drop job schedule again (idempotency)
+      opitzconsulting.ansible_oracle.oracle_jobschedule:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: absent
+        name: "{{ molecule_schedule_name }}"
+        repeat_interval: "{{ molecule_repeat_interval_2 }}"
+      register: drop_schedule_again_result
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert second drop is idempotent
+      ansible.builtin.assert:
+        that:
+          - not drop_schedule_again_result.changed
+      run_once: true
+
+    # =========================================================================
+    # BLOCK 12 – oracle_jobclass
+    # =========================================================================
+    # ── Ensure clean start ────────────────────────────────────────────
+    - name: Ensure job class is absent before test
+      opitzconsulting.ansible_oracle.oracle_jobclass:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        state: absent
+        name: "{{ molecule_jobclass_name }}"
+      delegate_to: localhost
+      run_once: true
+      register: preclean_jobclass
+
+    # ── Create job class ──────────────────────────────────────────────
+    - name: Create job class
+      opitzconsulting.ansible_oracle.oracle_jobclass:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        state: present
+        name: "{{ molecule_jobclass_name }}"
+        logging: failed runs
+        history: 14
+        comments: "created by molecule"
+      delegate_to: localhost
+      run_once: true
+      register: create_jobclass
+
+    - name: Assert create changed
+      ansible.builtin.assert:
+        that:
+          - create_jobclass is changed
+        fail_msg: "Creating the job class should report changed=true"
+        success_msg: "Create reported changed=true"
+
+    - name: Verify created job class attributes in database
+      ansible.builtin.shell: |
+        set -o pipefail
+        sqlplus -L -s "system/{{ oracle_pw }}@//localhost:1521/{{ oracle_service }}" <<'SQL'
+        set heading off
+        set feedback off
+        set pagesize 0
+        set verify off
+        set linesize 1000
+        select
+          nvl(resource_consumer_group, '<NULL>') || '|' ||
+          nvl(service, '<NULL>') || '|' ||
+          nvl(logging_level, '<NULL>') || '|' ||
+          nvl(to_char(log_history), '<NULL>') || '|' ||
+          nvl(comments, '<NULL>')
+        from all_scheduler_job_classes
+        where owner = 'SYS'
+          and job_class_name = '{{ molecule_jobclass_name }}';
+        exit
+        SQL
+      args:
+        executable: /bin/bash
+      register: verify_created_sql
+      changed_when: false
+
+    - name: Assert created job class database state
+      ansible.builtin.assert:
+        that:
+          - "'FAILED RUNS' in verify_created_sql.stdout"
+          - "'14' in verify_created_sql.stdout"
+          - "'created by molecule' in verify_created_sql.stdout"
+        fail_msg: "Database state after create is not as expected"
+        success_msg: "Database state after create is correct"
+
+    # ── Idempotency for present ───────────────────────────────────────
+    - name: Run create again for idempotency
+      opitzconsulting.ansible_oracle.oracle_jobclass:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        state: present
+        name: "{{ molecule_jobclass_name }}"
+        logging: failed runs
+        history: 14
+        comments: "created by molecule"
+      delegate_to: localhost
+      run_once: true
+      register: create_jobclass_idempotent
+
+    - name: Assert create is idempotent
+      ansible.builtin.assert:
+        that:
+          - not create_jobclass_idempotent.changed
+        fail_msg: "Second identical present run should report changed=false"
+        success_msg: "Present state is idempotent"
+
+    # ── Modify job class ──────────────────────────────────────────────
+    - name: Modify job class
+      opitzconsulting.ansible_oracle.oracle_jobclass:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        state: present
+        name: "{{ molecule_jobclass_name }}"
+        logging: full
+        history: 7
+        comments: "modified by molecule"
+      delegate_to: localhost
+      run_once: true
+      register: modify_jobclass
+
+    - name: Assert modify changed
+      ansible.builtin.assert:
+        that:
+          - modify_jobclass is changed
+        fail_msg: "Modifying the job class should report changed=true"
+        success_msg: "Modify reported changed=true"
+
+    - name: Verify modified job class attributes in database
+      ansible.builtin.shell: |
+        set -o pipefail
+        sqlplus -L -s "system/{{ oracle_pw }}@//localhost:1521/{{ oracle_service }}" <<'SQL'
+        set heading off
+        set feedback off
+        set pagesize 0
+        set verify off
+        set linesize 1000
+        select
+          nvl(resource_consumer_group, '<NULL>') || '|' ||
+          nvl(service, '<NULL>') || '|' ||
+          nvl(logging_level, '<NULL>') || '|' ||
+          nvl(to_char(log_history), '<NULL>') || '|' ||
+          nvl(comments, '<NULL>')
+        from all_scheduler_job_classes
+        where owner = 'SYS'
+          and job_class_name = '{{ molecule_jobclass_name }}';
+        exit
+        SQL
+      args:
+        executable: /bin/bash
+      register: verify_modified_sql
+      changed_when: false
+
+    - name: Assert modified job class database state
+      ansible.builtin.assert:
+        that:
+          - "'FULL' in verify_modified_sql.stdout"
+          - "'7' in verify_modified_sql.stdout"
+          - "'modified by molecule' in verify_modified_sql.stdout"
+        fail_msg: "Database state after modify is not as expected"
+        success_msg: "Database state after modify is correct"
+
+    # ── Idempotency for modified present state ────────────────────────
+    - name: Run modify again for idempotency
+      opitzconsulting.ansible_oracle.oracle_jobclass:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        state: present
+        name: "{{ molecule_jobclass_name }}"
+        logging: full
+        history: 7
+        comments: "modified by molecule"
+      delegate_to: localhost
+      run_once: true
+      register: modify_jobclass_idempotent
+
+    - name: Assert modify is idempotent
+      ansible.builtin.assert:
+        that:
+          - not modify_jobclass_idempotent.changed
+        fail_msg: "Second identical modified present run should report changed=false"
+        success_msg: "Modified present state is idempotent"
+
+    # ── Drop job class ────────────────────────────────────────────────
+    - name: Drop job class
+      opitzconsulting.ansible_oracle.oracle_jobclass:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        state: absent
+        name: "{{ molecule_jobclass_name }}"
+      delegate_to: localhost
+      run_once: true
+      register: drop_jobclass
+
+    - name: Assert drop changed
+      ansible.builtin.assert:
+        that:
+          - drop_jobclass is changed
+        fail_msg: "Dropping the job class should report changed=true"
+        success_msg: "Drop reported changed=true"
+
+    
+    - name: Verify job class is absent in database
+      ansible.builtin.shell: |
+        set -o pipefail
+        sqlplus -L -s "system/{{ oracle_pw }}@//{{ oracle_host }}:{{ oracle_port }}/{{ oracle_service }}" <<'SQL'
+        set heading off
+        set feedback off
+        set pagesize 0
+        set verify off
+        select count(*)
+        from all_scheduler_job_classes
+        where owner = 'SYS'
+          and job_class_name = '{{ molecule_jobclass_name }}';
+        exit
+        SQL
+      args:
+        executable: /bin/bash
+      register: verify_absent_sql
+      changed_when: false
+
+    - name: Show raw absence query output
+      ansible.builtin.debug:
+        msg:
+          - "rc={{ verify_absent_sql.rc }}"
+          - "stdout={{ verify_absent_sql.stdout }}"
+          - "stderr={{ verify_absent_sql.stderr }}"
+          - "stdout_lines={{ verify_absent_sql.stdout_lines }}"
+
+    - name: Assert job class is absent in database
+      ansible.builtin.assert:
+        that:
+          - (verify_absent_sql.stdout | trim) == '0'
+        fail_msg: "Job class should not exist after drop"
+        success_msg: "Job class is absent after drop"
+
+
+    # ── Idempotency for absent ────────────────────────────────────────
+    - name: Run drop again for idempotency
+      opitzconsulting.ansible_oracle.oracle_jobclass:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        state: absent
+        name: "{{ molecule_jobclass_name }}"
+      delegate_to: localhost
+      run_once: true
+      register: drop_jobclass_idempotent
+
+    - name: Assert absent state is idempotent
+      ansible.builtin.assert:
+        that:
+          - not drop_jobclass_idempotent.changed
+        fail_msg: "Second absent run should report changed=false"
+        success_msg: "Absent state is idempotent"
+
+
+# =========================================================================
+    # BLOCK 13 – oracle_job
+    # =========================================================================
+    # ── Ensure clean start ────────────────────────────────────────────
+    - name: Ensure Molecule test job is absent before test
+      opitzconsulting.ansible_oracle.oracle_job:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: absent
+        job_name: "{{ test_job_fqname }}"
+      delegate_to: localhost
+      register: preclean_job
+
+    # ── Create job ────────────────────────────────────────────────────
+    - name: Create scheduler job
+      opitzconsulting.ansible_oracle.oracle_job:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: present
+        job_name: "{{ test_job_fqname }}"
+        job_type: plsql_block
+        job_action: "begin null; end;"
+        repeat_interval: "FREQ=HOURLY;INTERVAL=3"
+        enabled: false
+        lightweight: false
+        restartable: true
+        logging_level: runs
+        comments: "molecule test job v1"
+        auto_drop: false
+      delegate_to: localhost
+      register: create_job
+
+    - name: Assert create changed
+      ansible.builtin.assert:
+        that:
+          - create_job.changed
+
+    # ──  Idempotence after create ──────────────────────────────────────
+    - name: Create scheduler job again (idempotence)
+      opitzconsulting.ansible_oracle.oracle_job:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: present
+        job_name: "{{ test_job_fqname }}"
+        job_type: plsql_block
+        job_action: "begin null; end;"
+        repeat_interval: "FREQ=HOURLY;INTERVAL=3"
+        enabled: false
+        lightweight: false
+        restartable: true
+        logging_level: runs
+        comments: "molecule test job v1"
+        auto_drop: false
+      delegate_to: localhost
+      register: create_job_again
+
+    - name: Assert second create is idempotent
+      ansible.builtin.assert:
+        that:
+          - not create_job_again.changed
+
+    # ── Modify job ────────────────────────────────────────────────────
+    - name: Modify scheduler job
+      opitzconsulting.ansible_oracle.oracle_job:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: present
+        job_name: "{{ test_job_fqname }}"
+        job_type: plsql_block
+        job_action: "begin null; end;"
+        repeat_interval: "FREQ=HOURLY;INTERVAL=3"
+        enabled: false
+        lightweight: false
+        restartable: true
+        logging_level: full
+        comments: "molecule test job v2"
+        auto_drop: false
+      delegate_to: localhost
+      register: modify_job
+
+    - name: Assert modify changed
+      ansible.builtin.assert:
+        that:
+          - modify_job.changed
+
+    # ── Idempotence after modify ──────────────────────────────────────
+    - name: Modify scheduler job again (idempotence)
+      opitzconsulting.ansible_oracle.oracle_job:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: present
+        job_name: "{{ test_job_fqname }}"
+        job_type: plsql_block
+        job_action: "begin null; end;"
+        repeat_interval: "FREQ=HOURLY;INTERVAL=3"
+        enabled: false
+        lightweight: false
+        restartable: true
+        logging_level: full
+        comments: "molecule test job v2"
+        auto_drop: false
+      delegate_to: localhost
+      register: modify_job_again
+
+    - name: Assert second modify is idempotent
+      ansible.builtin.assert:
+        that:
+          - not modify_job_again.changed
+
+    # ── Drop job ──────────────────────────────────────────────────────
+    - name: Drop scheduler job
+      opitzconsulting.ansible_oracle.oracle_job:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: absent
+        job_name: "{{ test_job_fqname }}"
+      delegate_to: localhost
+      register: drop_job
+
+    - name: Assert drop changed
+      ansible.builtin.assert:
+        that:
+          - drop_job.changed
+
+    # ── Idempotence after drop ────────────────────────────────────────
+    - name: Drop scheduler job again (idempotence)
+      opitzconsulting.ansible_oracle.oracle_job:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: absent
+        job_name: "{{ test_job_fqname }}"
+      delegate_to: localhost
+      register: drop_job_again
+
+    - name: Assert second drop is idempotent
+      ansible.builtin.assert:
+        that:
+          - not drop_job_again.changed
+
+
+    # =========================================================================
+    # BLOCK 14 – oracle_grants
+    # =========================================================================
+    
+    - name: Prepare test users, role and table
+      ansible.builtin.shell: |
+        sqlplus -s "sys/{{ oracle_pw }}@//localhost:1521/{{ oracle_service }} as sysdba" <<'SQL'
+        set define off
+        whenever sqlerror exit 1
+
+        begin
+          execute immediate 'drop user {{ test_user }} cascade';
+        exception
+          when others then
+            if sqlcode != -1918 then
+              raise;
+            end if;
+        end;
+        /
+
+        begin
+          execute immediate 'drop user {{ test_owner }} cascade';
+        exception
+          when others then
+            if sqlcode != -1918 then
+              raise;
+            end if;
+        end;
+        /
+
+        begin
+          execute immediate 'drop role {{ test_role }}';
+        exception
+          when others then
+            if sqlcode != -1919 then
+              raise;
+            end if;
+        end;
+        /
+
+        create user {{ test_user }} identified by "{{ test_password }}";
+        create user {{ test_owner }} identified by "{{ test_password }}";
+        create role {{ test_role }};
+
+        grant create session to {{ test_user }};
+        revoke create session from {{ test_user }};
+
+        grant create session, create table, unlimited tablespace to {{ test_owner }};
+
+        create table {{ test_owner }}.{{ test_table }} (id number);
+        exit
+        SQL
+      changed_when: true
+
+
+    - name: Grant initial privileges and one object privilege to schema
+      opitzconsulting.ansible_oracle.oracle_grants:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        schema: "{{ test_user }}"
+        state: present
+        grants:
+          - create session
+          - create table
+        object_privs:
+          - "select:{{ test_owner }}.{{ test_table }}"
+      delegate_to: localhost
+      run_once: true
+      register: grant_initial
+
+    - name: Assert initial grant task changed
+      ansible.builtin.assert:
+        that:
+          - grant_initial is changed
+        fail_msg: "Initial oracle_grants task should have changed"
+        success_msg: "Initial oracle_grants task changed as expected"
+
+    - name: Check current sys privileges on schema after initial grant
+      ansible.builtin.shell: |
+        sqlplus -s "sys/{{ oracle_pw }}@//localhost:1521/{{ oracle_service }} as sysdba" <<'SQL'
+        set heading off feedback off pages 0 verify off echo off
+        whenever sqlerror exit 1
+        select nvl(listagg(privilege, ',') within group (order by privilege), 'NONE')
+        from dba_sys_privs
+        where grantee = upper('{{ test_user }}');
+        exit
+        SQL
+      register: user_sys_privs_initial
+      changed_when: false
+
+    - name: Check current object privileges on schema after initial grant
+      ansible.builtin.shell: |
+        sqlplus -s "sys/{{ oracle_pw }}@//localhost:1521/{{ oracle_service }} as sysdba" <<'SQL'
+        set heading off feedback off pages 0 verify off echo off
+        whenever sqlerror exit 1
+        select nvl(listagg(privilege, ',') within group (order by privilege), 'NONE')
+        from dba_tab_privs
+        where grantee = upper('{{ test_user }}')
+          and owner = upper('{{ test_owner }}')
+          and table_name = upper('{{ test_table }}');
+        exit
+        SQL
+      register: user_obj_privs_initial
+      changed_when: false
+
+    - name: Assert initial schema privileges
+      ansible.builtin.assert:
+        that:
+          - user_sys_privs_initial.stdout_lines | last | trim == 'CREATE SESSION,CREATE TABLE'
+          - user_obj_privs_initial.stdout_lines | last | trim == 'SELECT'
+        fail_msg: "Initial schema grants are not as expected"
+        success_msg: "Initial schema grants are as expected"
+
+    - name: Run same grant task again to verify idempotence
+      opitzconsulting.ansible_oracle.oracle_grants:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        schema: "{{ test_user }}"
+        state: present
+        grants:
+          - create session
+          - create table
+        object_privs:
+          - "select:{{ test_owner }}.{{ test_table }}"
+      delegate_to: localhost
+      run_once: true
+      register: grant_idempotent
+
+    - name: Assert idempotent run did not change
+      ansible.builtin.assert:
+        that:
+          - not grant_idempotent.changed
+        fail_msg: "Second identical oracle_grants run should be idempotent"
+        success_msg: "Second identical oracle_grants run is idempotent"
+
+    - name: Append unlimited tablespace without removing existing privileges
+      opitzconsulting.ansible_oracle.oracle_grants:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        schema: "{{ test_user }}"
+        state: present
+        grants:
+          - unlimited tablespace
+        grants_mode: append
+      delegate_to: localhost
+      run_once: true
+      register: grant_append
+
+    - name: Assert append grant task changed
+      ansible.builtin.assert:
+        that:
+          - grant_append is changed
+        fail_msg: "Append oracle_grants task should have changed"
+        success_msg: "Append oracle_grants task changed as expected"
+
+    - name: Check sys privileges on schema after append
+      ansible.builtin.shell: |
+        sqlplus -s "sys/{{ oracle_pw }}@//localhost:1521/{{ oracle_service }} as sysdba" <<'SQL'
+        set heading off feedback off pages 0 verify off echo off
+        whenever sqlerror exit 1
+        select nvl(listagg(privilege, ',') within group (order by privilege), 'NONE')
+        from dba_sys_privs
+        where grantee = upper('{{ test_user }}');
+        exit
+        SQL
+      register: user_sys_privs_append
+      changed_when: false
+
+    - name: Assert append preserved old privileges and added new one
+      ansible.builtin.assert:
+        that:
+          - user_sys_privs_append.stdout_lines | last | trim == 'CREATE SESSION,CREATE TABLE,UNLIMITED TABLESPACE'
+        fail_msg: "Append mode did not preserve existing grants correctly"
+        success_msg: "Append mode preserved existing grants correctly"
+
+    - name: Revoke create table from schema
+      opitzconsulting.ansible_oracle.oracle_grants:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        schema: "{{ test_user }}"
+        state: absent
+        grants:
+          - create table
+      delegate_to: localhost
+      run_once: true
+      register: grant_absent
+
+    - name: Assert revoke task changed
+      ansible.builtin.assert:
+        that:
+          - grant_absent is changed
+        fail_msg: "Revoke oracle_grants task should have changed"
+        success_msg: "Revoke oracle_grants task changed as expected"
+
+    - name: Check sys privileges on schema after revoke
+      ansible.builtin.shell: |
+        sqlplus -s "sys/{{ oracle_pw }}@//localhost:1521/{{ oracle_service }} as sysdba" <<'SQL'
+        set heading off feedback off pages 0 verify off echo off
+        whenever sqlerror exit 1
+        select nvl(listagg(privilege, ',') within group (order by privilege), 'NONE')
+        from dba_sys_privs
+        where grantee = upper('{{ test_user }}');
+        exit
+        SQL
+      register: user_sys_privs_after_absent
+      changed_when: false
+
+    - name: Assert create table was revoked
+      ansible.builtin.assert:
+        that:
+          - user_sys_privs_after_absent.stdout_lines | last | trim == 'CREATE SESSION,UNLIMITED TABLESPACE'
+        fail_msg: "CREATE TABLE was not revoked as expected"
+        success_msg: "CREATE TABLE was revoked as expected"
+
+    - name: Grant create session to role
+      opitzconsulting.ansible_oracle.oracle_grants:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        role: "{{ test_role }}"
+        state: present
+        grants:
+          - create session
+      delegate_to: localhost
+      run_once: true
+      register: role_grant
+
+    - name: Assert role grant task changed
+      ansible.builtin.assert:
+        that:
+          - role_grant is changed
+        fail_msg: "Role oracle_grants task should have changed"
+        success_msg: "Role oracle_grants task changed as expected"
+
+    - name: Check sys privileges on role
+      ansible.builtin.shell: |
+        sqlplus -s "sys/{{ oracle_pw }}@//localhost:1521/{{ oracle_service }} as sysdba" <<'SQL'
+        set heading off feedback off pages 0 verify off echo off
+        whenever sqlerror exit 1
+        select nvl(listagg(privilege, ',') within group (order by privilege), 'NONE')
+        from dba_sys_privs
+        where grantee = upper('{{ test_role }}');
+        exit
+        SQL
+      register: role_sys_privs
+      changed_when: false
+
+    - name: Assert role privilege exists
+      ansible.builtin.assert:
+        that:
+          - role_sys_privs.stdout_lines | last | trim == 'CREATE SESSION'
+        fail_msg: "Role did not receive CREATE SESSION as expected"
+        success_msg: "Role received CREATE SESSION as expected"
+
+    - name: Remove all role/sys privileges from schema
+      opitzconsulting.ansible_oracle.oracle_grants:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        schema: "{{ test_user }}"
+        state: REMOVEALL
+        grants:
+          - create session
+      delegate_to: localhost
+      run_once: true
+      register: grant_removeall
+
+    - name: Assert REMOVEALL task changed
+      ansible.builtin.assert:
+        that:
+          - grant_removeall is changed
+        fail_msg: "REMOVEALL oracle_grants task should have changed"
+        success_msg: "REMOVEALL oracle_grants task changed as expected"
+
+    - name: Check sys privileges on schema after REMOVEALL
+      ansible.builtin.shell: |
+        sqlplus -s "sys/{{ oracle_pw }}@//localhost:1521/{{ oracle_service }} as sysdba" <<'SQL'
+        set heading off feedback off pages 0 verify off echo off
+        whenever sqlerror exit 1
+        select nvl(listagg(privilege, ',') within group (order by privilege), 'NONE')
+        from dba_sys_privs
+        where grantee = upper('{{ test_user }}');
+        exit
+        SQL
+      register: user_sys_privs_removeall
+      changed_when: false
+
+    - name: Check role grants on schema after REMOVEALL
+      ansible.builtin.shell: |
+        sqlplus -s "sys/{{ oracle_pw }}@//localhost:1521/{{ oracle_service }} as sysdba" <<'SQL'
+        set heading off feedback off pages 0 verify off echo off
+        whenever sqlerror exit 1
+        select nvl(listagg(granted_role, ',') within group (order by granted_role), 'NONE')
+        from dba_role_privs
+        where grantee = upper('{{ test_user }}');
+        exit
+        SQL
+      register: user_role_privs_removeall
+      changed_when: false
+
+    - name: Assert schema has no remaining role/sys privileges after REMOVEALL
+      ansible.builtin.assert:
+        that:
+          - user_sys_privs_removeall.stdout_lines | last | trim == 'NONE'
+          - user_role_privs_removeall.stdout_lines | last | trim == 'NONE'
+        fail_msg: "Schema still has role/sys privileges after REMOVEALL"
+        success_msg: "Schema role/sys privileges were removed by REMOVEALL as expected"
+
+    # =========================================================================
+    # BLOCK 15 – oracle_facts
+    # =========================================================================
+    # Test normal mode
+    - name: Gather Oracle facts in normal mode
+      opitzconsulting.ansible_oracle.oracle_facts:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+      delegate_to: localhost
+      run_once: true
+      register: oracle_facts_normal
+
+    - name: Validate Oracle facts in normal mode
+      ansible.builtin.assert:
+        that:
+          - oracle_facts_normal.changed == false
+          - oracle_facts_normal.ansible_facts is defined
+          - oracle_facts_normal.ansible_facts.version is defined
+          - oracle_facts_normal.ansible_facts.database is defined
+          - oracle_facts_normal.ansible_facts.instance is defined
+          - oracle_facts_normal.ansible_facts.rac is defined
+          - oracle_facts_normal.ansible_facts.pdb is defined
+          - oracle_facts_normal.ansible_facts.tablespace is defined
+          - oracle_facts_normal.ansible_facts.temp_tablespace is defined
+          - oracle_facts_normal.ansible_facts.userenv is defined
+          - oracle_facts_normal.ansible_facts.redolog is defined
+          - oracle_facts_normal.ansible_facts.option is defined
+          - oracle_facts_normal.ansible_facts.parameter is defined
+          - oracle_facts_normal.ansible_facts.userenv.CURRENT_USER is defined
+          - oracle_facts_normal.ansible_facts.userenv.CURRENT_USER | lower == oracle_user
+          - oracle_facts_normal.ansible_facts.database.NAME is defined
+          - oracle_facts_normal.ansible_facts.instance.INSTANCE_NAME is defined
+          - oracle_facts_normal.ansible_facts.option | length > 0
+          - oracle_facts_normal.ansible_facts.redolog | length > 0
+          - oracle_facts_normal.ansible_facts.parameter | length > 0
+      run_once: true
+
+    # Test SYSDBA mode
+    - name: Gather Oracle facts in SYSDBA mode
+      opitzconsulting.ansible_oracle.oracle_facts:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service_cdb }}"
+        user: "{{ oracle_user_sys }}"
+        password: "{{ oracle_pw }}"
+        mode: sysdba
+      delegate_to: localhost
+      run_once: true
+      register: oracle_facts_sysdba
+
+    - name: Validate Oracle facts in SYSDBA mode
+      ansible.builtin.assert:
+        that:
+          - oracle_facts_sysdba.changed == false
+          - oracle_facts_sysdba.ansible_facts is defined
+          - oracle_facts_sysdba.ansible_facts.version is defined
+          - oracle_facts_sysdba.ansible_facts.userenv is defined
+          - oracle_facts_sysdba.ansible_facts.userenv.ISDBA is defined
+          - oracle_facts_sysdba.ansible_facts.userenv.ISDBA == 'TRUE'
+      run_once: true
+
+    # Test check mode
+    - name: Run oracle_facts in check mode
+      opitzconsulting.ansible_oracle.oracle_facts:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+      check_mode: true
+      delegate_to: localhost
+      run_once: true
+      register: oracle_facts_check
+
+    - name: Validate check mode result
+      ansible.builtin.assert:
+        that:
+          - oracle_facts_check.changed == false
+      run_once: true
+
+    # Persist a small marker for verify.yml
+    - name: Write oracle_facts test marker
+      ansible.builtin.copy:
+        dest: /tmp/opitzconsulting_ansible_oracle_oracle_facts.json
+        mode: "0600"
+        content: |
+          {
+            "normal_version": {{ oracle_facts_normal.ansible_facts.version | to_json }},
+            "normal_current_user": {{ oracle_facts_normal.ansible_facts.userenv.CURRENT_USER | to_json }},
+            "sysdba_isdba": {{ oracle_facts_sysdba.ansible_facts.userenv.ISDBA | to_json }},
+            "check_mode_changed": {{ oracle_facts_check.changed | to_json }}
+          }
+      delegate_to: localhost
+      run_once: true
+
+    # =========================================================================
+    # BLOCK 16 – oracle_directory
+    # =========================================================================
+    # Start from a known state
+    - name: Ensure test directory is absent before testing
+      opitzconsulting.ansible_oracle.oracle_directory:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        directory_name: "{{ molecule_directory_name }}"
+        state: absent
+      delegate_to: localhost
+      register: directory_cleanup_before
+
+    - name: Create test directory
+      opitzconsulting.ansible_oracle.oracle_directory:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        directory_name: "{{ molecule_directory_name }}"
+        directory_path: "{{ molecule_directory_path_1 }}"
+        directory_mode: enforce
+        state: present
+      delegate_to: localhost
+      register: directory_create
+
+    - name: Assert test directory was created
+      ansible.builtin.assert:
+        that:
+          - directory_create is changed
+          - "'Directory:' in directory_create.msg"
+          - molecule_directory_name in directory_create.msg
+          - molecule_directory_path_1 in directory_create.msg
+
+    - name: Create test directory again to verify idempotence
+      opitzconsulting.ansible_oracle.oracle_directory:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        directory_name: "{{ molecule_directory_name }}"
+        directory_path: "{{ molecule_directory_path_1 }}"
+        directory_mode: enforce
+        state: present
+      delegate_to: localhost
+      register: directory_create_again
+
+    - name: Assert test directory creation is idempotent
+      ansible.builtin.assert:
+        that:
+          - not directory_create_again.changed
+          - "'already exists' in directory_create_again.msg"
+          - molecule_directory_name in directory_create_again.msg
+          - molecule_directory_path_1 in directory_create_again.msg
+
+    - name: Change test directory path with enforce
+      opitzconsulting.ansible_oracle.oracle_directory:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        directory_name: "{{ molecule_directory_name }}"
+        directory_path: "{{ molecule_directory_path_2 }}"
+        directory_mode: enforce
+        state: present
+      delegate_to: localhost
+      register: directory_change
+
+    - name: Assert test directory path was changed
+      ansible.builtin.assert:
+        that:
+          - directory_change is changed
+          - "'changed to path:' in directory_change.msg"
+          - molecule_directory_name in directory_change.msg
+          - molecule_directory_path_1 in directory_change.msg
+          - molecule_directory_path_2 in directory_change.msg
+
+    - name: Drop test directory
+      opitzconsulting.ansible_oracle.oracle_directory:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        directory_name: "{{ molecule_directory_name }}"
+        state: absent
+      delegate_to: localhost
+      register: directory_drop
+
+    - name: Assert test directory was dropped
+      ansible.builtin.assert:
+        that:
+          - directory_drop is changed
+          - "'successfully dropped' in directory_drop.msg"
+          - molecule_directory_name in directory_drop.msg
+
+    - name: Drop test directory again to verify idempotence
+      opitzconsulting.ansible_oracle.oracle_directory:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        directory_name: "{{ molecule_directory_name }}"
+        state: absent
+      delegate_to: localhost
+      register: directory_drop_again
+
+    - name: Assert test directory drop is idempotent
+      ansible.builtin.assert:
+        that:
+          - not directory_drop_again.changed
+          - '"doesn''t exist" in directory_drop_again.msg'
+          - molecule_directory_name in directory_drop_again.msg
+
+    # # =========================================================================
+    # # BLOCK 17 – oracle_db
+    # # =========================================================================    
+    
+    
+    # # Discover ORACLE_HOME and database name from /etc/oratab inside the container
+    # - name: Discover ORACLE_HOME from /etc/oratab
+    #   ansible.builtin.shell: |
+    #     set -o pipefail
+    #     awk -F: 'NF >= 2 && $1 !~ /^#/ {print $2; exit}' /etc/oratab
+    #   args:
+    #     executable: /bin/bash
+    #   register: oracle_home_cmd
+    #   changed_when: false
+    #   vars:
+    #     ansible_remote_tmp: /tmp/.ansible/tmp
+
+    # - name: Discover database name from /etc/oratab
+    #   ansible.builtin.shell: |
+    #     set -o pipefail
+    #     awk -F: 'NF >= 2 && $1 !~ /^#/ {print $1; exit}' /etc/oratab
+    #   args:
+    #     executable: /bin/bash
+    #   register: oracle_db_name_cmd
+    #   changed_when: false
+    #   vars:
+    #     ansible_remote_tmp: /tmp/.ansible/tmp
+
+    # - name: Store discovered Oracle facts
+    #   ansible.builtin.set_fact:
+    #     molecule_oracle_home: "{{ oracle_home_cmd.stdout | trim }}"
+    #     molecule_oracle_db_name: "{{ oracle_db_name_cmd.stdout | trim }}"
+
+    # # Show the default Python in the Oracle Linux 8 based image
+    # - name: Show default Python version in the Oracle container
+    #   ansible.builtin.raw: /usr/bin/python3 --version
+    #   register: default_python_version
+    #   changed_when: false
+
+    # - name: Show default Python version result
+    #   ansible.builtin.debug:
+    #     var: default_python_version.stdout
+
+    # # Bootstrap Python 3.9 and pip as root inside the container
+    # - name: Install Python 3.9 and pip in the Oracle container
+    #   ansible.builtin.raw: |
+    #     if command -v dnf >/dev/null 2>&1; then
+    #       dnf -y install python39 python39-pip
+    #     else
+    #       microdnf -y install python39 python39-pip
+    #     fi
+    #   register: py39_install
+    #   changed_when: false
+    #   vars:
+    #     ansible_docker_user: root
+    #     ansible_remote_tmp: /tmp/.ansible/tmp
+
+    # - name: Confirm Python 3.9 is available in the Oracle container
+    #   ansible.builtin.raw: /usr/bin/python3.9 --version
+    #   register: python39_version
+    #   changed_when: false
+    #   vars:
+    #     ansible_remote_tmp: /tmp/.ansible/tmp
+
+    # - name: Show Python 3.9 version
+    #   ansible.builtin.debug:
+    #     var: python39_version.stdout
+
+    # - name: Upgrade pip tooling for Python 3.9 in the Oracle container
+    #   ansible.builtin.raw: /usr/bin/python3.9 -m pip install --upgrade pip setuptools wheel
+    #   register: py39_pip_upgrade
+    #   changed_when: false
+    #   vars:
+    #     ansible_docker_user: root
+    #     ansible_remote_tmp: /tmp/.ansible/tmp
+
+    # - name: Install oracledb in the Oracle container with Python 3.9
+    #   ansible.builtin.raw: /usr/bin/python3.9 -m pip install --quiet oracledb
+    #   register: py39_oracledb_install
+    #   changed_when: false
+    #   vars:
+    #     ansible_docker_user: root
+    #     ansible_remote_tmp: /tmp/.ansible/tmp
+
+    # - name: Confirm oracledb is importable in the Oracle container with Python 3.9
+    #   ansible.builtin.raw: /usr/bin/python3.9 -c "import oracledb; print(oracledb.version)"
+    #   register: container_oracledb_version
+    #   changed_when: false
+    #   vars:
+    #     ansible_remote_tmp: /tmp/.ansible/tmp
+
+    # - name: Show installed oracledb version in the Oracle container
+    #   ansible.builtin.debug:
+    #     msg: "container oracledb {{ container_oracledb_version.stdout }} is ready"
+
+    # # Wait until a SYSDBA SQL*Plus connection succeeds against the CDB service
+    # - name: Wait until SQL*Plus SYSDBA connection succeeds
+    #   ansible.builtin.shell: |
+    #     set -o pipefail
+    #     "{{ molecule_oracle_home }}/bin/sqlplus" -s "sys/{{ oracle_pw }}@//localhost:{{ oracle_port }}/{{ molecule_oracle_db_name }} as sysdba" <<'SQL'
+    #     set heading off feedback off pages 0 verify off echo off
+    #     select 'READY' from dual;
+    #     exit
+    #     SQL
+    #   args:
+    #     executable: /bin/bash
+    #   register: sqlplus_ready
+    #   changed_when: false
+    #   retries: 60
+    #   delay: 10
+    #   until: "'READY' in sqlplus_ready.stdout"
+    #   environment:
+    #     ORACLE_HOME: "{{ molecule_oracle_home }}"
+    #     PATH: "{{ molecule_oracle_home }}/bin:{{ ansible_env.PATH | default('/usr/sbin:/usr/bin:/sbin:/bin') }}"
+    #   vars:
+    #     ansible_remote_tmp: /tmp/.ansible/tmp
+
+    # # Exercise the migrated oracledb connection path without forcing a restart
+    # - name: Exercise oracle_db with restarted and force_restart false
+    #   opitzconsulting.ansible_oracle.oracle_db:
+    #     oracle_home: "{{ molecule_oracle_home }}"
+    #     db_name: "{{ molecule_oracle_db_name }}"
+    #     sys_password: "{{ oracle_pw }}"
+    #     state: restarted
+    #     force_restart: false
+    #     port: "{{ oracle_port }}"
+    #   register: oracle_db_restart_auto
+    #   environment:
+    #     ORACLE_HOME: "{{ molecule_oracle_home }}"
+    #     PATH: "{{ molecule_oracle_home }}/bin:{{ ansible_env.PATH | default('/usr/sbin:/usr/bin:/sbin:/bin') }}"
+    #   vars:
+    #     ansible_python_interpreter: /usr/bin/python3.9
+    #     ansible_remote_tmp: /tmp/.ansible/tmp
+
+    # - name: Show result of restarted with force_restart false
+    #   ansible.builtin.debug:
+    #     var: oracle_db_restart_auto
+
+    # # Do one deterministic restart in the ephemeral test container
+    # - name: Restart the database with oracle_db
+    #   opitzconsulting.ansible_oracle.oracle_db:
+    #     oracle_home: "{{ molecule_oracle_home }}"
+    #     db_name: "{{ molecule_oracle_db_name }}"
+    #     sys_password: "{{ oracle_pw }}"
+    #     state: restarted
+    #     force_restart: true
+    #     port: "{{ oracle_port }}"
+    #   register: oracle_db_restart_forced
+    #   environment:
+    #     ORACLE_HOME: "{{ molecule_oracle_home }}"
+    #     PATH: "{{ molecule_oracle_home }}/bin:{{ ansible_env.PATH | default('/usr/sbin:/usr/bin:/sbin:/bin') }}"
+    #   vars:
+    #     ansible_python_interpreter: /usr/bin/python3.9
+    #     ansible_remote_tmp: /tmp/.ansible/tmp
+
+    # - name: Show result of forced restart
+    #   ansible.builtin.debug:
+    #     var: oracle_db_restart_forced
+
+    # # Confirm the module sees the database as already running afterwards
+    # - name: Ensure the database is started
+    #   opitzconsulting.ansible_oracle.oracle_db:
+    #     oracle_home: "{{ molecule_oracle_home }}"
+    #     db_name: "{{ molecule_oracle_db_name }}"
+    #     sys_password: "{{ oracle_pw }}"
+    #     state: started
+    #     port: "{{ oracle_port }}"
+    #   register: oracle_db_started
+    #   environment:
+    #     ORACLE_HOME: "{{ molecule_oracle_home }}"
+    #     PATH: "{{ molecule_oracle_home }}/bin:{{ ansible_env.PATH | default('/usr/sbin:/usr/bin:/sbin:/bin') }}"
+    #   vars:
+    #     ansible_python_interpreter: /usr/bin/python3.9
+    #     ansible_remote_tmp: /tmp/.ansible/tmp
+
+    # - name: Show result of started check
+    #   ansible.builtin.debug:
+    #     var: oracle_db_started
+
+    # =========================================================================
+    # BLOCK 18 – oracle_awr
+    # =========================================================================
+
+    # ── Read current AWR settings before change ───────────────────────────────
+    - name: Read current AWR settings
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import json
+        import oracledb
+
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn="{{ oracle_host }}:{{ oracle_port }}/{{ oracle_service_cdb }}"
+        )
+        cur = conn.cursor()
+        cur.execute("""
+            select
+                extract(day from snap_interval) * 1440
+                  + extract(hour from snap_interval) * 60
+                  + extract(minute from snap_interval) as interval_min,
+                extract(day from retention) as retention_days
+            from dba_hist_wr_control
+        """)
+        row = cur.fetchone()
+        print(json.dumps({
+            "interval_min": int(row[0]),
+            "retention_days": int(row[1]),
+        }))
+        cur.close()
+        conn.close()
+        PY
+      args:
+        executable: /bin/bash
+      delegate_to: localhost
+      register: awr_before_raw
+      changed_when: false
+      run_once: true
+
+    - name: Parse current AWR settings
+      ansible.builtin.set_fact:
+        awr_before: "{{ awr_before_raw.stdout | from_json }}"
+      run_once: true
+
+    # ── Choose target values that are guaranteed to differ ────────────────────
+    - name: Choose target AWR settings
+      ansible.builtin.set_fact:
+        awr_target_interval_min: "{{ 30 if awr_before.interval_min != 30 else 35 }}"
+        awr_target_retention_days: "{{ 40 if awr_before.retention_days != 40 else 45 }}"
+      run_once: true
+
+    - name: Show current and target AWR settings
+      ansible.builtin.debug:
+        msg:
+          - "Current interval={{ awr_before.interval_min }}, retention={{ awr_before.retention_days }}"
+          - "Target interval={{ awr_target_interval_min }}, retention={{ awr_target_retention_days }}"
+      run_once: true
+
+    # ── Apply AWR settings with the module under test ─────────────────────────
+    - name: Configure AWR settings
+      opitzconsulting.ansible_oracle.oracle_awr:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service_cdb }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        snapshot_interval_min: "{{ awr_target_interval_min }}"
+        snapshot_retention_days: "{{ awr_target_retention_days }}"
+      delegate_to: localhost
+      register: awr_apply
+      run_once: true
+
+    - name: Show first oracle_awr result
+      ansible.builtin.debug:
+        var: awr_apply
+      run_once: true
+
+    - name: Assert first run changed the database
+      ansible.builtin.assert:
+        that:
+          - awr_apply is changed
+        fail_msg: "oracle_awr should report changed=true on first apply"
+        success_msg: "oracle_awr reported changed=true on first apply"
+      run_once: true
+
+    # ── Read AWR settings after change ────────────────────────────────────────
+    - name: Read AWR settings after apply
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import json
+        import oracledb
+
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn="{{ oracle_host }}:{{ oracle_port }}/{{ oracle_service_cdb }}"
+        )
+        cur = conn.cursor()
+        cur.execute("""
+            select
+                extract(day from snap_interval) * 1440
+                  + extract(hour from snap_interval) * 60
+                  + extract(minute from snap_interval) as interval_min,
+                extract(day from retention) as retention_days
+            from dba_hist_wr_control
+        """)
+        row = cur.fetchone()
+        print(json.dumps({
+            "interval_min": int(row[0]),
+            "retention_days": int(row[1]),
+        }))
+        cur.close()
+        conn.close()
+        PY
+      args:
+        executable: /bin/bash
+      delegate_to: localhost
+      register: awr_after_raw
+      changed_when: false
+      run_once: true
+
+    - name: Parse AWR settings after apply
+      ansible.builtin.set_fact:
+        awr_after: "{{ awr_after_raw.stdout | from_json }}"
+      run_once: true
+
+    - name: Assert AWR settings were updated
+      ansible.builtin.assert:
+        that:
+          - awr_after.interval_min == (awr_target_interval_min | int)
+          - awr_after.retention_days == (awr_target_retention_days | int)
+        fail_msg: >-
+          AWR settings not updated as expected.
+          Got interval={{ awr_after.interval_min }}, retention={{ awr_after.retention_days }}.
+          Expected interval={{ awr_target_interval_min }}, retention={{ awr_target_retention_days }}
+        success_msg: >-
+          AWR settings updated correctly.
+          interval={{ awr_after.interval_min }}, retention={{ awr_after.retention_days }}
+      run_once: true
+
+    # ── Re-run to prove idempotency ───────────────────────────────────────────
+    - name: Re-apply the same AWR settings
+      opitzconsulting.ansible_oracle.oracle_awr:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service_cdb }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        mode: normal
+        snapshot_interval_min: "{{ awr_target_interval_min }}"
+        snapshot_retention_days: "{{ awr_target_retention_days }}"
+      delegate_to: localhost
+      register: awr_apply_again
+      run_once: true
+
+    - name: Show second oracle_awr result
+      ansible.builtin.debug:
+        var: awr_apply_again
+      run_once: true
+
+    - name: Assert second run is idempotent
+      ansible.builtin.assert:
+        that:
+          - not awr_apply_again.changed
+        fail_msg: "oracle_awr should report changed=false on second apply"
+        success_msg: "oracle_awr is idempotent on second apply"
+      run_once: true
+
+    # =========================================================================
+    # BLOCK 19 – oracle_asmdg
+    # =========================================================================
+    # Smoke-test the migrated module on the controller:
+    # - Python can import the module
+    # - python-oracledb is installed and importable
+    - name: Smoke test oracle_asmdg module import on the controller
+      ansible.builtin.command:
+        cmd: >-
+          python3 -c
+          "import importlib.util;
+          spec = importlib.util.spec_from_file_location(
+          'oracle_asmdg',
+          '{{ playbook_dir }}/../../../plugins/modules/oracle_asmdg.py'
+          );
+          mod = importlib.util.module_from_spec(spec);
+          spec.loader.exec_module(mod);
+          print('oracle_asmdg import ok')"
+      delegate_to: localhost
+      register: oracle_asmdg_import
+      changed_when: false
+      run_once: true
+
+    - name: Show oracle_asmdg import result
+      ansible.builtin.debug:
+        var: oracle_asmdg_import.stdout
+      run_once: true
+
+    # Oracle Free does not provide ASM / +ASM.
+    # Detect that explicitly so the scenario documents why functional tests are skipped.
+    - name: Check whether ASM background process exists
+      ansible.builtin.shell: |
+        ps -ef | grep '[a]sm_pmon'
+      register: asm_pmon_check
+      changed_when: false
+      failed_when: false
+
+    - name: Record whether oracle_asmdg can be functionally tested here
+      ansible.builtin.set_fact:
+        oracle_asmdg_supported: "{{ asm_pmon_check.rc == 0 }}"
+        oracle_asmdg_skip_reason: >-
+          oracle_asmdg functional tests are skipped in this Molecule scenario
+          because Oracle Database Free does not include Grid Infrastructure / ASM / +ASM.
+      changed_when: false
+
+    - name: Explain why oracle_asmdg functional tests are skipped
+      ansible.builtin.debug:
+        msg: "{{ oracle_asmdg_skip_reason }}"
+      when: not oracle_asmdg_supported
+
+
+
+    # =========================================================================
+    # BLOCK 20 – oracle_privs
+    # =========================================================================
+    # Create a clean test fixture in the PDB
+    - name: Create fixture users, role and grants for oracle_privs tests
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import oracledb
+
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn=oracledb.makedsn(
+                "{{ oracle_host }}",
+                {{ oracle_port }},
+                service_name="{{ oracle_service }}"
+            ),
+        )
+        cur = conn.cursor()
+
+        blocks = [
+            "begin execute immediate 'drop user PRIVS_OWNER cascade'; exception when others then null; end;",
+            "begin execute immediate 'drop user PRIVS_GRANTEE cascade'; exception when others then null; end;",
+            "begin execute immediate 'drop role PRIVS_TEST_ROLE'; exception when others then null; end;",
+            "create user PRIVS_OWNER identified by \"YourPassword123\" quota unlimited on users",
+            "grant create session, create table, create view to PRIVS_OWNER",
+            "create user PRIVS_GRANTEE identified by \"YourPassword123\" quota unlimited on users",
+            "grant create session to PRIVS_GRANTEE",
+            "create role PRIVS_TEST_ROLE",
+        ]
+
+        for stmt in blocks:
+            cur.execute(stmt)
+
+        conn.commit()
+        conn.close()
+        print("FIXTURE_READY")
+        PY
+      args:
+        executable: /bin/bash
+      register: fixture_setup
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    # Create test objects owned by PRIVS_OWNER
+    - name: Create fixture objects in PRIVS_OWNER schema
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import oracledb
+
+        conn = oracledb.connect(
+            user="PRIVS_OWNER",
+            password="YourPassword123",
+            dsn=oracledb.makedsn(
+                "{{ oracle_host }}",
+                {{ oracle_port }},
+                service_name="{{ oracle_service }}"
+            ),
+        )
+        cur = conn.cursor()
+
+        blocks = [
+            "begin execute immediate 'drop view TEST_VIEW'; exception when others then null; end;",
+            "begin execute immediate 'drop table TEST_TAB purge'; exception when others then null; end;",
+            "create table TEST_TAB (id number primary key, name varchar2(30))",
+            "insert into TEST_TAB (id, name) values (1, 'row1')",
+            "create view TEST_VIEW as select id, name from TEST_TAB",
+        ]
+
+        for stmt in blocks:
+            cur.execute(stmt)
+
+        conn.commit()
+        conn.close()
+        print("OBJECTS_READY")
+        PY
+      args:
+        executable: /bin/bash
+      register: object_setup
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    # Grant a system privilege to both a user and a role
+    - name: Grant CREATE TABLE system privilege
+      opitzconsulting.ansible_oracle.oracle_privs:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: present
+        privs:
+          - CREATE TABLE
+        roles:
+          - PRIVS_GRANTEE
+          - PRIVS_TEST_ROLE
+        quiet: false
+      register: grant_sys_privs
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert CREATE TABLE system privilege was granted
+      ansible.builtin.assert:
+        that:
+          - grant_sys_privs is changed
+          - grant_sys_privs.msg is search('GRANT CREATE TABLE TO "PRIVS_GRANTEE"') or grant_sys_privs.msg is search('GRANT CREATE TABLE TO "PRIVS_TEST_ROLE"')
+      run_once: true
+
+    - name: Check granted CREATE TABLE system privileges in DBA_SYS_PRIVS
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import oracledb
+
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn=oracledb.makedsn(
+                "{{ oracle_host }}",
+                {{ oracle_port }},
+                service_name="{{ oracle_service }}"
+            ),
+        )
+        cur = conn.cursor()
+        cur.execute("""
+            select count(*)
+            from dba_sys_privs
+            where grantee in ('PRIVS_GRANTEE', 'PRIVS_TEST_ROLE')
+              and privilege = 'CREATE TABLE'
+        """)
+        print(cur.fetchone()[0])
+        conn.close()
+        PY
+      args:
+        executable: /bin/bash
+      register: check_sys_grant
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert DBA_SYS_PRIVS contains both CREATE TABLE grants
+      ansible.builtin.assert:
+        that:
+          - check_sys_grant.stdout | trim == "2"
+      run_once: true
+
+    # Re-run to verify idempotence for system grants
+    - name: Grant CREATE TABLE system privilege again
+      opitzconsulting.ansible_oracle.oracle_privs:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: present
+        privs:
+          - CREATE TABLE
+        roles:
+          - PRIVS_GRANTEE
+          - PRIVS_TEST_ROLE
+      register: grant_sys_privs_idempotent
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert CREATE TABLE system privilege is idempotent
+      ansible.builtin.assert:
+        that:
+          - not grant_sys_privs_idempotent.changed
+      run_once: true
+
+    # Grant object privileges using a wildcard object list
+    - name: Grant SELECT object privilege on PRIVS_OWNER objects
+      opitzconsulting.ansible_oracle.oracle_privs:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: present
+        privs:
+          - SELECT
+        objs:
+          - PRIVS_OWNER.%
+        objtypes:
+          - TABLE
+          - VIEW
+        roles:
+          - PRIVS_GRANTEE
+          - PRIVS_TEST_ROLE
+        quiet: false
+      register: grant_obj_privs
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert SELECT object privilege was granted
+      ansible.builtin.assert:
+        that:
+          - grant_obj_privs is changed
+          - grant_obj_privs.msg is search('GRANT SELECT ON "PRIVS_OWNER"."TEST_TAB" TO "PRIVS_GRANTEE"') or grant_obj_privs.msg is search('GRANT SELECT ON "PRIVS_OWNER"."TEST_VIEW" TO "PRIVS_TEST_ROLE"')
+      run_once: true
+
+    - name: Check granted SELECT object privileges in DBA_TAB_PRIVS
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import oracledb
+
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn=oracledb.makedsn(
+                "{{ oracle_host }}",
+                {{ oracle_port }},
+                service_name="{{ oracle_service }}"
+            ),
+        )
+        cur = conn.cursor()
+        cur.execute("""
+            select count(*)
+            from dba_tab_privs
+            where owner = 'PRIVS_OWNER'
+              and table_name in ('TEST_TAB', 'TEST_VIEW')
+              and grantee in ('PRIVS_GRANTEE', 'PRIVS_TEST_ROLE')
+              and privilege = 'SELECT'
+        """)
+        print(cur.fetchone()[0])
+        conn.close()
+        PY
+      args:
+        executable: /bin/bash
+      register: check_obj_grant
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert DBA_TAB_PRIVS contains all SELECT grants
+      ansible.builtin.assert:
+        that:
+          - check_obj_grant.stdout | trim == "4"
+      run_once: true
+
+    # Re-run to verify idempotence for object grants
+    - name: Grant SELECT object privilege again
+      opitzconsulting.ansible_oracle.oracle_privs:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: present
+        privs:
+          - SELECT
+        objs:
+          - PRIVS_OWNER.%
+        objtypes:
+          - TABLE
+          - VIEW
+        roles:
+          - PRIVS_GRANTEE
+          - PRIVS_TEST_ROLE
+      register: grant_obj_privs_idempotent
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert SELECT object privilege is idempotent
+      ansible.builtin.assert:
+        that:
+          - not grant_obj_privs_idempotent.changed
+      run_once: true
+
+    # Revoke the object privileges again
+    - name: Revoke SELECT object privilege on PRIVS_OWNER objects
+      opitzconsulting.ansible_oracle.oracle_privs:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: absent
+        privs:
+          - SELECT
+        objs:
+          - PRIVS_OWNER.%
+        objtypes:
+          - TABLE
+          - VIEW
+        roles:
+          - PRIVS_GRANTEE
+          - PRIVS_TEST_ROLE
+        quiet: false
+      register: revoke_obj_privs
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert SELECT object privilege was revoked
+      ansible.builtin.assert:
+        that:
+          - revoke_obj_privs is changed
+          - revoke_obj_privs.msg is search('REVOKE SELECT ON "PRIVS_OWNER"."TEST_TAB" FROM "PRIVS_GRANTEE"') or revoke_obj_privs.msg is search('REVOKE SELECT ON "PRIVS_OWNER"."TEST_VIEW" FROM "PRIVS_TEST_ROLE"')
+      run_once: true
+
+    - name: Check revoked SELECT object privileges in DBA_TAB_PRIVS
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import oracledb
+
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn=oracledb.makedsn(
+                "{{ oracle_host }}",
+                {{ oracle_port }},
+                service_name="{{ oracle_service }}"
+            ),
+        )
+        cur = conn.cursor()
+        cur.execute("""
+            select count(*)
+            from dba_tab_privs
+            where owner = 'PRIVS_OWNER'
+              and table_name in ('TEST_TAB', 'TEST_VIEW')
+              and grantee in ('PRIVS_GRANTEE', 'PRIVS_TEST_ROLE')
+              and privilege = 'SELECT'
+        """)
+        print(cur.fetchone()[0])
+        conn.close()
+        PY
+      args:
+        executable: /bin/bash
+      register: check_obj_revoke
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert DBA_TAB_PRIVS no longer contains SELECT grants
+      ansible.builtin.assert:
+        that:
+          - check_obj_revoke.stdout | trim == "0"
+      run_once: true
+
+    # Re-run to verify idempotence for object revoke
+    - name: Revoke SELECT object privilege again
+      opitzconsulting.ansible_oracle.oracle_privs:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: absent
+        privs:
+          - SELECT
+        objs:
+          - PRIVS_OWNER.%
+        objtypes:
+          - TABLE
+          - VIEW
+        roles:
+          - PRIVS_GRANTEE
+          - PRIVS_TEST_ROLE
+      register: revoke_obj_privs_idempotent
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert SELECT object revoke is idempotent
+      ansible.builtin.assert:
+        that:
+          - not revoke_obj_privs_idempotent.changed
+      run_once: true
+
+    # Revoke the system privilege again
+    - name: Revoke CREATE TABLE system privilege
+      opitzconsulting.ansible_oracle.oracle_privs:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: absent
+        privs:
+          - CREATE TABLE
+        roles:
+          - PRIVS_GRANTEE
+          - PRIVS_TEST_ROLE
+        quiet: false
+      register: revoke_sys_privs
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert CREATE TABLE system privilege was revoked
+      ansible.builtin.assert:
+        that:
+          - revoke_sys_privs is changed
+          - revoke_sys_privs.msg is search('REVOKE CREATE TABLE FROM "PRIVS_GRANTEE"') or revoke_sys_privs.msg is search('REVOKE CREATE TABLE FROM "PRIVS_TEST_ROLE"')
+      run_once: true
+
+    - name: Check revoked CREATE TABLE system privileges in DBA_SYS_PRIVS
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import oracledb
+
+        conn = oracledb.connect(
+            user="{{ oracle_user }}",
+            password="{{ oracle_pw }}",
+            dsn=oracledb.makedsn(
+                "{{ oracle_host }}",
+                {{ oracle_port }},
+                service_name="{{ oracle_service }}"
+            ),
+        )
+        cur = conn.cursor()
+        cur.execute("""
+            select count(*)
+            from dba_sys_privs
+            where grantee in ('PRIVS_GRANTEE', 'PRIVS_TEST_ROLE')
+              and privilege = 'CREATE TABLE'
+        """)
+        print(cur.fetchone()[0])
+        conn.close()
+        PY
+      args:
+        executable: /bin/bash
+      register: check_sys_revoke
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert DBA_SYS_PRIVS no longer contains CREATE TABLE grants
+      ansible.builtin.assert:
+        that:
+          - check_sys_revoke.stdout | trim == "0"
+      run_once: true
+
+    # Re-run to verify idempotence for system revoke
+    - name: Revoke CREATE TABLE system privilege again
+      opitzconsulting.ansible_oracle.oracle_privs:
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        state: absent
+        privs:
+          - CREATE TABLE
+        roles:
+          - PRIVS_GRANTEE
+          - PRIVS_TEST_ROLE
+      register: revoke_sys_privs_idempotent
+      delegate_to: localhost
+      run_once: true
+
+    - name: Assert CREATE TABLE system revoke is idempotent
+      ansible.builtin.assert:
+        that:
+          - not revoke_sys_privs_idempotent.changed
+      run_once: true
+
+
+    # =========================================================================
+    # BLOCK 21 – oracle_asmvol
+    # =========================================================================
+    - name: Ensure result directory exists on the controller
+      ansible.builtin.file:
+        path: "{{ molecule_result_dir }}"
+        state: directory
+        mode: "0755"
+      delegate_to: localhost
+      run_once: true
+
+    # Real module test for this scenario:
+    # Oracle Free does not provide an ASM instance, so oracle_asmvol is expected to fail.
+    - name: Run oracle_asmvol against +ASM and capture the expected failure
+      opitzconsulting.ansible_oracle.oracle_asmvol:
+        name: molecule_test_vol
+        diskgroup: DATA
+        size: 128M
+        state: present
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        hostname: "{{ oracle_host }}"
+        port: "{{ oracle_port }}"
+        service_name: "+ASM"
+      register: oracle_asmvol_result
+      failed_when: false
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+
+    - name: Persist oracle_asmvol result for verify playbook
+      ansible.builtin.copy:
+        dest: "{{ molecule_asmvol_result_file }}"
+        mode: "0644"
+        content: |
+          {
+            "db_smoke_stdout": {{ oracle_db_smoke.stdout | default('') | to_json }},
+            "db_smoke_rc": {{ oracle_db_smoke.rc | default(-1) | int }},
+            "asmvol_failed": {{ (oracle_asmvol_result is failed or oracle_asmvol_result.failed | default(false)) | to_json }},
+            "asmvol_changed": {{ oracle_asmvol_result.changed | default(false) | to_json }},
+            "asmvol_msg": {{ oracle_asmvol_result.msg | default('') | to_json }},
+            "asmvol_module_stderr": {{ oracle_asmvol_result.module_stderr | default('') | to_json }},
+            "asmvol_exception": {{ oracle_asmvol_result.exception | default('') | to_json }}
+          }
+      delegate_to: localhost
+      run_once: true
+

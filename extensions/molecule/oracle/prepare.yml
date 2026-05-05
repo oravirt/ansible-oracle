@@ -1,0 +1,51 @@
+---
+# prepare.yml
+# Runs ONCE before converge, after "molecule create".
+# Goal: install the oracledb Python package on the CONTROLLER (localhost)
+#        so that oracle_role module can connect to Oracle DB.
+#        The Oracle Free container itself does NOT need oracledb / Python 3.11.
+
+- name: Prepare – install oracledb driver on the Ansible controller
+  hosts: localhost
+  gather_facts: false
+  tasks:
+
+    - name: Ensure pip is available on the controller
+      ansible.builtin.command:
+        cmd: python3 -m ensurepip --upgrade
+      changed_when: false
+      failed_when: false  # pip may already be present
+
+    - name: Install oracledb on the controller
+      ansible.builtin.pip:
+        name: oracledb
+        state: present
+        extra_args: "--quiet"
+      # Runs on localhost (the molecule-runner container) where the module executes.
+      # No network access to Oracle Linux yum repos is required.
+
+    - name: Confirm oracledb is importable
+      ansible.builtin.command:
+        cmd: python3 -c "import oracledb; print(oracledb.version)"
+      register: oracledb_version
+      changed_when: false
+
+    - name: Show installed oracledb version
+      ansible.builtin.debug:
+        msg: "oracledb {{ oracledb_version.stdout }} is ready on the controller"
+
+
+- name: Prepare oracle_tablespace scenario
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: "[oracle_tablespace] Ensure MOL_TEST_TBS is absent before tests"
+      opitzconsulting.ansible_oracle.oracle_tablespace:
+        hostname: "{{ oracle_host }}"
+        service_name: "{{ oracle_service }}"
+        user: "{{ oracle_user }}"
+        password: "{{ oracle_pw }}"
+        tablespace: "MOL_TEST_TBS"
+        state: absent
+      delegate_to: localhost
+

@@ -8,12 +8,12 @@ To use the modules, create a 'library' directory next to your top level playbook
 For more information, check out: http://docs.ansible.com/developing_modules.html
 
 
-Most (if not all) requires `cx_Oracle` either on your controlmachine or on the managed node.
+Most (if not all) requires `oracledb` either on your controlmachine or on the managed node.
 
-The default behaviour for the modules using `cx_Oracle` is this:
+The default behaviour for the modules using `oracledb` is this:
 
 - If neither username or password is passed as input to the module(s), the use of an Oracle wallet is assumed.
-- In that case, the `cx_Oracle.makedsn` step is skipped, and the connection will use the `'/@<service_name>'` format instead.
+- In that case, the `oracledb.makedsn` step is skipped, and the connection will use the `'/@<service_name>'` format instead.
 - You then need to make sure that you're using the correct tns-entry (service_name) to match the credential stored in the wallet.
 
 
@@ -21,14 +21,14 @@ These are the different modules:
 
 **oracle_user**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
  - Creates & drops a user.
  - Grants privileges only (can not remove them with oracle_user, use oracle_grants for that)
 
 **oracle_tablespace**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
  - Manages normal(permanent), temp & undo tablespaces (create, drop, make read only/read write, offline/online)
  - Tablespaces can be created as bigfile, autoextended
@@ -36,7 +36,7 @@ pre-req: cx_Oracle
 
 **oracle_grants**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
  - Manages privileges for a user
  - Grants/revokes privileges
@@ -45,13 +45,13 @@ pre-req: cx_Oracle
 
 **oracle_role**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
  - Manages roles in the database
 
 **oracle_parameter**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
  - Manages init parameters in the database (i.e alter system set parameter...)
  - Also handles underscore parameters. That will require using mode=sysdba, to be able to read the X$ tables needed to verify the existence of the parameter.
@@ -65,7 +65,7 @@ pre-req: cx_Oracle
 
  **oracle_services**
 
-pre-req: cx_Oracle (if GI is not running)
+pre-req: oracledb (if GI is not running)
 
   - Manages services in an Oracle database (RAC/Single instance)
 
@@ -75,7 +75,7 @@ At the moment, Idempotence only applies to the state (present,absent,started, st
 
 **oracle_pdb**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
  - Manages pluggable databases in an Oracle container database
  - Creates/deletes/opens/closes the pdb
@@ -85,7 +85,7 @@ pre-req: cx_Oracle
 
 **oracle_sql**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
 - 2 modes: sql or script
 - Executes arbitrary sql or runs a script
@@ -96,7 +96,7 @@ Should be considered as experimental, or an alpha-release
 
 **oracle_asmdg**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
 - Manages ASM diskgroup state. (absent/present)
 - Takes a list of disks and makes sure those disks are part of the DG.
@@ -113,56 +113,56 @@ If the disk is removed from the disk it will be removed from the DG.
 
 **oracle_ldapuser**
 
-pre-req: cx_Oracle, ldap, re
+pre-req: oracledb, ldap, re
 
 - Syncronises users/role grants from LDAP/Active Directory to the database
 
 **oracle_privs**
 
-pre-req: cx_Oracle, re
+pre-req: oracledb, re
 
 - Manages system and object level grants
 - Object level grant support wildcards, so now it is possible to grant access to all tables in a schema and maintain it automatically!
 
 **oracle_jobclass**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
 - Manages DBMS_SCHEDULER job classes
 
 **oracle_jobschedule**
 
-pre-req: cx_Oracle, re
+pre-req: oracledb, re
 
 - Manages DBMS_SCHEDULER job schedules
 
 **oracle_jobwindow**
 
-pre-req: cx_Oracle, datetime
+pre-req: oracledb, datetime
 
 - Manages DBMS_SCHEDULER windows
 
 **oracle_job**
 
-pre-req: cx_Oracle, re
+pre-req: oracledb, re
 
 - Manages DBMS_SCHEDULER jobs
 
 **oracle_rsrc_consgroup**
 
-pre-req: cx_Oracle, re
+pre-req: oracledb, re
 
 - Manages resource manager consumer groups including its mappings and grants
 
 **oracle_awr**
 
-pre-req: cx_Oracle, datetime
+pre-req: oracledb, datetime
 
 - Manages AWR snapshot settings
 
 **oracle_facts**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
 - Gathers facts about Oracle database
 
@@ -172,21 +172,21 @@ pre-req: cx_Oracle
 
 **oracle_stats_prefs**
 
-pre-req: cx_Oracle
+pre-req: oracledb
 
 - Managing DBMS_STATS global preferences
 
 
 **oracle_redo**
 
-pre-rec: cx_Oracle
+pre-rec: oracledb
 
 - Manage redo-groups and their size in RAC or single instance environments
 - NOTE: For RAC environments, the database needs to be in ARCHIVELOG mode. This is not required for SI environments.
 
 **oracle_db**
 
-pre-rec: cx_Oracle
+pre-rec: oracledb
 
 - Create/remove databases (cdb/non-cdb)
 - Can be created by passing in a responsefile or just by using parameters

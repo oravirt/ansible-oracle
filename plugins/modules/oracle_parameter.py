@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 import re
@@ -51,8 +50,8 @@ options:
         default: present
         choices: ['present','absent','reset']
 notes:
-    - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle","re" ]
+    - python-oracledb needs to be installed
+requirements: [ "oracledb","re" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
@@ -94,11 +93,11 @@ oracle_parameter:
 '''
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
 
 
 # Check if the parameter exists
@@ -126,7 +125,7 @@ def check_parameter_exists(module, mode, msg, cursor, name):
     try:
         cursor.execute(sql)
         result = cursor.fetchone()
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = error.message + 'sql: ' + sql
         return False
@@ -177,7 +176,7 @@ def modify_parameter(module, mode, msg, cursor, name, value, comment, scope, sid
     sql += 'scope=%s sid=\'%s\'' % (scope, sid)
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Blergh, something went wrong while changing the value - %s sql: %s' % (
             error.message,
@@ -231,7 +230,7 @@ def reset_parameter(module, mode, msg, cursor, name, value, comment, scope, sid)
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         if error.code == 32010:
             name = clean_string(name)
@@ -282,7 +281,7 @@ def get_curr_value(module, mode, msg, cursor, name, scope):
         cursor.execute(sql)
         result = cursor.fetchall()[0][0]
 
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = (
             'Blergh, something went wrong while getting current value - %s sql: %s'
@@ -327,13 +326,11 @@ def main():
     scope = module.params["scope"]
     sid = module.params["sid"]
 
-    if not cx_oracle_exists:
+    if not oracledb_exists:
         module.fail_json(
             msg=(
-                "The cx_Oracle module is required. "
-                "'pip install cx_Oracle' should do the trick. "
-                "If cx_Oracle is installed, make sure "
-                "ORACLE_HOME & LD_LIBRARY_PATH is set"
+                "The oracledb module is required. "
+                "'python -m pip install oracledb' should do the trick. "
             )
         )
 
@@ -344,29 +341,34 @@ def main():
             # oracle wallet is assumed
             if mode == 'sysdba':
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(dsn=wallet_connect, mode=oracledb.AUTH_MODE_SYSDBA)
             else:
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
+                conn = oracledb.connect(dsn=wallet_connect)
 
         elif user and password:
             if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(
+                dsn = oracledb.makedsn(
                     host=hostname, port=port, service_name=service_name
                 )
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(
+                    user=user,
+                    password=password,
+                    dsn=dsn,
+                    mode=oracledb.AUTH_MODE_SYSDBA,
+                )
             else:
-                dsn = cx_Oracle.makedsn(
+                dsn = oracledb.makedsn(
                     host=hostname, port=port, service_name=service_name
                 )
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
+                conn = oracledb.connect(user=user, password=password, dsn=dsn)
 
         elif not (user) or not (password):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
+            module.fail_json(msg='Missing username or password for oracledb')
 
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Could not connect to database - %s, connect descriptor: %s' % (
             error.message,

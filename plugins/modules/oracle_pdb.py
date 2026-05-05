@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 import os
@@ -81,8 +80,8 @@ options:
         default: 1521
 
 notes:
-    - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+    - python-oracledb needs to be installed
+requirements: [ "oracledb" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
@@ -142,11 +141,11 @@ oracle_pdb:
 '''
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
 
 
 # Check if the pdb exists
@@ -337,9 +336,9 @@ def ensure_pdb_state(
     #   change_db_sql.append(deftzsql)
     #
     # if len(change_db_sql) > 0 :
-    # 	total_sql.append(change_db_sql)
-    # 	for sql in total_sql:
-    # 		execute_sql(module, msg, cursor, sql)
+    #     total_sql.append(change_db_sql)
+    #     for sql in total_sql:
+    #         execute_sql(module, msg, cursor, sql)
     #     dbchange = True
 
     if wanted_state == state_now:
@@ -376,7 +375,7 @@ def execute_sql_get(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
         result = cursor.fetchall()
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
             error.message,
@@ -390,7 +389,7 @@ def execute_sql_get(module, msg, cursor, sql):
 def execute_sql(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Something went wrong while executing sql - %s sql: %s' % (
             error.message,
@@ -482,12 +481,10 @@ def main():
         msg = 'ORACLE_HOME variable not set. Please set it and re-run the command'
         module.fail_json(msg=msg, changed=False)
 
-    if not cx_oracle_exists:
+    if not oracledb_exists:
         msg = (
-            "The cx_Oracle module is required. "
-            "'pip install cx_Oracle' should do the trick. "
-            "If cx_Oracle is installed, make sure ORACLE_HOME "
-            "& LD_LIBRARY_PATH is set"
+            "The python-oracledb module is required. "
+            "'pip install oracledb' should do the trick. "
         )
         module.fail_json(msg=msg)
 
@@ -501,29 +498,36 @@ def main():
             # oracle wallet is assumed
             if mode == 'sysdba':
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(
+                    dsn=wallet_connect, mode=oracledb.AUTH_MODE_SYSDBA
+                )
             else:
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
+                conn = oracledb.connect(dsn=wallet_connect)
 
         elif user and password:
             if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(
+                dsn = oracledb.makedsn(
                     host=hostname, port=port, service_name=service_name
                 )
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(
+                    user=user,
+                    password=password,
+                    dsn=dsn,
+                    mode=oracledb.AUTH_MODE_SYSDBA,
+                )
             else:
-                dsn = cx_Oracle.makedsn(
+                dsn = oracledb.makedsn(
                     host=hostname, port=port, service_name=service_name
                 )
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
+                conn = oracledb.connect(user=user, password=password, dsn=dsn)
 
         elif not (user) or not (password):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
+            module.fail_json(msg='Missing username or password for python-oracledb')
 
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Could not connect to database - %s, connect descriptor: %s' % (
             error.message,

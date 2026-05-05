@@ -1071,6 +1071,9 @@ use_proxy: false
 **_assert_ansible_oracle_**\
 &emsp;Assert inventory variables from ansible-oracle
 
+**_assert_python_**\
+&emsp;Assert minimum Python version
+
 **_nfsmountdb_**
 
 **_nfsumountdb_**

@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 import os
@@ -90,8 +89,8 @@ options:
         default: 1521
 
 notes:
-    - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+    - python-oracledb needs to be installed
+requirements: [ "oracledb" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
@@ -132,11 +131,11 @@ oracle_services:
 '''
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
 
 
 # Check if the service exists
@@ -257,6 +256,7 @@ def ensure_service_state(
     rlbgoal,
 ):
     configchange = False
+    change = False
     if not newservice:
         _wanted_ai = ['']
         _wanted_pi = ['']
@@ -540,7 +540,7 @@ def stop_service(cursor, module, msg, oracle_home, name, database_name):
 
         if rc != 0:
             if (
-                'PRCR-1005' in stdout or 'CRS-2500' or 'PRCD-1316' in stdout
+                'PRCR-1005' in stdout or 'CRS-2500' in stdout or 'PRCD-1316' in stdout
             ):  # Already stopped
                 return False
             elif 'PRCR-1001' in stdout or 'PRCD-1132' in stdout:
@@ -580,18 +580,16 @@ def execute_sql_get(module, msg, cursor, sql):
     # module.exit_json(msg="In execute_sql_get %s" % sql, changed=False)
     try:
         cursor.execute(sql)
-        result = cursor.fetchone()  # noqa F841
+        result = cursor.fetchone()
 
-    except cx_Oracle.DatabaseError as exc:
-        (dberror,) = exc.args
-        if dberror.code == 1403:
+    except oracledb.DatabaseError as exc:
+        (error,) = exc.args
+        if getattr(error, 'code', None) == 1403:
             # no_data_found
             return False
 
-    except cx_Oracle.DatabaseError as exc:
-        (error,) = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
-            error.message,
+            getattr(error, 'message', str(error)),
             sql,
         )
         module.fail_json(msg=msg, changed=False)
@@ -599,16 +597,19 @@ def execute_sql_get(module, msg, cursor, sql):
 
     # we had no error fetching the row from database
     # => True
-    return True
+    if result:
+        return True
+    else:
+        return False
 
 
 def execute_sql(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Something went wrong while executing sql - %s sql: %s' % (
-            error.message,
+            getattr(error, 'message', str(error)),
             sql,
         )
         module.fail_json(msg=msg, changed=False)
@@ -698,11 +699,10 @@ def main():
         gimanaged = True
     else:
         gimanaged = False
-        if not cx_oracle_exists:
+        if not oracledb_exists:
             msg = (
-                "System doesn\'t seem to be managed by GI, so the cx_Oracle module is "
-                "required. 'pip install cx_Oracle' should do the trick. If cx_Oracle "
-                "is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
+                "System doesn\'t seem to be managed by GI, so the oracledb module is "
+                "required. 'pip install oracledb' should do the trick. "
             )
             module.fail_json(msg=msg)
 
@@ -720,20 +720,20 @@ def main():
                     # If neither user or password is supplied, the use of an
                     # oracle wallet is assumed
                     connect = wallet_connect
-                    conn = cx_Oracle.connect(wallet_connect)
+                    conn = oracledb.connect(wallet_connect)
                 elif user and password:
-                    dsn = cx_Oracle.makedsn(
+                    dsn = oracledb.makedsn(
                         host=hostname, port=port, service_name=service_name
                     )
                     connect = dsn
-                    conn = cx_Oracle.connect(user, password, dsn)
+                    conn = oracledb.connect(user=user, password=password, dsn=dsn)
                 elif not (user) or not (password):
-                    module.fail_json(msg='Missing username or password for cx_Oracle')
+                    module.fail_json(msg='Missing username or password for oracledb')
 
-            except cx_Oracle.DatabaseError as exc:
+            except oracledb.DatabaseError as exc:
                 (error,) = exc.args
                 msg = 'Could not connect to database - %s, connect descriptor: %s' % (
-                    error.message,
+                    getattr(error, 'message', str(error)),
                     connect,
                 )
                 module.fail_json(msg=msg, changed=False)
@@ -831,7 +831,9 @@ def main():
 
     elif state == 'restarted':
         if stop_service(cursor, module, msg, oracle_home, name, database_name):
-            if start_service(cursor, module, msg, oracle_home, name, database_name):
+            if start_service(
+                cursor, module, msg, oracle_home, name, database_name, configchange
+            ):
                 msg = "Service %s restarted in database %s" % (name, database_name)
                 module.exit_json(msg=msg, changed=True)
             else:

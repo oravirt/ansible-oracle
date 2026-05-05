@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 from ansible.module_utils.basic import AnsibleModule
@@ -84,8 +83,8 @@ options:
         aliases: ['max']
 
 notes:
-    - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+    - python-oracledb needs to be installed
+requirements: [ "oracledb" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
@@ -164,11 +163,11 @@ oracle_tablespace:
 '''
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
 
 
 # Check if the tablespace exists
@@ -187,7 +186,7 @@ def check_tablespace_exists(module, msg, cursor, tablespace):
         # result = cursor.fetchone()[0]
         result = cursor.fetchall()
         count = cursor.rowcount
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = error.message + 'sql: ' + sql  # noqa F641
         return False
@@ -845,9 +844,9 @@ def ensure_tablespace_attributes(
        END;
     """
     try:
-        v_autoextend_change = cursor.var(cx_Oracle.NUMBER)
-        v_nextsize_change = cursor.var(cx_Oracle.NUMBER)
-        v_maxsize_change = cursor.var(cx_Oracle.NUMBER)
+        v_autoextend_change = cursor.var(oracledb.NUMBER)
+        v_nextsize_change = cursor.var(oracledb.NUMBER)
+        v_maxsize_change = cursor.var(oracledb.NUMBER)
 
         print(ensure_sql)
         cursor.execute(
@@ -862,7 +861,7 @@ def ensure_tablespace_attributes(
                 'o_maxsize_changed': v_maxsize_change,
             },
         )
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = '%s' % (error.message)
         module.fail_json(msg=msg, changed=False)
@@ -892,7 +891,7 @@ def get_tablespace_files(module, msg, cursor, tablespace):
     try:
         cursor.execute(sql)
         result = cursor.fetchall()
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = error.message + ': sql: ' + sql
         module.fail_json(msg=msg)
@@ -917,7 +916,7 @@ def manage_tablespace(msg, cursor, tablespace, state):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = error.message + 'sql: ' + sql
         return False
@@ -931,7 +930,7 @@ def drop_tablespace(module, msg, cursor, tablespace):
 
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = ('Something went wrong while dropping the tablespace - %s sql: %s') % (
             error.message,
@@ -946,7 +945,7 @@ def execute_sql_get(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
         result = cursor.fetchall()
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
             error.message,
@@ -960,7 +959,7 @@ def execute_sql_get(module, msg, cursor, sql):
 def execute_sql(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Something went wrong while executing - %s sql: %s' % (error.message, sql)
         module.fail_json(msg=msg, changed=False)
@@ -1024,46 +1023,56 @@ def main():
     nextsize = module.params["nextsize"]
     maxsize = module.params["maxsize"]
 
-    if not cx_oracle_exists:
+    if not oracledb_exists:
         module.fail_json(
             msg=(
-                "The cx_Oracle module is required. "
-                "'pip install cx_Oracle' should do the trick. "
-                "If cx_Oracle is installed, make sure ORACLE_HOME "
-                "& LD_LIBRARY_PATH is set"
+                "The oracledb module is required. "
+                "'pip install oracledb' should do the trick. "
             )
         )
 
     wallet_connect = '/@%s' % service_name
+    connect = wallet_connect
     try:
         if not user and not password:
+            oracledb.init_oracle_client()
+
             # If neither user or password is supplied, the use of an
             # oracle wallet is assumed
             if mode == 'sysdba':
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(
+                    dsn=wallet_connect,
+                    mode=oracledb.AUTH_MODE_SYSDBA,
+                    externalauth=True,
+                )
             else:
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
+                conn = oracledb.connect(dsn=wallet_connect, externalauth=True)
 
         elif user and password:
             if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(
+                dsn = oracledb.makedsn(
                     host=hostname, port=port, service_name=service_name
                 )
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(
+                    user=user,
+                    password=password,
+                    dsn=dsn,
+                    mode=oracledb.AUTH_MODE_SYSDBA,
+                )
             else:
-                dsn = cx_Oracle.makedsn(
+                dsn = oracledb.makedsn(
                     host=hostname, port=port, service_name=service_name
                 )
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
+                conn = oracledb.connect(user=user, password=password, dsn=dsn)
 
         elif not (user) or not (password):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
+            module.fail_json(msg='Missing username or password for oracledb')
 
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.Error as exc:
         (error,) = exc.args
         msg = 'Could not connect to database - %s, connect descriptor: %s' % (
             error.message,

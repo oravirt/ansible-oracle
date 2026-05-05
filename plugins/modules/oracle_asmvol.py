@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 # import os
@@ -66,11 +65,11 @@ oracle_asmvol:
 '''
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
 
 
 # Check if the volume exists
@@ -153,7 +152,7 @@ def execute_sql_get(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
         result = cursor.fetchall()
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
             error.message,
@@ -168,7 +167,7 @@ def execute_sql_get(module, msg, cursor, sql):
 def execute_sql(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Something went wrong while executing sql - %s sql: %s' % (
             error.message,
@@ -227,11 +226,10 @@ def main():
     # elif 'ORACLE_SID' in os.environ:
     #     oracle_sid = os.environ['ORACLE_SID']
 
-    if not cx_oracle_exists:
+    if not oracledb_exists:
         msg = (
-            "The cx_Oracle module is required. "
-            "'pip install cx_Oracle' should do the trick. "
-            "If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
+            "The python-oracledb module is required. "
+            "'pip install oracledb' should do the trick. "
         )
         module.fail_json(msg=msg)
 
@@ -241,15 +239,15 @@ def main():
             # If neither user or password is supplied,
             # the use of an oracle wallet is assumed
             connect = wallet_connect
-            conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSASM)
+            conn = oracledb.connect(dsn=wallet_connect, mode=oracledb.SYSASM)
         elif user and password:
-            dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
+            dsn = oracledb.makedsn(host=hostname, port=port, service_name=service_name)
             connect = dsn
-            conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSASM)
+            conn = oracledb.connect(user=user, password=password, dsn=dsn, mode=oracledb.SYSASM)
         elif not (user) or not (password):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
+            module.fail_json(msg='Missing username or password for python-oracledb')
 
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = (
             'Could not connect to ASM: %s, connect descriptor: %s, '

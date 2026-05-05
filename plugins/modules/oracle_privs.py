@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 import re
@@ -90,9 +89,9 @@ options:
         type: bool
 
 notes:
-    - cx_Oracle needs to be installed
+    - python-oracledb needs to be installed
     - Oracle RDBMS 11gR2 or later required
-requirements: [ "cx_Oracle", "re" ]
+requirements: [ "oracledb", "re" ]
 author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
 '''
 
@@ -188,11 +187,11 @@ EXAMPLES = '''
 
 
 try:
-    import cx_Oracle
+    import oracledb
 except ImportError:
-    cx_oracle_exists = False
+    oracledb_exists = False
 else:
-    cx_oracle_exists = True
+    oracledb_exists = True
 
 
 # Ansible code
@@ -220,13 +219,11 @@ def main():
         supports_check_mode=True,
     )
     # Check for required modules
-    if not cx_oracle_exists:
+    if not oracledb_exists:
         module.fail_json(
             msg=(
-                "The cx_Oracle module is required. "
-                "'pip install cx_Oracle' should do the trick. "
-                "If cx_Oracle is installed, make sure ORACLE_HOME "
-                "& LD_LIBRARY_PATH is set"
+                "The python-oracledb module is required. "
+                "'pip install oracledb' should do the trick. "
             )
         )
     # Check input parameters
@@ -261,29 +258,31 @@ def main():
             # oracle wallet is assumed
             if mode == 'sysdba':
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(dsn=wallet_connect, mode=oracledb.SYSDBA)
             else:
                 connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
+                conn = oracledb.connect(dsn=wallet_connect)
 
         elif user and password:
             if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(
+                dsn = oracledb.makedsn(
                     host=hostname, port=port, service_name=service_name
                 )
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+                conn = oracledb.connect(
+                    user=user, password=password, dsn=dsn, mode=oracledb.SYSDBA
+                )
             else:
-                dsn = cx_Oracle.makedsn(
+                dsn = oracledb.makedsn(
                     host=hostname, port=port, service_name=service_name
                 )
                 connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
+                conn = oracledb.connect(user=user, password=password, dsn=dsn)
 
         elif not (user) or not (password):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
+            module.fail_json(msg='Missing username or password for python-oracledb')
 
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (
             error.message,
@@ -297,11 +296,11 @@ def main():
         module.exit_json(changed=False)
     #
     c = conn.cursor()
-    var_changes = c.var(cx_Oracle.NUMBER)
-    var_error = c.var(cx_Oracle.NUMBER)
-    var_errstr = c.var(cx_Oracle.STRING)
+    var_changes = c.var(oracledb.NUMBER)
+    var_error = c.var(oracledb.NUMBER)
+    var_errstr = c.var(oracledb.STRING)
     var_privs = c.arrayvar(
-        cx_Oracle.STRING, [p.upper() for p in module.params['privs']]
+        oracledb.STRING, [p.upper() for p in module.params['privs']]
     )
     objectslist = (
         [p.replace("_", "\_") for p in module.params['objs']]  # noqa W605
@@ -309,14 +308,14 @@ def main():
         else []
     )
     var_objs = c.arrayvar(
-        cx_Oracle.STRING,
+        oracledb.STRING,
         objectslist
         if not module.params['convert_to_upper']
         else [p.upper() for p in objectslist],
         100,
     )
     var_roles = c.arrayvar(
-        cx_Oracle.STRING,
+        oracledb.STRING,
         module.params['roles']
         if not module.params['convert_to_upper']
         else [p.upper() for p in module.params['roles']],
