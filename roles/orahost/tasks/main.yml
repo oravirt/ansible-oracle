@@ -39,7 +39,7 @@
 - name: Add host to /etc/hosts if needed
   ansible.builtin.lineinfile:
     dest: /etc/hosts
-    regexp: '.*{{ ansible_fqdn }}$'
+    regexp: '\s{{ ansible_fqdn }}\s'
     line: "{{ etc_hosts_ip }} {{ ansible_hostname }} {{ ansible_fqdn }}"
     state: present
   when: configure_etc_hosts
@@ -49,7 +49,7 @@
   # e.g. on non-DNS environments or if we don't rely on DNS
   ansible.builtin.lineinfile:
     dest: /etc/hosts
-    regexp: '.*{{ __orahost_etc_hosts_entry.fqdn }}$'
+    regexp: '\s{{ __orahost_etc_hosts_entry.fqdn }}\s'
     line:
       "{{ __orahost_etc_hosts_entry.ip }}
       {{ (__orahost_etc_hosts_entry.fqdn | split('.'))[0] }}
