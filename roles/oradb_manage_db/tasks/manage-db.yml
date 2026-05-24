@@ -56,7 +56,7 @@
     msg: "Maintaining DB - {{ odb.oracle_db_name }}, ORACLE_HOME - {{ _oracle_home_db }}"
   when:
     - odb.state == 'present'
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
 
 # dbca_copy_template is for special situations, when using DBCA-templates
 # without executing a template task before.
@@ -92,7 +92,7 @@
     dbh: "{{ odb }}"
   when:
     - odb.state == 'present'
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
   tags:
     - create_db
     - dbcatemplate
@@ -131,7 +131,7 @@
       become_user: "{{ oracle_user }}"
       when:
         - odb.state == 'present'
-        - _orasw_meta_primary_node | bool
+        - orasw_meta_primary_node | bool
       register: dbca_create
 
   rescue:
@@ -164,7 +164,7 @@
     msg: "Removing DB - {{ odb.oracle_db_name }}, ORACLE_HOME - {{ _oracle_home_db }}"  # noqa name[missing]
   when:
     - odb.state == 'absent'
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
 
 - name: manage_db | remove database
   opitzconsulting.ansible_oracle.oracle_db:
@@ -179,7 +179,7 @@
   become_user: "{{ oracle_user }}"
   when:
     - odb.state == 'absent'
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
   register: dbca_remove
   tags: remove_db,dbca
 

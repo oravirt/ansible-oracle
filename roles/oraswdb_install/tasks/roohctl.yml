@@ -14,7 +14,7 @@
   become: true
   become_user: "{{ oracle_user }}"
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_home_db not in existing_dbhome.stdout_lines
   tags:
     - roohctl
@@ -24,7 +24,7 @@
 - ansible.builtin.debug:  # noqa name[missing] ignore-errors no-handler
     var: roohctl.stdout_lines
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_home_db not in existing_dbhome.stdout_lines
     - roohctl.changed
   tags:

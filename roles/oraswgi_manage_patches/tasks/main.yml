@@ -52,7 +52,7 @@
         - _oraswgi_manage_patches_crs_configured | bool
           or
           (patch_before_rootsh | bool
-          and _orasw_meta_primary_node | bool
+          and orasw_meta_primary_node | bool
           )
       block:
         - name: Upgrade OPatch
@@ -233,7 +233,7 @@
       ansible.builtin.include_tasks: pre_install_patch.yml
       when:
         - patch_before_rootsh | bool
-        - _orasw_meta_primary_node | bool
+        - orasw_meta_primary_node | bool
         - not _oraswgi_manage_patches_crs_configured | bool
 
     - name: Patch configured Grid-Infrastructure/Restart

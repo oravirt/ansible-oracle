@@ -14,7 +14,7 @@
 - name: main_install | Download oracle installfiles to server (GI) (www)
   ansible.builtin.include_tasks: "{{ www_download_bin }}.yml"  # noqa name[missing]
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - not is_sw_source_local
     - oracle_sw_copy
 
@@ -30,7 +30,7 @@
   tags:
     - oragridsw
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
     - is_sw_source_local
     - oracle_sw_copy
