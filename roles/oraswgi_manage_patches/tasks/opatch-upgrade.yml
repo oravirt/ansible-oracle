@@ -14,6 +14,8 @@
   opitzconsulting.ansible_oracle.oracle_opatch:
     oracle_home: "{{ oracle_home_gi }}"
     state: opatchversion
+    script_env:
+      LANG: "{{ orasw_meta_forced_lang }}"
   register: current_opatch_version
   tags: current_opatch_version
   become: true
@@ -101,6 +103,8 @@
       opitzconsulting.ansible_oracle.oracle_opatch:
         oracle_home: "{{ oracle_home_gi }}"
         state: opatchversion
+        script_env:
+          LANG: "{{ orasw_meta_forced_lang }}"
       register: current_opatch_version2
       tags: current_opatch_version
       become: true

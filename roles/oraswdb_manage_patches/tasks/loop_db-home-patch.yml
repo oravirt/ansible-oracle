@@ -49,6 +49,8 @@
     ocm_response_file: "{{ ocm_response_file | default(omit) }}"
     output: verbose
     state: "{{ item.state }}"
+    script_env:
+      LANG: "{{ orasw_meta_forced_lang }}"
   with_items:
     - "{{ db_homes_config[dbh.home]['opatch'] | selectattr('state', 'equalto', 'absent') }}"
   become: true
@@ -72,6 +74,8 @@
     ocm_response_file: "{{ ocm_response_file | default(omit) }}"
     output: verbose
     state: "{{ item.0.state }}"
+    script_env:
+      LANG: "{{ orasw_meta_forced_lang }}"
   with_subelements:
     - "{{ db_homes_config[dbh.home]['opatchauto'] }}"
     - subpatches

@@ -14,6 +14,8 @@
     ocm_response_file: "{{ _oraswgi_manage_patches_ocm_response_file | default(omit) }}"
     output: verbose
     state: "{{ item.state }}"
+    script_env:
+      LANG: "{{ orasw_meta_forced_lang }}"
   notify: rootscript_postpatch
   vars:
     __opatchauto_patchtype: false  # opatch apply
