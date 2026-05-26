@@ -11,50 +11,48 @@ fi
 while read -r device label owner group
 do
 
-if [[ ${device} == /dev/sda ]]; then
- echo "Trying to use root disk. Exiting"
- continue
-fi
+# collect the available IDs
+scsiid=`$scsi_id_bin -g -u -d $device` # scsi ID
+dmname=`udevadm info -q property --property=DM_NAME --value $device` # Device Mapper Name
+dmlvname=`udevadm info -q property --property=DM_LV_NAME --value $device` # LVM logical volume name
+partuuid=`udevadm info -q property --property=ID_PART_ENTRY_UUID --value $device` # Partition UUID
+devserial=`udevadm info -q property --property=SERIAL --value $device` # Serial ID
 
-chkexist=0
-scsiid=`$scsi_id_bin -g -u -d $device`
-[ -z $scsiid ] || ( [ -f $UDEVRULE ] && grep -Pq "\bRESULT==\"$scsiid\"" $UDEVRULE && chkexist=1 )
-# if device has no scsiid, it might be a dm-device
-if [[ $scsiid == "" ]]; then
-   dmname=`udevadm info -q property $device | grep -P "^DM_NAME\b" | cut -d"=" -f2`
-   [ -z $dmname ] || ( [ -f $UDEVRULE ] && grep -Pq "\bENV\{DM_NAME\}==\"$dmname\"" $UDEVRULE && chkexist=1 )
-   # if device has no scsiid and no dmname, it might be a partition (block device must be ignored because it has no unique udev property)
-   if [[ $dmname == "" ]]; then
-      partuuid=`udevadm info -q property $device | grep -P "^ID_PART_ENTRY_UUID\b" | cut -d"=" -f2`
-      [ -z $partuuid ] || ( [ -f $UDEVRULE ] && grep -Pq "\bENV\{ID_PART_ENTRY_UUID\}==\"$partuuid\"" $UDEVRULE && chkexist=1 )
-   fi
-fi
+# determine search pattern to be used in udev rule
+case $(udevadm info -q name $device) in
+   dm-*)
+      kernel_device_prefix="dm-*"
+      ;;
+   nvme*)
+      kernel_device_prefix="nvme*"
+      ;;
+   *)
+      kernel_device_prefix="sd*"
+      ;;
+esac
 
-if [[ $chkexist == 1 ]]; then
- echo "Error: $scsiid is already present. Exiting"
- continue
-fi
-
-if [[ $scsiid != "" ]]; then
-   {% if use_partition_devices %}
-   {% if ansible_distribution_major_version == '6' %}
-   echo "KERNEL==\"sd*1\", BUS==\"scsi\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", NAME=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
-   {% elif ansible_distribution_major_version >= '7' %}
-   echo "KERNEL==\"sd*1\", SUBSYSTEM==\"block\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$parent\", RESULT==\"$scsiid\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
-   {% endif %}
-   {% elif not use_partition_devices %}
-   {% if ansible_distribution_major_version == '6' %}
-   echo "KERNEL==\"sd*\", BUS==\"scsi\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$kernel\", RESULT==\"$scsiid\", NAME=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
-   {% elif ansible_distribution_major_version >= '7' %}
-   echo "KERNEL==\"sd*\", SUBSYSTEM==\"block\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$kernel\", RESULT==\"$scsiid\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
-   {% endif %}
-   {% endif %}
-fi
-if [[ $dmname != "" ]]; then
-   echo "KERNEL==\"dm-*\", ENV{DM_NAME}==\"$dmname\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
-fi
+# device is a partition
 if [[ $partuuid != "" ]]; then
-   echo "KERNEL==\"sd*\", ENV{ID_PART_ENTRY_UUID}==\"$partuuid\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+   echo "KERNEL==\"$kernel_device_prefix\", ENV{ID_PART_ENTRY_UUID}==\"$partuuid\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+   continue
+fi
+# device has scsi ID and is NOT a LVM logical volume
+if [[ $scsiid != "" && $dmlvname == "" ]]; then
+   {% if ansible_distribution_major_version == '6' %}
+   echo "KERNEL==\"$kernel_device_prefix\", BUS==\"scsi\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$kernel\", RESULT==\"$scsiid\", NAME=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+   {% elif ansible_distribution_major_version >= '7' %}
+   echo "KERNEL==\"$kernel_device_prefix\", SUBSYSTEM==\"block\", PROGRAM==\"$scsi_id_bin -g -u -d /dev/\$kernel\", RESULT==\"$scsiid\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+   {% endif %}
+   continue
+fi
+# device is a LVM logical volume
+if [[ $dmlvname != "" ]]; then
+   echo "KERNEL==\"$kernel_device_prefix\", ENV{DM_NAME}==\"$dmname\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
+   continue
+fi
+# fallback to device serial ID, if any
+if [[ $devserial != "" ]]; then
+   echo "KERNEL==\"$kernel_device_prefix\", ENV{ID_SERIAL}==\"$devserial\", SYMLINK+=\"$label\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\"" >> $TEMPFILE
 fi
 done < {{ oracle_rsp_stage }}/udev-device-input.txt
 
