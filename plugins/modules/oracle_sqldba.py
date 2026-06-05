@@ -491,8 +491,14 @@ def main():
     if sqlselect is not None:
         if sqlselect.endswith(";"):
             sqlselect.rstrip(";")
-        sqlselect = "select dbms_xmlgen.getxml('" + sqlselect.replace("'", "''") + "') from dual;"
-        result = run_sql_p(sqlselect, username, password, scope, pdb_list, ignorable_err)
+        sqlselect = (
+            "select dbms_xmlgen.getxml('"
+            + sqlselect.replace("'", "''")
+            + "') from dual;"
+        )
+        result = run_sql_p(
+            sqlselect, username, password, scope, pdb_list, ignorable_err
+        )
     elif sql is not None:
         sql = os.linesep.join([s for s in sql.splitlines() if s.strip()])
         if not sql.endswith(";") and not sql.endswith("/"):
@@ -501,7 +507,9 @@ def main():
     elif sqlscript is not None:
         if not sqlscript.startswith("@"):
             sqlscript = "@" + sqlscript
-        result += run_sql_p(sqlscript, username, password, scope, pdb_list, ignorable_err)
+        result += run_sql_p(
+            sqlscript, username, password, scope, pdb_list, ignorable_err
+        )
     elif catcon_pl is not None:
         run_catcon_pl(catcon_pl)
 

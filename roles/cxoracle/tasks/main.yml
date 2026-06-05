@@ -1,13 +1,60 @@
 # cxoracle-install playbook
 ---
-# The ansible-oracle modules are using Python3 only
-# => Install cx_Oracle for Python3 only
-- name: Install cx_oracle for Python3
-  ansible.builtin.pip:
-    name: "{{ cx_oracle3_source | default(cx_oracle_source) | default('cx_oracle') }}"
-    executable: pip3
-    extra_args: "{{ extra_args }}"
-    umask: "{{ cx_oracle_umask | default(omit) }}"
-    state: present
+- name: Installation block
   when: install_cx_oracle
   tags: cx_oracle
+  block:
+    - name: cx_oracle | Get final installation source
+      ansible.builtin.set_fact:
+        _cx_oracle_source: "{{ cx_oracle3_source | default(cx_oracle_source) | default('cx_oracle') }}"
+
+    - name: cx_oracle | Get cx_oracle image filename
+      ansible.builtin.set_fact:
+        _cx_oracle_filename: "{{ _cx_oracle_source | basename }}"
+
+    - name: cx_oracle | Create temp download dir
+      ansible.builtin.tempfile:
+        state: directory
+      register: _cxoracle_tempdir
+
+    # Accept only if src is a file-URL or path
+    - name: cx_oracle | Transfer cx_oracle to server (local)
+      ansible.builtin.copy:
+        src: "{{ _cx_oracle_source | regex_replace('^file://', '') }}"
+        dest: "{{ _cxoracle_tempdir.path }}/{{ _cx_oracle_filename }}"
+        mode: 0644
+      when:
+        - is_sw_source_local
+        - oracle_sw_copy
+        - _cx_oracle_source is match('^(file://)?/')
+
+    # Accept only if src is of a supported protocol (http, https, ftp)
+    - name: cx_oracle | Transfer cx_oracle to server (www)
+      ansible.builtin.get_url:
+        url: "{{ _cx_oracle_source }}"
+        dest: "{{ _cxoracle_tempdir.path }}/{{ _cx_oracle_filename }}"
+        mode: 0644
+        force: false
+        client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
+        client_key: "{{ get_url_ssl_client_key | default(omit) }}"
+      environment: "{{ proxy_env | default(omit) }}"
+      when:
+        - not is_sw_source_local
+        - oracle_sw_copy
+        - _cx_oracle_source is match('^(http(s)?|ftp)://')
+
+    # The ansible-oracle modules are using Python3 only
+    # => Install cx_Oracle for Python3 only
+    - name: cx_oracle | Install cx_oracle for Python3
+      ansible.builtin.pip:
+        name: "{{ _cxoracle_tempdir.path }}/{{ _cx_oracle_filename }}"
+        executable: pip3
+        extra_args: "{{ extra_args }}"
+        umask: "{{ cx_oracle_umask | default(omit) }}"
+        state: present
+
+  always:
+    - name: "Cleanup cx_oracle from {{ _cxoracle_tempdir.path }}"
+      ansible.builtin.file:
+        path: "{{ _cxoracle_tempdir.path }}"
+        state: absent

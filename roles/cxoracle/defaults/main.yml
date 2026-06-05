@@ -33,3 +33,23 @@ extra_args: "
   {% if get_url_ssl_client_cert is defined -%}--client-cert={{ get_url_ssl_client_cert }}{% endif %}
   {% if get_url_ssl_client_key is defined -%}--cert={{ get_url_ssl_client_key }}{% endif %}
   "
+
+# @var is_sw_source_local:description: >
+# @end
+is_sw_source_local: true
+
+# @var oracle_stage:description: >
+# Defines the base directory for response files, configuration firles etc. for `ansible-oracle`.
+#
+# There is usually no need to change this variable.
+# @end
+oracle_stage: /u01/stage
+
+# @var install_from_nfs:description: >
+# Mount NFS-Server for installation media?
+#
+# `nfs_server_sw` and `nfs_server_sw_path` are needed, when `install_from_nfs: true`
+# @end
+install_from_nfs: false
+
+oracle_sw_copy: "{% if install_from_nfs %}false{% else %}true{% endif %}"
