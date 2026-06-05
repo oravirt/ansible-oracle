@@ -20,7 +20,7 @@
 
 - name: main_install | Copy oracle installfiles to server (GI) (local)
   ansible.builtin.copy:
-    src: "{{ oracle_sw_source_local }}/{{ item.filename }}"
+    src: "{{ item.filesource | default(oracle_sw_source_local + '/' + item.filename, true) }}"
     dest: "{{ oracle_stage }}"
     mode: "0775"
     force: false
