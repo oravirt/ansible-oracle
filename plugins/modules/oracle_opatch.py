@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import os
@@ -401,7 +401,8 @@ def stop_process(module, oracle_home):
                 elif len(line.split(':')) >= 2 and line.split(':')[1] == oracle_home:
                     # Find listener for ORACLE_HOME
                     p = subprocess.Popen(
-                        'ps -o cmd -C tnslsnr | grep "^%s/bin/tnslsnr "' % (line),
+                        'ps -o cmd -C tnslsnr | grep "^%s/bin/tnslsnr "'
+                        % (oracle_home),
                         shell=True,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
