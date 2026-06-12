@@ -5,6 +5,8 @@ Install/Remove Patches from Oracle Database Homes
 ## Table of content
 
 - [Requirements](#requirements)
+- [Default Variables](#default-variables)
+  - [opatch_gi_conflict_check](#opatch_gi_conflict_check)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -16,6 +18,20 @@ Install/Remove Patches from Oracle Database Homes
 
 - Minimum Ansible version: `2.14.0`
 
+## Default Variables
+
+### opatch_gi_conflict_check
+
+When calling oracle_opatch for GI, decide if analyze stage of
+opatch/opatchauto should be executed.
+
+**_Type:_** boolean<br />
+
+#### Default value
+
+```YAML
+opatch_gi_conflict_check: '{{ opatch_conflict_check | bool }}'
+```
 
 ## Discovered Tags
 

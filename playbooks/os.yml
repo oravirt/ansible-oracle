@@ -13,7 +13,13 @@
     - opitzconsulting.ansible_oracle.orahost_logrotate
 
   post_tasks:
+    - name: Collect service facts to determine if autofs even is restartable
+      ansible.builtin.service_facts:
+
     - name: Restart autofs
+      when:
+        - ansible_facts['services']['autofs.service'] is defined
+        - (ansible_facts['services']['autofs.service']['status'] | default('not-found')) not in ('not-found','masked')
       ansible.builtin.service:
         name: autofs
         enabled: true

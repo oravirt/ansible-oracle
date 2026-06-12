@@ -138,6 +138,20 @@ oracle_hostname: "{{ ansible_fqdn }}"
 # @end
 oracle_sw_source_www: http://www/orasw     # address to all software if using the get_url module when putting software on the host(s)
 
+# @var get_url_ssl_client_cert:description: >
+# PEM formatted certificate chain file to be used for SSL client authentication with ansible.builtin.get_url
+# @end
+# @var get_url_ssl_client_cert:type: path
+# @var get_url_ssl_client_cert:default: undefined
+# @var get_url_ssl_client_cert:example: /etc/pki/ca-trust/source/anchors/client-certchain.pem
+
+# @var get_url_ssl_client_key:description: >
+# PEM formatted file that contains your private key to be used for SSL client authentication with ansible.builtin.get_url
+# @end
+# @var get_url_ssl_client_key:type: path
+# @var get_url_ssl_client_key:default: undefined
+# @var get_url_ssl_client_key:example: /etc/pki/tls/private/client-cert.pem
+
 # @var oracle_sw_source_local:description: >
 # Define the directory when `` is set.
 #
@@ -410,6 +424,25 @@ oracle_ee_options_213:
   - {option: partitioning, state: false}
   - {option: rat, state: false}
 
+# @var oracle_ee_options_261:description: >
+# Define the enabled/disabled options for 26ai binaries.
+# @end
+oracle_ee_options_261:
+  - {option: partitioning, state: false}
+  - {option: rat, state: false}
+
+# @var oracle_all_editions_options_state:description: >
+# Intended state of edition independent database options, as defined in {{ oracle_all_editions_options }}
+# @end
+oracle_all_editions_options_state:
+  - {option: dnfs, enabled: false}
+  - {option: uniaud, enabled: false}
+
+# @var set_oracle_all_editions_options_state:description: >
+# Switch to globally enable/disable linking of edition independent database options
+# @end
+set_oracle_all_editions_options_state: true
+
 # @todo information: variable description is missing
 # @var oracle_databases:description: >
 #
@@ -618,3 +651,32 @@ orasw_meta_assert_oracle_databases: true
 # Ansible Inventory hostgroup for RAC-Cluster.
 # @end
 orasw_meta_cluster_hostgroup: ""
+
+# @var use_proxy:description: Enable Proxy for Download
+use_proxy: false
+
+# @var http_proxy:description: Define the http proxy for downloads
+http_proxy: ""
+
+# @var https_proxy:description: Define the https proxy for downloads
+https_proxy: ""
+
+# @var no_proxy:description: Define no_proxy list für downlads.
+no_proxy: ""
+
+# @var proxy_env:description: >
+# This is an internal variable for downloading patches.
+# Usually no need to change it.
+# @end
+proxy_env:
+  http_proxy: "{{ http_proxy }}"
+  https_proxy: "{{ https_proxy }}"
+  no_proxy: "{{ no_proxy }}"
+
+# @var opatch_conflict_check:description: >
+# When calling oracle_opatch for DB or GI, decide if analyze stage of
+# opatch/opatchauto should be executed.
+# Will be overridden by opatch_db_conflict_check and opatch_gi_conflict_check.
+# @end
+# @var opatch_conflict_check:type: boolean
+opatch_conflict_check: true

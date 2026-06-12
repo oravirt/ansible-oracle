@@ -78,21 +78,18 @@ options:
             The listener port to connect to the database
         required: false
         default: 1521
-notes:
-    - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
 EXAMPLES = '''
 '''
 
-try:
-    import cx_Oracle
-except ImportError:
-    cx_oracle_exists = False
-else:
-    cx_oracle_exists = True
+# try:
+#     import cx_Oracle
+# except ImportError:
+#     cx_oracle_exists = False
+# else:
+#     cx_oracle_exists = True
 
 
 def get_version(module, msg, oracle_home):
@@ -112,15 +109,32 @@ def check_db_exists(module, msg, oracle_home, db_name, sid, db_unique_name):
             checkdb = db_unique_name
         else:
             checkdb = db_name
-        command = "%s/bin/srvctl config database -d %s " % (oracle_home, checkdb)
-        (rc, stdout, stderr) = module.run_command(command)
+        if is_cluster:
+            # for cluster, assume SEHA and check if database is up at the local host
+            # (otherwise we can't datapatch it)
+            command = (
+                "%(oracle_home)s/bin/srvctl config database -d %(checkdb)s && \
+                %(oracle_home)s/bin/srvctl status database -d %(checkdb)s | \
+                grep -q %(shortname)s"
+                % {
+                    'oracle_home': oracle_home,
+                    'checkdb': checkdb,
+                    'shortname': os.uname()[1].split('.')[0],
+                }
+            )
+        else:
+            command = "%s/bin/srvctl config database -d %s" % (oracle_home, checkdb)
+
+        # cluster check command needs a shell, because we run multiple commands and pipe
+        (rc, stdout, stderr) = module.run_command(command, use_unsafe_shell=is_cluster)
+
         if rc != 0:
             if '%s' % (db_name) in stdout:  # <-- db doesn't exist
                 return False
             else:
                 msg = 'Error: command is  %s. stdout is %s' % (command, stdout)
                 return False
-        elif 'Database name: %s' % (db_name) in stdout:  # <-- Database already exist
+        else:
             return True
     else:
         existingdbs = []
@@ -236,19 +250,19 @@ def run_datapatch(module, msg, hostname, oracle_home, db_name, sid):
             #     module.exit_json(msg=msg, changed=False)
 
 
-def execute_sql_get(module, msg, cursor, sql):
-    try:
-        cursor.execute(sql)
-        result = cursor.fetchall()
-    except cx_Oracle.DatabaseError as exc:
-        (error,) = exc.args
-        msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
-            error.message,
-            sql,
-        )
-        module.fail_json(msg=msg, changed=False)
-        return False
-    return result
+# def execute_sql_get(module, msg, cursor, sql):
+#     try:
+#         cursor.execute(sql)
+#         result = cursor.fetchall()
+#     except cx_Oracle.DatabaseError as exc:
+#         (error,) = exc.args
+#         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
+#             error.message,
+#             sql,
+#         )
+#         module.fail_json(msg=msg, changed=False)
+#         return False
+#     return result
 
 
 # def execute_sql(module, msg, cursor, sql):
@@ -264,37 +278,37 @@ def execute_sql_get(module, msg, cursor, sql):
 #     return True
 
 
-def getconn(module, msg, hostname):
-    if not hostname:
-        hostname = os.uname()[1]
-    wallet_connect = '/@%s' % service_name
-    try:
-        if not user and not password:
-            # If neither user or password is supplied, the use of
-            # an oracle wallet is assumed
-            connect = wallet_connect
-            conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
-        elif user and password:
-            dsn = cx_Oracle.makedsn(
-                host=hostname,
-                port=port,
-                service_name=service_name,
-            )
-            connect = dsn
-            conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
-        elif not (user) or not (password):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
+# def getconn(module, msg, hostname):
+#     if not hostname:
+#         hostname = os.uname()[1]
+#     wallet_connect = '/@%s' % service_name
+#     try:
+#         if not user and not password:
+#             # If neither user or password is supplied, the use of
+#             # an oracle wallet is assumed
+#             connect = wallet_connect
+#             conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
+#         elif user and password:
+#             dsn = cx_Oracle.makedsn(
+#                 host=hostname,
+#                 port=port,
+#                 service_name=service_name,
+#             )
+#             connect = dsn
+#             conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
+#         elif not (user) or not (password):
+#             module.fail_json(msg='Missing username or password for cx_Oracle')
 
-    except cx_Oracle.DatabaseError as exc:
-        (error,) = exc.args
-        msg = 'Could not connect to database - %s, connect descriptor: %s' % (
-            error.message,
-            connect,
-        )
-        module.fail_json(msg=msg, changed=False)
+#     except cx_Oracle.DatabaseError as exc:
+#         (error,) = exc.args
+#         msg = 'Could not connect to database - %s, connect descriptor: %s' % (
+#             error.message,
+#             connect,
+#         )
+#         module.fail_json(msg=msg, changed=False)
 
-    cursor = conn.cursor()
-    return cursor
+#     cursor = conn.cursor()
+#     return cursor
 
 
 def main():
@@ -308,6 +322,7 @@ def main():
     global port
     global output
     global cursor
+    global is_cluster
 
     cursor = None
 
@@ -356,14 +371,23 @@ def main():
     else:
         gimanaged = False
 
-    if not cx_oracle_exists:
-        msg = (
-            "The cx_Oracle module is required. "
-            "'pip install cx_Oracle' should do the trick. "
-            "If cx_Oracle is installed, make sure "
-            "ORACLE_HOME & LD_LIBRARY_PATH is set"
+    # If gimanaged, check whether it's Oracle Restart or Oracle Clusterware
+    is_cluster = False
+    ocr_loc = '/etc/oracle/ocr.loc'
+    if gimanaged and os.path.exists(ocr_loc):
+        ocr_grep = subprocess.run(
+            ['grep', '-Piq', '^\\s*local_only\\s*=\\s*false', ocr_loc]
         )
-        module.fail_json(msg=msg)
+        is_cluster = not bool(ocr_grep.returncode)
+
+    # if not cx_oracle_exists:
+    #     msg = (
+    #         "The cx_Oracle module is required. "
+    #         "'pip install cx_Oracle' should do the trick. "
+    #         "If cx_Oracle is installed, make sure "
+    #         "ORACLE_HOME & LD_LIBRARY_PATH is set"
+    #     )
+    #     module.fail_json(msg=msg)
 
     # Connection details for database
     if service_name is not None:

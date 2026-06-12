@@ -28,6 +28,7 @@ Role to configure the hostsystem for ansible-oracle
   - [disable_selinux](#disable_selinux)
   - [etc_hosts_entries](#etc_hosts_entries)
   - [etc_hosts_ip](#etc_hosts_ip)
+  - [extra_hugepages_per_instance](#extra_hugepages_per_instance)
   - [extrarepos_disabled](#extrarepos_disabled)
   - [extrarepos_enabled](#extrarepos_enabled)
   - [firewall_service](#firewall_service)
@@ -325,6 +326,20 @@ etc_hosts_ip: "{% if 'virtualbox' in ansible_virtualization_type %}{{ ansible_al
   }}{% else %}{{ ansible_default_ipv4.address }}{% endif %}"
 ```
 
+### extra_hugepages_per_instance
+
+According to MOS KB151310's hugepages_settings.sh we've to add 1 page per shm segment.
+Empirically, instances allocate 4 segments each on Linux.
+This overhead is considered when computing `nr_hugepages_memory`
+
+**_Type:_** integer<br />
+
+#### Default value
+
+```YAML
+extra_hugepages_per_instance: 4
+```
+
 ### extrarepos_disabled
 
 List of disabled yum repos during installation for RHEL/OL.
@@ -614,6 +629,8 @@ oracle_packages:
   - elfutils-libelf-devel
   - cpp
   - lsof
+  - compat-openssl11
+  - fontconfig
 ```
 
 ### oracle_packages_sles_multi

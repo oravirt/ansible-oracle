@@ -12,6 +12,10 @@ _oraasm_manage_diskgroups_asmdevice_list: |-
   {%- for disk in ad_loop.disk -%}{{ _oracle_asm_disk_prefix }}{{ disk.asmlabel }}
   {%- if not loop.last -%},{%- endif -%}
   {%- endfor %}
+  {%- elif device_persistence == '' %}
+  {%- for disk in ad_loop.disk -%}{{ disk.device }}
+  {%- if not loop.last -%},{%- endif -%}
+  {%- endfor %}
   {%- endif %}
 
 _oraasm_manage_diskgroups_attr_name: |-

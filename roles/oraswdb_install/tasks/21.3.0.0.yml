@@ -5,7 +5,7 @@
   become: true
   become_user: "{{ oracle_user }}"
   when:
-    - _orasw_meta_primary_node | bool
+    - _orasw_meta_primary_node | bool or _oraswdb_install_home_type=='SI'
     - oracle_home_db not in existing_dbhome.stdout_lines
   tags:
     - oradbinstall
@@ -15,7 +15,7 @@
 - ansible.builtin.debug:  # noqa name[missing] ignore-errors
     var: oradbinstall.stdout_lines
   when:
-    - _orasw_meta_primary_node | bool
+    - _orasw_meta_primary_node | bool or _oraswdb_install_home_type=='SI'
     - oracle_home_db not in existing_dbhome.stdout_lines
     - oradbinstall.changed
   tags:

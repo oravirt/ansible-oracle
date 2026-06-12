@@ -45,12 +45,13 @@ Define umask for pip installation of cx_Oracle
 ### extra_args
 
 Define optional arguments for extra_args during pip installation.
-The variable is used by `user_proxy` and `http_proxy`.
+The variable is used by `use_proxy` and `http_proxy` and
+supports client certificates known from orasw_meta.
 
 #### Default value
 
 ```YAML
-extra_args: _unset_
+extra_args: ''
 ```
 
 ### http_proxy

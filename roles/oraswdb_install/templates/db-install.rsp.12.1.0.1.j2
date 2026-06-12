@@ -168,13 +168,16 @@ oracle.install.db.rac.configurationType=ADMIN_MANAGED
 #
 # Example : oracle.install.db.CLUSTER_NODES=node1,node2
 #------------------------------------------------------------------------------
+{% if _oraswdb_install_home_type == 'SI' %}
+oracle.install.db.CLUSTER_NODES=
+{% else %}
 {% if _oraswgi_meta_configure_cluster %}
 {% if oracle_gi_cluster_type |upper == 'FLEX' %}
 oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup_hub] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% else %}
 oracle.install.db.CLUSTER_NODES={% for host in groups[hostgroup] -%} {{host |regex_replace("^([^.]+)\..*", "\\1")}} {%- if not loop.last -%} , {%- endif -%} {%- endfor %}
 {% endif %}
-{% else %}
+{% andif %}
 {% endif %}
 
 
