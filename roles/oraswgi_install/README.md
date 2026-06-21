@@ -215,6 +215,11 @@ oracle_scan_port: 1521
 
 ### oracle_sw_image_gi
 
+List of version sepcific GI installation images
+
+NOTE: Image files are expected to be found by their `filename` under `oracle_sw_source_local`, or `oracle_sw_source_www` respectively,
+unless a `filesource` dict element provides a full path / complete URL to the image file.
+
 #### Default value
 
 ```YAML
@@ -227,6 +232,18 @@ oracle_sw_image_gi:
   - {filename: linuxamd64_12102_grid_2of2.zip, version: 12.1.0.2, creates: grid/install/.oui}
   - {filename: linuxamd64_12c_grid_1of2.zip, version: 12.1.0.1}
   - {filename: linuxamd64_12c_grid_2of2.zip, version: 12.1.0.1}
+```
+
+#### Example usage
+
+```YAML
+oracle_sw_image_gi:
+  # LINUX.X64_213000_grid_home.zip located under `oracle_sw_source_local`
+  - {filename: LINUX.X64_213000_grid_home.zip, version: 21.3.0.0, creates: 'install/.img.bin'}
+  # LINUX.X64_193000_grid_home.zip located under /mnt/images
+  - {filename: LINUX.X64_193000_grid_home.zip, filesource: /mnt/images/LINUX.X64_193000_grid_home.zip, version: 19.3.0.0, creates: 'install/.img.bin'}
+  # LINUX.X64_180000_grid_home.zip download
+  - {filename: LINUX.X64_180000_grid_home.zip, filesource: https://downloadserver/images?id=180000_grid_home, version: 18.3.0.0, creates: 'install/.img.bin'}
 ```
 
 ### oracle_vip
