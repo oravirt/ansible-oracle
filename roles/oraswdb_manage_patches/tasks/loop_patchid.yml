@@ -81,6 +81,8 @@
     ocm_response_file: "{{ ocm_response_file | default(omit) }}"
     output: verbose
     state: "{{ dhc_opatch.state }}"
+    script_env:
+      LANG: "{{ orasw_meta_forced_lang }}"
   become: true
   become_user: "{{ __opatchauto_patchtype | ternary('root', oracle_user) }}"
   register: _oracle_opatch_res

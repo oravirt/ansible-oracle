@@ -69,6 +69,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [oracle_sw_source_www](#oracle_sw_source_www)
   - [orasw_meta_assert_oracle_databases](#orasw_meta_assert_oracle_databases)
   - [orasw_meta_cluster_hostgroup](#orasw_meta_cluster_hostgroup)
+  - [orasw_meta_forced_lang](#orasw_meta_forced_lang)
   - [proxy_env](#proxy_env)
   - [set_oracle_all_editions_options_state](#set_oracle_all_editions_options_state)
   - [shell_aliases](#shell_aliases)
@@ -987,6 +988,17 @@ Ansible Inventory hostgroup for RAC-Cluster.
 
 ```YAML
 orasw_meta_cluster_hostgroup: ''
+```
+
+### orasw_meta_forced_lang
+
+Certain modules (e.g. oracle_db and oracle_opatch) rely on English language outputs. This causes trouble if system
+has different locale settings. That's why we force the language in script environments.
+
+#### Default value
+
+```YAML
+orasw_meta_forced_lang: en_US.UTF-8
 ```
 
 ### proxy_env
