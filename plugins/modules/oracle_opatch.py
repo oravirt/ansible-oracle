@@ -108,6 +108,11 @@ options:
             Dictionary of environment settings to be passed to run_command
         required: false
         default: {}
+    apply_options:
+        description: >
+            List of options to append to opatch(auto) apply
+        required: false
+        default: []
 notes:
 requirements: [ "os","pwd","distutils.version" ]
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
@@ -305,6 +310,7 @@ def apply_patch(
     stop_processes,
     rolling,
     script_env,
+    apply_options,
     output,
 ):
     '''
@@ -317,8 +323,8 @@ def apply_patch(
         ):
             module.fail_json(msg='Prereq checks failed')
 
+    opoptions = " ".join(apply_options)
     if opatchauto:
-        opoptions = ''
         if major_version < '12.1':
             opatch_cmd = 'opatch auto'
             if offline:
@@ -346,11 +352,12 @@ def apply_patch(
             stop_process(module, oracle_home)
 
         opatch_cmd = 'opatch'
-        command = '%s/OPatch/%s apply %s -oh %s -silent' % (
+        command = '%s/OPatch/%s apply %s -oh %s -silent %s' % (
             oracle_home,
             opatch_cmd,
             patch_base,
             oracle_home,
+            opoptions,
         )
 
     if ocm_response_file is not None and (
@@ -557,6 +564,7 @@ def main():
             hostname=dict(required=False, default='localhost', aliases=['host']),
             port=dict(required=False, type='int', default=1521),
             script_env=dict(required=False, type='dict', default={}),
+            apply_options=dict(required=False, type='list', default=[]),
         ),
     )
 
@@ -577,6 +585,7 @@ def main():
     hostname = module.params["hostname"]
     port = module.params["port"]
     script_env = module.params["script_env"]
+    apply_options = module.params["apply_options"]
 
     if not os.path.exists(oracle_home):
         msg = 'oracle_home: %s doesn\'t exist' % (oracle_home)
@@ -658,6 +667,7 @@ def main():
                 stop_processes,
                 rolling,
                 script_env,
+                apply_options,
                 output,
             ):
                 if patch_version is not None:

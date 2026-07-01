@@ -72,6 +72,7 @@
     ocm_response_file: "{{ ocm_response_file | default(omit) }}"
     output: verbose
     state: "{{ item.0.state }}"
+    apply_options: "{{ item.0.apply_options | default(omit) }}"
   with_subelements:
     - "{{ db_homes_config[dbh.home]['opatchauto'] }}"
     - subpatches
