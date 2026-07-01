@@ -81,6 +81,7 @@
     ocm_response_file: "{{ ocm_response_file | default(omit) }}"
     output: verbose
     state: "{{ dhc_opatch.state }}"
+    apply_options: "{{ dhc_opatch.apply_options | default(omit) }}"
   become: true
   become_user: "{{ __opatchauto_patchtype | ternary('root', oracle_user) }}"
   register: _oracle_opatch_res

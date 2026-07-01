@@ -111,11 +111,15 @@ gi_patches_config:
             - 34139601  # ACFS Release Update 19.16.0.0.220719
             - 34318175  # TOMCAT RELEASE UPDATE 19.0.0.0.0
             - 34133642  # Database Release Update 19.16.0.0.220719
+          apply_options:
+            - "-deleteInactivePatches"
       opatch:
           # Oracle JavaVM Component Release Update (OJVM RU) 19.16.0.0.220719
           stop_processes: true
           state: present
           path: 19.16.0.0.220719/ojvm/p34086870_190000_Linux-x86-64.zip
+          apply_options:
+            - "-force_conflict"
           # Oracle Database 19c Important Recommended One-off Patches (Doc ID 555.1)
 gi_patches: "{{ gi_patches_config['19.16.0.0.220719'] }}"
 ```

@@ -141,7 +141,8 @@ The dictionary holds data for:
 | opatch_minversion | Is needed for patching. Automatically installs a new version of OPatch, when existing version is older then `opatch_minversion` |
 | oracle_home | |
 | oracle_home_name | Mandatory variable, when `readonly_home: true`. Oracle allows only characters, numbers and '_' as value in `oracle_home_name`. Do _not_ use '-' as a value!|
-| opatch | |
+| opatchauto | Bundle patches to be installed/removed using opatchauto |
+| opatch | One-off patches to be installed/removed using opatch |
 | readonly_home | Should `ansible-oracle` install this ORACLE_HOME as readonly home? Do _NOT_ change this attribute for an installed ORACLE_HOME. default value: false|
 | version | The base version for the ORACLE_HOME. Use the version from the official 1st release of Oracle. |
 
@@ -159,6 +160,30 @@ db_homes_config:
     home: db1_base
     version: 19.3.0.0
     edition: EE
+  1931_se2:
+    oracle_home: /u01/app/oracle/product/19.0.0/dbhome_1
+    version: 19.3.0.0
+    edition: SE2
+    opatch_minversion: "12.2.0.1.51"
+    opatchauto:
+      - patchid: 39062956
+        patchversion: 19.31.0.0.260421
+        state: present
+        path: 39062956/39062956/39036936
+        subpatches:
+          - 39034528 # Database
+          - 39039430 # OCW
+          - 39055473 # ACFS
+          - 39107855 # Tomcat
+          - 39107825 # DBWLM
+        apply_options:
+          - "-deleteInactivePatches"
+    opatch:
+      - patchid: 39473469
+        state: present
+        path: 39473469/39473469/39473469
+        apply_options:
+          - "-force_conflict"
 ```
 
 ### db_homes_installed

@@ -57,6 +57,7 @@
     output: verbose
     state: "{{ gip_opatch.0.state }}"
     script_env: "{{ {'TMPDIR': orahost_meta_tmpdir, '_JAVA_OPTIONS': orahost_meta_java_options} }}"
+    apply_options: "{{ gip_opatch.0.apply_options | default(omit) }}"
   become: true
   become_user: "{{ __opatchauto_patchtype | ternary('root', grid_user) }}"
   vars:

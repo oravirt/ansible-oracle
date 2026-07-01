@@ -14,6 +14,7 @@
     ocm_response_file: "{{ _oraswgi_manage_patches_ocm_response_file | default(omit) }}"
     output: verbose
     state: "{{ item.state }}"
+    apply_options: "{{ item.apply_options | default(omit) }}"
   notify: rootscript_postpatch
   vars:
     __opatchauto_patchtype: false  # opatch apply
