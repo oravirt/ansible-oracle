@@ -34,3 +34,7 @@
         state: "{{ gip_opatch.state }}"
       become: true
       become_user: "{{ _grid_install_user }}"
+
+    - name: loop_remove_single_opatch | Flag non opatchauto patches for GI were applied
+      ansible.builtin.set_fact:
+        _oraswgi_manage_patches_oneoff_removed: true

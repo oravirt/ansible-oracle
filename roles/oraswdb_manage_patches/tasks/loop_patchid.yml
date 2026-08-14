@@ -42,14 +42,18 @@
 - name: loop_Patchid | Work on oracle_sw_patches
   ansible.builtin.include_tasks: loop_opatch_apply.yml
   vars:
-    __sw_patches_filename_creates: "{{ osp_loop.creates | default(dhc_opatch.patchid | string) }}"
+    __sw_patches_filename_creates: "{{ osp_loop.creates | default(dhc_opatch.unique_patchid) | default(dhc_opatch.patchid | string) }}"
     __patch_unarchive_dir: "{{ oracle_patch_stage }}/{{ db_version }}/{{ __patch_upisubdir }}/"
     __patch_upisubdir: >-
       {{ osp_loop.unique_patchid is defined
           | ternary(osp_loop.unique_patchid,
                     osp_loop.patchid) }}/
-  with_items:
-    - "{{ oracle_sw_patches | selectattr('patchid', 'equalto', dhc_opatch.patchid) }}"
+  with_items: >-
+    {%- if dhc_opatch.unique_patchid is defined -%}
+    {{ oracle_sw_patches | selectattr('unique_patchid', 'defined') | selectattr('unique_patchid', 'equalto', dhc_opatch.unique_patchid) | default([]) | list -}}
+    {%- else -%}
+    {{ oracle_sw_patches | selectattr('patchid', 'equalto', dhc_opatch.patchid) | default([]) | list -}}
+    {%- endif -%}
   loop_control:
     loop_var: osp_loop
     label: >-
@@ -60,7 +64,7 @@
     - apply_patches_db
     - dhc_opatch.state == 'present'
     - not dbhome_patches.stdout_lines | select('match', osp_loop.patchid | string) | length > 0
-    - osp_loop.unique_patchid | default(0) == dhc_opatch.excludeUPI | default(0)
+    - osp_loop.unique_patchid | default(0) == dhc_opatch.excludeUPI | default(osp_loop.unique_patchid) | default(0)
 
 - name: loop_Patchid | Info
   ansible.builtin.debug:
@@ -87,7 +91,7 @@
   register: _oracle_opatch_res
   vars:
     __patch_localsubdir: >-
-      {{ dhc_opatch.excludeUPI | default(dhc_opatch.patchid) }}/{{ dhc_opatch.patchid | string }}
+      {{ dhc_opatch.excludeUPI | default(dhc_opatch.unique_patchid) | default(dhc_opatch.patchid) }}/{{ dhc_opatch.patchid | string }}
   when:
     - (
         dhc_opatch.state == 'absent'
