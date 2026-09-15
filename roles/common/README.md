@@ -200,30 +200,23 @@ common_packages_el8:
 
 ### common_packages_el9
 
-List of RPMs for RHEL9 or OL9
+List of RPMs for RHEL9 or OL9. Contains required packages for Oracle RDBMS and some optional packages.
 
 #### Default value
 
 ```YAML
 common_packages_el9:
-  - facter
-  - lsof
-  - nc
-  - rlwrap
-  - expect
-  - git
-  - lvm2
-  - xfsprogs
   - autofs
-  - parted
-  - mlocate
-  - python3
-  - python3-pip
   - bind-utils
   - binutils
   - ethtool
+  - expect
+  - facter
+  - fontconfig
+  - git
   - glibc
   - glibc-devel
+  - grubby
   - initscripts
   - ksh
   - libaio
@@ -232,24 +225,32 @@ common_packages_el9:
   - libnsl
   - libstdc++
   - libstdc++-devel
+  - lsof
+  - lvm2
   - make
+  - mlocate
   - module-init-tools
+  - nc
   - net-tools
   - nfs-utils
   - openssh-clients
   - pam
+  - parted
   - policycoreutils
   - policycoreutils-python-utils
   - procps
   - psmisc
+  - python3
+  - python3-pip
+  - rlwrap
   - smartmontools
   - sysstat
   - tar
   - unzip
   - util-linux-ng
+  - xfsprogs
   - xorg-x11-utils
   - xorg-x11-xauth
-  - grubby
 ```
 
 ### common_packages_sles
