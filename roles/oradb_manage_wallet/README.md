@@ -41,7 +41,7 @@ oracle_wallet_config:
     home: 19300_base
     path: /u01/app/oracle/wallet
     state: present
-    dbcredential:
+    dbcredentials:
       - tns_name: db1
         db_name: db1
         db_user: user1
