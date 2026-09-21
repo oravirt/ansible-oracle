@@ -1,0 +1,79 @@
+---
+# get fingerprints for a single cert file
+- name: Get fingerprints for a single cert file
+  when: owc_c.type == 'cert'
+  block:
+    - name: wallet_manage_certificate | Get SHA-1 fingerprint for user certificate
+      community.crypto.x509_certificate_info:
+        path: "{{ owc_c.file }}"
+      delegate_to: localhost
+      register: _user_cert_info
+
+    - name: wallet_manage_certificate | Set fingerprints collection
+      ansible.builtin.set_fact:
+        _fingerprints: "{{ [{'sha': _user_cert_info.fingerprints.sha1 | upper}] }}"
+      delegate_to: localhost
+
+# inspect pfx certificates
+- name: Get fingerprints for pkcs12 certificates
+  when: owc_c.type == 'pkcs12'
+  block:
+    - name: wallet_manage_certificate | Obtain certificates from the PKCS#12 file
+      community.crypto.openssl_pkcs12_info:
+        path: "{{ owc_c.file }}"
+        passphrase: "{{ owc_c.password | default(omit) }}"
+      delegate_to: localhost
+      register: _cert_info
+
+    - name: wallet_manage_certificate | Get SHA-1 fingerprint for user certificate
+      community.crypto.x509_certificate_info:
+        content: "{{ _cert_info.certificate }}"
+      delegate_to: localhost
+      register: _user_cert_info
+
+    - name: wallet_manage_certificate | Set fingerprints collection
+      ansible.builtin.set_fact:
+        _fingerprints: "{{ [{'sha': _user_cert_info.fingerprints.sha1 | upper}] }}"
+      delegate_to: localhost
+
+    - name: Get SHA-1 for each certificate
+      community.crypto.x509_certificate_info:
+        content: "{{ item }}"
+      delegate_to: localhost
+      loop: "{{ _cert_info.other_certificates }}"
+      loop_control:
+        label: "cert {{ loop_index }}"
+        index_var: loop_index
+      register: _other_cert_info
+
+    - name: Add fingerprints
+      ansible.builtin.set_fact:
+        _fingerprints: "{{ _fingerprints + [{'sha': _c.fingerprints.sha1 | upper}] }}"
+      delegate_to: localhost
+      loop: "{{ _other_cert_info.results }}"
+      loop_control:
+        label: "cert {{ loop_index }}"
+        index_var: loop_index
+        loop_var: _c
+
+- name: Collect wallet SHAs
+  ansible.builtin.set_fact:
+    wallet_shas: >-
+      {{
+        (wallet_certs.usercerts | map(attribute='sha') | list)
+        +
+        (wallet_certs.trustedcerts | map(attribute='sha') | list)
+      }}
+
+- name: Find missing certificates
+  ansible.builtin.set_fact:
+    _missing_certs: >-
+      {{
+        _fingerprints
+        | rejectattr('sha', 'in', wallet_shas)
+        | list
+      }}
+
+- name: Check if wallet needs refresh
+  ansible.builtin.set_fact:
+    wallet_refresh_required: "{{ _missing_certs | length > 0 }}"

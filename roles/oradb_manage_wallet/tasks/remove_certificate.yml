@@ -1,0 +1,52 @@
+---
+- name: remove_certificate | Identify wallet certs to remove
+  ansible.builtin.set_fact:
+    certs_to_remove: >-
+      {{
+        (
+          wallet_certs.usercerts
+          | map('combine', {'cert_type': 'user_cert'})
+          | list
+        )
+        +
+        (
+          wallet_certs.trustedcerts
+          | map('combine', {'cert_type': 'trusted_cert'})
+          | list
+        )
+        | selectattr(
+            'sha',
+            'in',
+            _fingerprints | map(attribute='sha') | list
+          )
+        | list
+      }}
+
+- name: remove_certificate | Remove certificates from wallet
+  ansible.builtin.shell:
+    cmd: |
+      set -eu
+      set -o pipefail
+      echo -e "$stdin" | "${ORACLE_HOME}/bin/orapki" \
+                            wallet remove \
+                            -nologo \
+                            -wallet "{{ owc.path }}" \
+                            -dn "{{ item.subject }}" \
+                            -issuer_dn "{{ item.issuer }}" \
+                            -{{ item.cert_type }}
+  become: true
+  become_user: "{{ osc.owner | default(oracle_user) }}"
+  changed: true
+  environment:
+    stdin: "{{ _oradb_manage_wallet_password }}"
+    ORACLE_HOME: "{{ _oracle_home_db }}"
+  loop: "{{ certs_to_remove }}"
+
+- name: remove_certificate | include wallet_certificates_info.yml
+  ansible.builtin.include_tasks:
+    file: wallet_certificates_info.yml
+    apply:
+      tags:
+        - cert
+  when: certs_to_remove | length > 0
+  tags: cert
