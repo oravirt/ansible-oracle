@@ -51,7 +51,7 @@ oracle_wallet_config:
         type: "cert"
         extra_args: "-trusted_cert"
         state: present
-      - file: "/home/assets/certs/oracle/test-server.pfx"
+      - file: "/home/oracle/assets/certs/oracle/test-server.pfx"
         type: "pkcs12"
         password: "secret123"
         state: present
@@ -86,6 +86,8 @@ oracle_wallet_show_password: false
 ## Discovered Tags
 
 **_always_**
+
+**_cert_**
 
 ## Dependencies
 

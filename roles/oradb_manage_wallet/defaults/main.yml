@@ -20,24 +20,20 @@ oracle_wallet_config: []
 #     group: <OS-Group | default(omit)>
 #     mode: <chmod auf path | default(omit)>
 #     state: present/absent
-#     certificates: <optional>
-#       - type: ca
-#         cert: <certificate>
-#         state: present/absent
 #     dbcredentials: <optional>
 #       - tns_name: <tns-alias from
 #         db_name: <db_name for dbpasswords[db_name]>
 #         db_user: <database user>
 #         state: present/absent
 #     certificates:
-#       - file: "/home/oracle/assets/certs/https/mysite.crt"
+#       - file: <path-to-cert-file>
 #         type: "cert"
-#         extra_args: "-trusted_cert"
-#         state: present
-#       - file: "/home/assets/certs/oracle/test-server.pfx"
+#         extra_args: "<additional-orapki-arguments>"
+#         state: present/absent
+#       - file: <path-to-pfx-file>
 #         type: "pkcs12"
-#         password: "secret123"
-#         state: present
+#         password: <pfx_file_password>
+#         state: present/absent
 
 # @end
 #
@@ -51,6 +47,15 @@ oracle_wallet_config: []
 #       - tns_name: db1
 #         db_name: db1
 #         db_user: user1
+#         state: present
+#     certificates:
+#       - file: "/home/oracle/assets/certs/https/mysite.crt"
+#         type: "cert"
+#         extra_args: "-trusted_cert"
+#         state: present
+#       - file: "/home/oracle/assets/certs/oracle/test-server.pfx"
+#         type: "pkcs12"
+#         password: "secret123"
 #         state: present
 # @end
 
