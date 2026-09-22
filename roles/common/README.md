@@ -7,6 +7,7 @@ sets up the host generic stuff
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [common_packages](#common_packages)
+  - [common_packages_el10](#common_packages_el10)
   - [common_packages_el6](#common_packages_el6)
   - [common_packages_el7](#common_packages_el7)
   - [common_packages_el8](#common_packages_el8)
@@ -51,6 +52,73 @@ This is an internal variable only. Do not define it!
 
 ```YAML
 common_packages: _unset_
+```
+
+### common_packages_el10
+
+List of RPMs for RHEL10 or OL10
+
+#### Default value
+
+```YAML
+common_packages_el10:
+  - bc
+  - binutils
+  - elfutils-libelf
+  - fontconfig
+  - glibc
+  - glibc-devel
+  - ksh
+  - libaio
+  - libgcc
+  - libibverbs
+  - libstdc++
+  - libvirt-libs
+  - libxcb
+  - libX11
+  - libXau
+  - libXi
+  - libXrender
+  - libXtst
+  - libxcrypt-compat
+  - make
+  - policycoreutils
+  - policycoreutils-python-utils
+  - smartmontools
+  - sysstat
+  - xz-devel
+  - autofs
+  - bind-utils
+  - ethtool
+  - expect
+  - facter
+  - git
+  - grubby
+  - initscripts
+  - libaio-devel
+  - libnsl
+  - libstdc++-devel
+  - lsof
+  - lvm2
+  - mlocate
+  - module-init-tools
+  - nc
+  - net-tools
+  - nfs-utils
+  - openssh-clients
+  - pam
+  - parted
+  - procps
+  - psmisc
+  - python3
+  - python3-pip
+  - rlwrap
+  - tar
+  - unzip
+  - util-linux-ng
+  - xfsprogs
+  - xorg-x11-utils
+  - xorg-x11-xauth
 ```
 
 ### common_packages_el6
