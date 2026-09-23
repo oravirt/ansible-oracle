@@ -1,0 +1,9 @@
+---
+breaking_changes:
+  - "orahost: firewall_open_listener_ports is now true by default (was false before)"
+  - "orahost: disable_firewall is now false by default (was true before)"
+bugfixes:
+  - "orahost: fixed reload firewalld handler failing with 'dict object' has no attribute 'results' when disable_firewall is false"
+  - "orahost: firewalld is started and enabled again when firewall_open_listener_ports is set and disable_firewall is false (opening ports failed after a previous run with disable_firewall)"
+  - "orahost: opening ports with firewall_open_listener_ports no longer fails when firewalld is stopped by disable_firewall (only permanent config is changed)"
+  - "orahost: firewalld is not started, when its permanent config does not allow the SSH connection of Ansible (check of service ssh, port and zone target; rich rules and source zones are not evaluated)"

@@ -31,7 +31,7 @@ Role to configure the hostsystem for ansible-oracle
   - [extra_hugepages_per_instance](#extra_hugepages_per_instance)
   - [extrarepos_disabled](#extrarepos_disabled)
   - [extrarepos_enabled](#extrarepos_enabled)
-  - [firewall_open_ports](#firewall_open_ports)
+  - [firewall_open_listener_ports](#firewall_open_listener_ports)
   - [firewall_service](#firewall_service)
   - [grid_users](#grid_users)
   - [host_fs_layout](#host_fs_layout)
@@ -265,7 +265,7 @@ Should the Linux firewall be disabled? Only applicable to RHEL/OL at the moment.
 #### Default value
 
 ```YAML
-disable_firewall: true
+disable_firewall: false
 ```
 
 ### disable_numa_boot
@@ -353,14 +353,14 @@ extrarepos_disabled: '[]'
 extrarepos_enabled: "{%- if ansible_distribution == 'OracleLinux' -%}ol{{ ansible_distribution_major_version }}_addons{%- else -%}{%- endif %}"
 ```
 
-### firewall_open_ports
+### firewall_open_listener_ports
 
 Should the Listener ports be opened on the Linux firewall? Only applicable to RHEL/OL at the moment.
 
 #### Default value
 
 ```YAML
-firewall_open_ports: false
+firewall_open_listener_ports: true
 ```
 
 ### firewall_service
