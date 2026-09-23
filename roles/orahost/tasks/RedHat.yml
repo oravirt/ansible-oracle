@@ -27,24 +27,81 @@
 
 - name: Check if firewall is installed
   when:
-    - firewall_open_ports or disable_firewall | bool
+    - firewall_open_listener_ports | bool or disable_firewall | bool
   ansible.builtin.yum:  # noqa fqcn[action-core]
     list: "{{ firewall_service }}"
     disablerepo: "*"
   tags: iptables,firewalld
-  register: firewall  # TODO: Make firewall.results a Boolean before using Ansible 2.19
+  register: firewall
+
+# Starting firewalld activates its permanent config. Do not start it, when this
+# would block new SSH connections of Ansible.
+# Limitation: Rich rules and zones bound to sources are not evaluated.
+- name: Check SSH access before starting firewall
+  when:
+    - firewall_open_listener_ports | bool
+    - not disable_firewall | bool
+    - firewall.results | length > 0
+    - firewall_service == 'firewalld'
+  tags: iptables,firewalld
+  block:
+    # SSH_CONNECTION is removed by sudo => become: false
+    - name: Get SSH connection of Ansible
+      ansible.builtin.command: printenv SSH_CONNECTION
+      become: false
+      changed_when: false
+      failed_when: false
+      register: firewall_ssh_connection
+
+    # see files/firewall_check_ssh.sh for details
+    - name: Check SSH in permanent firewall config
+      when:
+        - firewall_ssh_connection.stdout | length > 0
+      ansible.builtin.script: >-
+        firewall_check_ssh.sh
+        {{ (firewall_ssh_connection.stdout.split())[2] }}
+        {{ (firewall_ssh_connection.stdout.split())[3] }}
+      changed_when: false
+      failed_when: false
+      register: firewall_ssh_check
+
+    - name: Assert SSH is allowed in permanent firewall config
+      when:
+        - firewall_ssh_check.rc is defined
+      ansible.builtin.assert:
+        that:
+          - firewall_ssh_check.rc == 0
+        fail_msg: >-
+          Starting {{ firewall_service }} would block new SSH connections of Ansible
+          ({{ firewall_ssh_check.stdout_lines | join(', ') }}).
+          Allow SSH in the permanent firewall config or set disable_firewall: true.
+        quiet: true
+
+# A firewall stopped by disable_firewall in a previous run must be running again
+# before ports can be opened immediately.
+- name: Enable firewall
+  when:
+    - firewall_open_listener_ports | bool
+    - not disable_firewall | bool
+    - firewall.results | length > 0
+  ansible.builtin.service:
+    name: "{{ firewall_service }}"
+    state: started
+    enabled: true
+  tags: iptables,firewalld
 
 - name: Open Listener ports on firewall
   when:
-    - firewall_open_ports
-    - firewall.results
+    - firewall_open_listener_ports | bool
+    - firewall.results | length > 0
     - oracle_install_option_gi not in ("CRS_CONFIG") or oracle_install_option_gi == ""
     # - not disable_firewall  # ATM: Open ports in spite of disable_firewall
   ansible.posix.firewalld:
     port: "{{ item }}/tcp"
     permanent: true
     state: enabled
-    immediate: true
+    # firewalld is stopped when disable_firewall is set => only change permanent config
+    immediate: "{{ not disable_firewall | bool }}"
   # Iterate through all configured listener ports.
   loop: >-
     {{
@@ -72,15 +129,16 @@
 
 - name: Open Listener ports on firewall (CRS)
   when:
-    - firewall_open_ports
-    - firewall.results
+    - firewall_open_listener_ports | bool
+    - firewall.results | length > 0
     - oracle_install_option_gi == "CRS_CONFIG"
     # - not disable_firewall # ATM: Open ports in spite of disable_firewall
   ansible.posix.firewalld:
     port: "{{ item }}/tcp"
     permanent: true
     state: enabled
-    immediate: true
+    # firewalld is stopped when disable_firewall is set => only change permanent config
+    immediate: "{{ not disable_firewall | bool }}"
   # Iterate through all configured listener ports.
   loop: >-
     {{
@@ -112,13 +170,6 @@
   when:
     - disable_firewall | bool
   block:
-    - name: Check if firewall is installed
-      ansible.builtin.yum:  # noqa fqcn[action-core]
-        list: "{{ firewall_service }}"
-        disablerepo: "*"
-      tags: iptables,firewalld
-      register: firewall
-
     - name: Disable firewall
       ansible.builtin.service:
         name: "{{ firewall_service }}"

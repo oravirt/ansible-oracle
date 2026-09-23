@@ -50,6 +50,10 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<Default of oracle_sw_copy and oracle_sw_unpack with install_from_nfs>>
 |`install_from_nfs: true` *and* `oracle_sw_copy` or `oracle_sw_unpack` are not set in inventory
 |Set `oracle_sw_copy: true` and `oracle_sw_unpack: true` to keep the old behavior or test the installation directly from NFS
+
+|<<Firewall enabled by default on RHEL/OL>>
+|Target hosts with RHEL/OL *and* `firewalld` is installed *and* `disable_firewall` is not set in inventory
+|Check the permanent `firewalld` config before the upgrade, or set `disable_firewall: true` and `firewall_open_listener_ports: false` to keep the old behavior
 |===
 
 ==== Minimum ansible-core 2.16
@@ -276,6 +280,70 @@ Keep the behavior of 4.x:
 install_from_nfs: true
 oracle_sw_copy: true
 oracle_sw_unpack: true
+----
+
+==== Firewall enabled by default on RHEL/OL
+
+Until 4.x the role `orahost` stopped and disabled `firewalld` on RHEL/OL by default (`disable_firewall: true`).
+As of 5.0.0 `firewalld` stays active and the role opens the ports of the Oracle listeners:
+
+[cols="2,2,3",options="header"]
+|===
+|Variable |4.x |5.0.0
+
+|`disable_firewall`
+|`true`
+|`false`
+
+|`firewall_open_listener_ports`
+|- (not available)
+|`true` (new)
+|===
+
+The change applies only to RHEL/OL target hosts with installed `firewalld`.
+SUSE is not changed.
+
+What `orahost` does with the new defaults:
+
+. Checks, if the permanent `firewalld` config allows the SSH connection of Ansible (service `ssh`, port and target of the zone).
+  The play fails, when starting `firewalld` would block SSH.
+  Rich rules and zones bound to sources are not evaluated by this check.
+. Starts and enables `firewalld`.
+. Opens the following TCP ports in the permanent and the running config:
+** all ports from `address` in `oracle_listeners_config` with a `host` (IPC addresses are ignored, `listener_port` is used for addresses without `port`),
+** all ports from the new variable `oracle_extra_firewall_ports`,
+** `oracle_scan_port` with `oracle_install_option_gi: CRS_CONFIG`.
+
+Other ports are not opened automatically, e.g. EM Express (5500), ORDS/APEX or the Enterprise Manager agent.
+Add them to `oracle_extra_firewall_ports`:
+
+[source,yaml]
+----
+oracle_extra_firewall_ports:
+  - 5500  # EM Express
+----
+
+WARNING: Oracle RAC needs unrestricted network traffic on the private interconnect.
+Allow the interconnect in `firewalld` (for example with a trusted zone for the interconnect interfaces) or set `disable_firewall: true` on the cluster nodes.
+
+Combinations of both variables:
+
+[cols="1,1,4",options="header"]
+|===
+|`disable_firewall` |`firewall_open_listener_ports` |Result
+
+|`false` |`true` |Default in 5.0.0: `firewalld` is started and enabled, ports are opened immediately and permanently
+|`true` |`false` |Behavior of 4.x: `firewalld` is stopped and disabled
+|`true` |`true` |`firewalld` is stopped and disabled, ports are only added to the permanent config (prepared for a later start)
+|`false` |`false` |`firewalld` is not changed by `orahost`
+|===
+
+Keep the behavior of 4.x:
+
+[source,yaml]
+----
+disable_firewall: true
+firewall_open_listener_ports: false
 ----
 
 === Adding new breaking changes

@@ -12,4 +12,6 @@
   ansible.builtin.systemd:
     name: firewalld
     state: reloaded
-  when: firewall.results and not disable_firewall | bool
+  when:
+    - firewall.results | default([]) | length > 0
+    - not disable_firewall | bool
