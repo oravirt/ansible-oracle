@@ -9,6 +9,8 @@
       opitzconsulting.ansible_oracle.oracle_opatch:
         oracle_home: "{{ oracle_home_db }}"
         state: opatchversion
+        script_env:
+          LANG: "{{ orasw_meta_forced_lang }}"
       register: current_opatch_version
       tags: current_opatch_version
       when: db_homes_config[dbh.home]['opatch_minversion'] is defined

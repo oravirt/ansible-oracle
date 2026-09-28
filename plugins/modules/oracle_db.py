@@ -271,6 +271,11 @@ options:
         required: false
         type: str
         default: 1521
+    script_env:
+        description: >
+            Dictionary of environment settings to be passed to run_command
+        required: false
+        default: {}
 
 
 notes:
@@ -354,9 +359,9 @@ else:
     cx_oracle_exists = True
 
 
-def get_version(module, oracle_home):
+def get_version(module, oracle_home, script_env):
     command = '%s/bin/sqlplus -V' % (oracle_home)
-    (rc, stdout, stderr) = module.run_command(command)
+    (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
         module.fail_json(msg=msg, changed=False)
@@ -366,7 +371,7 @@ def get_version(module, oracle_home):
 
 
 # Check if the database exists
-def check_db_exists(module, oracle_home, db_name, sid, db_unique_name):
+def check_db_exists(module, oracle_home, db_name, sid, db_unique_name, script_env):
     global msg
 
     if sid is None:
@@ -378,7 +383,7 @@ def check_db_exists(module, oracle_home, db_name, sid, db_unique_name):
             checkdb = db_name
 
         command = "%s/bin/srvctl config database -d %s " % (oracle_home, checkdb)
-        (rc, stdout, stderr) = module.run_command(command)
+        (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
         if rc != 0:
             if 'PRCD-1229' in stdout:
                 # DB created, with different ORACLE_HOME
@@ -695,6 +700,7 @@ def ensure_db_state(
     default_tablespace,
     default_temp_tablespace,
     timezone,
+    script_env,
 ):
     cursor = getconn(module)
     global israc
@@ -819,6 +825,7 @@ def ensure_db_state(
                     instance_name,
                     israc,
                     change_restart_sql,
+                    script_env,
                 )
         else:
             if len(change_restart_sql) > 0:
@@ -832,6 +839,7 @@ def ensure_db_state(
                     instance_name,
                     israc,
                     change_restart_sql,
+                    script_env,
                 )
 
             if len(change_db_sql) > 0:
@@ -886,16 +894,25 @@ def apply_restart_changes(
     instance_name,
     israc,
     change_restart_sql,
+    script_env,
 ):
     open_mode = stop_db(module, oracle_home, db_name, db_unique_name, sid)
     start_instance(
-        module, oracle_home, db_name, db_unique_name, sid, 'mount', israc, instance_name
+        module,
+        oracle_home,
+        db_name,
+        db_unique_name,
+        sid,
+        script_env,
+        'mount',
+        israc,
+        instance_name,
     )
     cursor = getconn(module)
     for sql in change_restart_sql:
         execute_sql(module, cursor, sql)
     stop_db(module, oracle_home, db_name, db_unique_name, sid)
-    start_db(module, oracle_home, db_name, db_unique_name, sid, open_mode)
+    start_db(module, oracle_home, db_name, db_unique_name, sid, script_env, open_mode)
 
 
 def apply_norestart_changes(module, change_db_sql):
@@ -1022,13 +1039,23 @@ def stop_db(module, oracle_home, db_name, db_unique_name, sid):
             return open_mode[0][0]
 
 
-def start_db(module, oracle_home, db_name, db_unique_name, sid, open_mode=None):
+def start_db(
+    module, oracle_home, db_name, db_unique_name, sid, script_env, open_mode=None
+):
     # global debug
     # debug.append('start_db called with open_mode %s,
     #              calling start_instance' % \
     #              (open_mode or "None"))
     return start_instance(
-        module, oracle_home, db_name, db_unique_name, sid, open_mode, False, ''
+        module,
+        oracle_home,
+        db_name,
+        db_unique_name,
+        sid,
+        script_env,
+        open_mode,
+        False,
+        '',
     )
 
 
@@ -1038,6 +1065,7 @@ def start_instance(
     db_name,
     db_unique_name,
     sid,
+    script_env,
     open_mode=None,
     israc=False,
     instance_name='',
@@ -1058,7 +1086,7 @@ def start_instance(
         else:
             command = '%s/bin/srvctl status database -d %s ' % (oracle_home, db_name)
 
-        (rc, stdout, stderr) = module.run_command(command)
+        (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
         if rc != 0:
             msg = 'Error(start_instance) - STDOUT: %s, STDERR: %s, COMMAND: %s' % (
                 stdout,
@@ -1091,7 +1119,9 @@ def start_instance(
                     )
             if open_mode is not None:
                 command += ' -o %s ' % (open_mode)
-            (rc, stdout, stderr) = module.run_command(command)
+            (rc, stdout, stderr) = module.run_command(
+                command, environ_update=script_env
+            )
 
             # To allow the DB to register with the listener,
             # as following tasks may want to connect to it immediately and fail
@@ -1287,6 +1317,7 @@ def main():
             hostname            = dict(required=False, default = 'localhost', aliases = ['host']), # noqa E231
             port                = dict(required=False, default = 1521), # noqa E231
             omf                 = dict(required=False, type='bool', default=False), # noqa E231
+            script_env          = dict(required=False, type='dict', default={}), # noqa E231
         ),
         mutually_exclusive=[['memory_percentage', 'memory_totalmb']],
     )
@@ -1333,6 +1364,7 @@ def main():
     hostname            = module.params["hostname"] # noqa E221
     port                = module.params["port"] # noqa E221
     omf                 = module.params["omf"] # noqa E221
+    script_env          = module.params["script_env"] # noqa E221
     # fmt: on
 
     # ld_library_path = '%s/lib' % (oracle_home)
@@ -1380,7 +1412,7 @@ def main():
         service_name = "%s.%s" % (service_name, domain)
 
     # Get the Oracle version
-    major_version = get_version(module, oracle_home)
+    major_version = get_version(module, oracle_home, script_env)
 
     if state == 'started' or state == 'restarted':
         msg = "oracle_home: %s db_name: %s sid: %s db_unique_name: %s" % (
@@ -1391,7 +1423,9 @@ def main():
         )
         spf_restart_needed = False
 
-        if not check_db_exists(module, oracle_home, db_name, sid, db_unique_name):
+        if not check_db_exists(
+            module, oracle_home, db_name, sid, db_unique_name, script_env
+        ):
             msg = "Database not found. %s" % msg
             module.fail_json(msg=msg, changed=False)
 
@@ -1411,11 +1445,17 @@ def main():
                     open_mode = None
 
                 start_db_state = start_db(
-                    module, oracle_home, db_name, db_unique_name, sid, open_mode
+                    module,
+                    oracle_home,
+                    db_name,
+                    db_unique_name,
+                    sid,
+                    script_env,
+                    open_mode,
                 )
             else:
                 start_db_state = start_db(
-                    module, oracle_home, db_name, db_unique_name, sid
+                    module, oracle_home, db_name, db_unique_name, sid, script_env
                 )
 
             if start_db_state == 'changed' and not spf_restart_needed:
@@ -1440,7 +1480,9 @@ def main():
                 module.fail_json(msg=msg, changed=False)
 
     elif state == 'present':
-        if not check_db_exists(module, oracle_home, db_name, sid, db_unique_name):
+        if not check_db_exists(
+            module, oracle_home, db_name, sid, db_unique_name, script_env
+        ):
             if create_db(
                 module,
                 oracle_home,
@@ -1486,6 +1528,7 @@ def main():
                     default_tablespace,
                     default_temp_tablespace,
                     timezone,
+                    script_env,
                 )
 
             else:
@@ -1505,12 +1548,15 @@ def main():
                 default_tablespace,
                 default_temp_tablespace,
                 timezone,
+                script_env,
             )
             # msg = 'Database %s already exists' % (db_name)
             # module.exit_json(msg=msg, changed=False)
 
     elif state == 'absent':
-        if check_db_exists(module, oracle_home, db_name, sid, db_unique_name):
+        if check_db_exists(
+            module, oracle_home, db_name, sid, db_unique_name, script_env
+        ):
             if remove_db(
                 module, oracle_home, db_name, sid, db_unique_name, sys_password
             ):

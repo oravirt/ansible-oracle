@@ -78,6 +78,11 @@ options:
             The listener port to connect to the database
         required: false
         default: 1521
+    script_env:
+        description: >
+            Dictionary of environment settings to be passed to run_command
+        required: false
+        default: {}
 author: Mikael Sandström, oravirt@gmail.com, @oravirt
 '''
 
@@ -92,9 +97,9 @@ EXAMPLES = '''
 #     cx_oracle_exists = True
 
 
-def get_version(module, msg, oracle_home):
+def get_version(module, msg, oracle_home, script_env):
     command = '%s/bin/sqlplus -V' % (oracle_home)
-    (rc, stdout, stderr) = module.run_command(command)
+    (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
         module.fail_json(msg=msg, changed=False)
@@ -183,7 +188,7 @@ def check_db_exists(module, msg, oracle_home, db_name, sid, db_unique_name):
                             return True
 
 
-def run_datapatch(module, msg, hostname, oracle_home, db_name, sid):
+def run_datapatch(module, msg, hostname, oracle_home, db_name, sid, script_env):
     if major_version > '11.2':
         if sid is not None:
             os.environ['ORACLE_SID'] = sid
@@ -191,7 +196,7 @@ def run_datapatch(module, msg, hostname, oracle_home, db_name, sid):
             os.environ['ORACLE_SID'] = db_name
 
         command = '%s/OPatch/datapatch -verbose' % (oracle_home)
-        (rc, stdout, stderr) = module.run_command(command)
+        (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
         if rc != 0:
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (
                 stdout,
@@ -339,6 +344,7 @@ def main():
             hostname=dict(required=False, default='localhost', aliases=['host']),
             service_name=dict(required=False, aliases=['sn']),
             port=dict(required=False, default=1521),
+            script_env=dict(required=False, type='dict', default={}),
         ),
     )
 
@@ -353,6 +359,7 @@ def main():
     hostname = module.params["hostname"]
     service_name = module.params["service_name"]
     port = module.params["port"]
+    script_env = module.params["script_env"]
 
     # ld_library_path = '%s/lib' % (oracle_home)
     if oracle_home is not None:
@@ -397,9 +404,9 @@ def main():
     else:
         service_name = db_name
     # Get the Oracle version
-    major_version = get_version(module, msg, oracle_home)
+    major_version = get_version(module, msg, oracle_home, script_env)
     if check_db_exists(module, msg, oracle_home, db_name, sid, db_unique_name):
-        if run_datapatch(module, msg, hostname, oracle_home, db_name, sid):
+        if run_datapatch(module, msg, hostname, oracle_home, db_name, sid, script_env):
             msg = 'Datapatch run successfully for database: %s' % (db_name)
             module.exit_json(msg=msg, changed=True)
         else:
