@@ -26,6 +26,17 @@
   tags: os_packages, oscheck
   notify: Reboot concerning package updates
 
+- name: Install extra packages
+  community.general.zypper:
+    name: "{{ extra_packages | default('') }}"
+    state: installed
+  when:
+    - install_os_packages | default(false)
+    - ansible_os_family == 'Suse'
+    - extra_packages is defined
+  tags: os_packages, oscheck
+  notify: Reboot concerning package updates
+
 - name: Install packages required by Oracle for ASMlib on SLES
   community.general.zypper:
     name: "{{ oracle_asm_packages_sles }}"
