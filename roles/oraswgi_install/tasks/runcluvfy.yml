@@ -4,7 +4,7 @@
   # => unzip was executed on 1st node only.
   # => hopefully the setup is the same on all nodes...
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
   tags: runcluvfy
   block:
 
@@ -42,7 +42,7 @@
       environment: "{{ oracle_script_env }}"
       when:
         - _oraswgi_meta_configure_cluster
-        - _orasw_meta_primary_node | bool
+        - orasw_meta_primary_node | bool
         - not gi_ignoreprereq | bool
 
     - name: runcluvfy | Execute cluvfy for Oracle Restart

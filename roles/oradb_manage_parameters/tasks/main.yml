@@ -20,7 +20,7 @@
     - flags:
       skip_missing: true
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_databases is defined
     - odb.0.state == 'present'
     - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
@@ -63,7 +63,7 @@
     - flags:
       skip_missing: true
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_pdbs is defined
     - opdb.0.state == 'present'
     - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
@@ -103,7 +103,7 @@
     - "{{ oracle_databases }}"
     - ""  # dummy to force odb.0 instead of item.
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - odb.0.restart_spparameter_changed | default(true)
     - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
     - restart_spparameter_changed
