@@ -9,12 +9,14 @@
       vars:
         _key_owner_home: "{{ oracle_user_home }}"
         _key_owner: "{{ oracle_user }}"
+        _key_group: "{{ oracle_group }}"
 
     - name: SSH-Keys for {{ _grid_install_user }}
       ansible.builtin.include_tasks: loop_osuser.yml
       vars:
         _key_owner_home: "{{ grid_user_home }}"
         _key_owner: "{{ _grid_install_user }}"
+        _key_group: "{{ oracle_group }}"
       when:
         - role_separation | bool
         - oracle_user != _grid_install_user
