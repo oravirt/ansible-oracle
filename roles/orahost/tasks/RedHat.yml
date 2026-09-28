@@ -37,6 +37,7 @@
 - name: Open Listener ports on firewall
   when:
     - firewall_open_ports
+    - oracle_install_option_gi not in ('CRS_CONFIG')
     # - not disable_firewall # ATM: Open ports in spite of disable_firewall
   ansible.posix.firewalld:
     port: "{{ item }}/tcp"
@@ -65,6 +66,32 @@
   # list — materializes the result
   # + (oracle_extra_firewall_ports | default([])) — adds the items of oracle_extra_firewall_ports to the list
   # unique — deduplicates (in case two listeners share a port)
+  tags: iptables,firewalld
+  notify: reload firewalld
+
+- name: Open Listener ports on firewall (CRS)
+  when:
+    - firewall_open_ports
+    - oracle_install_option_gi in ('CRS_CONFIG')
+    # - not disable_firewall # ATM: Open ports in spite of disable_firewall
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  # Iterate through all configured listener ports.
+  loop: >-
+    {{
+      (
+        oracle_listeners_config.values()
+        | selectattr('address', 'defined')
+        | map(attribute='address')
+        | flatten
+        | selectattr('host', 'defined')
+        | map(attribute='port', default=listener_port)
+        | list + (oracle_extra_firewall_ports | default([])) + (oracle_scan_port | default([]))
+      ) | unique
+    }}
   tags: iptables,firewalld
   notify: reload firewalld
 
