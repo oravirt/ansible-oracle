@@ -7,6 +7,7 @@ Manage Cluster Verification Utility from Oracle
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [oracluvfy_archive](#oracluvfy_archive)
+  - [oracluvfy_archive_filesource](#oracluvfy_archive_filesource)
   - [oracluvfy_force_update](#oracluvfy_force_update)
   - [oracluvfy_home](#oracluvfy_home)
 - [Discovered Tags](#discovered-tags)
@@ -30,6 +31,18 @@ ZIP Archive used by the role.
 
 ```YAML
 oracluvfy_archive: cvupack_linux_ol7_x86_64.zip
+```
+
+### oracluvfy_archive_filesource
+
+If `oracluvfy_archive` ist not placed under `oracle_sw_source_local` / `oracle_sw_source_www`,
+path can be forced using `oracluvfy_archive_filesource` instead.
+`oracluvfy_archive_filesource` must be the full path/URL, including the filename.
+
+#### Example usage
+
+```YAML
+oracluvfy_archive_filesource: /full/path/to/cvupack_linux_ol7_x86_64.zip
 ```
 
 ### oracluvfy_force_update

@@ -31,7 +31,7 @@
   block:
     - name: db_opatch | Copy oracle opatch to server (www)
       ansible.builtin.get_url:
-        url: "{{ oracle_sw_source_www }}/{{ oop_loop.filename }}"
+        url: "{{ oop_loop.filesource | default(oracle_sw_source_www + '/' + oop_loop.filename, true) }}"
         dest: "{{ oracle_stage }}"
         mode: "0644"
         owner: "{{ oracle_user }}"
@@ -54,13 +54,17 @@
 
     - name: db_opatch | Copy oracle opatch to server (local)
       ansible.builtin.copy:
-        src: "{{ oracle_sw_source_local }}/{{ item.filename }}"
+        src: "{{ oop_loop.filesource | default(oracle_sw_source_local + '/' + oop_loop.filename, true) }}"
         dest: "{{ oracle_stage }}"
         mode: "0644"
         owner: "{{ oracle_user }}"
         group: "{{ oracle_group }}"
         force: true
       with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', db_version) }}"
+      loop_control:
+        loop_var: oop_loop
+        label: >-
+          filename: {{ oop_loop.filename | default('') }}
       when:
         - oracle_sw_copy
         - is_sw_source_local

@@ -1,8 +1,8 @@
 # oradb_manage_wallet
 
-Manage Wallets for Oracle with `mkstore`.
+Manage Wallets for Oracle with `mkstore` and `orapki`.
 
-Multiple wallets with different locations are possivle.
+Multiple wallets with different locations are possible.
 Define a password for the wallet in `oracle_wallet_password`.
 
 ## Table of content
@@ -41,10 +41,19 @@ oracle_wallet_config:
     home: 19300_base
     path: /u01/app/oracle/wallet
     state: present
-    dbcredential:
+    dbcredentials:
       - tns_name: db1
         db_name: db1
         db_user: user1
+        state: present
+    certificates:
+      - file: "/home/oracle/assets/certs/https/mysite.crt"
+        type: "cert"
+        extra_args: "-trusted_cert"
+        state: present
+      - file: "/home/oracle/assets/certs/oracle/test-server.pfx"
+        type: "pkcs12"
+        password: "secret123"
         state: present
 ```
 
@@ -77,6 +86,8 @@ oracle_wallet_show_password: false
 ## Discovered Tags
 
 **_always_**
+
+**_cert_**
 
 ## Dependencies
 
