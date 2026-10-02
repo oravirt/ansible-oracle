@@ -32,13 +32,14 @@
     list: "{{ firewall_service }}"
     disablerepo: "*"
   tags: iptables,firewalld
-  register: firewall
+  register: firewall  # TODO: Make firewall.results a Boolean before using Ansible 2.19
 
 - name: Open Listener ports on firewall
   when:
     - firewall_open_ports
-    - oracle_install_option_gi not in ('CRS_CONFIG')
-    # - not disable_firewall # ATM: Open ports in spite of disable_firewall
+    - firewall.results
+    - oracle_install_option_gi not in ("CRS_CONFIG") or oracle_install_option_gi == ""
+    # - not disable_firewall  # ATM: Open ports in spite of disable_firewall
   ansible.posix.firewalld:
     port: "{{ item }}/tcp"
     permanent: true
@@ -72,7 +73,8 @@
 - name: Open Listener ports on firewall (CRS)
   when:
     - firewall_open_ports
-    - oracle_install_option_gi in ('CRS_CONFIG')
+    - firewall.results
+    - oracle_install_option_gi == "CRS_CONFIG"
     # - not disable_firewall # ATM: Open ports in spite of disable_firewall
   ansible.posix.firewalld:
     port: "{{ item }}/tcp"
