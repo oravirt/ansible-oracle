@@ -31,6 +31,7 @@ Role to configure the hostsystem for ansible-oracle
   - [extra_hugepages_per_instance](#extra_hugepages_per_instance)
   - [extrarepos_disabled](#extrarepos_disabled)
   - [extrarepos_enabled](#extrarepos_enabled)
+  - [firewall_open_ports](#firewall_open_ports)
   - [firewall_service](#firewall_service)
   - [grid_users](#grid_users)
   - [host_fs_layout](#host_fs_layout)
@@ -43,6 +44,7 @@ Role to configure the hostsystem for ansible-oracle
   - [old_ssh_config](#old_ssh_config)
   - [oracle_asm_packages](#oracle_asm_packages)
   - [oracle_asm_packages_sles](#oracle_asm_packages_sles)
+  - [oracle_extra_firewall_ports](#oracle_extra_firewall_ports)
   - [oracle_groups](#oracle_groups)
   - [oracle_hugepages](#oracle_hugepages)
   - [oracle_hugepages_sysctl_file](#oracle_hugepages_sysctl_file)
@@ -266,6 +268,8 @@ configure_ssh: false
 
 ### disable_firewall
 
+Should the Linux firewall be disabled? Only applicable to RHEL/OL at the moment.
+
 #### Default value
 
 ```YAML
@@ -357,6 +361,16 @@ extrarepos_disabled: '[]'
 ```YAML
 extrarepos_enabled: "{%- if ansible_distribution == 'OracleLinux' -%}ol{{ ansible_distribution_major_version
   }}_addons{%- else -%}{%- endif %}"
+```
+
+### firewall_open_ports
+
+Should the Listener ports be opened on the Linux firewall? Only applicable to RHEL/OL at the moment.
+
+#### Default value
+
+```YAML
+firewall_open_ports: false
 ```
 
 ### firewall_service
@@ -502,6 +516,23 @@ oracle_asm_packages_sles:
   - oracleasm-kmp-default
   - oracleasm-kmp-xen
   - '{{ asmlib_rpm_sles }}'
+```
+
+### oracle_extra_firewall_ports
+
+Define additional ports to open on the OS firewall.
+
+#### Default value
+
+```YAML
+oracle_extra_firewall_ports: '[]'
+```
+
+#### Example usage
+
+```YAML
+oracle_extra_firewall_ports:
+  - 5500 # EM Express
 ```
 
 ### oracle_groups
@@ -871,6 +902,8 @@ transparent_hugepage_disable_by_grub: false
 **_hostfs_**
 
 **_hugepages_**
+
+**_iptables,firewalld_**
 
 **_molecule-idempotence-notest_**
 
