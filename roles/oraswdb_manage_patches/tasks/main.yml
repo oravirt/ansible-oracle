@@ -45,6 +45,21 @@
     - apply_patches_db
     - item.apply_patches | default(false)
 
+# opatchauto precheck runs on all cluster nodes in {{ oracle_tmp_stage }}, although patching only one
+- name: db_opatch | Ensure stage temp directory is present at all nodes when patching a cluster
+  when:
+    - orasw_meta_cluster_hostgroup is defined
+  ansible.builtin.file:
+    path: "{{ oracle_tmp_stage }}"
+    state: directory
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: "0775"
+  delegate_to: "{{ _oraswgi_manage_patches_cluster_host }}"
+  loop: "{{ groups[orasw_meta_cluster_hostgroup] }}"
+  loop_control:
+    loop_var: _oraswgi_manage_patches_cluster_host
+
 - name: Include loop_db-home-patch.yml
   ansible.builtin.include_tasks: loop_db-home-patch.yml
   with_items:
