@@ -1,0 +1,93 @@
+---
+- name: autoupgrade | Assert
+  ansible.builtin.include_tasks: assert.yml
+  tags:
+    - assert
+    - always
+
+- name: autoupgrade | Download latest version into software repository
+  become: false
+  delegate_to: localhost
+  run_once: true
+  when:
+    - autoupgrade_download_latest | bool
+  block:
+    - name: autoupgrade | Assert software repository is local
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - is_sw_source_local
+        fail_msg: >-
+          autoupgrade_download_latest requires is_sw_source_local: true
+
+    - name: autoupgrade | Download latest from {{ autoupgrade_jar_url }}
+      ansible.builtin.get_url:
+        url: "{{ autoupgrade_jar_url }}"
+        dest: "{{ _autoupgrade_jar_source_local }}"
+        mode: "0644"
+        # always check for a newer file. changed only when file differs
+        force: true
+      environment: "{{ proxy_env }}"
+
+- name: autoupgrade | Install
+  become: "{{ _autoupgrade_become }}"
+  become_user: "{{ oracle_user }}"
+  delegate_to: "{{ _autoupgrade_delegate_to }}"
+  run_once: "{{ _autoupgrade_run_local | bool }}"
+  block:
+    - name: autoupgrade | Create directories
+      ansible.builtin.file:
+        path: "{{ aud }}"
+        mode: "0755"
+        state: directory
+      loop:
+        - "{{ _autoupgrade_home }}"
+        - "{{ _autoupgrade_cfg_dir }}"
+        - "{{ autoupgrade_log_dir }}"
+      loop_control:
+        loop_var: aud
+
+    - name: autoupgrade | Copy from controller {{ autoupgrade_jar }}
+      ansible.builtin.copy:
+        src: "{{ _autoupgrade_jar_source_local }}"
+        dest: "{{ _autoupgrade_jar_path }}"
+        mode: "0644"
+        force: "{{ autoupgrade_force_update }}"
+        remote_src: false
+      when:
+        - is_sw_source_local
+        - oracle_sw_copy or _autoupgrade_run_local | bool
+
+    - name: autoupgrade | Download from www {{ autoupgrade_jar }}
+      ansible.builtin.get_url:
+        url: "{{ autoupgrade_jar_filesource | default(oracle_sw_source_www + '/' + autoupgrade_jar, true) }}"
+        dest: "{{ _autoupgrade_jar_path }}"
+        mode: "0644"
+        force: "{{ autoupgrade_force_update }}"
+        client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
+        client_key: "{{ get_url_ssl_client_key | default(omit) }}"
+      environment: "{{ proxy_env }}"
+      when:
+        - not is_sw_source_local
+        - oracle_sw_copy or _autoupgrade_run_local | bool
+
+    - name: autoupgrade | Copy from remote stage {{ autoupgrade_jar }}
+      ansible.builtin.copy:
+        src: "{{ autoupgrade_jar_filesource | default(oracle_stage_remote + '/' + autoupgrade_jar, true) }}"
+        dest: "{{ _autoupgrade_jar_path }}"
+        mode: "0644"
+        force: "{{ autoupgrade_force_update }}"
+        remote_src: true
+      when:
+        - not oracle_sw_copy
+        - not _autoupgrade_run_local | bool
+
+    - name: autoupgrade | Get version
+      ansible.builtin.command: >-
+        {{ _autoupgrade_java }} -jar {{ _autoupgrade_jar_path }} -version
+      register: _autoupgrade_version_res
+      changed_when: false
+
+    - name: autoupgrade | Show version
+      ansible.builtin.debug:
+        var: _autoupgrade_version_res.stdout_lines

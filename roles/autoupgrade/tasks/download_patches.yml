@@ -1,0 +1,123 @@
+---
+- name: autoupgrade | Install AutoUpgrade
+  ansible.builtin.include_tasks: install.yml
+  vars:
+    _autoupgrade_run_local: "{{ autoupgrade_download_run_local | bool }}"
+
+- name: autoupgrade | Manage keystore
+  ansible.builtin.include_tasks: keystore.yml
+  vars:
+    _autoupgrade_run_local: "{{ autoupgrade_download_run_local | bool }}"
+  when:
+    - autoupgrade_keystore_manage | bool
+
+- name: autoupgrade | Download patches
+  become: "{{ _autoupgrade_become }}"
+  become_user: "{{ oracle_user }}"
+  delegate_to: "{{ _autoupgrade_delegate_to }}"
+  run_once: "{{ _autoupgrade_run_local | bool }}"
+  vars:
+    _autoupgrade_run_local: "{{ autoupgrade_download_run_local | bool }}"
+    _autoupgrade_download_cfg: "{{ _autoupgrade_cfg_dir }}/download_patches.cfg"
+  block:
+    - name: autoupgrade | Assert patch list for download
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _autoupgrade_download_list | length > 0
+        fail_msg: >-
+          Nothing to download. Set autoupgrade_download_patches or
+          oracle_sw_patches / db_homes_installed (autoupgrade_download_use_oracle_sw_patches).
+
+    - name: autoupgrade | Show patch list for download
+      ansible.builtin.debug:
+        var: _autoupgrade_download_list
+
+    - name: autoupgrade | Warn about ignored patches from oracle_sw_patches
+      ansible.builtin.debug:
+        msg: >-
+          Ignored from oracle_sw_patches (no database patch for {{ autoupgrade_download_platform }}
+          or release not in {{ autoupgrade_download_supported_releases }}):
+          {{ _autoupgrade_download_skipped | map(attribute='filename') | list }}
+      when:
+        - autoupgrade_download_use_oracle_sw_patches | bool
+        - _autoupgrade_download_skipped | length > 0
+
+    - name: autoupgrade | Create download directory
+      ansible.builtin.file:
+        path: "{{ autoupgrade_download_dir }}"
+        mode: "0755"
+        state: directory
+
+    - name: autoupgrade | Create config file
+      ansible.builtin.template:
+        src: download_patches.cfg.j2
+        dest: "{{ _autoupgrade_download_cfg }}"
+        mode: "0644"
+
+    - name: autoupgrade | Check keystore
+      ansible.builtin.stat:
+        path: "{{ autoupgrade_keystore }}/cwallet.sso"
+      register: _autoupgrade_keystore_stat
+      when:
+        - not autoupgrade_keystore_manage | bool
+
+    - name: autoupgrade | Assert keystore
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _autoupgrade_keystore_stat.stat.exists
+        fail_msg: >-
+          Auto-login keystore {{ autoupgrade_keystore }}/cwallet.sso is missing.
+          Set autoupgrade_keystore_manage: true with mos_username / mos_password,
+          or create the keystore manually.
+      when:
+        - not autoupgrade_keystore_manage | bool
+
+    - name: autoupgrade | Run AutoUpgrade in download mode
+      ansible.builtin.command: >-
+        {{ _autoupgrade_java }} -jar {{ _autoupgrade_jar_path }}
+        -config {{ _autoupgrade_download_cfg }}
+        -patch -mode download
+      environment: "{{ proxy_env }}"
+      register: _autoupgrade_download_res
+      # VALIDATED: patch has been downloaded
+      # LOCATED:   patch already exists in autoupgrade_download_dir
+      changed_when: "'VALIDATED' in _autoupgrade_download_res.stdout"
+
+    # remove progress indicator (backspaces) and empty lines from output
+    # 'File: x.zip | 0%\b\b\b\b/ ... 100%\b\b\b\bVALIDATED' => 'File: x.zip - VALIDATED'
+    - name: autoupgrade | Show result
+      ansible.builtin.debug:
+        msg: >-
+          {{ _autoupgrade_download_res.stdout_lines
+             | map('regex_replace', '^(.*?) [|/\\-] .*\x08([^\x08]*)$', '\1 - \2')
+             | reject('match', '^\s*$')
+             | list }}
+
+    - name: autoupgrade | Warn about unavailable patches
+      ansible.builtin.debug:
+        msg: >-
+          {{ _autoupgrade_download_res.stdout_lines | select('search', 'unavailable') | list }}
+      when:
+        - "'unavailable' in _autoupgrade_download_res.stdout"
+
+    - name: autoupgrade | Check files from oracle_sw_patches
+      ansible.builtin.stat:
+        path: "{{ autoupgrade_download_dir }}/{{ aupf }}"
+        get_checksum: false
+      loop: "{{ _autoupgrade_download_expected }}"
+      loop_control:
+        loop_var: aupf
+      register: _autoupgrade_download_stat
+      when:
+        - autoupgrade_download_use_oracle_sw_patches | bool
+
+    - name: autoupgrade | Warn about missing files from oracle_sw_patches
+      ansible.builtin.debug:
+        msg: >-
+          Missing in {{ autoupgrade_download_dir }}:
+          {{ _autoupgrade_download_stat.results | rejectattr('stat.exists') | map(attribute='aupf') | list }}
+      when:
+        - autoupgrade_download_use_oracle_sw_patches | bool
+        - _autoupgrade_download_stat.results | default([]) | rejectattr('stat.exists') | list | length > 0
