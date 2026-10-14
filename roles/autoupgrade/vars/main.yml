@@ -1,0 +1,116 @@
+---
+# Execution on the Ansible controller (delegate_to localhost, run_once, no become).
+# Only download_patches.yml sets it to autoupgrade_download_run_local for itself
+# and for the included install.yml / keystore.yml (task vars override role vars).
+_autoupgrade_run_local: false
+
+_autoupgrade_home: >-
+  {{ _autoupgrade_run_local | bool | ternary(autoupgrade_local_home, autoupgrade_home) }}
+
+_autoupgrade_jar_path: "{{ _autoupgrade_home }}/{{ autoupgrade_jar }}"
+
+# autoupgrade.jar in software repository on the Ansible controller
+_autoupgrade_jar_source_local: >-
+  {{ autoupgrade_jar_filesource | default(oracle_sw_source_local + '/' + autoupgrade_jar, true) }}
+
+_autoupgrade_cfg_dir: "{{ _autoupgrade_home }}/cfg"
+
+# SHA256 of mos_password, when autoupgrade_keystore_password is empty
+_autoupgrade_keystore_password: >-
+  {{ autoupgrade_keystore_password | default('', true)
+     or (mos_password | default('') | hash('sha256')) }}
+
+_autoupgrade_keystore_cfg: "{{ _autoupgrade_cfg_dir }}/keystore.cfg"
+
+# output from 'list' in the keystore console:
+# valid MOS credentials: 'Credentials Loaded' without 'Connection Fail...'
+_autoupgrade_keystore_loaded_regex: "\\(MOS\\) - Credentials Loaded"
+_autoupgrade_keystore_failed_regex: "\\(MOS\\) - Credentials Loaded - Connection Fail"
+
+_autoupgrade_java_home: >-
+  {{ _autoupgrade_run_local | bool | ternary(autoupgrade_local_java_home, autoupgrade_java_home) }}
+
+_autoupgrade_java: >-
+  {{ (_autoupgrade_java_home | length > 0)
+     | ternary(_autoupgrade_java_home + '/bin/java', 'java') }}
+
+# local execution: delegate to controller, run once, no become
+_autoupgrade_delegate_to: >-
+  {{ _autoupgrade_run_local | bool | ternary('localhost', inventory_hostname) }}
+
+_autoupgrade_become: "{{ not (_autoupgrade_run_local | bool) }}"
+
+# oracle_sw_patches usable for AutoUpgrade: database patches for the platform
+# (e.g. p36582781_190000_Linux-x86-64.zip) with a supported release in 'version'.
+# APEX (Generic), cvupack etc. are not usable.
+_autoupgrade_download_sw_patches: >-
+  {{ oracle_sw_patches | default([])
+     | selectattr('version', 'defined')
+     | selectattr('filename', 'defined')
+     | selectattr('filename', 'match', autoupgrade_download_filename_regex)
+     | selectattr('version', 'match', '(' + (autoupgrade_download_supported_releases | map('string') | join('|')) + ')\.')
+     | list }}
+
+# oracle_sw_patches entries not usable for AutoUpgrade
+_autoupgrade_download_skipped: >-
+  {{ oracle_sw_patches | default([])
+     | rejectattr('filename', 'in', _autoupgrade_download_sw_patches | map(attribute='filename') | list)
+     | list }}
+
+# Releases from oracle_sw_patches, db_homes_installed and GI (same sources as orasw_download_patches)
+_autoupgrade_download_all_versions: >-
+  {%- set ns = namespace(v=[]) -%}
+  {%- for p in _autoupgrade_download_sw_patches -%}
+  {%-   set ns.v = ns.v + [p.version | string] -%}
+  {%- endfor -%}
+  {%- for h in db_homes_installed | default([]) -%}
+  {%-   if db_homes_config[h.home]['version'] is defined -%}
+  {%-     set ns.v = ns.v + [db_homes_config[h.home]['version'] | string] -%}
+  {%-   endif -%}
+  {%- endfor -%}
+  {%- if oracle_install_option_gi | default('') in ('CRS_CONFIG', 'HA_CONFIG')
+        and oracle_install_version_gi is defined -%}
+  {%-   set ns.v = ns.v + [oracle_install_version_gi | string] -%}
+  {%- endif -%}
+  {{ ns.v | unique }}
+
+_autoupgrade_download_releases: >-
+  {{ _autoupgrade_download_all_versions
+     | map('split', '.') | map('first') | map('int')
+     | select('in', autoupgrade_download_supported_releases | map('int') | list)
+     | unique | sort }}
+
+# AutoUpgrade does not accept RU/OJVM by patch number => keywords are used:
+#   autoupgrade_patch attribute in oracle_sw_patches (explicit, e.g. 'RU:19.24', 'DPBP')
+#   ru_version (e.g. 19.24.0.0.240716) => RU:19.24
+#   description with 'OJVM'            => OJVM
+#   others                             => patchid (one-off)
+_autoupgrade_download_derived: >-
+  {%- set ns = namespace(res=[]) -%}
+  {%- for r in _autoupgrade_download_releases -%}
+  {%-   set ns.tok = ['OPATCH'] -%}
+  {%-   for p in _autoupgrade_download_sw_patches | selectattr('version', 'match', r | string + '\.') -%}
+  {%-     set desc = p.description | default('') | string -%}
+  {%-     if p.autoupgrade_patch is defined -%}
+  {%-       set t = p.autoupgrade_patch | string -%}
+  {%-     elif p.ru_version is defined -%}
+  {%-       set t = 'RU:' + (p.ru_version | string).split('.')[0:2] | join('.') -%}
+  {%-     elif desc is search('OJVM', ignorecase=true) -%}
+  {%-       set t = 'OJVM' -%}
+  {%-     else -%}
+  {%-       set t = p.patchid | string -%}
+  {%-     endif -%}
+  {%-     set ns.tok = ns.tok + [t] -%}
+  {%-   endfor -%}
+  {%-   set ns.res = ns.res + [{'target_version': r, 'patch': ns.tok | unique | join(',')}] -%}
+  {%- endfor -%}
+  {{ ns.res }}
+
+# effective list for the AutoUpgrade config file
+_autoupgrade_download_list: >-
+  {{ autoupgrade_download_patches
+     + (autoupgrade_download_use_oracle_sw_patches | bool | ternary(_autoupgrade_download_derived, [])) }}
+
+# expected files from oracle_sw_patches after download
+_autoupgrade_download_expected: >-
+  {{ _autoupgrade_download_sw_patches | map(attribute='filename') | unique | list }}

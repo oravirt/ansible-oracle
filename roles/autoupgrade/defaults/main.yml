@@ -1,0 +1,239 @@
+---
+# @var autoupgrade_download_run_local:description: >
+# Execute the download of patches (`download_patches.yml`) on the Ansible controller.
+# This includes the keystore (`keystore.yml`) and the installation of AutoUpgrade
+# needed for the download.
+#
+# `true`: Tasks are delegated to `localhost` with `run_once` and without `become`.
+# `autoupgrade_local_home` is used instead of `autoupgrade_home`.
+#
+# `false`: The download is executed on the target host as `oracle_user`.
+#
+# All other task files (e.g. `install.yml`) are always executed on the target host.
+#
+# _Important_
+#
+# With `true` the download is executed only once (`run_once`) with the variables
+# of the first host in the play (`oracle_sw_patches`, `db_homes_installed`, `db_homes_config`,
+# `oracle_install_version_gi`, `autoupgrade_download_patches`).
+# These variables must be the same for all hosts in the play - e.g. defined in `group_vars/all`
+# for the whole environment.
+# When they are defined per host, limit the playbook to one host (`--limit <host>`)
+# or execute it for each host.
+# @end
+autoupgrade_download_run_local: true
+
+# @var autoupgrade_home:description: >
+# Directory for `autoupgrade.jar` and the generated AutoUpgrade config files
+# on the target host.
+# @end
+autoupgrade_home: "{{ oracle_base }}/product/autoupgrade"
+
+# @var autoupgrade_local_home:description: >
+# Directory for `autoupgrade.jar` and the generated AutoUpgrade config files
+# on the Ansible controller (`autoupgrade_download_run_local: true`).
+# @end
+autoupgrade_local_home: "{{ lookup('ansible.builtin.env', 'HOME') }}/autoupgrade"
+
+# @var autoupgrade_jar:description: >
+# Filename of AutoUpgrade.
+# The file is expected under `oracle_sw_source_local` / `oracle_sw_source_www`.
+#
+# On the Ansible controller the file is always taken from `oracle_sw_source_local`
+# (`is_sw_source_local: true`) or `oracle_sw_source_www` - `oracle_sw_copy` is ignored.
+# @end
+autoupgrade_jar: autoupgrade.jar
+
+# @var autoupgrade_jar_filesource:description: >
+# If `autoupgrade_jar` is not placed under `oracle_sw_source_local` / `oracle_sw_source_www`,
+# path can be forced using `autoupgrade_jar_filesource` instead.
+# `autoupgrade_jar_filesource` must be the full path/URL, including the filename.
+# @end
+# @var autoupgrade_jar_filesource:example: >
+# autoupgrade_jar_filesource: /orasw/autoupgrade/autoupgrade.jar
+# @end
+
+# @var autoupgrade_download_latest:description: >
+# Download the latest `autoupgrade.jar` from `autoupgrade_jar_url` into the software
+# repository on the Ansible controller before the installation.
+#
+# Target is `autoupgrade_jar_filesource` or `oracle_sw_source_local`/`autoupgrade_jar`.
+# The download is done once (`run_once`) on `localhost` without `become`.
+# Requires `is_sw_source_local: true`.
+#
+# Existing installations are only replaced with `autoupgrade_force_update: true`.
+# @end
+autoupgrade_download_latest: false
+
+# @var autoupgrade_jar_url:description: >
+# URL for the latest version of AutoUpgrade (used by `autoupgrade_download_latest`).
+# @end
+autoupgrade_jar_url: https://download.oracle.com/otn-pub/otn_software/autoupgrade.jar
+
+# @var autoupgrade_force_update:description: >
+# Update an existing `autoupgrade.jar` in the AutoUpgrade home.
+#
+# `false`: An existing file is never replaced.
+#
+# `true`: The file is replaced, when it differs from the file in the software repository.
+# @end
+autoupgrade_force_update: false
+
+# @var autoupgrade_java_home:description: >
+# JAVA_HOME used for AutoUpgrade on the target host.
+# `java` from `PATH` is used, when `autoupgrade_java_home` is empty.
+# @end
+# @var autoupgrade_java_home:example: >
+# autoupgrade_java_home: /u01/app/oracle/product/19/db1/jdk
+# @end
+autoupgrade_java_home: ""
+
+# @var autoupgrade_local_java_home:description: >
+# JAVA_HOME used for AutoUpgrade on the Ansible controller (`autoupgrade_download_run_local: true`).
+# `java` from `PATH` is used, when `autoupgrade_local_java_home` is empty.
+# @end
+autoupgrade_local_java_home: ""
+
+# @var autoupgrade_log_dir:description: >
+# Value for `global.global_log_dir` in the AutoUpgrade config files.
+# @end
+autoupgrade_log_dir: >-
+  {{ _autoupgrade_run_local | bool
+     | ternary(_autoupgrade_home + '/log', oracle_base + '/cfgtoollogs/autoupgrade') }}
+
+# @var autoupgrade_keystore:description: >
+# Value for `global.keystore` in the AutoUpgrade config files.
+#
+# The keystore holds the My Oracle Support credentials (`mos_username`, `mos_password`)
+# and is managed by `keystore.yml` (included by `download_patches.yml`).
+# @end
+autoupgrade_keystore: "{{ _autoupgrade_home }}/keystore"
+
+# @var autoupgrade_keystore_manage:description: >
+# Create/update the keystore with `mos_username` / `mos_password` in `download_patches.yml`.
+#
+# `false`: The keystore must exist. It is not changed by the role.
+#
+# Requires the Python module `pexpect` on the host executing AutoUpgrade.
+# @end
+autoupgrade_keystore_manage: true
+
+# @var autoupgrade_keystore_password:description: >
+# Password for the AutoUpgrade keystore. At least 16 characters are required.
+#
+# When `autoupgrade_keystore_password` is empty, the SHA256 hash of `mos_password` is used.
+# When `mos_password` is changed, the keystore cannot be opened for changes anymore.
+# The keystore is then removed and created again with the new credentials.
+# The same happens, when `autoupgrade_keystore_password` is changed.
+# @end
+autoupgrade_keystore_password: ""
+
+# @var autoupgrade_keystore_no_log:description: >
+# Hide the output of tasks with passwords for the keystore console.
+# Set to `false` for debugging only!
+# @end
+autoupgrade_keystore_no_log: true
+
+# @var autoupgrade_keystore_recreate:description: >
+# Remove and create the keystore in each execution.
+# @end
+autoupgrade_keystore_recreate: false
+
+# @var autoupgrade_keystore_fail_on_invalid_credentials:description: >
+# Fail, when the credentials in the keystore cannot login into My Oracle Support.
+# @end
+autoupgrade_keystore_fail_on_invalid_credentials: true
+
+# @var autoupgrade_keystore_timeout:description: >
+# Timeout in seconds for each prompt of the keystore console.
+# The console connects to My Oracle Support for checking the credentials.
+# @end
+autoupgrade_keystore_timeout: 300
+
+# @var autoupgrade_download_dir:description: >
+# Value for `global.download_folder`. Downloaded patches are placed here.
+# @end
+autoupgrade_download_dir: "{{ oracle_sw_source_local }}"
+
+# @var autoupgrade_download_patches:description: >
+# List of patches to download with `download_patches.yml`.
+# Each element creates a `patch<n>` section in the AutoUpgrade config file.
+#
+# | Attribute | Description |
+# | --- | --- |
+# | target_version | mandatory: release, e.g. `19`, `23` |
+# | patch | mandatory: e.g. `RECOMMENDED` or `RU,OPATCH,OJVM,DPBP` or `RU:19.28,OPATCH` |
+# | platform | optional: default `autoupgrade_download_platform` |
+# | gold_image | optional: `NO`, `AUTO`, `YES`, `ALL` - default `autoupgrade_download_gold_image` |
+# @end
+# @var autoupgrade_download_patches:example: >
+# autoupgrade_download_patches:
+#   - target_version: 19
+#     patch: RU,OPATCH,OJVM,DPBP
+#   - target_version: 23
+#     patch: RECOMMENDED
+#     platform: LINUX.X64
+#   - target_version: 19
+#     patch: RU,OPATCH,OJVM,DPBP
+#     gold_image: "NO"
+# @end
+autoupgrade_download_patches: []
+
+# @var autoupgrade_download_use_oracle_sw_patches:description: >
+# Use the same variables as role `orasw_download_patches` for the download:
+#
+# - `oracle_sw_patches`: each entry is added to the AutoUpgrade patch list
+#   of the release from `version` (e.g. `19.3.0.0` -> `target_version=19`).
+#   AutoUpgrade does not accept Release Updates by patch number. The keyword is derived:
+#
+#   | Entry in `oracle_sw_patches` | AutoUpgrade |
+#   | --- | --- |
+#   | attribute `autoupgrade_patch` | value, e.g. `RU:19.24`, `OJVM`, `DPBP` |
+#   | attribute `ru_version` (Release Update), e.g. `19.24.0.0.240716` | `RU:19.24` |
+#   | `description` contains `OJVM` | `OJVM` |
+#   | others | `patchid` (one-off) |
+# - `db_homes_installed` / `db_homes_config` and `oracle_install_version_gi`
+#   (`oracle_install_option_gi`: `CRS_CONFIG` or `HA_CONFIG`):
+#   `OPATCH` is downloaded for each release
+#
+# The result is added to `autoupgrade_download_patches`.
+#
+# See `autoupgrade_download_run_local` for multiple hosts in the play.
+# Only entries from `oracle_sw_patches` are used, where `filename` matches
+# `autoupgrade_download_filename_regex` and the release from `version` is in
+# `autoupgrade_download_supported_releases`. Others (e.g. APEX, cvupack) are ignored with a warning.
+#
+# The My Oracle Support credentials (`mos_username` / `mos_password`) are read
+# by AutoUpgrade from the keystore `autoupgrade_keystore`.
+# @end
+autoupgrade_download_use_oracle_sw_patches: true
+
+# @var autoupgrade_download_supported_releases:description: >
+# Releases supported by AutoUpgrade for downloading patches.
+# @end
+autoupgrade_download_supported_releases: [19, 21, 23, 26]
+
+# @var autoupgrade_download_filename_regex:description: >
+# Regex for `filename` in `oracle_sw_patches`.
+# Only matching entries are downloaded by AutoUpgrade (database patches for `autoupgrade_download_platform`).
+# @end
+autoupgrade_download_filename_regex: "^p[0-9]+_[0-9A-Za-z]+_Linux-x86-64\\.zip$"
+
+# @var autoupgrade_download_platform:description: >
+# Default platform for the download, when `platform` is not set in `autoupgrade_download_patches`.
+# @end
+autoupgrade_download_platform: LINUX.X64
+
+# @var autoupgrade_download_gold_image:description: >
+# Value for `patch<n>.gold_image` in the AutoUpgrade config file for all patch sections.
+# Can be overwritten with attribute `gold_image` in `autoupgrade_download_patches`.
+#
+# `NO`: no gold image is downloaded.
+# `AUTO`, `YES`, `ALL`: see Oracle documentation for AutoUpgrade.
+#
+# Empty: parameter is not written and the default from AutoUpgrade (`AUTO`) is used.
+# @end
+# @var autoupgrade_download_gold_image:example: >
+# autoupgrade_download_gold_image: "NO"
+# @end
+autoupgrade_download_gold_image: ""
