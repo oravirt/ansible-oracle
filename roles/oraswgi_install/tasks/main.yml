@@ -27,7 +27,7 @@
   ansible.builtin.debug:
     msg:
       - "GI/Restart installed? {{ olrloc.stat.exists }}"
-      - "Clusternode primary?  {{ _orasw_meta_primary_node }}"
+      - "Clusternode primary?  {{ orasw_meta_primary_node }}"
 
 - name: install_home_gi | Assert inventory
   when:
@@ -96,7 +96,7 @@
   register: crsctl
   when:
     - oracle_home_gi not in checkgiinstall.stdout
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
 
 - ansible.builtin.debug:  # noqa name[missing]
     var: crsctl.stdout_lines
@@ -104,7 +104,7 @@
     - crsctl
   when:
     - oracle_home_gi not in checkgiinstall.stdout
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
 
 - name: install_home_gi | Update Nodelist, set CRS=TRUE
   ansible.builtin.shell: "{{ oracle_home_gi }}/oui/bin/runInstaller -updateNodeList ORACLE_HOME={{ oracle_home_gi }} CRS=TRUE"
@@ -113,7 +113,7 @@
   become_user: "{{ _grid_install_user }}"
   when:
     - oracle_home_gi not in checkgiinstall.stdout
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
   ignore_errors: true
   tags:
     - updatenodelist
@@ -127,7 +127,7 @@
     - glogingi
   when:
     - oracle_home_gi not in checkgiinstall.stdout
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
 
 - name: install_home_gi | Add additional info to glogin.sql (2)
   ansible.builtin.lineinfile:
@@ -138,7 +138,7 @@
     - glogingi
   when:
     - oracle_home_gi not in checkgiinstall.stdout
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
 
 - name: install_home_gi | ansible.builtin.include_role oraswgi_manage_patches
   ansible.builtin.include_role:
@@ -146,7 +146,7 @@
   when:
     - not patch_before_rootsh
     - apply_patches_gi
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
 
 - name: install_home_gi | Check opatch lsinventory (GI)
   ansible.builtin.shell: "{{ oracle_home_gi }}/OPatch/opatch lspatches"
@@ -160,7 +160,7 @@
     - opatchls
   when:
     - oracle_home_gi not in checkgiinstall.stdout
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
 
 - name: install_home_gi | Check opatch lsinventory (GI)
   ansible.builtin.debug:
@@ -169,7 +169,7 @@
     - opatchls
   when:
     - oracle_home_gi not in checkgiinstall.stdout
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
 
 # disable 12c stuff
 # => not tested anymore and usually needed in version specified scripts.

@@ -40,7 +40,7 @@
   tags:
     - responsefilegi
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
     - item.diskgroup == oracle_asm_init_dg
 
@@ -52,14 +52,14 @@
   tags:
     - oragridinstall
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
   register: giinstall
 
 - ansible.builtin.debug:  # noqa name[missing]
     var: giinstall.stdout_lines
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
 
 - ansible.builtin.include_role:
@@ -82,14 +82,14 @@
   tags:
     - runroot
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
   register: rootmaster
 
 - ansible.builtin.debug:  # noqa name[missing]
     var: rootmaster.stdout_lines
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Run root script after installation (Other Nodes)
@@ -101,7 +101,7 @@
     - runroot
   # when: not master_node and oracle_home_gi not in checkgiinstall.stdout and inventory_hostname == item.1
   when:
-    - not _orasw_meta_primary_node | bool
+    - not orasw_meta_primary_node | bool
     - inventory_hostname == item.1
     - oracle_home_gi not in checkgiinstall.stdout
   register: rootother
@@ -110,7 +110,7 @@
     var: rootother.stdout_lines
   when:
     - _oraswgi_meta_configure_cluster
-    - not _orasw_meta_primary_node | bool
+    - not orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
   ignore_errors: true
 
@@ -125,7 +125,7 @@
   tags:
     - responsefileconfigtool
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - run_configtoolallcommand
     - oracle_home_gi not in checkgiinstall.stdout
 
@@ -137,7 +137,7 @@
   tags:
     - runconfigtool
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - run_configtoolallcommand
     - oracle_home_gi not in checkgiinstall.stdout
   ignore_errors: true

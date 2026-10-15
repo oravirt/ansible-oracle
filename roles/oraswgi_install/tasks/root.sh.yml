@@ -2,7 +2,7 @@
 - ansible.builtin.debug:  # noqa name[missing]
     msg: "root.sh | Start Run root script after installation (Master Node)"
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
 
 - name: root.sh | Run root script after installation (Master Node)
   ansible.builtin.command: "{{ oracle_home_gi }}/root.sh"
@@ -10,7 +10,7 @@
   become: true
   register: rootmaster
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
   tags:
     - runroot
 
@@ -19,7 +19,7 @@
     var: rootmaster.stdout_lines
   when:
     - rootmaster.stdout_lines is defined
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
 
 - name: root.sh | Info
   ansible.builtin.debug:
@@ -38,7 +38,7 @@
     - runroot
   when:
     - _oraswgi_meta_configure_cluster
-    - not _orasw_meta_primary_node | bool
+    - not orasw_meta_primary_node | bool
     - inventory_hostname in groups[orasw_meta_cluster_hostgroup]
   register: rootother
 
