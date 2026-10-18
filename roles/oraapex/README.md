@@ -7,7 +7,7 @@ A lot of changes are planned during development at the moment.
 Limitations:
 
 - Oracle RDBMS 19c+ - older versions may work but not tested anymore.
-- Installation in nonCDB or single PDB only - no CDB installation at the moment
+- Installation in PDB only - no CDB or nonCDB installation at the moment
 - RAC not tested yet.
 
 Documentation: https://github.com/oravirt/ansible-oracle/blob/master/doc/guides/apex_ords.adoc
