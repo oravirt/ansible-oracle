@@ -108,7 +108,7 @@ oraords_oracle_home: >-
 
 ```YAML
 oraords_ords_bin: >-
-  /usr/local/bin
+  /opt/oracle/ords/bin
 ```
 
 ### oraords_ords_config
