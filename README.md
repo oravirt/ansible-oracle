@@ -22,8 +22,9 @@
 ### Next Steps
 
 1. [APEX and ORDS in `ansible-oracle`](doc/guides/apex_ords.adoc)
-2. [How to develop in ansible-oracle](doc/development.adoc)
-3. [List of roles in ansible-oracle](doc/roles.adoc)
+2. [Oracle AutoUpgrade in `ansible-oracle`](doc/guides/autoupgrade.adoc)
+3. [How to develop in ansible-oracle](doc/development.adoc)
+4. [List of roles in ansible-oracle](doc/roles.adoc)
 
 
 ## Pre-requisites

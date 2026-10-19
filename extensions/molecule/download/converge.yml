@@ -4,18 +4,68 @@
   gather_facts: true
   any_errors_fatal: true
   vars:
-    mos_login: "{{ lookup('ansible.builtin.env', 'MOS_LOGIN', default=Undefined) }}"
-    mos_password: "{{ lookup('ansible.builtin.env', 'MOS_PASSWORD', default=Undefined) }}"
+    # mos_login / mos_password / mos_username: shared_config/inventory/group_vars/all/mos.yml
+    # use autoupgrade.jar from /vagrant inside the container
+    # => no copy from the Ansible controller
+    oracle_sw_copy: false
+    # Java for AutoUpgrade (same package as oraords_java_rpm)
+    autoupgrade_java_rpm: java-21-openjdk
+    # /vagrant is a mount from the host (e.g. WSL /mnt/d) owned by another uid
+    # => chmod as oracle_user is not permitted there. Download into the container.
+    autoupgrade_download_dir: /u01/stage
   tasks:
     # - debug: var=oracle_sw_patches
     - name: Assert credentials
       ansible.builtin.assert:
         quiet: true
         that:
-          - mos_login is defined
-          - mos_password is defined
-        fail_msg: "Set MOS_LOGIN and MOS_PASSWORD in shell environment and restart converge again."
+          - mos_login | length > 0
+          - mos_password | length > 0
+        fail_msg: >-
+          Set MOS_LOGIN and MOS_PASSWORD in shell environment or in extensions/.env.yml
+          and restart converge again.
 
-    - name: "Import orasw_download_patches"
+    # This scenario is a container of its own without the OS roles
+    # => prepare Java, oracle_user and oracle_base for AutoUpgrade.
+    # On database servers this is done by playbook os and Java comes from ORACLE_HOME/jdk.
+    - name: Install Java for AutoUpgrade
+      ansible.builtin.package:
+        name: "{{ autoupgrade_java_rpm }}"
+
+    # keystore.yml uses ansible.builtin.expect => needs pexpect on the target host
+    - name: Install pexpect for AutoUpgrade keystore
+      ansible.builtin.package:
+        name: python3-pexpect
+
+    - name: Create group oinstall
+      ansible.builtin.group:
+        name: "{{ oracle_group }}"
+        gid: 54321
+
+    - name: Create oracle_user
+      ansible.builtin.user:
+        name: "{{ oracle_user }}"
+        uid: 54321
+        group: "{{ oracle_group }}"
+
+    - name: Create oracle_base and download directory
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        owner: "{{ oracle_user }}"
+        group: "{{ oracle_group }}"
+        mode: "{{ item.mode }}"
+        state: directory
+      loop:
+        - {path: "{{ oracle_base }}", mode: "0775"}
+        # same mode as 'Create download directory' in download_patches.yml
+        - {path: "{{ autoupgrade_download_dir }}", mode: "0755"}
+
+    - name: Install autoupgrade.jar
       ansible.builtin.import_role:
-        name: opitzconsulting.ansible_oracle.orasw_download_patches
+        name: opitzconsulting.ansible_oracle.autoupgrade
+        tasks_from: install.yml
+
+    - name: Download patches
+      ansible.builtin.import_role:
+        name: opitzconsulting.ansible_oracle.autoupgrade
+        tasks_from: download_patches.yml
