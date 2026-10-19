@@ -221,6 +221,38 @@ The following szenarios are existing in the `ansible-oracle profect.
 | golden | Create Golden-Image for installation from dbfs.
 |=======================
 
+=== Directory for installation media and patches
+
+The scenarios `dbfs`, `dbfs-ol9`, `download` and `golden` mount a local directory as `/vagrant` into the container.
+The local directory must be defined by `MOLECULE_SW_DIR`, there is no default. The path inside the container is always `/vagrant`.
+
+.Set the directory as environment variable
+----
+export MOLECULE_SW_DIR=/mnt/d/ORACLE/sw/linux64
+----
+
+.or permanently in `extensions/.env.yml` (ignored by git)
+----
+MOLECULE_SW_DIR: /mnt/d/ORACLE/sw/linux64
+----
+
+=== Taskfile
+
+`extensions/Taskfile.yml` wraps the molecule commands. The scenario is selected with `S=` (default: `default`).
+
+----
+cd extensions
+task --list
+task pull                      # pull container images before the 1st run
+task converge S=dbfs-ol9
+task converge S=dbfs-ol9 -- -vv  # arguments after -- are passed to molecule
+task login S=default H=ol9
+task destroy S=dbfs-ol9
+task collection                # reinstall collection after role changes
+----
+
+The tasks are also available from the repository root as `task molecule:<task>`.
+
 === Test OS roles
 
 IMPORTANT: This szenario is used, when changes at OS roles should be tested against different OS Distribuitions. +
@@ -245,6 +277,16 @@ IMPORTANT: Make sure that /vagrant has enough free space for installation media 
 export MOS_LOGIN=Username
 export MOS_PASSWORD=verySecret
 ----
+
+.or store them in `extensions/.env.yml` (ignored by git)
+----
+MOS_LOGIN: Username
+MOS_PASSWORD: 'verySecret'
+----
+
+Environment variables have precedence over `extensions/.env.yml`.
+Quote the password with `'` when it contains special characters like `:`, `#` or `"`.
+Restrict the access to the file with `chmod 600 extensions/.env.yml`.
 
 .Start download
 ----

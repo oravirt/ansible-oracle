@@ -19,22 +19,22 @@ oracle_stage: /u01/stage
 oraswdb_golden_image_create: true
 golden_image_dest: /u01/golden
 
-apply_patches_db: true
+apply_patches_db: false
 
 oracle_sw_patches:
   - filename: cvupack_linux_ol7_x86_64.zip
     patchid: 30839369
     version: 21.0.0.0
     description: Latest cluvfy
-  - filename: p36695709_2410_Generic.zip
-    patchid: 36695709
-    version: 24.1
-    description: PSE BUNDLE FOR APEX 24.1
-    opatch_needed: false
-  - filename: p36582781_190000_Linux-x86-64.zip
-    patchid: 36582781
+  # - filename: p36695709_2410_Generic.zip
+  #   patchid: 36695709
+  #   version: 24.1
+  #   description: PSE BUNDLE FOR APEX 24.1
+  #   opatch_needed: false
+  - filename: p39472050_190000_Linux-x86-64.zip
+    patchid: 39472050
     version: 19.3.0.0
-    description: Database Release Update 19.24.0.0.240716
+    description: Database Release Update 19.32.0.0.260721
 
 # Important!
 # The converge.yml disables the installation of patches.
@@ -50,14 +50,14 @@ db_homes_config:
     version: 19.3.0.0
     oracle_home: /u01/app/oracle/product/19/db19-si-ee
     edition: EE
-    opatch_minversion: 12.2.0.1.36
-    # imagename: db_home_19_ol9.21.zip
+    opatch_minversion: 12.2.0.1.52  # minimum for RU 19.32 (39472050)
+    imagename: db_home_19.19.zip
     opatch:
       # - {patchid: 29213893, state: absent, excludeUPI: 25224952, stop_processes: true}  # 19.3
       # - {patchid: 29213893, state: absent, excludeUPI: 24722761, stop_processes: true}  # 19.15
-      - patchid: 36582781
-        # Database Release Update 19.24.0.0.240716
-        patchversion: 19.24.0.0.240716
+      - patchid: 39472050
+        # Database Release Update 19.32.0.0.260721
+        patchversion: 19.32.0.0.260721
         stop_processes: true
         state: present
 
