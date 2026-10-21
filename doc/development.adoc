@@ -164,6 +164,46 @@ pip3 install antsibull-changelog
 
 Changelogs for Collections: https://github.com/ansible-community/antsibull-changelog/blob/main/docs/changelogs.rst#releasing-a-new-version-of-a-collection
 
+=== Add PR references to fragments
+
+Each entry in a fragment should end with a reference to its Pull-Request, e.g. `(oravirt#599)`.
+`tools/release/fix_fragments.py` adds missing references to all fragments in `changelogs/fragments`.
+
+The Pull-Request is determined from the last commit of the fragment file via the GitHub API.
+If this commit is not part of a Pull-Request (e.g. not pushed yet), older commits of the fragment are used.
+The reference is appended to every entry that does not end with it, even if the entry already references an issue.
+
+----
+# show what would be changed
+tools/release/fix_fragments.py --dry-run
+
+# update the fragments
+tools/release/fix_fragments.py
+----
+
+Single fragments can be checked with `-f` / `--fragment`, e.g. by a developer after the Pull-Request for a new fragment has been created.
+The parameter accepts a path or a filename from `changelogs/fragments` and can be repeated.
+With `--dry-run` the script returns exit code 1 if the fragment needs to be updated.
+
+----
+# check a single fragment
+tools/release/fix_fragments.py --dry-run -f blanks-in-gi-responsefile.yml
+
+# update a single fragment
+tools/release/fix_fragments.py -f changelogs/fragments/blanks-in-gi-responsefile.yml
+----
+
+NOTE: The Pull-Request must exist on GitHub, otherwise the fragment is reported as `no pull request found`.
+
+Fragments without a Pull-Request and entries that cannot be updated automatically (e.g. broken quoting) are reported and must be fixed manually.
+The script returns exit code 1 in this case.
+
+Without `--fragment` all fragments in `changelogs/fragments` are processed.
+
+NOTE: Set `GITHUB_TOKEN` to avoid the rate limit of 60 unauthenticated GitHub API requests per hour.
+
+This must be done before `antsibull-changelog release`, because the release removes the fragments.
+
 === Creating new releases
 
 `antsibull-changelog release` reads `galaxy.yml` to get the release version automatically.
