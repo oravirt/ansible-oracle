@@ -77,9 +77,10 @@ _local_oracle_sw_absolute_image_db: >-
         | selectattr('version', 'equalto', db_homes_config[dbh.home]['version'])
         | list)[0]['filesource']
       ) }}
+# ORACLE_HOME without database (e.g. dedicated listener home or before a home switch) => SI
 _oraswdb_install_home_type: >-
-  {{ ((oracle_databases | default([]))
+  {{ (oracle_databases | default([]))
       | selectattr('home','equalto',dbh.home)
       | selectattr('state','equalto','present')
       | map(attribute='oracle_db_type',default='SI')
-      | unique)[0] }}
+      | unique | first | default('SI') }}
