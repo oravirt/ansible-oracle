@@ -7,6 +7,7 @@ Install Oracle Database Software
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [autostartup_service](#autostartup_service)
+  - [autostartup_service_dependency](#autostartup_service_dependency)
   - [configure_oracle_profile](#configure_oracle_profile)
   - [glogin_default_cdb](#glogin_default_cdb)
   - [glogin_default_nocdb](#glogin_default_nocdb)
@@ -44,6 +45,18 @@ switches between on/off for an option.
 
 ```YAML
 autostartup_service: false
+```
+
+### autostartup_service_dependency
+
+Configure autostartup service to require and be started after this service.
+
+Only used when autostartup_service is true.
+
+#### Default value
+
+```YAML
+autostartup_service_dependency: network.target
 ```
 
 ### configure_oracle_profile
