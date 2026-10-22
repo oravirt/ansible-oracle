@@ -1028,7 +1028,7 @@ def start_db(module, oracle_home, db_name, db_unique_name, sid, open_mode=None):
     #              calling start_instance' % \
     #              (open_mode or "None"))
     return start_instance(
-        module, oracle_home, db_name, db_unique_name, sid, open_mode, is_cluster, sid 
+        module, oracle_home, db_name, db_unique_name, sid, open_mode, is_cluster, sid
     )
 
 
