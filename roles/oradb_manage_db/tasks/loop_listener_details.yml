@@ -28,6 +28,61 @@
         marker: "# {mark} Ansible managed for  {{ lsnrinst.listener_name }}"
         block: "{{ lookup('template', 'listener_details.j2') }}"
 
+    # Out-of-Place Patching: the listener is running from a different ORACLE_HOME
+    # => stop the listener with lsnrctl from the old ORACLE_HOME
+    #    lsnrctl finds the listener.ora in the old ORACLE_HOME (Read-Write)
+    #    or ORACLE_BASE_HOME (Read-Only) by itself.
+    # => the listener is started from the new ORACLE_HOME in the next task
+    - name: listener | Switch ORACLE_HOME of listener
+      when:
+        - oracle_install_option_gi == ''
+      tags:
+        - molecule-idempotence-notest
+      block:
+        - name: listener | Read ORACLE_HOME from running listener
+          ansible.builtin.shell: |
+            set -eu
+            # args: <ORACLE_HOME>/bin/tnslsnr <listener_name> -inherit
+            # -i: listener names are case-insensitive
+            if pid=$(pgrep -i -f "^[^ ]*/bin/tnslsnr ${LSNR_NAME}( .*)?$") ; then
+              # /proc/<pid>/exe => <ORACLE_HOME>/bin/tnslsnr
+              exe=$(readlink "/proc/${pid}/exe")
+              echo "${exe%/bin/tnslsnr*}"
+            fi
+          environment:
+            LSNR_NAME: "{{ lsnrinst.listener_name }}"
+          register: _oradb_manage_db_listener_running
+          changed_when: false
+
+        # The old ORACLE_HOME could be removed already, while the listener is still running
+        # (/proc/<pid>/exe => '<ORACLE_HOME>/bin/tnslsnr (deleted)')
+        # => lsnrctl is not available: terminate the tnslsnr process instead
+        - name: listener | Stop listener from old ORACLE_HOME
+          ansible.builtin.shell: |
+            set -eu
+            unset TNS_ADMIN
+            if [ -x "${ORACLE_HOME}/bin/lsnrctl" ] ; then
+              "${ORACLE_HOME}/bin/lsnrctl" stop "${LSNR_NAME}"
+            else
+              echo "${ORACLE_HOME}/bin/lsnrctl not found => terminate tnslsnr ${LSNR_NAME}"
+              pattern="^[^ ]*/bin/tnslsnr ${LSNR_NAME}( .*)?$"
+              pkill -TERM -i -f "${pattern}" || true
+              for i in $(seq 1 30) ; do
+                pgrep -i -f "${pattern}" > /dev/null || exit 0
+                sleep 1
+              done
+              pkill -KILL -i -f "${pattern}" || true
+            fi
+          environment:
+            ORACLE_BASE: "{{ oracle_base }}"
+            ORACLE_HOME: "{{ _oradb_manage_db_listener_running_home }}"
+            LD_LIBRARY_PATH: "{{ _oradb_manage_db_listener_running_home }}/lib"
+            LSNR_NAME: "{{ lsnrinst.listener_name }}"
+          changed_when: true
+          when:
+            - _oradb_manage_db_listener_running_home | length > 0
+            - _oradb_manage_db_listener_running_home != listener_home | regex_replace('/$', '')
+
     # Don't try to stop the listener at this point
     # => Restart of role will fail at create/manage database due to TNS-12514
     # Only executed when on Single-Instance!

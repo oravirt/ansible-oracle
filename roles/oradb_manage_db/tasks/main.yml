@@ -73,6 +73,23 @@
   when:
     - oracle_pdbs is defined
 
+# Out-of-Place Patching
+# The switch must be done before manage-db.yml, because oracle_db fails
+# for a database in a different ORACLE_HOME.
+- name: Switch ORACLE_HOME of database
+  ansible.builtin.include_tasks: switch_home.yml
+  with_items:
+    - "{{ oracle_databases }}"
+  loop_control:
+    loop_var: odb
+    label: >-
+      oracle_db_name={{ odb.oracle_db_name | default('') }}
+      home={{ odb.home | default('') }}
+  when:
+    - oracle_databases is defined
+    - odb.state == 'present'
+  tags: switch_home
+
 - name: Create/Modify database
   ansible.builtin.include_tasks: manage-db.yml
   with_items:

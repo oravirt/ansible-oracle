@@ -85,3 +85,63 @@ _oradb_manage_db_sysasmpassword: >-
 
 _oradb_manage_db_asmmonitorpassword: >-
   {{ (oracle_install_option_gi | length > 0) | ternary(default_gipass, '') }}
+
+# Variables for switch_home.yml (Out-of-Place Patching)
+# Requires `odb` as `loop_var`.
+_oradb_manage_db_switch_sid: "{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}"
+
+_oradb_manage_db_switch_new_home: "{{ _oracle_home_db | regex_replace('/$', '') }}"
+
+# 1st line from /etc/oratab for the SID: <SID>:<ORACLE_HOME>:<flag>
+_oradb_manage_db_switch_oratab_line: >-
+  {{ (_oradb_manage_db_switch_oratab.content | default('') | b64decode).splitlines()
+     | select('match', _oradb_manage_db_switch_sid ~ ':')
+     | first | default('') }}
+
+_oradb_manage_db_switch_oratab_home: >-
+  {{ (_oradb_manage_db_switch_oratab_line.split(':') + [''])[1] | regex_replace('/$', '') }}
+
+_oradb_manage_db_switch_oratab_flag: >-
+  {{ (_oradb_manage_db_switch_oratab_line.split(':') + ['', 'N'])[2] | default('N', true) }}
+
+# ORACLE_HOME of the running instance. Empty when the instance is not running.
+_oradb_manage_db_switch_running_home: >-
+  {{ _oradb_manage_db_switch_running.stdout | default('') | trim }}
+
+# Active ORACLE_HOME: running instance or /etc/oratab
+_oradb_manage_db_switch_old_home: >-
+  {{ _oradb_manage_db_switch_running_home
+     if _oradb_manage_db_switch_running_home | length > 0
+     else _oradb_manage_db_switch_oratab_home }}
+
+# Database is running from or registered with a different ORACLE_HOME
+_oradb_manage_db_switch_needs_switch: >-
+  {{ _oradb_manage_db_switch_old_home | length > 0
+     and _oradb_manage_db_switch_old_home != _oradb_manage_db_switch_new_home }}
+
+# Flag file for an incomplete switch (e.g. failed datapatch)
+_oradb_manage_db_switch_flagfile: "{{ oracle_base }}/switch_home_{{ _oradb_manage_db_switch_sid }}.pending"
+
+_oradb_manage_db_switch_dbs_old: "{{ _oradb_manage_db_switch_orabaseconfig.results[0].stdout }}/dbs"
+
+_oradb_manage_db_switch_dbs_new: "{{ _oradb_manage_db_switch_orabaseconfig.results[1].stdout }}/dbs"
+
+_oradb_manage_db_switch_dbs_files:
+  - "spfile{{ _oradb_manage_db_switch_sid }}.ora"
+  - "init{{ _oradb_manage_db_switch_sid }}.ora"
+  - "orapw{{ _oradb_manage_db_switch_sid }}"
+
+_oradb_manage_db_switch_env_old:
+  ORACLE_HOME: "{{ _oradb_manage_db_switch_old_home }}"
+  ORACLE_SID: "{{ _oradb_manage_db_switch_sid }}"
+  PATH: "{{ _oradb_manage_db_switch_old_home }}/bin:/usr/local/bin:/bin:/usr/bin:/usr/sbin:/sbin"
+
+_oradb_manage_db_switch_env_new:
+  ORACLE_HOME: "{{ _oradb_manage_db_switch_new_home }}"
+  ORACLE_SID: "{{ _oradb_manage_db_switch_sid }}"
+  PATH: "{{ _oradb_manage_db_switch_new_home }}/bin:/usr/local/bin:/bin:/usr/bin:/usr/sbin:/sbin"
+
+# ORACLE_HOME of the running listener in loop_listener_details.yml.
+# Empty when the listener is not running.
+_oradb_manage_db_listener_running_home: >-
+  {{ _oradb_manage_db_listener_running.stdout | default('') | trim }}
