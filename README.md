@@ -23,8 +23,9 @@
 
 1. [APEX and ORDS in `ansible-oracle`](doc/guides/apex_ords.adoc)
 2. [Oracle AutoUpgrade in `ansible-oracle`](doc/guides/autoupgrade.adoc)
-3. [How to develop in ansible-oracle](doc/development.adoc)
-4. [List of roles in ansible-oracle](doc/roles.adoc)
+3. [Upgrade of PDBs with AutoUpgrade (Unplug/Plug)](doc/guides/autoupgrade_upgrade.adoc)
+4. [How to develop in ansible-oracle](doc/development.adoc)
+5. [List of roles in ansible-oracle](doc/roles.adoc)
 
 
 ## Pre-requisites

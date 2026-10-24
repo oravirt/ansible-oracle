@@ -1,0 +1,14 @@
+---
+# User friendly error for a failed execution of AutoUpgrade
+# requires: _autoupgrade_upgrade_result, _autoupgrade_upgrade_result_mode, aupjob
+#
+# debug prints a list line by line - fail would print it as one line of JSON.
+- name: upgrade_error | Details
+  ansible.builtin.debug:
+    msg: "{{ _autoupgrade_upgrade_error_msg }}"
+
+- name: upgrade_error | AutoUpgrade failed
+  ansible.builtin.fail:
+    msg: >-
+      AutoUpgrade failed in mode {{ _autoupgrade_upgrade_result_mode }} for job {{ aupjob.name }}
+      (rc {{ _autoupgrade_upgrade_result.rc | default('-') }}) - see details above.

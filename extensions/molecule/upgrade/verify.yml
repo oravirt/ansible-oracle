@@ -1,0 +1,31 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  vars:
+    _verify_home: "{{ db_homes_config['db26-si-ee']['oracle_home'] }}"
+  tasks:
+    - name: Read release and PDBs of DB1
+      ansible.builtin.shell: |
+        set -eu
+        "${ORACLE_HOME}/bin/sqlplus" -S -L /nolog <<EOF
+        connect / as sysdba
+        whenever sqlerror exit failure
+        set heading off feedback off pagesize 0 linesize 200
+        select 'VERSION=' || version_full from v\$instance;
+        select 'PDB=' || name || ':' || open_mode from v\$pdbs where name <> 'PDB\$SEED';
+        EOF
+      environment:
+        ORACLE_HOME: "{{ _verify_home }}"
+        ORACLE_SID: DB1
+      become: true
+      become_user: oracle
+      register: _verify_db1
+      changed_when: false
+
+    - name: Assert ORCLPDB1 upgraded into DB1 (26ai)
+      ansible.builtin.assert:
+        that:
+          - _verify_db1.stdout is search('VERSION=23\.')
+          - _verify_db1.stdout is search('PDB=ORCLPDB1:READ WRITE')
+        fail_msg: "{{ _verify_db1.stdout_lines }}"

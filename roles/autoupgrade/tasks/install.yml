@@ -2,6 +2,7 @@
 # The keystore console is controlled with ansible.builtin.expect, which needs the Python module pexpect
 # on the host executing AutoUpgrade. pexpect is not installed by the role (package names differ between
 # distributions) => check it with a dummy command for a clean error message.
+# The upgrade of databases does not use the keystore console => _autoupgrade_check_pexpect: false
 - name: autoupgrade | Check Python module pexpect
   ansible.builtin.expect:
     command: "true"
@@ -14,6 +15,8 @@
   register: _autoupgrade_pexpect_res
   changed_when: false
   failed_when: false
+  when:
+    - _autoupgrade_check_pexpect | default(true) | bool
 
 - name: autoupgrade | Assert Python module pexpect
   ansible.builtin.assert:
@@ -25,6 +28,8 @@
       {{ _autoupgrade_run_local | bool | ternary('the Ansible controller', inventory_hostname) }}.
       Install it (e.g. package python3-pexpect or pip install pexpect) and try again.
       {{ _autoupgrade_pexpect_res.msg | default('') }}
+  when:
+    - _autoupgrade_check_pexpect | default(true) | bool
 
 - name: autoupgrade | Assert
   ansible.builtin.include_tasks: assert.yml

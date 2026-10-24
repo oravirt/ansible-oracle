@@ -85,6 +85,35 @@
           New ORACLE_HOME {{ _oradb_manage_db_switch_new_home }} is not installed.
           Add home {{ odb.home }} to db_homes_installed.
 
+    # A new release needs an upgrade of the database (role autoupgrade), not a switch.
+    # oraversion exists from 18c => no check for older ORACLE_HOMEs
+    - name: switch_home | Get release of old and new ORACLE_HOME
+      ansible.builtin.command: "{{ item }}/bin/oraversion -majorVersion"
+      environment:
+        ORACLE_HOME: "{{ item }}"
+      loop:
+        - "{{ _oradb_manage_db_switch_old_home }}"
+        - "{{ _oradb_manage_db_switch_new_home }}"
+      register: _oradb_manage_db_switch_release
+      changed_when: false
+      failed_when: false
+      when:
+        - _oradb_manage_db_switch_needs_switch | bool
+
+    - name: switch_home | Assert same release in old and new ORACLE_HOME
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _oradb_manage_db_switch_release.results | map(attribute='stdout') | map('trim') | unique | length == 1
+        fail_msg: >-
+          The release of the new ORACLE_HOME differs from the old ORACLE_HOME
+          ({{ _oradb_manage_db_switch_release.results | map(attribute='stdout') | map('trim') | list }}).
+          Upgrade the database with role autoupgrade (upgrade_deploy.yml) before changing home in oracle_databases.
+      when:
+        - _oradb_manage_db_switch_needs_switch | bool
+        - _oradb_manage_db_switch_release.results | default([]) | selectattr('rc', 'defined')
+          | selectattr('rc', 'equalto', 0) | list | length == 2
+
     - name: switch_home | Stop database in old ORACLE_HOME
       when:
         - _oradb_manage_db_switch_needs_switch | bool

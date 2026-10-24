@@ -10,6 +10,11 @@ Each area of AutoUpgrade has its own task file, which must be called with `tasks
 | `assert.yml` | Check variables and Java |
 | `install.yml` | Install `autoupgrade.jar` into `autoupgrade_home` |
 | `download_patches.yml` | Download patches from My Oracle Support with AutoUpgrade |
+| `upgrade_analyze.yml` | Analyze phase for the Unplug/Plug upgrade of PDBs (`oracle_pdbs`): AutoUpgrade `analyze` |
+| `upgrade_fixups.yml` | Fixups phase: AutoUpgrade `fixups` in the source CDB/PDBs |
+| `upgrade_deploy.yml` | Unplug/Plug upgrade of PDBs: analyze phase + AutoUpgrade `deploy` |
+
+See `doc/guides/autoupgrade_upgrade.adoc` for the upgrade of PDBs.
 
 ## Table of content
 
@@ -42,6 +47,14 @@ Each area of AutoUpgrade has its own task file, which must be called with `tasks
   - [autoupgrade_local_java_home](#autoupgrade_local_java_home)
   - [autoupgrade_log_dir](#autoupgrade_log_dir)
   - [autoupgrade_run_local](#autoupgrade_run_local)
+  - [autoupgrade_upgrade_clear_recovery_data](#autoupgrade_upgrade_clear_recovery_data)
+  - [autoupgrade_upgrade_fail_on_precheck_errors](#autoupgrade_upgrade_fail_on_precheck_errors)
+  - [autoupgrade_upgrade_global_parameters](#autoupgrade_upgrade_global_parameters)
+  - [autoupgrade_upgrade_parameters](#autoupgrade_upgrade_parameters)
+  - [autoupgrade_upgrade_pdbs](#autoupgrade_upgrade_pdbs)
+  - [autoupgrade_upgrade_poll](#autoupgrade_upgrade_poll)
+  - [autoupgrade_upgrade_restoration](#autoupgrade_upgrade_restoration)
+  - [autoupgrade_upgrade_timeout](#autoupgrade_upgrade_timeout)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -462,6 +475,171 @@ or execute it for each host.
 
 ```YAML
 autoupgrade_run_local: true
+```
+
+### autoupgrade_upgrade_clear_recovery_data
+
+Discard the recovery data of AutoUpgrade (`-clear_recovery_data`) before the analyze phase.
+
+AutoUpgrade keeps recovery data after each deploy - finished or not.
+The role handles it automatically:
+
+| Recovery data | Behaviour |
+| --- | --- |
+| finished deploy, PDBs pending | cleared automatically before analyze/fixups |
+| finished deploy, all PDBs upgraded | kept (needed for `-restore`) |
+| unfinished deploy | deploy phase: resumed. analyze/fixups phase: fail |
+
+`true`: the recovery data is discarded in any case, e.g. after a manual restore of the PDBs.
+An unfinished deploy cannot be resumed anymore!
+
+#### Default value
+
+```YAML
+autoupgrade_upgrade_clear_recovery_data: false
+```
+
+### autoupgrade_upgrade_fail_on_precheck_errors
+
+Fail the analyze phase and the fixups phase, when AutoUpgrade reports checks with severity `ERROR`,
+which cannot be fixed automatically by AutoUpgrade (no fixup available or `runfix` is `NO`).
+
+The deploy phase is never started, when these checks fail.
+
+#### Default value
+
+```YAML
+autoupgrade_upgrade_fail_on_precheck_errors: true
+```
+
+### autoupgrade_upgrade_global_parameters
+
+Additional global parameters for the upgrade config files (`global.<key>=<value>`).
+`global_log_dir` is set by the role.
+
+#### Default value
+
+```YAML
+autoupgrade_upgrade_global_parameters: {}
+```
+
+#### Example usage
+
+```YAML
+autoupgrade_upgrade_global_parameters:
+  keystore: /u01/app/oracle/admin/autoupgrade/keystore
+```
+
+### autoupgrade_upgrade_parameters
+
+Default AutoUpgrade parameters for all AutoUpgrade jobs (`upg1.<key>=<value>`).
+Can be overwritten with `autoupgrade.parameters` in `oracle_pdbs`.
+
+Values are written unchanged. Booleans are converted into `yes`/`no`.
+
+#### Default value
+
+```YAML
+autoupgrade_upgrade_parameters: {}
+```
+
+#### Example usage
+
+```YAML
+autoupgrade_upgrade_parameters:
+  timezone_upg: "yes"
+  drop_grp_after_upgrade: "yes"
+```
+
+### autoupgrade_upgrade_pdbs
+
+Limit `upgrade_analyze.yml` / `upgrade_fixups.yml` / `upgrade_deploy.yml` to these PDBs (`pdb_name` in `oracle_pdbs`).
+
+Empty (default): all PDBs in `oracle_pdbs` with attribute `autoupgrade`
+and `state: present` are processed.
+
+The upgrade is an Unplug/Plug upgrade of PDBs into a CDB of the new release.
+`oracle_pdbs` defines the _end state_: `cdb` and `home` are the target CDB and target `ORACLE_HOME`.
+The source is defined with the attribute `autoupgrade` of the PDB:
+
+| Attribute | Description |
+| --- | --- |
+| source_cdb | mandatory: `oracle_db_name` of the source CDB |
+| source_home | optional: key in `db_homes_config` of the source `ORACLE_HOME`. Default: `home` of `source_cdb` in `oracle_databases` |
+| source_sid | optional: SID of the source CDB. Default: from `source_cdb` in `oracle_databases`, otherwise `source_cdb` |
+| source_pdb_name | optional: name of the PDB in the source CDB. Default: `pdb_name` |
+| copy_option | optional: `upg1.target_pdb_copy_option.<pdb>`, e.g. `file_name_convert=NONE`. Default: datafiles are reused (no copy) |
+| restoration | optional: `true`/`false` - default `autoupgrade_upgrade_restoration` |
+| parameters | optional: dict with additional AutoUpgrade parameters (`upg1.<key>=<value>`). Overrides `autoupgrade_upgrade_parameters`. |
+
+All PDBs with the same `source_cdb` and `cdb` are upgraded in one AutoUpgrade job.
+`restoration` and `parameters` must be identical for these PDBs.
+
+`sid`, `source_home`, `target_home`, `target_cdb`, `pdbs`, `log_dir` and `restoration`
+are set by the role and must not be used in `parameters`.
+
+_Important_: Do not execute playbook `manage_db` between the change of `oracle_pdbs`
+and the upgrade. `oradb_manage_pdb` would create a new, empty PDB in the target CDB.
+
+#### Default value
+
+```YAML
+autoupgrade_upgrade_pdbs: []
+```
+
+#### Example usage
+
+```YAML
+autoupgrade_upgrade_pdbs:
+  - ORCLPDB1
+
+oracle_pdbs:
+  - cdb: DB26              # target CDB (end state)
+    home: db26-si-ee       # target ORACLE_HOME (end state)
+    pdb_name: ORCLPDB1
+    state: present
+    autoupgrade:
+      source_cdb: DB2      # source CDB in 19c
+      source_home: db1932-si-ee
+      parameters:
+        timezone_upg: "yes"
+```
+
+### autoupgrade_upgrade_poll
+
+Poll interval in seconds for AutoUpgrade in deploy mode.
+
+#### Default value
+
+```YAML
+autoupgrade_upgrade_poll: 60
+```
+
+### autoupgrade_upgrade_restoration
+
+Value for `upg1.restoration` for all AutoUpgrade jobs.
+Can be overwritten with `autoupgrade.restoration` in `oracle_pdbs`.
+
+`false` (default): AutoUpgrade creates no Guaranteed Restore Point before the upgrade
+(`upg1.restoration=no`). There is no automatic fallback - take a backup before the upgrade!
+
+`true`: AutoUpgrade creates a Guaranteed Restore Point before the upgrade (`upg1.restoration=yes`).
+Requires a Fast Recovery Area and Enterprise Edition.
+
+#### Default value
+
+```YAML
+autoupgrade_upgrade_restoration: false
+```
+
+### autoupgrade_upgrade_timeout
+
+Maximum runtime in seconds for AutoUpgrade in deploy mode per AutoUpgrade job (`async`).
+
+#### Default value
+
+```YAML
+autoupgrade_upgrade_timeout: 21600
 ```
 
 ## Discovered Tags

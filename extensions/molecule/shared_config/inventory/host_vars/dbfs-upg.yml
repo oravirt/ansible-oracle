@@ -1,0 +1,105 @@
+---
+# Scenario upgrade: Unplug/Plug upgrade of ORCLPDB1 with AutoUpgrade
+#   from DB2 (19c, db1932-si-ee) into DB1 (26ai, db26-si-ee)
+#
+# converge:    DB2 with ORCLPDB1 and the empty target CDB DB1 (oracle_pdbs: source state)
+# side_effect: oracle_pdbs in end state + attribute autoupgrade (defined in side_effect.yml)
+#
+# oracle_sw_copy is true in this scenario
+# => installation media and patches are copied from the Ansible controller
+# => /vagrant only exists inside the container
+oracle_sw_source_local: "{{ lookup('ansible.builtin.env', 'MOLECULE_SW_DIR') }}"
+
+oracle_db1_home: db26-si-ee
+oracle_db2_home: db1932-si-ee
+# listener and network configuration from 26ai: a listener can serve databases of older releases only
+oracle_net_home: db26-si-ee
+
+db_homes_installed:
+  - home: db1932-si-ee
+    state: present
+    apply_patches: false
+  - home: db26-si-ee
+    state: present
+    apply_patches: false
+
+listener_installed:
+  - home: "{{ oracle_net_home }}"
+    listener_name: LISTENER
+    state: present
+
+tnsnames_installed:
+  - tnsname: "{{ oracle_pdbs[0]['pdb_name'] }}"
+    home: "{{ oracle_net_home }}"
+    state: present
+
+sqlnet_installed:
+  - home: "{{ oracle_net_home }}"
+    sqlnet: sqlnetalias1
+    state: present
+
+# wallet from group_vars uses home db19-si-ee, which is not installed here
+oracle_wallet_config: []
+
+# sqlnetalias1 from group_vars without WALLET_LOCATION/SQLNET.WALLET_OVERRIDE:
+# the wallet does not exist => ORA-12578 for datapatch in dbca
+# => DB creation fails with ORA-04062 while restoring PDB$SEED
+sqlnet_config:
+  sqlnetalias1:
+    - {name: "ADR_BASE", value: "/u01/app/oracle/"}
+    - {name: "SQLNET.ALLOWED_LOGON_VERSION_CLIENT", value: 12}
+
+oracle_databases:
+  - home: "{{ oracle_db1_home }}"
+    oracle_db_name: DB1
+    oracle_db_type: SI
+    is_container: true
+    storage_type: FS
+    oracle_database_type: MULTIPURPOSE
+    redolog_size: 50M
+    redolog_groups: 3
+    datafile_dest: /u01/app/oracle/oradata
+    recoveryfile_dest: /u01/app/oracle/fra
+    listener_name: LISTENER
+    listener_port: 1521
+    archivelog: false
+    flashback: false
+    force_logging: false
+    state: present
+    init_parameters:
+      - {name: db_create_file_dest, value: '/u01/app/oracle/oradata', scope: both, state: present}
+      - {name: db_create_online_log_dest_1, value: '/u01/app/oracle/oradata', scope: both, state: present}
+      - {name: recyclebin, value: 'off', scope: spfile, state: present}
+      - {name: pga_aggregate_target, value: '128M', scope: both, state: present}
+      - {name: sga_target, value: '1808M', scope: spfile, state: present}
+
+  - home: "{{ oracle_db2_home }}"
+    oracle_db_name: DB2
+    oracle_db_type: SI
+    is_container: true
+    storage_type: FS
+    oracle_database_type: MULTIPURPOSE
+    redolog_size: 50M
+    redolog_groups: 3
+    datafile_dest: /u01/app/oracle/oradata
+    recoveryfile_dest: /u01/app/oracle/fra
+    listener_name: LISTENER
+    listener_port: 1521
+    archivelog: false
+    flashback: false
+    force_logging: false
+    state: present
+    init_parameters:
+      - {name: db_create_file_dest, value: '/u01/app/oracle/oradata', scope: both, state: present}
+      - {name: db_create_online_log_dest_1, value: '/u01/app/oracle/oradata', scope: both, state: present}
+      - {name: recyclebin, value: 'off', scope: spfile, state: present}
+      - {name: pga_aggregate_target, value: '128M', scope: both, state: present}
+      - {name: sga_target, value: '1808M', scope: spfile, state: present}
+
+oracle_pdbs:
+  - cdb: DB2
+    home: "{{ oracle_db2_home }}"
+    pdb_name: ORCLPDB1
+    listener_port: 1521
+    state: present
+    datafile_dest: /u01/app/oracle/oradata
