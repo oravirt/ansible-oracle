@@ -17,7 +17,7 @@ vars:
   REGISTRY: '{{.REGISTRY | default "quay.io/rendanic"}}'
   TAG: '{{.TAG | default "latest"}}'
   # Images built/pushed by molecule:build and molecule:push
-  MOLECULE_DISTROS: ol8 ol9
+  MOLECULE_DISTROS: ol8 ol9 ol10
   # SLES is not working with these containers for ansible-oracle
   # => bci-base <> SLES ...
   # => not all needed RPMs are available during installation
@@ -58,6 +58,12 @@ tasks:
     cmds:
       - task: molecule:build:image
         vars: { DISTRO: ol9 }
+
+  molecule:build:ol10:
+    desc: Build molecule image for Oracle Linux 10
+    cmds:
+      - task: molecule:build:image
+        vars: { DISTRO: ol10 }
 
   molecule:push:
     desc: Push all supported molecule images to {{.REGISTRY}}
