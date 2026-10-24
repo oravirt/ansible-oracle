@@ -22,8 +22,8 @@
     label: "{{ aup.target_version | default('') }}: {{ aup.patch | default('') }}"
 
 # The target host must be prepared by ansible-oracle (playbook os / role orahost).
-# autoupgrade does not create users or oracle_base.
-- name: autoupgrade | Check oracle_user and oracle_base on target host
+# autoupgrade does not create users. oracle_base is created in install.yml.
+- name: autoupgrade | Check oracle_user on target host
   when:
     - not _autoupgrade_run_local | bool
   block:
@@ -33,19 +33,13 @@
         key: "{{ oracle_user }}"
         fail_key: false
 
-    - name: autoupgrade | Check oracle_base
-      ansible.builtin.stat:
-        path: "{{ oracle_base }}"
-      register: _autoupgrade_oracle_base_stat
-
-    - name: autoupgrade | Assert oracle_user and oracle_base
+    - name: autoupgrade | Assert oracle_user
       ansible.builtin.assert:
         quiet: true
         that:
           - ansible_facts.getent_passwd[oracle_user] is not none
-          - _autoupgrade_oracle_base_stat.stat.isdir | default(false)
         fail_msg: >-
-          oracle_user '{{ oracle_user }}' or oracle_base '{{ oracle_base }}' missing on {{ inventory_hostname }}.
+          oracle_user '{{ oracle_user }}' missing on {{ inventory_hostname }}.
           Prepare the host with playbook opitzconsulting.ansible_oracle.os (role orahost) first.
 
 - name: autoupgrade | Check Java
@@ -65,7 +59,7 @@
       - _autoupgrade_java_res.rc == 0
     fail_msg: >-
       '{{ _autoupgrade_java }}' is not executable on
-      {{ _autoupgrade_run_local | bool | ternary('Ansible controller (autoupgrade_download_run_local: true)', inventory_hostname) }}.
+      {{ _autoupgrade_run_local | bool | ternary('Ansible controller (autoupgrade_run_local: true)', inventory_hostname) }}.
       Set {{ _autoupgrade_run_local | bool | ternary('autoupgrade_local_java_home', 'autoupgrade_java_home') }} or install Java.
       {{ _autoupgrade_java_res.msg | default(_autoupgrade_java_res.stderr | default('')) }}
 

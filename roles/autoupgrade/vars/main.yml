@@ -1,8 +1,6 @@
 ---
-# Execution on the Ansible controller (delegate_to localhost, run_once, no become).
-# Only download_patches.yml sets it to autoupgrade_download_run_local for itself
-# and for the included install.yml / keystore.yml (task vars override role vars).
-_autoupgrade_run_local: false
+# Execution on the Ansible controller (delegate_to localhost, run_once, no become)
+_autoupgrade_run_local: "{{ autoupgrade_run_local | bool }}"
 
 _autoupgrade_home: >-
   {{ _autoupgrade_run_local | bool | ternary(autoupgrade_local_home, autoupgrade_home) }}
@@ -12,6 +10,10 @@ _autoupgrade_jar_path: "{{ _autoupgrade_home }}/{{ autoupgrade_jar }}"
 # autoupgrade.jar in software repository on the Ansible controller
 _autoupgrade_jar_source_local: >-
   {{ autoupgrade_jar_filesource | default(oracle_sw_source_local + '/' + autoupgrade_jar, true) }}
+
+# autoupgrade.jar in software repository on the target host (oracle_sw_copy: false)
+_autoupgrade_jar_source_remote: >-
+  {{ autoupgrade_jar_filesource | default(oracle_stage_remote + '/' + autoupgrade_jar, true) }}
 
 _autoupgrade_cfg_dir: "{{ _autoupgrade_home }}/cfg"
 
@@ -114,3 +116,25 @@ _autoupgrade_download_list: >-
 # expected files from oracle_sw_patches after download
 _autoupgrade_download_expected: >-
   {{ _autoupgrade_download_sw_patches | map(attribute='filename') | unique | list }}
+
+# Gold Images from patches_info.json (autoupgrade_download_gold_image_rename)
+# src:  filename created by AutoUpgrade, e.g. db_goldimage_19_32_20261021112350.zip
+# dest: autoupgrade_download_gold_image_prefix + release + .zip
+#       19.32.0.0.0 => 19.32, 23.26.3.0.0 => 26.03 (23ai with RU >= 23.26)
+_autoupgrade_gold_images: >-
+  {%- set ns = namespace(res=[]) -%}
+  {%- set info = (_autoupgrade_patches_info.content | default('') | b64decode or '{}') | from_json -%}
+  {%- for p in info.patches | default([]) -%}
+  {%-   if p.description | default('') is search('Gold Image') and p.releaseUpdate is defined -%}
+  {%-     set v = (p.releaseUpdate | string).split('.') -%}
+  {%-     if v[0] | int == 23 and v[1] | default(0) | int >= 26 -%}
+  {%-       set rel = v[1] ~ '.' ~ ('%02d' | format(v[2] | default(0) | int)) -%}
+  {%-     else -%}
+  {%-       set rel = v[0] ~ '.' ~ v[1] | default('0') -%}
+  {%-     endif -%}
+  {%-     for f in p.files | default([]) -%}
+  {%-       set ns.res = ns.res + [{'src': f.name, 'dest': autoupgrade_download_gold_image_prefix ~ rel ~ '.zip'}] -%}
+  {%-     endfor -%}
+  {%-   endif -%}
+  {%- endfor -%}
+  {{ ns.res }}

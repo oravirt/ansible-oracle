@@ -27,7 +27,7 @@ The variables of the role are described in link:../../roles/autoupgrade/README.m
   * Database server: e.g. the JDK from an `ORACLE_HOME` (`autoupgrade_java_home`)
   * Ansible controller: `java` from `PATH` or `autoupgrade_local_java_home`
 - Python module `pexpect` on the host executing AutoUpgrade for the keystore management
-  (used by `ansible.builtin.expect`)
+  (used by `ansible.builtin.expect`). It is checked by `install.yml`, but not installed by the role.
 - My Oracle Support account (`mos_username`, `mos_password`) for downloading patches
 - Downloads with AutoUpgrade are supported for the releases 19, 21, 23 and 26 (AutoUpgrade 26.6)
 
@@ -60,13 +60,14 @@ Each area of AutoUpgrade has its own task file, which must be called with `tasks
 [options="header,footer"]
 |=======================
 |Playbook |Description
-|`playbooks/autoupgrade_install.yml` | Install AutoUpgrade on the database servers. `hostgroup` is mandatory.
+|`playbooks/autoupgrade_install.yml` | Install AutoUpgrade. `hostgroup` is mandatory. Use `autoupgrade_run_local: false` for the database servers.
 |`playbooks/autoupgrade_download_patches.yml` | Download patches with AutoUpgrade.
 |=======================
 
 .Install AutoUpgrade on database servers
 ----
-ansible-playbook -i inventory/ -e hostgroup=dbservers playbooks/autoupgrade_install.yml
+ansible-playbook -i inventory/ -e hostgroup=dbservers -e autoupgrade_run_local=false \
+  playbooks/autoupgrade_install.yml
 ----
 
 .Download patches and the latest autoupgrade.jar
@@ -77,21 +78,41 @@ ansible-playbook -i inventory/ -e hostgroup=dbservers -e autoupgrade_download_la
 
 === Execution on Ansible controller or database server
 
-AutoUpgrade is always executed on the database server as `oracle_user` - with one exception:
-
-The download of patches (`download_patches.yml`) including the keystore and the installation needed for the download
-is executed on the Ansible controller by default (`autoupgrade_download_run_local: true`).
+`autoupgrade_run_local` defines, where AutoUpgrade is executed.
+The switch is valid for all task files.
 
 .Execution of AutoUpgrade
 [options="header,footer"]
 |=======================
-|Task file |`autoupgrade_download_run_local` |Executed on |Directory |Java
-|`install.yml` (direct call) | ignored | database server as `oracle_user` | `autoupgrade_home` | `autoupgrade_java_home`
-|`download_patches.yml` | `true` (default) | Ansible controller, `run_once`, no `become` | `autoupgrade_local_home` | `autoupgrade_local_java_home`
-|`download_patches.yml` | `false` | database server as `oracle_user` | `autoupgrade_home` | `autoupgrade_java_home`
+|`autoupgrade_run_local` |Executed on |Directory |Java
+|`true` (default) | Ansible controller, `run_once`, no `become` | `autoupgrade_local_home` | `autoupgrade_local_java_home`
+|`false` | target host as `oracle_user` | `autoupgrade_home` | `autoupgrade_java_home`
 |=======================
 
-IMPORTANT: The download on the Ansible controller is executed only once (`run_once`) with the variables
+IMPORTANT: AutoUpgrade is executed on the Ansible controller by default. +
+Set `autoupgrade_run_local: false` for the execution on the database servers, e.g. for the installation on the database servers.
+
+.Install AutoUpgrade on the database servers and download patches on the Ansible controller
+----
+ansible-playbook -i inventory/ -e hostgroup=dbservers -e autoupgrade_run_local=false \
+  playbooks/autoupgrade_install.yml
+
+ansible-playbook -i inventory/ -e hostgroup=dbservers playbooks/autoupgrade_download_patches.yml
+----
+
+The host executing AutoUpgrade needs:
+
+- Java (see `autoupgrade_java_home` / `autoupgrade_local_java_home`)
+- Python module `pexpect` for the Python interpreter used by Ansible (keystore console).
+  `install.yml` checks it at the beginning and fails with a clear message.
+  The role does not install `pexpect` - install it e.g. with the package `python3-pexpect` or with `pip`.
+- With `autoupgrade_run_local: false`: `autoupgrade_download_dir` must be a directory on the target host,
+  writable for `oracle_user`. The default `oracle_sw_source_local` is a directory on the Ansible controller.
+- With `autoupgrade_run_local: false`: `oracle_user` must exist (playbook `os`).
+  `oracle_base` and `oracle_base/cfgtoollogs` are created by `install.yml` with the same attributes as in `oraswdb_install`.
+  AutoUpgrade can be used before the installation of the Oracle software, e.g. for downloading the patches.
+
+IMPORTANT: With `autoupgrade_run_local: true` the tasks are executed only once (`run_once`) with the variables
 of the *first host* in the play. +
 `oracle_sw_patches`, `db_homes_installed`, `db_homes_config`, `oracle_install_version_gi` and
 `autoupgrade_download_patches` must be the same for all hosts in the play - e.g. defined in `group_vars/all`
@@ -113,8 +134,19 @@ On the Ansible controller `oracle_sw_copy` is ignored and the file is always tak
 ==== Download the latest version
 
 `autoupgrade_download_latest: true` downloads the latest `autoupgrade.jar` from Oracle (`autoupgrade_jar_url`)
-into the software repository on the Ansible controller before the installation.
-The download is done once (`run_once`) and requires `is_sw_source_local: true`.
+into the software repository before the installation.
+The target depends on the location of the installation media:
+
+.Target for the download of the latest version
+[options="header,footer"]
+|=======================
+|Installation media |Download on |Target
+|`oracle_sw_copy: true` or `autoupgrade_run_local: true` | Ansible controller, `run_once`, no `become`. Requires `is_sw_source_local: true`. | `autoupgrade_jar_filesource` or `oracle_sw_source_local`/`autoupgrade_jar`
+|`oracle_sw_copy: false` | target host as `oracle_user` | `autoupgrade_jar_filesource` or `oracle_stage_remote`/`autoupgrade_jar`
+|=======================
+
+IMPORTANT: With `oracle_sw_copy: false` the target directory must exist on the target host and must be writable for `oracle_user`. +
+On a shared NFS directory each host downloads the file.
 
 ==== Update an existing installation
 
@@ -123,7 +155,7 @@ An existing `autoupgrade.jar` is not replaced by default. +
 
 .Update AutoUpgrade on all database servers with the latest version from Oracle
 ----
-ansible-playbook -i inventory/ -e hostgroup=dbservers \
+ansible-playbook -i inventory/ -e hostgroup=dbservers -e autoupgrade_run_local=false \
   -e autoupgrade_download_latest=true -e autoupgrade_force_update=true \
   playbooks/autoupgrade_install.yml
 ----
