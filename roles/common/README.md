@@ -92,7 +92,6 @@ common_packages_el10:
   - bind-utils
   - ethtool
   - expect
-  - facter
   - git
   - grubby
   - initscripts
@@ -101,7 +100,6 @@ common_packages_el10:
   - libstdc++-devel
   - lsof
   - lvm2
-  - mlocate
   - module-init-tools
   - nc
   - net-tools
@@ -118,8 +116,6 @@ common_packages_el10:
   - unzip
   - util-linux-ng
   - xfsprogs
-  - xorg-x11-utils
-  - xorg-x11-xauth
 ```
 
 ### common_packages_el6
@@ -161,9 +157,7 @@ common_packages_el6:
   - twm
   - autofs
   - parted
-  - mlocate
   - ksh
-  - psmisc
 ```
 
 ### common_packages_el7
