@@ -46,12 +46,35 @@ db_homes_installed:
     apply_patches: "{{ apply_patches_db }}"  # patching is done in side-effect.yml!
 
 db_homes_config:
-  db19-si-ee:
+  db1919-si-ee: &db1919-si-ee
     version: 19.3.0.0
-    oracle_home: /u01/app/oracle/product/19/db19-si-ee
+    oracle_home: "/u01/app/oracle/product/19/db_19.19"
     edition: EE
     opatch_minversion: 12.2.0.1.52  # minimum for RU 19.32 (39472050)
     imagename: db_home_19.19.zip
+    readonly_home: true
+    oracle_home_name: db1919siee
+    opatch: []
+  db1932-si-ee:
+    version: 19.3.0.0
+    oracle_home: "/u01/app/oracle/product/19/db_19.32"
+    edition: EE
+    opatch_minversion: 12.2.0.1.52  # minimum for RU 19.32 (39472050)
+    imagename: db_home_19.32.zip
+    readonly_home: true
+    oracle_home_name: db1932siee
+    opatch: []
+  db1933-si-ee:
+    version: 19.3.0.0
+    oracle_home: "/u01/app/oracle/product/19/db_19.33"
+    edition: EE
+    opatch_minversion: 12.2.0.1.52  # minimum for RU 19.32 (39472050)
+    imagename: db_home_19.33.zip
+    readonly_home: true
+    oracle_home_name: db1933siee
+    opatch: []
+  db19-si-ee:
+    <<: *db1919-si-ee
     opatch:
       # - {patchid: 29213893, state: absent, excludeUPI: 25224952, stop_processes: true}  # 19.3
       # - {patchid: 29213893, state: absent, excludeUPI: 24722761, stop_processes: true}  # 19.15
