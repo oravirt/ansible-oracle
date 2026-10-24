@@ -18,10 +18,11 @@ Each area of AutoUpgrade has its own task file, which must be called with `tasks
   - [autoupgrade_download_dir](#autoupgrade_download_dir)
   - [autoupgrade_download_filename_regex](#autoupgrade_download_filename_regex)
   - [autoupgrade_download_gold_image](#autoupgrade_download_gold_image)
+  - [autoupgrade_download_gold_image_prefix](#autoupgrade_download_gold_image_prefix)
+  - [autoupgrade_download_gold_image_rename](#autoupgrade_download_gold_image_rename)
   - [autoupgrade_download_latest](#autoupgrade_download_latest)
   - [autoupgrade_download_patches](#autoupgrade_download_patches)
   - [autoupgrade_download_platform](#autoupgrade_download_platform)
-  - [autoupgrade_download_run_local](#autoupgrade_download_run_local)
   - [autoupgrade_download_supported_releases](#autoupgrade_download_supported_releases)
   - [autoupgrade_download_use_oracle_sw_patches](#autoupgrade_download_use_oracle_sw_patches)
   - [autoupgrade_force_update](#autoupgrade_force_update)
@@ -40,6 +41,7 @@ Each area of AutoUpgrade has its own task file, which must be called with `tasks
   - [autoupgrade_local_home](#autoupgrade_local_home)
   - [autoupgrade_local_java_home](#autoupgrade_local_java_home)
   - [autoupgrade_log_dir](#autoupgrade_log_dir)
+  - [autoupgrade_run_local](#autoupgrade_run_local)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -96,14 +98,52 @@ autoupgrade_download_gold_image: ''
 autoupgrade_download_gold_image: "NO"
 ```
 
+### autoupgrade_download_gold_image_prefix
+
+Prefix for the new filename of a Gold Image (`autoupgrade_download_gold_image_rename: true`).
+
+#### Default value
+
+```YAML
+autoupgrade_download_gold_image_prefix: db_home_
+```
+
+### autoupgrade_download_gold_image_rename
+
+Rename downloaded Gold Images after the download.
+
+AutoUpgrade creates unique filenames with a timestamp, e.g. `db_goldimage_19_32_20261021112350.zip`.
+The file is renamed to `autoupgrade_download_gold_image_prefix` + release + `.zip`:
+
+| Gold Image (AutoUpgrade) | Renamed file |
+| --- | --- |
+| `db_goldimage_19_32_<timestamp>.zip` (19.32) | `db_home_19.32.zip` |
+| `db_goldimage_23_26_3_<timestamp>.zip` (23.26.3) | `db_home_26.03.zip` |
+
+A symlink with the original filename is created for the renamed file.
+AutoUpgrade finds the file under the original name and skips a new download.
+The symlinks can be removed for cleanup. They are not created again.
+
+Release and filename are taken from `patches_info.json` in `autoupgrade_download_dir`.
+An existing file with the new name is never replaced.
+
+#### Default value
+
+```YAML
+autoupgrade_download_gold_image_rename: false
+```
+
 ### autoupgrade_download_latest
 
 Download the latest `autoupgrade.jar` from `autoupgrade_jar_url` into the software
-repository on the Ansible controller before the installation.
+repository before the installation.
 
-Target is `autoupgrade_jar_filesource` or `oracle_sw_source_local`/`autoupgrade_jar`.
-The download is done once (`run_once`) on `localhost` without `become`.
-Requires `is_sw_source_local: true`.
+The target depends on the location of the installation media:
+
+| Installation media | Download to |
+| --- | --- |
+| `oracle_sw_copy: true` or `autoupgrade_run_local: true` | Ansible controller (`run_once`, no `become`): `autoupgrade_jar_filesource` or `oracle_sw_source_local`/`autoupgrade_jar`. Requires `is_sw_source_local: true`. |
+| `oracle_sw_copy: false` | target host as `oracle_user`: `autoupgrade_jar_filesource` or `oracle_stage_remote`/`autoupgrade_jar`. The directory must exist and be writable for `oracle_user`. |
 
 Existing installations are only replaced with `autoupgrade_force_update: true`.
 
@@ -155,35 +195,6 @@ Default platform for the download, when `platform` is not set in `autoupgrade_do
 autoupgrade_download_platform: LINUX.X64
 ```
 
-### autoupgrade_download_run_local
-
-Execute the download of patches (`download_patches.yml`) on the Ansible controller.
-This includes the keystore (`keystore.yml`) and the installation of AutoUpgrade
-needed for the download.
-
-`true`: Tasks are delegated to `localhost` with `run_once` and without `become`.
-`autoupgrade_local_home` is used instead of `autoupgrade_home`.
-
-`false`: The download is executed on the target host as `oracle_user`.
-
-All other task files (e.g. `install.yml`) are always executed on the target host.
-
-_Important_
-
-With `true` the download is executed only once (`run_once`) with the variables
-of the first host in the play (`oracle_sw_patches`, `db_homes_installed`, `db_homes_config`,
-`oracle_install_version_gi`, `autoupgrade_download_patches`).
-These variables must be the same for all hosts in the play - e.g. defined in `group_vars/all`
-for the whole environment.
-When they are defined per host, limit the playbook to one host (`--limit <host>`)
-or execute it for each host.
-
-#### Default value
-
-```YAML
-autoupgrade_download_run_local: true
-```
-
 ### autoupgrade_download_supported_releases
 
 Releases supported by AutoUpgrade for downloading patches.
@@ -214,7 +225,7 @@ AutoUpgrade does not accept Release Updates by patch number. The keyword is deri
 
 The result is added to `autoupgrade_download_patches`.
 
-See `autoupgrade_download_run_local` for multiple hosts in the play.
+See `autoupgrade_run_local` for multiple hosts in the play.
 Only entries from `oracle_sw_patches` are used, where `filename` matches
 `autoupgrade_download_filename_regex` and the release from `version` is in
 `autoupgrade_download_supported_releases`. Others (e.g. APEX, cvupack) are ignored with a warning.
@@ -393,7 +404,7 @@ autoupgrade_keystore_timeout: 300
 ### autoupgrade_local_home
 
 Directory for `autoupgrade.jar` and the generated AutoUpgrade config files
-on the Ansible controller (`autoupgrade_download_run_local: true`).
+on the Ansible controller (`autoupgrade_run_local: true`).
 
 #### Default value
 
@@ -403,7 +414,7 @@ autoupgrade_local_home: "{{ lookup('ansible.builtin.env', 'HOME') }}/autoupgrade
 
 ### autoupgrade_local_java_home
 
-JAVA_HOME used for AutoUpgrade on the Ansible controller (`autoupgrade_download_run_local: true`).
+JAVA_HOME used for AutoUpgrade on the Ansible controller (`autoupgrade_run_local: true`).
 `java` from `PATH` is used, when `autoupgrade_local_java_home` is empty.
 
 #### Default value
@@ -423,6 +434,34 @@ autoupgrade_log_dir: >-
   {{ _autoupgrade_run_local | bool
      | ternary(_autoupgrade_home + '/log', oracle_base + '/cfgtoollogs/autoupgrade')
   }}
+```
+
+### autoupgrade_run_local
+
+Execute AutoUpgrade on the Ansible controller instead of the target host.
+The switch is valid for all task files (`install.yml`, `keystore.yml`, `download_patches.yml`).
+
+`true` (default): Tasks are delegated to `localhost` with `run_once` and without `become`.
+`autoupgrade_local_home` and `autoupgrade_local_java_home` are used.
+This is useful for downloading patches into the software repository on the Ansible controller.
+
+`false`: Tasks are executed on the target host as `oracle_user`,
+e.g. for the installation of AutoUpgrade on database servers.
+
+_Important_
+
+With `true` the tasks are executed only once (`run_once`) with the variables
+of the first host in the play (`oracle_sw_patches`, `db_homes_installed`, `db_homes_config`,
+`oracle_install_version_gi`, `autoupgrade_download_patches`).
+These variables must be the same for all hosts in the play - e.g. defined in `group_vars/all`
+for the whole environment.
+When they are defined per host, limit the playbook to one host (`--limit <host>`)
+or execute it for each host.
+
+#### Default value
+
+```YAML
+autoupgrade_run_local: true
 ```
 
 ## Discovered Tags

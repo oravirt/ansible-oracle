@@ -1,16 +1,67 @@
 ---
+# The keystore console is controlled with ansible.builtin.expect, which needs the Python module pexpect
+# on the host executing AutoUpgrade. pexpect is not installed by the role (package names differ between
+# distributions) => check it with a dummy command for a clean error message.
+- name: autoupgrade | Check Python module pexpect
+  ansible.builtin.expect:
+    command: "true"
+    responses:
+      "unused": "unused"
+  become: "{{ _autoupgrade_become }}"
+  become_user: "{{ oracle_user }}"
+  delegate_to: "{{ _autoupgrade_delegate_to }}"
+  run_once: "{{ _autoupgrade_run_local | bool }}"
+  register: _autoupgrade_pexpect_res
+  changed_when: false
+  failed_when: false
+
+- name: autoupgrade | Assert Python module pexpect
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _autoupgrade_pexpect_res.rc | default(1) == 0
+    fail_msg: >-
+      Python module pexpect is missing for the Python interpreter on
+      {{ _autoupgrade_run_local | bool | ternary('the Ansible controller', inventory_hostname) }}.
+      Install it (e.g. package python3-pexpect or pip install pexpect) and try again.
+      {{ _autoupgrade_pexpect_res.msg | default('') }}
+
 - name: autoupgrade | Assert
   ansible.builtin.include_tasks: assert.yml
   tags:
     - assert
     - always
 
-- name: autoupgrade | Download latest version into software repository
+# AutoUpgrade can be used before the installation of the Oracle software
+# (e.g. downloading patches for the installation) => oracle_base does not exist yet.
+# Create it with the same attributes as oraswdb_install. The directories below are created as oracle_user.
+- name: autoupgrade | Create oracle_base
+  ansible.builtin.file:
+    path: "{{ aub }}"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: "0775"
+    state: directory
+  loop:
+    - "{{ oracle_base }}"
+    - "{{ oracle_base }}/cfgtoollogs"
+  loop_control:
+    loop_var: aub
+  become: true
+  when:
+    - not _autoupgrade_run_local | bool
+
+# Download the latest autoupgrade.jar into the software repository:
+# - on the Ansible controller, when the installation media are copied from there
+#   (oracle_sw_copy: true) or AutoUpgrade is executed there (download_patches.yml)
+# - on the target host, when the installation media are read from there (oracle_sw_copy: false)
+- name: autoupgrade | Download latest version into software repository on Ansible controller
   become: false
   delegate_to: localhost
   run_once: true
   when:
     - autoupgrade_download_latest | bool
+    - oracle_sw_copy or _autoupgrade_run_local | bool
   block:
     - name: autoupgrade | Assert software repository is local
       ansible.builtin.assert:
@@ -20,7 +71,7 @@
         fail_msg: >-
           autoupgrade_download_latest requires is_sw_source_local: true
 
-    - name: autoupgrade | Download latest from {{ autoupgrade_jar_url }}
+    - name: autoupgrade | Download latest on Ansible controller from {{ autoupgrade_jar_url }}
       ansible.builtin.get_url:
         url: "{{ autoupgrade_jar_url }}"
         dest: "{{ _autoupgrade_jar_source_local }}"
@@ -28,6 +79,23 @@
         # always check for a newer file. changed only when file differs
         force: true
       environment: "{{ proxy_env }}"
+
+- name: autoupgrade | Download latest on target host from {{ autoupgrade_jar_url }}
+  ansible.builtin.get_url:
+    url: "{{ autoupgrade_jar_url }}"
+    dest: "{{ _autoupgrade_jar_source_remote }}"
+    mode: "0644"
+    # always check for a newer file. changed only when file differs
+    force: true
+    client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
+    client_key: "{{ get_url_ssl_client_key | default(omit) }}"
+  environment: "{{ proxy_env }}"
+  become: true
+  become_user: "{{ oracle_user }}"
+  when:
+    - autoupgrade_download_latest | bool
+    - not oracle_sw_copy
+    - not _autoupgrade_run_local | bool
 
 - name: autoupgrade | Install
   become: "{{ _autoupgrade_become }}"
@@ -73,7 +141,7 @@
 
     - name: autoupgrade | Copy from remote stage {{ autoupgrade_jar }}
       ansible.builtin.copy:
-        src: "{{ autoupgrade_jar_filesource | default(oracle_stage_remote + '/' + autoupgrade_jar, true) }}"
+        src: "{{ _autoupgrade_jar_source_remote }}"
         dest: "{{ _autoupgrade_jar_path }}"
         mode: "0644"
         force: "{{ autoupgrade_force_update }}"

@@ -1,13 +1,9 @@
 ---
 - name: autoupgrade | Install AutoUpgrade
   ansible.builtin.include_tasks: install.yml
-  vars:
-    _autoupgrade_run_local: "{{ autoupgrade_download_run_local | bool }}"
 
 - name: autoupgrade | Manage keystore
   ansible.builtin.include_tasks: keystore.yml
-  vars:
-    _autoupgrade_run_local: "{{ autoupgrade_download_run_local | bool }}"
   when:
     - autoupgrade_keystore_manage | bool
 
@@ -17,7 +13,6 @@
   delegate_to: "{{ _autoupgrade_delegate_to }}"
   run_once: "{{ _autoupgrade_run_local | bool }}"
   vars:
-    _autoupgrade_run_local: "{{ autoupgrade_download_run_local | bool }}"
     _autoupgrade_download_cfg: "{{ _autoupgrade_cfg_dir }}/download_patches.cfg"
   block:
     - name: autoupgrade | Assert patch list for download
@@ -94,6 +89,67 @@
              | map('regex_replace', '^(.*?) [|/\\-] .*\x08([^\x08]*)$', '\1 - \2')
              | reject('match', '^\s*$')
              | list }}
+
+    # Gold Images get unique filenames with a timestamp from AutoUpgrade.
+    # Rename them and create a symlink with the original filename,
+    # because AutoUpgrade skips the download when the file exists.
+    # Symlinks are created only after the rename => removed symlinks are not recreated.
+    - name: autoupgrade | Rename Gold Images
+      when:
+        - autoupgrade_download_gold_image_rename | bool
+      block:
+        - name: autoupgrade | Read patches_info.json
+          ansible.builtin.slurp:
+            src: "{{ autoupgrade_download_dir }}/patches_info.json"
+          register: _autoupgrade_patches_info
+
+        - name: autoupgrade | Check downloaded Gold Images
+          ansible.builtin.stat:
+            path: "{{ autoupgrade_download_dir }}/{{ augi.src }}"
+            get_checksum: false
+          loop: "{{ _autoupgrade_gold_images }}"
+          loop_control:
+            loop_var: augi
+            label: "{{ augi.src }}"
+          register: _autoupgrade_gold_images_stat
+
+        # creates: an existing file with the new name is never replaced
+        - name: autoupgrade | Rename Gold Image
+          ansible.builtin.command:
+            argv:
+              - mv
+              - "{{ autoupgrade_download_dir }}/{{ augs.augi.src }}"
+              - "{{ autoupgrade_download_dir }}/{{ augs.augi.dest }}"
+            creates: "{{ autoupgrade_download_dir }}/{{ augs.augi.dest }}"
+          loop: "{{ _autoupgrade_gold_images_stat.results }}"
+          loop_control:
+            loop_var: augs
+            label: "{{ augs.augi.src }} => {{ augs.augi.dest }}"
+          register: _autoupgrade_gold_images_mv
+          when:
+            # regular file only, not a symlink from a previous rename
+            - augs.stat.isreg | default(false)
+
+        - name: autoupgrade | Create symlink with the original filename
+          ansible.builtin.file:
+            src: "{{ augm.augs.augi.dest }}"
+            dest: "{{ autoupgrade_download_dir }}/{{ augm.augs.augi.src }}"
+            state: link
+          loop: "{{ _autoupgrade_gold_images_mv.results | selectattr('changed') | list }}"
+          loop_control:
+            loop_var: augm
+            label: "{{ augm.augs.augi.src }} -> {{ augm.augs.augi.dest }}"
+
+        - name: autoupgrade | Warn about Gold Images not renamed
+          ansible.builtin.debug:
+            msg: >-
+              Not renamed, because the file exists already:
+              {{ _autoupgrade_gold_images_mv.results
+                 | rejectattr('skip_reason', 'defined') | rejectattr('changed')
+                 | map(attribute='augs.augi.src') | list }}
+          when:
+            - _autoupgrade_gold_images_mv.results
+              | rejectattr('skip_reason', 'defined') | rejectattr('changed') | list | length > 0
 
     - name: autoupgrade | Warn about unavailable patches
       ansible.builtin.debug:
