@@ -1,0 +1,13 @@
+---
+# Fixups phase for the Unplug/Plug upgrade of PDBs with AutoUpgrade.
+#
+# Same as the analyze phase, but AutoUpgrade is executed in mode fixups:
+# the prechecks are executed and the fixups are applied in the source CDB/PDBs
+# (e.g. dictionary statistics, purge recyclebin). The PDBs stay in the source CDB.
+# This shortens the downtime of the deploy phase.
+#
+# Fails, when AutoUpgrade reports errors without automatic fixup.
+- name: upgrade_fixups | Fixups phase
+  ansible.builtin.include_tasks: upgrade_analyze.yml
+  vars:
+    _autoupgrade_upgrade_mode: fixups

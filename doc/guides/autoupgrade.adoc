@@ -9,8 +9,10 @@ toc::[]
 == Oracle AutoUpgrade
 
 IMPORTANT: The role `autoupgrade` is currently _experimental_. +
-At the moment it supports the installation of AutoUpgrade and the download of patches from My Oracle Support. +
-Patching and upgrading databases with AutoUpgrade is not implemented yet.
+At the moment it supports the installation of AutoUpgrade, the download of patches from My Oracle Support
+and the Unplug/Plug upgrade of PDBs. +
+Patching databases with AutoUpgrade is not implemented yet. +
+The upgrade of PDBs is described in link:autoupgrade_upgrade.adoc[Upgrade of PDBs with AutoUpgrade].
 
 The role `autoupgrade` uses Oracle AutoUpgrade (`autoupgrade.jar`) for:
 
@@ -18,6 +20,7 @@ The role `autoupgrade` uses Oracle AutoUpgrade (`autoupgrade.jar`) for:
 - Download of the latest `autoupgrade.jar` from Oracle into the software repository
 - Management of the AutoUpgrade keystore with the My Oracle Support credentials
 - Download of patches from My Oracle Support (`-patch -mode download`)
+- Unplug/Plug upgrade of PDBs into a CDB of a new release (`-mode analyze`, `-mode fixups`, `-mode deploy`), see link:autoupgrade_upgrade.adoc[autoupgrade_upgrade.adoc]
 
 The variables of the role are described in link:../../roles/autoupgrade/README.md[roles/autoupgrade/README.md].
 
@@ -44,6 +47,9 @@ Each area of AutoUpgrade has its own task file, which must be called with `tasks
 |`install.yml` | Install `autoupgrade.jar`. Optional download of the latest version from Oracle.
 |`keystore.yml` | Create/update the keystore with the My Oracle Support credentials. Included by `download_patches.yml`.
 |`download_patches.yml` | Download patches with AutoUpgrade. Includes `install.yml` and `keystore.yml`.
+|`upgrade_analyze.yml` | Analyze phase for the Unplug/Plug upgrade of PDBs (`analyze`). Includes `install.yml`.
+|`upgrade_fixups.yml` | Fixups phase (`fixups`) in the source CDB/PDBs. Includes `upgrade_analyze.yml`.
+|`upgrade_deploy.yml` | Unplug/Plug upgrade of PDBs. Executes `upgrade_analyze.yml` first.
 |=======================
 
 .Example: call a task file
@@ -62,6 +68,9 @@ Each area of AutoUpgrade has its own task file, which must be called with `tasks
 |Playbook |Description
 |`playbooks/autoupgrade_install.yml` | Install AutoUpgrade. `hostgroup` is mandatory. Use `autoupgrade_run_local: false` for the database servers.
 |`playbooks/autoupgrade_download_patches.yml` | Download patches with AutoUpgrade.
+|`playbooks/autoupgrade_upgrade_analyze.yml` | Analyze phase for the upgrade of PDBs. `hostgroup` is mandatory.
+|`playbooks/autoupgrade_upgrade_fixups.yml` | Fixups phase for the upgrade of PDBs. `hostgroup` is mandatory.
+|`playbooks/autoupgrade_upgrade.yml` | Unplug/Plug upgrade of PDBs (analyze phase + deploy). `hostgroup` is mandatory.
 |=======================
 
 .Install AutoUpgrade on database servers
@@ -482,7 +491,7 @@ AutoUpgrade writes `patches_info.json` into `autoupgrade_download_dir`.
 
 === Known limitations
 
-- Patching and upgrading databases with AutoUpgrade is not implemented yet.
+- Patching databases with AutoUpgrade is not implemented yet.
 - The download on the Ansible controller uses the variables of the first host in the play (see above).
 - An explicit entry in `autoupgrade_download_patches` and the derived entry from `db_homes_installed` /
   `oracle_sw_patches` for the same release create two sections in the config file.

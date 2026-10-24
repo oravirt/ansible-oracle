@@ -1,0 +1,47 @@
+---
+- name: Converge
+  hosts: all
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+
+    # install missing cron on rhel9 container
+    - name: Install cron on RHEL/OL9
+      ansible.builtin.package:
+        name: cronie
+      when:
+        - ansible_os_family == 'RedHat'
+        - ansible_distribution_major_version | int == 9
+
+    # the container image is based on an older OL9 release.
+    # Installing packages pulls a newer openssl-libs and the old ssh-keygen
+    # fails with 'OpenSSL version mismatch' => update openssh first
+    - name: Update openssh on RHEL/OL9
+      ansible.builtin.package:
+        name:
+          - openssh
+          - openssh-clients
+        state: latest  # noqa package-latest
+      when:
+        - ansible_os_family == 'RedHat'
+        - ansible_distribution_major_version | int == 9
+
+- name: Converge os
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.os
+
+# 19c (source) and 26ai (target) ORACLE_HOME from host_vars/dbfs-upg.yml
+- name: Converge swdb
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swdb
+  vars:
+    # copy installation media and patches from the Ansible controller
+    # => source is oracle_sw_source_local from host_vars/dbfs-upg.yml
+    oracle_sw_copy: true
+    is_sw_source_local: true
+
+- name: Converge sql_zauberkasten
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.sql_zauberkasten
+
+# DB2 (19c) with ORCLPDB1 and the empty target CDB DB1 (26ai)
+# oracle_pdbs still points to DB2 (source state) - the end state is set in side_effect.yml
+- name: Converge manage_db
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db

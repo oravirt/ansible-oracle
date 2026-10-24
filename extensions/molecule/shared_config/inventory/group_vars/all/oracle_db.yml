@@ -55,7 +55,7 @@ db_homes_config:
     readonly_home: true
     oracle_home_name: db1919siee
     opatch: []
-  db1932-si-ee:
+  db1932-si-ee: &db1932-si-ee
     version: 19.3.0.0
     oracle_home: "/u01/app/oracle/product/19/db_19.32"
     edition: EE
@@ -73,16 +73,16 @@ db_homes_config:
     readonly_home: true
     oracle_home_name: db1933siee
     opatch: []
+  # target for the upgrade with AutoUpgrade (scenario upgrade)
+  db26-si-ee:
+    version: 26.1.0.0
+    oracle_home: "/u01/app/oracle/product/26/db_26.1"
+    imagename: db_home_26.04.zip
+    edition: EE
+    readonly_home: true
+    oracle_home_name: db261siee
   db19-si-ee:
-    <<: *db1919-si-ee
-    opatch:
-      # - {patchid: 29213893, state: absent, excludeUPI: 25224952, stop_processes: true}  # 19.3
-      # - {patchid: 29213893, state: absent, excludeUPI: 24722761, stop_processes: true}  # 19.15
-      - patchid: 39472050
-        # Database Release Update 19.32.0.0.260721
-        patchversion: 19.32.0.0.260721
-        stop_processes: true
-        state: present
+    <<: *db1932-si-ee
 
 oracle_listeners_config:
   LISTENER:

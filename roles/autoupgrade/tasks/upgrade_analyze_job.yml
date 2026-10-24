@@ -1,0 +1,311 @@
+---
+# Analyze phase or fixups phase for one AutoUpgrade job (loop_var: aupjob)
+# AutoUpgrade mode: _autoupgrade_upgrade_mode (analyze, fixups), default analyze
+#
+# State of the PDBs from v$pdbs of the source and the target CDB:
+#   pending  => in source CDB, not in target CDB: AutoUpgrade analyze or fixups
+#   upgraded => in target CDB, not in source CDB: nothing to do
+#   conflict => in both CDBs: fail (e.g. created in the target CDB by manage_db)
+#   missing  => in no CDB: fail
+#
+# The target CDB must run from the target ORACLE_HOME.
+# The source CDB must run from the source ORACLE_HOME, when PDBs are pending.
+#
+# Recovery data of AutoUpgrade (from a former deploy of the job):
+#   unfinished => deploy phase (_autoupgrade_upgrade_in_deploy): state 'resume', no further checks,
+#                 the deploy resumes the job with the existing config file
+#                 analyze/fixups phase: fail
+#   finished   => cleared before analyze/fixups, when PDBs are pending
+#                 (kept otherwise: needed for -restore)
+#   autoupgrade_upgrade_clear_recovery_data: true => cleared in any case
+- name: upgrade_analyze_job | State of source and target CDB
+  become: true
+  become_user: "{{ oracle_user }}"
+  block:
+    # ORACLE_HOME from the running instance (/proc/<pid of pmon>/exe)
+    - name: upgrade_analyze_job | Read PDBs from source and target CDB
+      ansible.builtin.shell: |
+        set -eu
+        # -f: match args (ora_pmon_DB2), not comm (ora_pmon_db2)
+        if ! pid=$(pgrep -f "^ora_pmon_${ORACLE_SID}$") ; then
+          exit 0
+        fi
+        exe=$(readlink "/proc/${pid}/exe")
+        ORACLE_HOME="${exe%/bin/oracle*}"
+        export ORACLE_HOME
+        echo "HOME=${ORACLE_HOME}"
+        "${ORACLE_HOME}/bin/sqlplus" -S -L /nolog <<EOF
+        connect / as sysdba
+        whenever sqlerror exit failure
+        set heading off feedback off pagesize 0 linesize 200
+        -- UNPLUGGED: PDB kept in the source CDB after the upgrade (keep_source_pdb)
+        select 'PDB=' || p.name || ':' || p.open_mode
+          from v\$pdbs p join cdb_pdbs d on d.pdb_id = p.con_id
+         where p.name <> 'PDB\$SEED' and d.status <> 'UNPLUGGED';
+        EOF
+      environment:
+        ORACLE_SID: "{{ aupcdb }}"
+      loop:
+        - "{{ aupjob.source_sid }}"
+        - "{{ aupjob.target_sid }}"
+      loop_control:
+        loop_var: aupcdb
+      register: _autoupgrade_upgrade_query
+      changed_when: false
+
+- name: upgrade_analyze_job | Recovery data of AutoUpgrade
+  become: true
+  become_user: "{{ oracle_user }}"
+  block:
+    - name: upgrade_analyze_job | Check recovery data
+      ansible.builtin.stat:
+        path: "{{ _autoupgrade_upgrade_recovery_dir }}/config_files/upgradeJobs.bin"
+        get_checksum: false
+      register: _autoupgrade_upgrade_recovery_jobs
+
+    - name: upgrade_analyze_job | Read state of AutoUpgrade jobs
+      ansible.builtin.slurp:
+        src: "{{ _autoupgrade_upgrade_recovery_dir }}/state.txt"
+      register: _autoupgrade_upgrade_recovery_state
+      failed_when: false
+      when:
+        - _autoupgrade_upgrade_recovery_jobs.stat.exists
+
+    - name: upgrade_analyze_job | Show recovery data
+      ansible.builtin.debug:
+        msg: >-
+          Recovery data of AutoUpgrade for job {{ aupjob.name }}: {{ _autoupgrade_upgrade_recovery }}
+          ({{ _autoupgrade_upgrade_recovery_statuses | join(', ') }})
+      when:
+        - _autoupgrade_upgrade_recovery != 'none'
+
+    - name: upgrade_analyze_job | Clear recovery data (autoupgrade_upgrade_clear_recovery_data)
+      ansible.builtin.command: >-
+        {{ _autoupgrade_java }} -jar {{ _autoupgrade_jar_path }}
+        -config {{ _autoupgrade_upgrade_cfg }} -clear_recovery_data
+      register: _autoupgrade_upgrade_clear
+      changed_when: true
+      failed_when: false
+      when:
+        - autoupgrade_upgrade_clear_recovery_data | bool
+        - _autoupgrade_upgrade_recovery != 'none'
+
+    - name: upgrade_analyze_job | AutoUpgrade failed
+      ansible.builtin.include_tasks: upgrade_error.yml
+      vars:
+        _autoupgrade_upgrade_result: "{{ _autoupgrade_upgrade_clear }}"
+        _autoupgrade_upgrade_result_mode: clear_recovery_data
+      when:
+        - _autoupgrade_upgrade_clear.rc | default(0) != 0
+
+    - name: upgrade_analyze_job | Check recovery data after clear
+      ansible.builtin.stat:
+        path: "{{ _autoupgrade_upgrade_recovery_dir }}/config_files/upgradeJobs.bin"
+        get_checksum: false
+      register: _autoupgrade_upgrade_recovery_jobs
+      when:
+        - autoupgrade_upgrade_clear_recovery_data | bool
+
+    - name: upgrade_analyze_job | Resume unfinished deploy
+      ansible.builtin.set_fact:
+        _autoupgrade_upgrade_state: >-
+          {{ _autoupgrade_upgrade_state | combine({aupjob.name: {
+               'state': 'resume',
+               'pdbs': aupjob.pdbs | map(attribute='target_name') | list,
+               'log_dir': _autoupgrade_upgrade_log_dir}}) }}
+      when:
+        - _autoupgrade_upgrade_recovery == 'unfinished'
+        - _autoupgrade_upgrade_in_deploy | default(false) | bool
+
+    - name: upgrade_analyze_job | Assert no unfinished deploy
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _autoupgrade_upgrade_recovery != 'unfinished'
+        fail_msg: >-
+          AutoUpgrade job {{ aupjob.name }} has an unfinished deploy
+          ({{ _autoupgrade_upgrade_recovery_statuses | join(', ') or 'state unknown' }}).
+          Resume it with the deploy phase (playbook autoupgrade_upgrade.yml).
+          When the PDBs were restored manually, discard the recovery data with
+          -e autoupgrade_upgrade_clear_recovery_data=true.
+          Logfiles: {{ _autoupgrade_upgrade_log_dir }}
+      when:
+        - not _autoupgrade_upgrade_in_deploy | default(false) | bool
+
+# Not executed for an unfinished deploy => resumed by the deploy phase
+- name: upgrade_analyze_job | Check state of PDBs
+  when:
+    - _autoupgrade_upgrade_recovery != 'unfinished'
+  block:
+    - name: upgrade_analyze_job | Show state of PDBs
+      ansible.builtin.debug:
+        msg:
+          - "Job:                {{ aupjob.name }}"
+          - "Source CDB:         {{ aupjob.source_cdb }} (SID {{ aupjob.source_sid }}) {{ _autoupgrade_upgrade_source_home }}"
+          - "  running from:     {{ _autoupgrade_upgrade_source_running_home or 'not running' }}"
+          - "Target CDB:         {{ aupjob.target_cdb }} (SID {{ aupjob.target_sid }}) {{ _autoupgrade_upgrade_target_home }}"
+          - "  running from:     {{ _autoupgrade_upgrade_target_running_home or 'not running' }}"
+          - "PDBs:               {{ _autoupgrade_upgrade_pdb_states | map(attribute='target_name')
+                                    | zip(_autoupgrade_upgrade_pdb_states | map(attribute='state'))
+                                    | map('join', '=') | join(', ') }}"
+
+    - name: upgrade_analyze_job | Assert target CDB
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _autoupgrade_upgrade_target_running_home == _autoupgrade_upgrade_target_home
+        fail_msg: >-
+          Target CDB {{ aupjob.target_cdb }} must be running from {{ _autoupgrade_upgrade_target_home }}.
+          Current: {{ _autoupgrade_upgrade_target_running_home or 'not running' }}.
+          Create the target CDB with playbook manage_db before the PDBs are changed in oracle_pdbs.
+
+    - name: upgrade_analyze_job | Assert state of PDBs
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _autoupgrade_upgrade_pdb_states | selectattr('state', 'in', ['conflict', 'missing']) | list | length == 0
+        fail_msg: >-
+          {% for p in _autoupgrade_upgrade_pdb_states | selectattr('state', 'in', ['conflict', 'missing']) %}
+          PDB {{ p.source_name }} => {{ p.target_name }}: {{ p.state }}.
+          {% endfor %}
+          conflict: the PDB exists in source CDB {{ aupjob.source_cdb }} and in target CDB {{ aupjob.target_cdb }}.
+          Was playbook manage_db executed after the change of oracle_pdbs? Then an empty PDB was created
+          in the target CDB. Drop it manually before the upgrade.
+          missing: the PDB exists in no CDB{{ '' if _autoupgrade_upgrade_source_running_home | length > 0
+          else ' - source CDB ' ~ aupjob.source_cdb ~ ' is not running' }}.
+
+    - name: upgrade_analyze_job | All PDBs upgraded already
+      ansible.builtin.set_fact:
+        _autoupgrade_upgrade_state: >-
+          {{ _autoupgrade_upgrade_state | combine({aupjob.name: {
+               'state': 'upgraded',
+               'pdbs': _autoupgrade_upgrade_pdb_states | map(attribute='target_name') | list}}) }}
+      when:
+        - _autoupgrade_upgrade_pending_pdbs | length == 0
+
+    - name: upgrade_analyze_job | Analyze/fixups for pending PDBs
+      when:
+        - _autoupgrade_upgrade_pending_pdbs | length > 0
+      become: true
+      become_user: "{{ oracle_user }}"
+      block:
+        - name: upgrade_analyze_job | Assert source CDB
+          ansible.builtin.assert:
+            quiet: true
+            that:
+              - _autoupgrade_upgrade_source_running_home == _autoupgrade_upgrade_source_home
+            fail_msg: >-
+              Source CDB {{ aupjob.source_cdb }} must be running from {{ _autoupgrade_upgrade_source_home }}.
+              Current: {{ _autoupgrade_upgrade_source_running_home or 'not running' }}.
+
+        - name: upgrade_analyze_job | Create directories
+          ansible.builtin.file:
+            path: "{{ _autoupgrade_upgrade_log_dir }}"
+            mode: "0755"
+            state: directory
+
+        - name: upgrade_analyze_job | Create config file
+          ansible.builtin.template:
+            src: upgrade.cfg.j2
+            dest: "{{ _autoupgrade_upgrade_cfg }}"
+            mode: "0644"
+
+        # AutoUpgrade refuses analyze/fixups/deploy with recovery data of a former deploy,
+        # even when it is finished. Pending PDBs => a new upgrade => recovery data not needed anymore.
+        - name: upgrade_analyze_job | Clear recovery data of finished deploy
+          ansible.builtin.command: >-
+            {{ _autoupgrade_java }} -jar {{ _autoupgrade_jar_path }}
+            -config {{ _autoupgrade_upgrade_cfg }} -clear_recovery_data
+          register: _autoupgrade_upgrade_clear_finished
+          changed_when: true
+          failed_when: false
+          when:
+            - _autoupgrade_upgrade_recovery == 'finished'
+
+        - name: upgrade_analyze_job | AutoUpgrade failed
+          ansible.builtin.include_tasks: upgrade_error.yml
+          vars:
+            _autoupgrade_upgrade_result: "{{ _autoupgrade_upgrade_clear_finished }}"
+            _autoupgrade_upgrade_result_mode: clear_recovery_data
+          when:
+            - _autoupgrade_upgrade_clear_finished.rc | default(0) != 0
+
+        # failed_when: false => user friendly message in the next task
+        - name: upgrade_analyze_job | Run AutoUpgrade in mode {{ _autoupgrade_upgrade_mode | default('analyze') }}
+          ansible.builtin.command: >-
+            {{ _autoupgrade_java }} -jar {{ _autoupgrade_jar_path }}
+            -config {{ _autoupgrade_upgrade_cfg }}
+            -mode {{ _autoupgrade_upgrade_mode | default('analyze') }} -noconsole
+          register: _autoupgrade_upgrade_analyze
+          # analyze does not change the database
+          changed_when:
+            - (_autoupgrade_upgrade_mode | default('analyze')) == 'fixups'
+            - _autoupgrade_upgrade_analyze.rc == 0
+          failed_when: false
+
+        - name: upgrade_analyze_job | AutoUpgrade failed
+          ansible.builtin.include_tasks: upgrade_error.yml
+          vars:
+            _autoupgrade_upgrade_result: "{{ _autoupgrade_upgrade_analyze }}"
+            _autoupgrade_upgrade_result_mode: "{{ _autoupgrade_upgrade_mode | default('analyze') }}"
+          when:
+            - _autoupgrade_upgrade_analyze.rc != 0
+
+        - name: upgrade_analyze_job | Show output of AutoUpgrade
+          ansible.builtin.debug:
+            var: _autoupgrade_upgrade_analyze.stdout_lines
+
+        # <log_dir>/<sid>/<job number>/prechecks/*_checklist.json, *_preupgrade.html
+        # <log_dir>/<sid>/<job number>/autoupgrade_<date>.log, autoupgrade_<date>_user.log
+        - name: upgrade_analyze_job | Find files of AutoUpgrade job
+          ansible.builtin.find:
+            paths: "{{ _autoupgrade_upgrade_log_dir }}"
+            patterns:
+              - "*_checklist.json"
+              - "*_preupgrade.html"
+              - "autoupgrade_*.log"
+            recurse: true
+          register: _autoupgrade_upgrade_job_files
+
+        - name: upgrade_analyze_job | Read checklists
+          ansible.builtin.slurp:
+            src: "{{ aupcl }}"
+          loop: "{{ _autoupgrade_upgrade_job_file_list | select('search', '_checklist\\.json$') | list }}"
+          loop_control:
+            loop_var: aupcl
+          register: _autoupgrade_upgrade_checklist
+
+        - name: upgrade_analyze_job | Store result
+          ansible.builtin.set_fact:
+            _autoupgrade_upgrade_state: >-
+              {{ _autoupgrade_upgrade_state | combine({aupjob.name: {
+                   'state': 'analyzed',
+                   'mode': _autoupgrade_upgrade_mode | default('analyze'),
+                   'pdbs': _autoupgrade_upgrade_pending_pdbs | map(attribute='target_name') | list,
+                   'upgraded_pdbs': _autoupgrade_upgrade_pdb_states | selectattr('state', 'equalto', 'upgraded')
+                                    | map(attribute='target_name') | list,
+                   'checks': _autoupgrade_upgrade_checks | length,
+                   'errors': _autoupgrade_upgrade_checks | selectattr('severity', 'defined')
+                             | map(attribute='severity') | map('upper') | select('equalto', 'ERROR') | list | length,
+                   'warnings': _autoupgrade_upgrade_checks | selectattr('severity', 'defined')
+                               | map(attribute='severity') | map('upper') | select('equalto', 'WARNING') | list | length,
+                   'blocking': _autoupgrade_upgrade_blocking_checks,
+                   'reports': _autoupgrade_upgrade_job_file_list | select('search', '_preupgrade\.html$') | list,
+                   'logfile': _autoupgrade_upgrade_job_file_list | select('search', '/autoupgrade_[0-9]+\.log$')
+                              | first | default(''),
+                   'user_logfile': _autoupgrade_upgrade_job_file_list | select('search', '/autoupgrade_[0-9]+_user\.log$')
+                                   | first | default(''),
+                   'log_dir': _autoupgrade_upgrade_log_dir}}) }}
+
+        # no checklist => the result of the prechecks is unknown
+        - name: upgrade_analyze_job | Assert checklist
+          ansible.builtin.assert:
+            quiet: true
+            that:
+              - _autoupgrade_upgrade_checklist.results | default([]) | length > 0
+            fail_msg: >-
+              No *_checklist.json found in {{ _autoupgrade_upgrade_log_dir }}.
+              The prechecks could not be evaluated. Check the output of AutoUpgrade
+              and the logfile {{ _autoupgrade_upgrade_state[aupjob.name]['logfile'] or _autoupgrade_upgrade_log_dir }}.
+          when:
+            - autoupgrade_upgrade_fail_on_precheck_errors | bool
