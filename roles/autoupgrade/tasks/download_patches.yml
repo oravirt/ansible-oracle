@@ -2,6 +2,12 @@
 - name: autoupgrade | Install AutoUpgrade
   ansible.builtin.include_tasks: install.yml
 
+# before the keystore: a wrong proxy leads to misleading errors of the keystore console
+- name: autoupgrade | Check connection to Oracle
+  ansible.builtin.include_tasks: proxy_check.yml
+  when:
+    - autoupgrade_proxy_check | bool
+
 - name: autoupgrade | Manage keystore
   ansible.builtin.include_tasks: keystore.yml
   when:
@@ -71,10 +77,10 @@
 
     - name: autoupgrade | Run AutoUpgrade in download mode
       ansible.builtin.command: >-
-        {{ _autoupgrade_java }} -jar {{ _autoupgrade_jar_path }}
+        {{ _autoupgrade_java }}{{ _autoupgrade_java_opts }} -jar {{ _autoupgrade_jar_path }}
         -config {{ _autoupgrade_download_cfg }}
         -patch -mode download
-      environment: "{{ proxy_env }}"
+      environment: "{{ _autoupgrade_proxy_env }}"
       register: _autoupgrade_download_res
       # VALIDATED: patch has been downloaded
       # LOCATED:   patch already exists in autoupgrade_download_dir

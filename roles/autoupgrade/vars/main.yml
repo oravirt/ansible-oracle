@@ -36,6 +36,36 @@ _autoupgrade_java_home: >-
      | ternary(autoupgrade_local_java_home,
                autoupgrade_java_home | default('', true) or _autoupgrade_upgrade_java_home | default('')) }}
 
+# Proxy for get_url and AutoUpgrade (AutoUpgrade reads lowercase https_proxy):
+# proxy_env from orasw_meta + optional credentials autoupgrade_proxy_username/password
+# => [scheme://]user:password@host:port (URL encoded), only when no credentials are in the URL
+_autoupgrade_proxy_env: >-
+  {%- set ns = namespace(env=proxy_env | default({})) -%}
+  {%- if autoupgrade_proxy_username | length > 0 -%}
+  {%-   set cred = (autoupgrade_proxy_username | urlencode | replace('/', '%2F'))
+                   ~ ':' ~ (autoupgrade_proxy_password | urlencode | replace('/', '%2F')) -%}
+  {%-   for key in ['http_proxy', 'https_proxy'] -%}
+  {%-     set url = ns.env[key] | default('') | string -%}
+  {%-     if url | length > 0 and '@' not in url -%}
+  {%-       set scheme = url | regex_search('^[A-Za-z0-9]+://') or 'http://' -%}
+  {%-       set rest = url | regex_replace('^[A-Za-z0-9]+://', '') -%}
+  {%-       set ns.env = ns.env | combine({key: scheme ~ cred ~ '@' ~ rest}) -%}
+  {%-     endif -%}
+  {%-   endfor -%}
+  {%- endif -%}
+  {{ ns.env }}
+
+# Java options for AutoUpgrade (leading blank or empty).
+# Proxy with credentials: Java disables Basic authentication for HTTPS tunneling by default
+# => enable it with jdk.http.auth.tunneling.disabledSchemes=
+_autoupgrade_java_opts: >-
+  {%- set opts = autoupgrade_java_options | default([]) | list -%}
+  {%- if '@' in (_autoupgrade_proxy_env.https_proxy | default('') | string)
+        or '@' in (_autoupgrade_proxy_env.http_proxy | default('') | string) -%}
+  {%-   set opts = opts + ['-Djdk.http.auth.tunneling.disabledSchemes='] -%}
+  {%- endif -%}
+  {{ (' ' ~ (opts | join(' '))) if opts | length > 0 else '' }}
+
 _autoupgrade_java: >-
   {{ (_autoupgrade_java_home | length > 0)
      | ternary(_autoupgrade_java_home + '/bin/java', 'java') }}
@@ -360,3 +390,55 @@ _autoupgrade_upgrade_error_msg: >-
      + ((r.msg | default('') | length > 0 and r.msg != 'non-zero return code') | ternary(['Ansible:      ' ~ r.msg], []))
      + ['--- Output of AutoUpgrade ---'] + (out or ['(no output)'])
      + ['--- What to do ---'] + hint }}
+
+# Check of the connection to Oracle (proxy_check.yml)
+# proxy URL without password for messages
+_autoupgrade_proxy_display: >-
+  {{ (_autoupgrade_proxy_env.https_proxy | default('') | string
+      | regex_replace('(://[^:/@]*):[^@]*@', '\1:***@'))
+     or 'none (direct connection)' }}
+
+# failed URLs with a hint for the cause: requires _autoupgrade_proxy_check_res (registered loop of uri)
+_autoupgrade_proxy_check_failures: >-
+  {%- set ns = namespace(res=[]) -%}
+  {%- set proxy = _autoupgrade_proxy_env.https_proxy | default('') | string -%}
+  {%- for r in _autoupgrade_proxy_check_res.results | default([]) -%}
+  {%-   if (r.status | default(-1) | int) <= 0 -%}
+  {%-     set m = r.msg | default('') | string -%}
+  {%-     if m is search('407') -%}
+  {%-       set hint = 'Proxy authentication failed (407): check autoupgrade_proxy_username / autoupgrade_proxy_password or the credentials in https_proxy.' -%}
+  {%-     elif m is search('Tunnel connection failed: 403') -%}
+  {%-       set hint = 'The proxy denies the connection (403): the target is not allowed by the proxy. Ask the proxy administrator.' -%}
+  {%-     elif m is search('Tunnel connection failed') -%}
+  {%-       set hint = 'The proxy refused the connection: ' ~ (m | regex_search('Tunnel connection failed: [^>]*') | default('')) -%}
+  {%-     elif m is search('Name or service not known|Temporary failure in name resolution|nodename nor servname|No address associated') -%}
+  {%-       set hint = (proxy | length > 0) | ternary('Name resolution failed: check the hostname of the proxy in https_proxy.',
+                                                     'Name resolution failed and no proxy is configured: set https_proxy, when the internet is reachable through a proxy only.') -%}
+  {%-     elif m is search('Connection refused') -%}
+  {%-       set hint = (proxy | length > 0) | ternary('Connection refused: check the port in https_proxy and that the proxy is running.',
+                                                     'Connection refused without proxy: set https_proxy, when the internet is reachable through a proxy only.') -%}
+  {%-     elif m is search('timed out|Network is unreachable|No route to host') -%}
+  {%-       set hint = (proxy | length > 0) | ternary('No connection to the proxy (timeout/no route): check https_proxy and the firewall to the proxy.',
+                                                     'No route to the internet and no proxy configured: set https_proxy.') -%}
+  {%-     elif m is search('CERTIFICATE_VERIFY_FAILED|certificate verify failed') -%}
+  {%-       set hint = 'TLS certificate not trusted: the proxy probably inspects TLS. Add the CA of the proxy to the trust store of the host and of Java.' -%}
+  {%-     else -%}
+  {%-       set hint = 'Connection failed. Check https_proxy, no_proxy and the firewall.' -%}
+  {%-     endif -%}
+  {%-     set ns.res = ns.res + [{'url': r.aupu | default(r.url | default('')), 'error': m | regex_replace('^Status code was -1 and not \[[^]]*\]: ', ''), 'hint': hint}] -%}
+  {%-   endif -%}
+  {%- endfor -%}
+  {{ ns.res }}
+
+# lines for the debug output of a failed check of the connection
+_autoupgrade_proxy_check_details: >-
+  {%- set ns = namespace(lines=[
+        'No connection to Oracle',
+        'Executed on: ' ~ ((_autoupgrade_proxy_check_controller | default(false) | bool)
+                           | ternary('Ansible controller', _autoupgrade_delegate_to)),
+        'Proxy:       ' ~ _autoupgrade_proxy_display,
+        'no_proxy:    ' ~ (_autoupgrade_proxy_env.no_proxy | default('') or '-')]) -%}
+  {%- for f in _autoupgrade_proxy_check_failures -%}
+  {%-   set ns.lines = ns.lines + ['--- ' ~ f.url ~ ' ---', 'Error: ' ~ f.error, 'Hint:  ' ~ f.hint] -%}
+  {%- endfor -%}
+  {{ ns.lines }}

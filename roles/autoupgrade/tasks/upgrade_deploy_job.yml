@@ -21,7 +21,7 @@
 
     - name: upgrade_deploy_job | Run AutoUpgrade in mode deploy
       ansible.builtin.command: >-
-        {{ _autoupgrade_java }} -jar {{ _autoupgrade_jar_path }}
+        {{ _autoupgrade_java }}{{ _autoupgrade_java_opts }} -jar {{ _autoupgrade_jar_path }}
         -config {{ _autoupgrade_upgrade_cfg }}
         -mode deploy -noconsole
       register: _autoupgrade_upgrade_deploy

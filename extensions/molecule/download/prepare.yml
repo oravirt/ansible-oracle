@@ -1,0 +1,43 @@
+---
+# Squid as mandatory proxy with Basic authentication on download-squid.
+# The proxy for dnf on download is configured in converge.yml.
+- name: Prepare Squid
+  hosts: proxy
+  gather_facts: false
+  vars_files:
+    - proxy_vars.yml
+  tasks:
+    - name: Install Squid
+      ansible.builtin.package:
+        name:
+          - squid
+          - httpd-tools
+
+    - name: Create squid.conf
+      ansible.builtin.copy:
+        src: files/squid.conf
+        dest: /etc/squid/squid.conf
+        owner: root
+        group: squid
+        mode: "0640"
+      register: _download_squid_conf
+
+    - name: Create user for Basic authentication
+      ansible.builtin.command: >-
+        htpasswd -b -c /etc/squid/passwd {{ download_proxy_username }} {{ download_proxy_password }}
+      args:
+        creates: /etc/squid/passwd
+      no_log: true
+
+    - name: Permissions of password file
+      ansible.builtin.file:
+        path: /etc/squid/passwd
+        owner: root
+        group: squid
+        mode: "0640"
+
+    - name: Start Squid
+      ansible.builtin.service:
+        name: squid
+        state: "{{ _download_squid_conf is changed | ternary('restarted', 'started') }}"
+        enabled: true

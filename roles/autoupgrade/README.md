@@ -36,6 +36,7 @@ See `doc/guides/autoupgrade_upgrade.adoc` for the upgrade of PDBs.
   - [autoupgrade_jar_filesource](#autoupgrade_jar_filesource)
   - [autoupgrade_jar_url](#autoupgrade_jar_url)
   - [autoupgrade_java_home](#autoupgrade_java_home)
+  - [autoupgrade_java_options](#autoupgrade_java_options)
   - [autoupgrade_keystore](#autoupgrade_keystore)
   - [autoupgrade_keystore_fail_on_invalid_credentials](#autoupgrade_keystore_fail_on_invalid_credentials)
   - [autoupgrade_keystore_manage](#autoupgrade_keystore_manage)
@@ -46,6 +47,11 @@ See `doc/guides/autoupgrade_upgrade.adoc` for the upgrade of PDBs.
   - [autoupgrade_local_home](#autoupgrade_local_home)
   - [autoupgrade_local_java_home](#autoupgrade_local_java_home)
   - [autoupgrade_log_dir](#autoupgrade_log_dir)
+  - [autoupgrade_proxy_check](#autoupgrade_proxy_check)
+  - [autoupgrade_proxy_check_timeout](#autoupgrade_proxy_check_timeout)
+  - [autoupgrade_proxy_check_urls](#autoupgrade_proxy_check_urls)
+  - [autoupgrade_proxy_password](#autoupgrade_proxy_password)
+  - [autoupgrade_proxy_username](#autoupgrade_proxy_username)
   - [autoupgrade_run_local](#autoupgrade_run_local)
   - [autoupgrade_upgrade_clear_recovery_data](#autoupgrade_upgrade_clear_recovery_data)
   - [autoupgrade_upgrade_fail_on_precheck_errors](#autoupgrade_upgrade_fail_on_precheck_errors)
@@ -330,6 +336,29 @@ autoupgrade_java_home: ''
 autoupgrade_java_home: /u01/app/oracle/product/19/db1/jdk
 ```
 
+### autoupgrade_java_options
+
+Additional Java options for each call of `autoupgrade.jar`, e.g. a truststore
+for a proxy with TLS inspection.
+
+With proxy credentials (`autoupgrade_proxy_username` or credentials in `https_proxy`)
+`-Djdk.http.auth.tunneling.disabledSchemes=` is added automatically,
+because Java disables Basic authentication for HTTPS tunneling by default.
+
+#### Default value
+
+```YAML
+autoupgrade_java_options: []
+```
+
+#### Example usage
+
+```YAML
+autoupgrade_java_options:
+  - -Djavax.net.ssl.trustStore=/etc/pki/java/cacerts
+  - -Djavax.net.ssl.trustStorePassword=changeit
+```
+
 ### autoupgrade_keystore
 
 Value for `global.keystore` in the AutoUpgrade config files.
@@ -447,6 +476,91 @@ autoupgrade_log_dir: >-
   {{ _autoupgrade_run_local | bool
      | ternary(_autoupgrade_home + '/log', oracle_base + '/cfgtoollogs/autoupgrade')
   }}
+```
+
+### autoupgrade_proxy_check
+
+Check the connection to Oracle before AutoUpgrade (`download_patches.yml`) or `get_url`
+(`autoupgrade_download_latest`) is executed.
+
+The check uses the same host, user and proxy settings (`http_proxy`, `https_proxy`, `no_proxy`,
+`autoupgrade_proxy_username`, `autoupgrade_proxy_password`) as the later download.
+Any HTTP response of the target counts as success.
+Errors are explained (e.g. proxy authentication failed, proxy not reachable, no route to the internet),
+before they lead to misleading errors of AutoUpgrade or of the keystore.
+
+The upgrade of PDBs does not need a connection to the internet and does not execute the check.
+
+#### Default value
+
+```YAML
+autoupgrade_proxy_check: true
+```
+
+### autoupgrade_proxy_check_timeout
+
+Timeout in seconds for each URL of the check of the connection.
+
+#### Default value
+
+```YAML
+autoupgrade_proxy_check_timeout: 30
+```
+
+### autoupgrade_proxy_check_urls
+
+URLs for the check of the connection in `download_patches.yml`.
+These are the hosts used by AutoUpgrade 26 for the login into My Oracle Support and the download of patches.
+For `autoupgrade_download_latest` the host of `autoupgrade_jar_url` is checked.
+
+#### Default value
+
+```YAML
+autoupgrade_proxy_check_urls:
+  - https://login-ext.identity.oraclecloud.com
+  - https://transport.oracle.com
+  - https://updates.oracle.com
+  - https://aru-akam.oracle.com
+```
+
+### autoupgrade_proxy_password
+
+Password for an HTTP proxy with authentication. See `autoupgrade_proxy_username`.
+
+#### Default value
+
+```YAML
+autoupgrade_proxy_password: ''
+```
+
+### autoupgrade_proxy_username
+
+Username for an HTTP proxy with authentication.
+
+The proxy itself is defined with `http_proxy`, `https_proxy` and `no_proxy`
+(same variables as for other downloads in `ansible-oracle`).
+Username and password are added URL encoded to `http_proxy` and `https_proxy`:
+`http://<user>:<password>@proxy:3128`.
+Credentials in `http_proxy` / `https_proxy` are not changed.
+
+The proxy is used by `get_url` (download of `autoupgrade.jar`) and by AutoUpgrade
+(keystore, download of patches). AutoUpgrade reads `https_proxy`.
+AutoUpgrade needs access to `updates.oracle.com`, `login-ext.identity.oraclecloud.com`
+and `aru-akam.oracle.com`.
+
+#### Default value
+
+```YAML
+autoupgrade_proxy_username: ''
+```
+
+#### Example usage
+
+```YAML
+https_proxy: http://proxy.example.com:3128
+no_proxy: localhost,.example.com
+autoupgrade_proxy_username: proxyuser
+autoupgrade_proxy_password: "{{ vault_proxy_password }}"
 ```
 
 ### autoupgrade_run_local

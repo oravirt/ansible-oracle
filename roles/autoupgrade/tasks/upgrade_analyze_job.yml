@@ -81,7 +81,7 @@
 
     - name: upgrade_analyze_job | Clear recovery data (autoupgrade_upgrade_clear_recovery_data)
       ansible.builtin.command: >-
-        {{ _autoupgrade_java }} -jar {{ _autoupgrade_jar_path }}
+        {{ _autoupgrade_java }}{{ _autoupgrade_java_opts }} -jar {{ _autoupgrade_jar_path }}
         -config {{ _autoupgrade_upgrade_cfg }} -clear_recovery_data
       register: _autoupgrade_upgrade_clear
       changed_when: true
@@ -214,7 +214,7 @@
         # even when it is finished. Pending PDBs => a new upgrade => recovery data not needed anymore.
         - name: upgrade_analyze_job | Clear recovery data of finished deploy
           ansible.builtin.command: >-
-            {{ _autoupgrade_java }} -jar {{ _autoupgrade_jar_path }}
+            {{ _autoupgrade_java }}{{ _autoupgrade_java_opts }} -jar {{ _autoupgrade_jar_path }}
             -config {{ _autoupgrade_upgrade_cfg }} -clear_recovery_data
           register: _autoupgrade_upgrade_clear_finished
           changed_when: true
@@ -233,7 +233,7 @@
         # failed_when: false => user friendly message in the next task
         - name: upgrade_analyze_job | Run AutoUpgrade in mode {{ _autoupgrade_upgrade_mode | default('analyze') }}
           ansible.builtin.command: >-
-            {{ _autoupgrade_java }} -jar {{ _autoupgrade_jar_path }}
+            {{ _autoupgrade_java }}{{ _autoupgrade_java_opts }} -jar {{ _autoupgrade_jar_path }}
             -config {{ _autoupgrade_upgrade_cfg }}
             -mode {{ _autoupgrade_upgrade_mode | default('analyze') }} -noconsole
           register: _autoupgrade_upgrade_analyze
