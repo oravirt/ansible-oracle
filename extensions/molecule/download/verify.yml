@@ -1,10 +1,74 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
-- name: Verify
-  hosts: all
+# Proof of the proxy support:
+# 1. download has no direct access to the internet (otherwise the test proves nothing)
+# 2. the downloads of AutoUpgrade went through Squid with the user of the Basic authentication
+- name: Verify - no direct access to the internet
+  hosts: dbservers
   gather_facts: false
   tasks:
-    - name: Example assertion
+    - name: Connect to My Oracle Support without proxy
+      ansible.builtin.command: curl -sS --noproxy '*' -m 15 -o /dev/null https://updates.oracle.com
+      register: _verify_direct
+      changed_when: false
+      failed_when: false
+
+    # DNS alone is no proof => connect to an IP address of updates.oracle.com (from access.log of Squid)
+    - name: Connect to an IP address without proxy
+      ansible.builtin.command: curl -sS --noproxy '*' -m 15 -o /dev/null -k https://104.102.61.39
+      register: _verify_direct_ip
+      changed_when: false
+      failed_when: false
+
+    - name: Read default route
+      ansible.builtin.command: ip route show default
+      register: _verify_route
+      changed_when: false
+
+    - name: Assert no direct access to the internet
       ansible.builtin.assert:
-        that: true
+        that:
+          - _verify_direct.rc != 0
+          - _verify_direct_ip.rc != 0
+          - _verify_route.stdout | trim | length == 0
+        fail_msg: >-
+          download reaches the internet without proxy - the network isolation does not work
+          (molecule-download-noinet must be internal).
+          default route: '{{ _verify_route.stdout | trim }}'
+        success_msg:
+          - "No default route"
+          - "by name: {{ _verify_direct.stderr | default('') }}"
+          - "by IP:   {{ _verify_direct_ip.stderr | default('') }}"
+
+- name: Verify - downloads through the proxy
+  hosts: proxy
+  gather_facts: false
+  vars_files:
+    - proxy_vars.yml
+  tasks:
+    - name: Read access.log of Squid
+      ansible.builtin.slurp:
+        src: /var/log/squid/access.log
+      register: _verify_access_log
+
+    # squid log format: ... <code>/<status> <bytes> CONNECT <host>:443 <user> ...
+    - name: Requests of AutoUpgrade to Oracle
+      ansible.builtin.set_fact:
+        _verify_oracle_requests: >-
+          {{ (_verify_access_log.content | b64decode).splitlines()
+             | select('search', ' CONNECT [^ ]*oracle\.com:443 ' ~ download_proxy_username ~ ' ')
+             | list }}
+
+    - name: Show requests to Oracle
+      ansible.builtin.debug:
+        var: _verify_oracle_requests
+
+    # yum.oracle.com is dnf => check the hosts of AutoUpgrade:
+    # updates.oracle.com (search/login MOS), aru-akam.oracle.com (download of the patches)
+    - name: Assert downloads of AutoUpgrade through the proxy
+      ansible.builtin.assert:
+        that:
+          - _verify_oracle_requests | select('search', 'TCP_TUNNEL/200 [0-9]+ CONNECT updates\.oracle\.com:443') | list | length > 0
+          - _verify_oracle_requests | select('search', 'TCP_TUNNEL/200 [0-9]+ CONNECT aru-akam\.oracle\.com:443') | list | length > 0
+        fail_msg: >-
+          No successful CONNECT of AutoUpgrade to updates.oracle.com and aru-akam.oracle.com
+          by user {{ download_proxy_username }} in /var/log/squid/access.log of {{ inventory_hostname }}.

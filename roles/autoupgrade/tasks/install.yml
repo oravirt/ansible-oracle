@@ -60,6 +60,28 @@
 # - on the Ansible controller, when the installation media are copied from there
 #   (oracle_sw_copy: true) or AutoUpgrade is executed there (download_patches.yml)
 # - on the target host, when the installation media are read from there (oracle_sw_copy: false)
+- name: autoupgrade | Check connection to Oracle on Ansible controller
+  ansible.builtin.include_tasks: proxy_check.yml
+  vars:
+    _autoupgrade_proxy_check_controller: true
+    _autoupgrade_proxy_check_url_list:
+      - "{{ autoupgrade_jar_url }}"
+  when:
+    - autoupgrade_proxy_check | bool
+    - autoupgrade_download_latest | bool
+    - oracle_sw_copy or _autoupgrade_run_local | bool
+
+- name: autoupgrade | Check connection to Oracle on target host
+  ansible.builtin.include_tasks: proxy_check.yml
+  vars:
+    _autoupgrade_proxy_check_url_list:
+      - "{{ autoupgrade_jar_url }}"
+  when:
+    - autoupgrade_proxy_check | bool
+    - autoupgrade_download_latest | bool
+    - not oracle_sw_copy
+    - not _autoupgrade_run_local | bool
+
 - name: autoupgrade | Download latest version into software repository on Ansible controller
   become: false
   delegate_to: localhost
@@ -83,7 +105,7 @@
         mode: "0644"
         # always check for a newer file. changed only when file differs
         force: true
-      environment: "{{ proxy_env }}"
+      environment: "{{ _autoupgrade_proxy_env }}"
 
 - name: autoupgrade | Download latest on target host from {{ autoupgrade_jar_url }}
   ansible.builtin.get_url:
@@ -94,7 +116,7 @@
     force: true
     client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
     client_key: "{{ get_url_ssl_client_key | default(omit) }}"
-  environment: "{{ proxy_env }}"
+  environment: "{{ _autoupgrade_proxy_env }}"
   become: true
   become_user: "{{ oracle_user }}"
   when:
@@ -139,7 +161,7 @@
         force: "{{ autoupgrade_force_update }}"
         client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
         client_key: "{{ get_url_ssl_client_key | default(omit) }}"
-      environment: "{{ proxy_env }}"
+      environment: "{{ _autoupgrade_proxy_env }}"
       when:
         - not is_sw_source_local
         - oracle_sw_copy or _autoupgrade_run_local | bool
@@ -157,7 +179,7 @@
 
     - name: autoupgrade | Get version
       ansible.builtin.command: >-
-        {{ _autoupgrade_java }} -jar {{ _autoupgrade_jar_path }} -version
+        {{ _autoupgrade_java }}{{ _autoupgrade_java_opts }} -jar {{ _autoupgrade_jar_path }} -version
       register: _autoupgrade_version_res
       changed_when: false
 

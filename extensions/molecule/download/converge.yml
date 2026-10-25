@@ -1,9 +1,19 @@
 ---
 - name: Converge
-  hosts: all
+  # download only - download-squid is the proxy (prepare.yml)
+  hosts: dbservers
   gather_facts: true
   any_errors_fatal: true
+  vars_files:
+    - proxy_vars.yml
   vars:
+    # mandatory proxy: download has no route to the internet (molecule.yml)
+    # credentials are added to the URL by the role (autoupgrade_proxy_username/password)
+    http_proxy: "{{ download_proxy_url }}"
+    https_proxy: "{{ download_proxy_url }}"
+    no_proxy: localhost,127.0.0.1
+    autoupgrade_proxy_username: "{{ download_proxy_username }}"
+    autoupgrade_proxy_password: "{{ download_proxy_password }}"
     # mos_login / mos_password / mos_username: shared_config/inventory/group_vars/all/mos.yml
     # use autoupgrade.jar from /vagrant inside the container
     # => no copy from the Ansible controller
@@ -28,6 +38,21 @@
     # This scenario is a container of its own without the OS roles
     # => prepare Java, oracle_user and oracle_base for AutoUpgrade.
     # On database servers this is done by playbook os and Java comes from ORACLE_HOME/jdk.
+    # download has no route to the internet => dnf through the proxy as well
+    - name: Proxy for dnf
+      community.general.ini_file:
+        path: /etc/dnf/dnf.conf
+        section: main
+        option: "{{ item.option }}"
+        value: "{{ item.value }}"
+        mode: "0644"
+      loop:
+        - {option: proxy, value: "{{ download_proxy_url }}"}
+        - {option: proxy_username, value: "{{ download_proxy_username }}"}
+        - {option: proxy_password, value: "{{ download_proxy_password }}"}
+      loop_control:
+        label: "{{ item.option }}"
+
     - name: Install Java for AutoUpgrade
       ansible.builtin.package:
         name: "{{ autoupgrade_java_rpm }}"

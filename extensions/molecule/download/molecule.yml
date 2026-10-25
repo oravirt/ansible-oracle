@@ -1,4 +1,12 @@
 ---
+# Download of patches with AutoUpgrade behind a mandatory HTTP proxy
+#
+# download-squid: Squid with Basic authentication, connected to the bridge (internet)
+#                 and to the internal network molecule-download-noinet
+# download:       connected to molecule-download-noinet only (internal: true => no route to the internet)
+#                 => dnf, get_url and AutoUpgrade can reach the internet through download-squid only
+#
+# Everything for the proxy is defined in this scenario only (no shared_config).
 dependency:
   name: galaxy
   enabled: true
@@ -6,6 +14,24 @@ dependency:
 driver:
   name: docker
 platforms:
+  - name: download-squid
+    image: "quay.io/rendanic/docker-${MOLECULE_DISTRO:-ol9}-ansible:latest"
+    pre_build_image: true
+    # The following 4 lines are needed only for making systemd work
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    groups:
+      - proxy
+    docker_networks:
+      - name: molecule-download-noinet
+        internal: true
+    networks:
+      - name: bridge
+      - name: molecule-download-noinet
+
   - name: download
     image: "quay.io/rendanic/docker-${MOLECULE_DISTRO:-ol9}-ansible:latest"
     pre_build_image: true
@@ -16,6 +42,11 @@ platforms:
       - ${MOLECULE_SW_DIR}:/vagrant:rw
     cgroupns_mode: host
     privileged: true
+    groups:
+      - dbservers
+    # internal network only => no direct access to the internet
+    networks:
+      - name: molecule-download-noinet
 
 verifier:
   name: ansible
