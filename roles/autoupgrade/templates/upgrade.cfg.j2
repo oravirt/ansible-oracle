@@ -1,0 +1,27 @@
+# {{ ansible_managed }}
+# Unplug/Plug upgrade from CDB {{ aupjob.source_cdb }} into CDB {{ aupjob.target_cdb }}
+global.global_log_dir={{ _autoupgrade_upgrade_log_dir }}
+{% for key, value in autoupgrade_upgrade_global_parameters | default({}, true) | dictsort %}
+{%   if key != 'global_log_dir' %}
+global.{{ key }}={{ value | ternary('yes', 'no') if value is boolean else value }}
+{%   endif %}
+{% endfor %}
+
+upg1.sid={{ aupjob.source_sid }}
+upg1.source_home={{ _autoupgrade_upgrade_source_home }}
+upg1.target_home={{ _autoupgrade_upgrade_target_home }}
+upg1.target_cdb={{ aupjob.target_sid }}
+upg1.pdbs={{ _autoupgrade_upgrade_pending_pdbs | map(attribute='source_name') | join(',') }}
+upg1.log_dir={{ _autoupgrade_upgrade_log_dir }}
+upg1.restoration={{ _autoupgrade_upgrade_restoration }}
+{% for pdb in _autoupgrade_upgrade_pending_pdbs %}
+{%   if pdb.target_name | upper != pdb.source_name | upper %}
+upg1.target_pdb_name.{{ pdb.source_name }}={{ pdb.target_name }}
+{%   endif %}
+{%   if pdb.copy_option | length > 0 %}
+upg1.target_pdb_copy_option.{{ pdb.source_name }}={{ pdb.copy_option }}
+{%   endif %}
+{% endfor %}
+{% for key, value in _autoupgrade_upgrade_parameters | dictsort %}
+upg1.{{ key }}={{ value | ternary('yes', 'no') if value is boolean else value }}
+{% endfor %}

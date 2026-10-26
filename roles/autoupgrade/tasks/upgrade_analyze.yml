@@ -1,0 +1,130 @@
+---
+# Analyze phase for the Unplug/Plug upgrade of PDBs with AutoUpgrade.
+# Used by the fixups phase as well (upgrade_fixups.yml: _autoupgrade_upgrade_mode=fixups).
+#
+# - executed on the database server as oracle_user (autoupgrade_run_local: false)
+# - oracle_pdbs defines the end state (target CDB), attribute 'autoupgrade' the source CDB
+# - one AutoUpgrade job for all PDBs with the same source and target CDB
+# - AutoUpgrade in mode analyze (default) or fixups (_autoupgrade_upgrade_mode) for each job with pending PDBs
+# - fails, when AutoUpgrade reports errors without automatic fixup
+#
+# The result per job is stored in _autoupgrade_upgrade_state
+# (used by upgrade_deploy.yml):
+#   analyzed: checks executed, upgrade of the pending PDBs can be started
+#   upgraded: all PDBs are in the target CDB already
+- name: upgrade_analyze | Assert execution on database server
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - not _autoupgrade_run_local | bool
+    fail_msg: >-
+      The upgrade of databases is executed on the database server.
+      Set autoupgrade_run_local: false.
+
+- name: upgrade_analyze | Assert no configuration in oracle_databases
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - oracle_databases | default([]) | selectattr('autoupgrade', 'defined') | list | length == 0
+    fail_msg: >-
+      The attribute autoupgrade in oracle_databases is not supported.
+      Configure the upgrade with attribute autoupgrade in oracle_pdbs
+      ({{ oracle_databases | default([]) | selectattr('autoupgrade', 'defined')
+          | map(attribute='oracle_db_name') | list }}).
+
+- name: upgrade_analyze | Assert AutoUpgrade jobs
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - aupjob.source_cdb | length > 0
+      - aupjob.source_cdb != aupjob.target_cdb
+      - aupjob.target_cdb_defined
+      - db_homes_config[aupjob.source_home_key] is defined
+      - db_homes_config[aupjob.target_home_key] is defined
+      - aupjob.source_home_key != aupjob.target_home_key
+      - aupjob.target_cdb_home_key == aupjob.target_home_key
+      - aupjob.pdbs | map(attribute='restoration') | unique | length == 1
+      - aupjob.pdbs | map(attribute='parameters') | map('to_json', sort_keys=true) | unique | length == 1
+      - aupjob.pdbs | map(attribute='parameters') | map('list') | flatten
+        | intersect(_autoupgrade_upgrade_reserved_parameters) | length == 0
+      - _autoupgrade_upgrade_mode | default('analyze') in ['analyze', 'fixups']
+    fail_msg: >-
+      Invalid configuration for {{ aupjob.pdbs | map(attribute='target_name') | list }}:
+      autoupgrade.source_cdb is mandatory and must differ from cdb.
+      cdb must be defined in oracle_databases with the same home as the PDB.
+      The source ORACLE_HOME (autoupgrade.source_home or home of source_cdb in oracle_databases)
+      must be a key in db_homes_config and differ from home.
+      restoration and parameters must be identical for all PDBs of {{ aupjob.source_cdb }} => {{ aupjob.target_cdb }}.
+      autoupgrade.parameters must not contain {{ _autoupgrade_upgrade_reserved_parameters }}.
+  loop: "{{ _autoupgrade_upgrade_jobs }}"
+  loop_control:
+    loop_var: aupjob
+    label: >-
+      {{ aupjob.source_cdb }} ({{ aupjob.source_home_key }}) =>
+      {{ aupjob.target_cdb }} ({{ aupjob.target_home_key }}):
+      {{ aupjob.pdbs | map(attribute='target_name') | join(',') }}
+
+- name: upgrade_analyze | Show AutoUpgrade jobs
+  ansible.builtin.debug:
+    msg: >-
+      {{ (_autoupgrade_upgrade_jobs | length > 0)
+         | ternary(_autoupgrade_upgrade_jobs
+                   | map(attribute='name') | list,
+                   'No PDB with attribute autoupgrade in oracle_pdbs') }}
+
+- name: upgrade_analyze | Analyze AutoUpgrade jobs
+  when:
+    - _autoupgrade_upgrade_jobs | length > 0
+  block:
+    # AutoUpgrade should be executed with the JDK of the target ORACLE_HOME
+    - name: upgrade_analyze | Set Java from target ORACLE_HOME
+      ansible.builtin.set_fact:
+        _autoupgrade_upgrade_java_home: "{{ _autoupgrade_upgrade_target_home }}/jdk"
+        _autoupgrade_upgrade_state: {}
+      vars:
+        aupjob: "{{ _autoupgrade_upgrade_jobs | first }}"
+
+    # pexpect is only needed for the keystore console
+    - name: upgrade_analyze | Install AutoUpgrade
+      ansible.builtin.include_tasks: install.yml
+      vars:
+        _autoupgrade_check_pexpect: false
+
+    - name: upgrade_analyze | Analyze job
+      ansible.builtin.include_tasks: upgrade_analyze_job.yml
+      loop: "{{ _autoupgrade_upgrade_jobs }}"
+      loop_control:
+        loop_var: aupjob
+        label: "{{ aupjob.name }}"
+
+    - name: upgrade_analyze | Result
+      ansible.builtin.debug:
+        var: _autoupgrade_upgrade_state
+
+    - name: upgrade_analyze | Logfiles of AutoUpgrade
+      ansible.builtin.debug:
+        msg:
+          - "Job:       {{ aul.key }} ({{ aul.value.state }})"
+          - "Logfile:   {{ aul.value.logfile | default('') or 'not found' }}"
+          - "User log:  {{ aul.value.user_logfile | default('') or 'not found' }}"
+          - "Reports:   {{ aul.value.reports | default([]) | join(', ') or 'not found' }}"
+      loop: "{{ _autoupgrade_upgrade_state | dict2items | selectattr('value.state', 'equalto', 'analyzed') }}"
+      loop_control:
+        loop_var: aul
+        label: "{{ aul.key }}"
+
+    - name: upgrade_analyze | Assert result of prechecks
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _autoupgrade_upgrade_state.values() | selectattr('blocking', 'defined')
+            | map(attribute='blocking') | flatten | length == 0
+        fail_msg: >-
+          AutoUpgrade reports errors without automatic fixup for
+          {{ _autoupgrade_upgrade_state | dict2items
+             | selectattr('value.blocking', 'defined') | selectattr('value.blocking')
+             | map(attribute='key') | list }}.
+          Fix them and execute the {{ _autoupgrade_upgrade_mode | default('analyze') }} phase again.
+          See the preupgrade reports and the logfile of AutoUpgrade above.
+      when:
+        - autoupgrade_upgrade_fail_on_precheck_errors | bool

@@ -1,0 +1,244 @@
+---
+# Out-of-Place Patching: switch the ORACLE_HOME of an existing database
+#
+# Supported: Single Instance without Grid Infrastructure/Oracle Restart
+#
+# The active ORACLE_HOME is taken from the running instance (/proc/<pid of pmon>/exe)
+# or from /etc/oratab when the instance is not running.
+#
+# Steps:
+# - create flag file $ORACLE_BASE/switch_home_<SID>.pending
+# - stop database from old ORACLE_HOME
+# - copy SPFile/PFile and password file, when the location differs
+#   (e.g. switch from a Read-Write to a Read-Only Oracle Home)
+# - change ORACLE_HOME in /etc/oratab
+# - start database from new ORACLE_HOME and open all PDBs
+# - execute datapatch
+# - remove flag file
+#
+# /etc/oratab is changed before the start, so it always matches the running instance.
+# An existing flag file marks an incomplete switch (e.g. failed datapatch).
+# The switch is completed with the next execution.
+
+- name: switch_home | check if GI is present
+  ansible.builtin.stat:
+    path: /etc/oracle/olr.loc
+  register: _oradb_manage_db_switch_olrloc
+
+- name: switch_home | Get state of ORACLE_HOME switch
+  when:
+    - not _oradb_manage_db_switch_olrloc.stat.exists
+  block:
+    - name: switch_home | Read /etc/oratab
+      ansible.builtin.slurp:
+        src: /etc/oratab
+      register: _oradb_manage_db_switch_oratab
+      failed_when: false
+
+    - name: switch_home | Read ORACLE_HOME from running instance
+      ansible.builtin.shell: |
+        set -eu
+        # -f: match args (ora_pmon_DB2), not comm (ora_pmon_db2)
+        if pid=$(pgrep -f "^ora_pmon_${ORACLE_SID}$") ; then
+          # /proc/<pid>/exe => <ORACLE_HOME>/bin/oracle
+          exe=$(readlink "/proc/${pid}/exe")
+          echo "${exe%/bin/oracle*}"
+        fi
+      environment:
+        ORACLE_SID: "{{ _oradb_manage_db_switch_sid }}"
+      register: _oradb_manage_db_switch_running
+      changed_when: false
+
+    - name: switch_home | Check flag file for incomplete switch
+      ansible.builtin.stat:
+        path: "{{ _oradb_manage_db_switch_flagfile }}"
+      register: _oradb_manage_db_switch_flag
+
+- name: switch_home | Switch ORACLE_HOME
+  when:
+    - not _oradb_manage_db_switch_olrloc.stat.exists
+    - _oradb_manage_db_switch_needs_switch | bool or _oradb_manage_db_switch_flag.stat.exists
+  become: true
+  become_user: "{{ oracle_user }}"
+  block:
+
+    - name: switch_home | Switch ORACLE_HOME
+      ansible.builtin.debug:
+        msg:
+          - "Database: {{ _oradb_manage_db_switch_sid }}"
+          - "ORACLE_HOME of instance: {{ _oradb_manage_db_switch_running_home | default('', true) or 'not running' }}"
+          - "ORACLE_HOME in /etc/oratab: {{ _oradb_manage_db_switch_oratab_home }}"
+          - "new ORACLE_HOME: {{ _oradb_manage_db_switch_new_home }}"
+          - "incomplete switch: {{ _oradb_manage_db_switch_flag.stat.exists }}"
+
+    - name: switch_home | Check new ORACLE_HOME
+      ansible.builtin.stat:
+        path: "{{ _oradb_manage_db_switch_new_home }}/bin/oracle"
+      register: _oradb_manage_db_switch_new_oracle
+
+    - name: switch_home | Assert new ORACLE_HOME
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _oradb_manage_db_switch_new_oracle.stat.exists
+        fail_msg: >-
+          New ORACLE_HOME {{ _oradb_manage_db_switch_new_home }} is not installed.
+          Add home {{ odb.home }} to db_homes_installed.
+
+    # A new release needs an upgrade of the database (role autoupgrade), not a switch.
+    # oraversion exists from 18c => no check for older ORACLE_HOMEs
+    - name: switch_home | Get release of old and new ORACLE_HOME
+      ansible.builtin.command: "{{ item }}/bin/oraversion -majorVersion"
+      environment:
+        ORACLE_HOME: "{{ item }}"
+      loop:
+        - "{{ _oradb_manage_db_switch_old_home }}"
+        - "{{ _oradb_manage_db_switch_new_home }}"
+      register: _oradb_manage_db_switch_release
+      changed_when: false
+      failed_when: false
+      when:
+        - _oradb_manage_db_switch_needs_switch | bool
+
+    - name: switch_home | Assert same release in old and new ORACLE_HOME
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _oradb_manage_db_switch_release.results | map(attribute='stdout') | map('trim') | unique | length == 1
+        fail_msg: >-
+          The release of the new ORACLE_HOME differs from the old ORACLE_HOME
+          ({{ _oradb_manage_db_switch_release.results | map(attribute='stdout') | map('trim') | list }}).
+          Upgrade the database with role autoupgrade (upgrade_deploy.yml) before changing home in oracle_databases.
+      when:
+        - _oradb_manage_db_switch_needs_switch | bool
+        - _oradb_manage_db_switch_release.results | default([]) | selectattr('rc', 'defined')
+          | selectattr('rc', 'equalto', 0) | list | length == 2
+
+    - name: switch_home | Stop database in old ORACLE_HOME
+      when:
+        - _oradb_manage_db_switch_needs_switch | bool
+      block:
+        - name: switch_home | Create flag file for incomplete switch
+          ansible.builtin.copy:
+            dest: "{{ _oradb_manage_db_switch_flagfile }}"
+            content: |
+              # ansible-oracle: switch of ORACLE_HOME not completed
+              # Remove this file only, when datapatch was executed successfully!
+              sid={{ _oradb_manage_db_switch_sid }}
+              old_oracle_home={{ _oradb_manage_db_switch_old_home }}
+              new_oracle_home={{ _oradb_manage_db_switch_new_home }}
+            mode: "0644"
+
+        # orabaseconfig returns the ORACLE_HOME for a Read-Write Oracle Home
+        # and ORACLE_BASE for a Read-Only Oracle Home
+        - name: switch_home | Get location of SPFile and password file
+          ansible.builtin.command: "{{ item }}/bin/orabaseconfig"
+          environment:
+            ORACLE_HOME: "{{ item }}"
+          loop:
+            - "{{ _oradb_manage_db_switch_old_home }}"
+            - "{{ _oradb_manage_db_switch_new_home }}"
+          register: _oradb_manage_db_switch_orabaseconfig
+          changed_when: false
+
+        - name: switch_home | Stop database from old ORACLE_HOME
+          ansible.builtin.shell: |
+            set -eu
+            "${ORACLE_HOME}/bin/sqlplus" -S -L /nolog <<EOF
+            connect / as sysdba
+            -- after connect: glogin.sql fails on an idle instance
+            whenever sqlerror exit failure
+            shutdown immediate
+            EOF
+          environment: "{{ _oradb_manage_db_switch_env_old }}"
+          changed_when: true
+          when:
+            - _oradb_manage_db_switch_running_home | length > 0
+
+        - name: switch_home | Check SPFile, PFile and password file in old location
+          ansible.builtin.stat:
+            path: "{{ _oradb_manage_db_switch_dbs_old }}/{{ item }}"
+          loop: "{{ _oradb_manage_db_switch_dbs_files }}"
+          register: _oradb_manage_db_switch_dbs_stat
+          when:
+            - _oradb_manage_db_switch_dbs_old != _oradb_manage_db_switch_dbs_new
+
+        - name: switch_home | Copy SPFile, PFile and password file to new location
+          ansible.builtin.copy:
+            src: "{{ item.stat.path }}"
+            dest: "{{ _oradb_manage_db_switch_dbs_new }}/{{ item.item }}"
+            remote_src: true
+            mode: preserve
+          loop: "{{ _oradb_manage_db_switch_dbs_stat.results | default([]) | selectattr('stat.exists', 'defined') | selectattr('stat.exists') }}"
+          loop_control:
+            label: "{{ item.item }}"
+          when:
+            - _oradb_manage_db_switch_dbs_old != _oradb_manage_db_switch_dbs_new
+
+        - name: switch_home | Change ORACLE_HOME in /etc/oratab
+          ansible.builtin.lineinfile:
+            path: /etc/oratab
+            regexp: "^{{ _oradb_manage_db_switch_sid }}:"
+            line: >-
+              {{ _oradb_manage_db_switch_sid }}:{{ _oradb_manage_db_switch_new_home }}:{{ _oradb_manage_db_switch_oratab_flag }}
+          become: true
+          become_user: root
+
+    # The instance is stopped after a switch or already running from the new ORACLE_HOME
+    # after an incomplete switch.
+    - name: switch_home | Start database from new ORACLE_HOME
+      ansible.builtin.shell: |
+        set -eu
+        if pgrep -f "^ora_pmon_${ORACLE_SID}$" > /dev/null ; then
+          echo "Database already running"
+          startup=""
+        else
+          startup="startup"
+        fi
+        "${ORACLE_HOME}/bin/sqlplus" -S -L /nolog <<EOF
+        connect / as sysdba
+        -- after connect: glogin.sql fails on an idle instance
+        whenever sqlerror exit failure
+        ${startup}
+        {% if odb.is_container | default(false) %}
+        alter pluggable database all open;
+        {% endif %}
+        EOF
+      environment: "{{ _oradb_manage_db_switch_env_new }}"
+      register: _oradb_manage_db_switch_start
+      changed_when: "'Database already running' not in _oradb_manage_db_switch_start.stdout"
+
+    # The name of the logfile directory is known after the start of datapatch only:
+    # $ORACLE_BASE/cfgtoollogs/sqlpatch/sqlpatch_<pid>_<timestamp>/
+    - name: switch_home | Logfile of datapatch
+      ansible.builtin.debug:
+        msg:
+          - "datapatch could take some time to complete."
+          - "Logfiles: {{ oracle_base }}/cfgtoollogs/sqlpatch/sqlpatch_<pid>_<timestamp>/"
+          - "Follow the progress on {{ inventory_hostname }} as {{ oracle_user }} with:"
+          - "tail -f $(ls -td {{ oracle_base }}/cfgtoollogs/sqlpatch/sqlpatch_*/ | head -1)sqlpatch_invocation.log"
+
+    - name: switch_home | Execute datapatch
+      opitzconsulting.ansible_oracle.oracle_datapatch:
+        oracle_home: "{{ _oradb_manage_db_switch_new_home }}"
+        db_name: "{{ odb.oracle_db_name }}"
+        db_unique_name: "{{ odb.oracle_db_unique_name | default(omit) }}"
+        sid: "{{ odb.oracle_db_instance_name | default(omit) }}"
+        output: verbose
+        fail_on_db_not_exist: true
+        user: sys
+        password: "{{ _oradb_manage_db_dbca_sys_pass }}"
+        hostname: "{{ ansible_fqdn }}"
+        service_name: "{{ _db_service_name }}"
+        port: "{{ _listener_port_cdb }}"
+      environment: "{{ _oradb_manage_db_switch_env_new }}"
+      register: _oradb_manage_db_switch_datapatch
+
+    - name: switch_home | datapatch output
+      ansible.builtin.debug:
+        msg: "{{ _oradb_manage_db_switch_datapatch.msg | default('') }}"
+
+    - name: switch_home | Remove flag file for incomplete switch
+      ansible.builtin.file:
+        path: "{{ _oradb_manage_db_switch_flagfile }}"
+        state: absent

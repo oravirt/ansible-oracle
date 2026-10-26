@@ -1,0 +1,420 @@
+:toc:
+:toc-placement!:
+:toclevels: 4
+toc::[]
+
+:sectnums:
+:sectnumlevels: 4
+
+== Out-of-Place Patching - Switch ORACLE_HOME
+
+IMPORTANT: Out-of-Place Patching is supported for Single Instance primary databases without Grid Infrastructure/Oracle Restart only. +
+The guide describes the concept, all dependencies and the gaps in the current implementation.
+
+Out-of-Place Patching switches a database from its current `ORACLE_HOME` to another, already installed and patched `ORACLE_HOME`.
+The installation and patching of the new `ORACLE_HOME` is not part of Out-of-Place Patching.
+It is done before with other roles (`oraswdb_install`, `oraswdb_manage_patches` or from a Golden Image).
+
+Advantages compared to In-Place Patching with `opatch apply`:
+
+- The new `ORACLE_HOME` is installed and patched before the switch without downtime, because no database is running from it.
+- The downtime is reduced to a restart of the database and `datapatch`.
+- Fallback is easy: the old `ORACLE_HOME` is still available.
+
+NOTE: A Golden Image is recommended, but _not_ required. +
+The new `ORACLE_HOME` can also be installed and patched with `ansible-oracle` on the database server.
+The switch of the database is independent from the way the new `ORACLE_HOME` was created.
+See <<Preparation of the new ORACLE_HOME>>.
+
+=== Requirements
+
+- Oracle Database 19c or newer
+- _Read-Only Oracle Homes_ (`readonly_home: true`) are recommended, but not required
+  * Configuration files like SPFile and password file are not part of the `ORACLE_HOME`
+    and are shared between all Read-Only `ORACLE_HOME`s.
+  * The switch copies SPFile, PFile and password file, when the location differs between old and new `ORACLE_HOME`
+    (e.g. switch from a Read-Write into a Read-Only `ORACLE_HOME`).
+  * `readonly_home` must not be changed for an installed `ORACLE_HOME`.
+- Each Read-Only `ORACLE_HOME` needs 2 attributes in `db_homes_config`:
++
+----
+db_homes_config:
+  db1932-si-ee:
+    readonly_home: true
+    oracle_home_name: db1932siee
+----
+- `oracle_home_name` is mandatory:
+  * It cannot be derived from the key in `db_homes_config`.
+    Oracle allows only characters, numbers and `_` in the name of an `ORACLE_HOME` in the Oracle Inventory.
+    YAML keys are much less restrictive (e.g. `db1932-si-ee` is a valid key, but not a valid `oracle_home_name`).
+  * It must be unique over all `ORACLE_HOME`s on a server.
+    It defines the `ORACLE_BASE_HOME` (`$ORACLE_BASE/homes/<oracle_home_name>`), which must not be shared between the old and the new `ORACLE_HOME`.
+- Enough disk space for at least 2 `ORACLE_HOME`s at the same time
+
+=== Read-Only Oracle Home
+
+A Read-Only Oracle Home separates the software from the configuration.
+The locations are reported by `orabasehome` and `orabaseconfig`.
+
+.Locations in a Read-Only Oracle Home
+[options="header,footer"]
+|=======================
+|Location |Path |Shared between ORACLE_HOMEs |Content
+|`ORACLE_HOME`
+|e.g. `/u01/app/oracle/product/19/db19_2610`
+|no
+|Software only
+|`ORACLE_BASE_CONFIG`
+|`$ORACLE_BASE/dbs`
+|yes
+|SPFile, password file, `hc_*.dat`, `lk*`
+|`ORACLE_BASE_HOME`
+|`$ORACLE_BASE/homes/<oracle_home_name>`
+|no
+|`network/admin` (`listener.ora`, `sqlnet.ora`, `tnsnames.ora`), `log`, `rdbms/log`
+|=======================
+
+IMPORTANT: `ORACLE_BASE_CONFIG` is shared, but `ORACLE_BASE_HOME` is _not_. +
+All files in `$ORACLE_BASE/homes/<oracle_home_name>/network/admin` must exist in the new `ORACLE_HOME` before the switch.
+
+=== Process overview
+
+. Prepare the new `ORACLE_HOME` (no downtime)
+.. Install the new `ORACLE_HOME` with `oraswdb_install` / `oraswdb_manage_patches` (not part of Out-of-Place Patching), one of:
+... from a Golden Image (recommended)
+... from the base release, followed by `opatch apply` for all patches
+.. Create the network configuration in the new `ORACLE_BASE_HOME`
+. Switch the database (downtime) - Out-of-Place Patching with `oradb_manage_db`
+.. Stop the database (and listener) from the old `ORACLE_HOME`
+.. Change the `ORACLE_HOME` in `/etc/oratab` or in Oracle Clusterware (`srvctl`)
+.. Start the listener and database from the new `ORACLE_HOME`
+.. Execute `datapatch`
+. Post tasks
+.. APEX, time zone, statistics, etc. (optional)
+.. Remove the old `ORACLE_HOME` after a successful test period
+
+=== Preparation of the new ORACLE_HOME
+
+The new `ORACLE_HOME` can be prepared in 2 ways.
+Both are supported by `ansible-oracle` and both lead to the same result for the switch.
+
+.Ways to prepare the new ORACLE_HOME
+[options="header,footer"]
+|=======================
+|Topic |Golden Image |Install and patch on the server
+|Source
+|Golden Image (`imagename` or `filesource` in `db_homes_config`)
+|Base release (e.g. 19.3) + patches from `oracle_sw_patches`
+|Patching
+|Included in the Golden Image. Additional patches are possible like for the base release.
+|`oraswdb_manage_patches` with `opatch`/`opatchauto` from `db_homes_config`
+|Duration on the database server
+|Short (unzip + `runInstaller`)
+|Long (`opatch apply` for each patch)
+|Identical `ORACLE_HOME`s on all servers
+|Guaranteed by the Golden Image
+|Depends on identical patch lists in the inventory
+|Software needed on the server
+|Golden Image only
+|Base release, OPatch and all patches
+|Relink options (e.g. Unified Auditing, dNFS)
+|Included in the Golden Image, checked by `oraswdb_install`
+|Set by `oraswdb_install`
+|Downtime
+|None
+|None - no database is running from the new `ORACLE_HOME`, `stop_processes` is not needed
+|=======================
+
+Recommendation: download the Golden Image created by Oracle with the role `autoupgrade`
+(`gold_image` in `autoupgrade_download_patches` or `autoupgrade_download_gold_image`).
+This is the way with the least effort, because no `ORACLE_HOME` has to be installed and patched for creating the Golden Image.
+
+Alternative: create the Golden Image once from an `ORACLE_HOME` installed and patched by `ansible-oracle` (role `oraswdb_golden_image`),
+e.g. when one-off patches are needed, which are not part of the Golden Image from Oracle.
+
+Use the Golden Image for all servers.
+
+IMPORTANT: The implementation of the switch must not depend on the way the new `ORACLE_HOME` was prepared. +
+The only requirement for the switch is an installed and fully patched `ORACLE_HOME`.
+
+=== Dependencies
+
+==== Registration of the ORACLE_HOME
+
+.Registration of the ORACLE_HOME for a database
+[options="header,footer"]
+|=======================
+|Environment |Registration |Switch
+|Single Instance without GI
+|`/etc/oratab`
+|Replace the line `<SID>:<old ORACLE_HOME>:<Y/N>` with the new `ORACLE_HOME`.
+|Oracle Restart
+|Oracle Clusterware (OCR/OLR)
+|`srvctl modify database -db <db_unique_name> -oraclehome <new ORACLE_HOME>` +
+`/etc/oratab` is maintained by Oracle Clusterware.
+|Oracle RAC
+|Oracle Clusterware (OCR)
+|Rolling switch node by node. Not covered in this guide yet.
+|=======================
+
+The following parts of `ansible-oracle` read the `ORACLE_HOME` from `/etc/oratab` and follow the switch automatically:
+
+- systemd service / `manage_oracle_rdbms_procs.sh` (start/stop of databases)
+- `ocenv` / `.profile_<ORACLE_SID>`
+- `rman_backup.sh` from role `oradb_rman`
+
+==== Stop and Start
+
+- The database must be stopped from the _old_ `ORACLE_HOME`.
+- With Oracle Restart/RAC the stop must be done with `srvctl` from the old `ORACLE_HOME`, before `srvctl modify database` is executed.
+- The start is done from the _new_ `ORACLE_HOME`.
+
+==== Listener
+
+- A listener running from the database `ORACLE_HOME` must be restarted from the new `ORACLE_HOME`.
+- All databases served by this listener must be switched together.
+  Recommendation: run the listener from Grid Infrastructure or from a dedicated `ORACLE_HOME`.
+- Static registrations in `SID_LIST_<LISTENER>` contain the `ORACLE_HOME`:
+  * Data Guard Broker (`<db_unique_name>_DGMGRL`)
+  * `extproc`
+  * Static service entries
+
+==== Network configuration and wallets
+
+- `sqlnet.ora`, `tnsnames.ora` and `listener.ora` must exist in `$ORACLE_BASE/homes/<new oracle_home_name>/network/admin`.
+  Alternative: a central `TNS_ADMIN`.
+- `WALLET_LOCATION` or `ENCRYPTION_WALLET_LOCATION` in `sqlnet.ora` must not point into the old `ORACLE_HOME`.
+- TDE with the init parameter `WALLET_ROOT` is independent from the `ORACLE_HOME`.
+
+==== datapatch
+
+- `datapatch` is mandatory after the start from the new `ORACLE_HOME`.
+- `datapatch` must be executed for the CDB and all PDBs.
+- OJVM patches may need a startup in upgrade mode, depending on the release.
+- Data Guard: `datapatch` is executed on the primary database only.
+
+==== Directory objects
+
+Directory objects can point into the old `ORACLE_HOME`.
+The OPatch directories are changed by `datapatch`, own directories are not.
+
+.Find directory objects in the old ORACLE_HOME
+----
+select directory_name, directory_path
+from dba_directories
+where directory_path like '/u01/app/oracle/product/19/db19_2601%';
+----
+
+==== Content of the ORACLE_HOME
+
+The new `ORACLE_HOME` must contain all customizations of the old `ORACLE_HOME`:
+
+- Relink options (e.g. Unified Auditing, dNFS) - included in a Golden Image or set by `oraswdb_install`
+- One-off patches - included in a Golden Image or defined in `db_homes_config[].opatch` for the new `ORACLE_HOME`
+- `oranfstab`
+- Custom DBCA templates
+
+==== Data Guard
+
+- The standby databases are switched first.
+- The primary database is switched afterwards, followed by `datapatch`.
+- Static listener registrations for the Data Guard Broker must be changed (see <<Listener>>).
+
+===== Physical Standby
+
+IMPORTANT: Not implemented yet. +
+The current implementation opens every database after the switch and executes `datapatch`.
+
+A physical standby database must be handled differently from a primary database:
+
+- The standby database is started in `MOUNT` only.
+  Opening the database while Redo Apply is running uses Active Data Guard,
+  which needs an extra license.
+  This is valid even when the standby database was opened `READ ONLY WITH APPLY` before the switch.
+- `datapatch` must not be executed on a standby database.
+  The SQL changes are applied with Redo Apply from the primary database.
+
+The role of the database is read after `startup mount` from the controlfile:
+
+----
+startup mount
+select database_role from v$database;
+----
+
+.Actions after `startup mount` depending on `DATABASE_ROLE`
+[options="header,footer"]
+|=======================
+|DATABASE_ROLE |Open database |`datapatch`
+|`PRIMARY`
+|yes (+ all PDBs)
+|yes
+|`PHYSICAL STANDBY`
+|no, remains in `MOUNT`
+|no
+|=======================
+
+Redo Apply after the switch:
+
+- With Data Guard Broker (`dg_broker_start=TRUE`) the broker restarts Redo Apply automatically.
+- Without Data Guard Broker Redo Apply must be restarted manually.
+  `ansible-oracle` does not start Redo Apply, because it does not manage Data Guard configurations.
++
+----
+alter database recover managed standby database disconnect;
+----
+
+==== External dependencies
+
+- Enterprise Manager and other monitoring targets
+- Scripts and crontabs with a hard coded `ORACLE_HOME`
+- Applications with a local `ORACLE_HOME` (e.g. Bequeath connections)
+
+=== Implementation in ansible-oracle
+
+==== Existing features
+
+Out-of-Place Patching itself is the switch of the `ORACLE_HOME` in `oradb_manage_db`.
+The other features prepare the new `ORACLE_HOME` and are used before the switch.
+
+.Existing features used for Out-of-Place Patching
+[options="header,footer"]
+|=======================
+|Feature |Role |Comment
+|Read-Only Oracle Home
+|`oraswdb_install`
+|`readonly_home: true` and `oracle_home_name` in `db_homes_config`
+|Install from base release
+|`oraswdb_install`
+|Without `imagename` in `db_homes_config`
+|Patch the new `ORACLE_HOME`
+|`oraswdb_manage_patches`
+|`opatch`/`opatchauto` in `db_homes_config`, `apply_patches: true` in `db_homes_installed`.
+No `stop_processes` needed, because no database is running from the new `ORACLE_HOME`
+|Download Golden Image from Oracle (recommended)
+|`autoupgrade` (`download_patches.yml`)
+|`gold_image` in `autoupgrade_download_patches` or `autoupgrade_download_gold_image`
+|Create Golden Image (optional)
+|`oraswdb_golden_image`
+|
+|Install from Golden Image (optional)
+|`oraswdb_install`
+|`imagename` or `filesource` in `db_homes_config`
+|Relink options
+|`oraswdb_install`
+|Enforced for every `ORACLE_HOME`, independent from the source
+|Network configuration
+|`oradb_manage_db`
+|Files are created in `ORACLE_BASE_HOME` of the `ORACLE_HOME` of the listener (`listener_installed[].home`)
+|`datapatch`
+|`oradb_datapatch`
+|
+|Remove `ORACLE_HOME`
+|`oraswdb_install`
+|`state: absent` in `db_homes_installed`
+|Switch `ORACLE_HOME` of database
+|`oradb_manage_db` (`switch_home.yml`)
+|Change of `oracle_databases[].home`. Single Instance without GI only.
+Stop from old `ORACLE_HOME`, copy of SPFile/PFile/password file (when the location differs), change of `/etc/oratab`,
+start from new `ORACLE_HOME`, `datapatch`.
+Flag file `$ORACLE_BASE/switch_home_<SID>.pending` for an incomplete switch.
+|Switch `ORACLE_HOME` of listener
+|`oradb_manage_db` (`loop_listener_details.yml`)
+|Change of `listener_installed[].home`. Stop from old `ORACLE_HOME`, start from new `ORACLE_HOME`.
+|`/etc/oratab` without duplicate entries
+|`oradb_manage_db` (`manage-db.yml`)
+|`lineinfile` with `regexp` replaces the entry for the SID.
+|`ORACLE_HOME` without database
+|`orasw_meta`, `oraswdb_install`
+|An `ORACLE_HOME` in `db_homes_installed` without a database in `oracle_databases` is valid
+(e.g. new `ORACLE_HOME` before the switch, dedicated listener home).
+|`ORACLE_HOME` of listener, tnsnames and sqlnet must be installed
+|`orasw_meta` (`assert_sqlnet.yml`)
+|`home` in `listener_installed`, `sqlnet_installed` and `tnsnames_installed` must be in `db_homes_installed` without `state: absent`
+(unless `state: absent` or `use_gi_home: true` for the entry).
+|=======================
+
+==== Gaps
+
+.Missing features for Out-of-Place Patching
+[options="header,footer"]
+|=======================
+|Gap |Location |Description
+|Incomplete check of `oracle_home_name`
+|`roles/oraswdb_install/tasks/roohctl.yml`
+|Only the existence of `oracle_home_name` is checked for `readonly_home: true`, and only during the installation.
+Missing: check for allowed characters, unique value over all `ORACLE_HOME`s in `db_homes_installed`, check in `orasw_meta` before any change on the server.
+|=======================
+
+==== ORACLE_HOME without database
+
+An `ORACLE_HOME` in `db_homes_installed` without a database in `oracle_databases` is a valid configuration:
+
+- The new `ORACLE_HOME` has no database before the switch.
+- The old `ORACLE_HOME` has no database after the switch, until it is removed.
+- Listeners can run from a dedicated `ORACLE_HOME` without database.
+
+The `oracle_db_type` must still be identical for all databases in the same `ORACLE_HOME`.
+All roles and asserts must support an `ORACLE_HOME` without database.
+
+=== Inventory example
+
+The `ORACLE_HOME` for each Release Update gets its own entry in `db_homes_config` with a unique `oracle_home` and `oracle_home_name`.
+Both ways to prepare the new `ORACLE_HOME` can be mixed, e.g. the old `ORACLE_HOME` from a Golden Image and the new one installed and patched on the server.
+
+.Example `db_homes_config` with Golden Image
+----
+db_homes_config:
+  db19_2601:
+    version: 19.3.0.0
+    oracle_home: /u01/app/oracle/product/19/db19_2601
+    oracle_home_name: db19_2601
+    readonly_home: true
+    edition: EE
+    imagename: db_home_19.30.zip
+----
+
+.Example `db_homes_config` installed and patched on the server
+----
+db_homes_config:
+  db19_2604:
+    version: 19.3.0.0
+    oracle_home: /u01/app/oracle/product/19/db19_2604
+    oracle_home_name: db19_2604
+    readonly_home: true
+    edition: EE
+    opatch_minversion: 12.2.0.1.48
+    opatch:
+      - patchid: <RU patch id>
+        # Database Release Update 19.31
+        state: present
+      - patchid: <OJVM patch id>
+        # Oracle JavaVM Component Release Update 19.31
+        state: present
+----
+
+NOTE: `stop_processes` is not needed for the patches of the new `ORACLE_HOME`.
+
+.Example: switch of database `ORCL` from `db19_2601` to `db19_2604`
+----
+db_homes_installed:
+  - home: db19_2601
+    state: present
+  - home: db19_2604
+    state: present
+
+oracle_databases:
+  - home: db19_2604    # <1>
+    oracle_db_name: ORCL
+    state: present
+----
+<1> Changing `home` is the trigger for the switch. See <<Existing features>>.
+
+=== Open questions
+
+- Support for Oracle Restart and RAC in the 1st implementation?
+- `oraswdb_install` derives the type of an `ORACLE_HOME` (SI or cluster installation) from the databases in `oracle_databases`.
+  An `ORACLE_HOME` without database is installed as `SI`.
+  A new RAC `ORACLE_HOME` needs the cluster installation before the switch
+  => explicit type in `db_homes_config` (e.g. `oracle_db_type`)?
+- Handling of a listener shared by databases in different `ORACLE_HOME`s
+- Fallback to the old `ORACLE_HOME` (`datapatch` rollback)

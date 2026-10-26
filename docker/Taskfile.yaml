@@ -1,0 +1,106 @@
+# Taskfile.yaml
+#
+# Build container images for ansible-oracle development.
+#
+# Examples:
+#   task                       # list all tasks
+#   task molecule:build        # build all supported molecule images
+#   task molecule:build:ol9    # build a single image
+#   task molecule:push         # push all supported molecule images
+#   task molecule:build CONTAINER_CMD=podman REGISTRY=localhost
+version: '3'
+
+vars:
+  # docker or podman
+  CONTAINER_CMD: '{{.CONTAINER_CMD | default "docker"}}'
+  # Image names match the references in extensions/molecule/*/molecule.yml
+  REGISTRY: '{{.REGISTRY | default "quay.io/rendanic"}}'
+  TAG: '{{.TAG | default "latest"}}'
+  # Images built/pushed by molecule:build and molecule:push
+  MOLECULE_DISTROS: ol8 ol9
+  # SLES is not working with these containers for ansible-oracle
+  # => bci-base <> SLES ...
+  # => not all needed RPMs are available during installation
+  MOLECULE_DISTROS_EXPERIMENTAL: sles15sp3 sles15sp4 sles15sp5
+
+tasks:
+  default:
+    cmds:
+      - task --list
+    silent: true
+
+  # ---------------------------------------------------------------- molecule
+
+  molecule:build:
+    desc: Build all supported molecule images ({{.MOLECULE_DISTROS}})
+    cmds:
+      - for: { var: MOLECULE_DISTROS }
+        task: molecule:build:image
+        vars:
+          DISTRO: '{{.ITEM}}'
+
+  molecule:build:experimental:
+    desc: Build experimental SLES molecule images ({{.MOLECULE_DISTROS_EXPERIMENTAL}})
+    cmds:
+      - for: { var: MOLECULE_DISTROS_EXPERIMENTAL }
+        task: molecule:build:image
+        vars:
+          DISTRO: '{{.ITEM}}'
+
+  molecule:build:ol8:
+    desc: Build molecule image for Oracle Linux 8
+    cmds:
+      - task: molecule:build:image
+        vars: { DISTRO: ol8 }
+
+  molecule:build:ol9:
+    desc: Build molecule image for Oracle Linux 9
+    cmds:
+      - task: molecule:build:image
+        vars: { DISTRO: ol9 }
+
+  molecule:push:
+    desc: Push all supported molecule images to {{.REGISTRY}}
+    cmds:
+      - for: { var: MOLECULE_DISTROS }
+        task: molecule:push:image
+        vars:
+          DISTRO: '{{.ITEM}}'
+
+  molecule:list:
+    desc: List local molecule images
+    cmds:
+      - '{{.CONTAINER_CMD}} image ls --filter "reference={{.REGISTRY}}/docker-*-ansible"'
+
+  molecule:clean:
+    desc: Remove local molecule images (supported and experimental)
+    cmds:
+      - for: { var: MOLECULE_DISTROS }
+        cmd: '{{.CONTAINER_CMD}} image rm {{.REGISTRY}}/docker-{{.ITEM}}-ansible:{{.TAG}} || true'
+      - for: { var: MOLECULE_DISTROS_EXPERIMENTAL }
+        cmd: '{{.CONTAINER_CMD}} image rm {{.REGISTRY}}/docker-{{.ITEM}}-ansible:{{.TAG}} || true'
+
+  # Internal helper tasks
+
+  molecule:build:image:
+    internal: true
+    label: 'molecule:build:{{.DISTRO}}'
+    dir: '{{.TASKFILE_DIR}}/molecule'
+    requires:
+      vars: [DISTRO]
+    vars:
+      # Dockerfiles use mixed case for SLES (Dockerfile-SLES15SP3)
+      DOCKERFILE: 'Dockerfile-{{if hasPrefix "sles" .DISTRO}}{{upper .DISTRO}}{{else}}{{.DISTRO}}{{end}}'
+    preconditions:
+      - sh: test -f {{.DOCKERFILE}}
+        msg: 'Dockerfile {{.DOCKERFILE}} not found in docker/molecule'
+    cmds:
+      - '{{.CONTAINER_CMD}} build --pull -t {{.REGISTRY}}/docker-{{.DISTRO}}-ansible:{{.TAG}} -f {{.DOCKERFILE}} .'
+
+  molecule:push:image:
+    internal: true
+    label: 'molecule:push:{{.DISTRO}}'
+    requires:
+      vars: [DISTRO]
+    cmds:
+      - '{{.CONTAINER_CMD}} push {{.REGISTRY}}/docker-{{.DISTRO}}-ansible:{{.TAG}}'

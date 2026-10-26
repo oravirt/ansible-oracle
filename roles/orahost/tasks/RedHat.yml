@@ -25,6 +25,18 @@
   tags: os_packages, oscheck
   notify: Reboot concerning package updates
 
+- name: Install extra packages
+  ansible.builtin.yum:  # noqa fqcn[action-core]
+    name: "{{ extra_packages | default('') }}"
+    state: installed
+    enablerepo: "{{ extrarepos_enabled | default(omit, True) }}"
+    disablerepo: "{{ extrarepos_disabled | default(omit, True) }}"
+  when:
+    - install_os_packages
+    - extra_packages is defined
+  tags: os_packages, oscheck
+  notify: Reboot concerning package updates
+
 - name: Disable Firewall
   when:
     - disable_firewall

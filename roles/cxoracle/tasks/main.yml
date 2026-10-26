@@ -47,7 +47,12 @@
     # => Install cx_Oracle for Python3 only
     - name: cx_oracle | Install cx_oracle for Python3
       ansible.builtin.pip:
-        name: "{{ _cxoracle_tempdir.path }}/{{ _cx_oracle_filename }}"
+        name: >-
+          {{
+            _cxoracle_tempdir.path ~ '/' ~ _cx_oracle_filename
+            if '/' in _cx_oracle_source
+            else _cx_oracle_filename
+          }}
         executable: pip3
         extra_args: "{{ extra_args }}"
         umask: "{{ cx_oracle_umask | default(omit) }}"

@@ -104,6 +104,8 @@ oracle_gi_cluster_type: STANDARD
 
 **_sqlnet2_**
 
+**_switch_home_**
+
 **_tnsnames_**
 
 **_tnsnames2_**

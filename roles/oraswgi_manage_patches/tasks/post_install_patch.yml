@@ -74,6 +74,18 @@
     - olrloc.stat.exists
     - gihome_patches.stdout_lines | select('match', gip_opatch.subpatches | first | string) | length > 0
 
+- name: post_install_patch | Get new list of current installed patches
+  ansible.builtin.command: "{{ oracle_home_gi }}/OPatch/opatch lspatches -oh {{ oracle_home_gi }}"
+  become: true
+  become_user: "{{ _grid_install_user }}"
+  changed_when: false
+  register: gihome_patches
+
+- name: post_install_patch | include_tasks rootscript_postpatch.yml
+  ansible.builtin.include_tasks: rootscript_postpatch.yml
+  when:
+    - _oraswgi_manage_patches_oneoff_removed | default(false)
+
 - name: post_install_patch | Manage Patch from gi_patches with opatchauto
   ansible.builtin.include_tasks: loop_patchid.yml
   with_subelements:
@@ -136,9 +148,9 @@
   become: true
   become_user: "{{ _grid_install_user }}"
   changed_when: false
-  register: dbhome_patches
-  when:
-    - _oraswgi_manage_patches_oneoff_removed | default(false)
+  register: gihome_patches
 
 - name: post_install_patch | include_tasks rootscript_postpatch.yml
   ansible.builtin.include_tasks: rootscript_postpatch.yml
+  when:
+    - _oraswgi_manage_patches_oneoff_applied | default(false)

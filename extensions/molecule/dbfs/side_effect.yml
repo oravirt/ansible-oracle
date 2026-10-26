@@ -8,9 +8,11 @@
     oracle_sw_unpack: true
     apply_patches_db: true
 
-
-- name: Side-Effect - DB-Patching 19.20
+# 2nd run: nothing should be changed
+- name: Side-Effect - DB-Patching 19c
   ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.opatch
+  vars:
+    apply_patches_db: true
 
 - name: Side-Effect - Manage-DB
   ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db
@@ -54,6 +56,8 @@
             content: undo
             state: present
         init_parameters:
+          # needed by oradb_manage_tablespace without explicit datafiles
+          - {name: db_create_file_dest, value: '/u01/app/oracle/oradata', scope: both, state: present}
           - {name: recyclebin, value: 'off', scope: spfile, state: present}
           - {name: sga_target, value: '1808M', scope: spfile, state: present}
 

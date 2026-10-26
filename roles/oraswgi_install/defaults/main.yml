@@ -117,6 +117,19 @@ oracle_asm_storage_option: "{% if oracle_install_version_gi is version('12.2', '
 oracle_gi_gns_vip:
 
 # @var oracle_sw_image_gi:description: >
+# List of version sepcific GI installation images
+#
+# NOTE: Image files are expected to be found by their `filename` under `oracle_sw_source_local`, or `oracle_sw_source_www` respectively,
+# unless a `filesource` dict element provides a full path / complete URL to the image file.
+# @end
+# @var oracle_sw_image_gi:example: >
+# oracle_sw_image_gi:
+#   # LINUX.X64_213000_grid_home.zip located under `oracle_sw_source_local`
+#   - {filename: LINUX.X64_213000_grid_home.zip, version: 21.3.0.0, creates: 'install/.img.bin'}
+#   # LINUX.X64_193000_grid_home.zip located under /mnt/images
+#   - {filename: LINUX.X64_193000_grid_home.zip, filesource: /mnt/images/LINUX.X64_193000_grid_home.zip, version: 19.3.0.0, creates: 'install/.img.bin'}
+#   # LINUX.X64_180000_grid_home.zip download
+#   - {filename: LINUX.X64_180000_grid_home.zip, filesource: https://downloadserver/images?id=180000_grid_home, version: 18.3.0.0, creates: 'install/.img.bin'}
 # @end
 oracle_sw_image_gi:
   - {filename: LINUX.X64_213000_grid_home.zip, version: 21.3.0.0, creates: 'install/.img.bin'}

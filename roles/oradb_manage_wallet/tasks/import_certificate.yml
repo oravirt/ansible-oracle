@@ -1,0 +1,100 @@
+---
+- name: import_certificate | Certiticates to remove
+  ansible.builtin.set_fact:
+    certs_to_remove: >-
+      {{
+        wallet_certs.usercerts
+          | selectattr('sha', 'in', _fingerprints | map(attribute='sha') | list)
+          | map('combine', {'type': 'user_cert'})
+          | list
+      }}
+
+- name: import_certificate | Remove user certificates
+  ansible.builtin.shell:
+    cmd: |
+      set -eu
+      set -o pipefail
+      echo -e "$stdin" | "${ORACLE_HOME}/bin/orapki" \
+                            wallet remove \
+                            -nologo \
+                            -wallet "{{ owc.path }}" \
+                            -dn "{{ item.subject }}" \
+                            -issuer_dn "{{ item.issuer }}" \
+                            -user_cert
+  become: true
+  become_user: "{{ osc.owner | default(oracle_user) }}"
+  changed_when: true
+  environment:
+    stdin: "{{ _oradb_manage_wallet_password }}"
+    ORACLE_HOME: "{{ _oracle_home_db }}"
+  loop: "{{ certs_to_remove }}"
+
+- name: import_certificate | Import certificate
+  block:
+    - name: import_certificate | Create temp download dir
+      ansible.builtin.tempfile:
+        state: directory
+      become: true
+      become_user: "{{ osc.owner | default(oracle_user) }}"
+      register: _cert_tempdir
+
+    - name: import_certificate | Get certificate filename
+      ansible.builtin.set_fact:
+        _cert_filename: "{{ owc_c.file | basename }}"
+
+    - name: import_certificate | Transfer certificates to server (local)
+      ansible.builtin.copy:
+        src: "{{ owc_c.file | regex_replace('^file://', '') }}"
+        dest: "{{ _cert_tempdir.path }}/{{ _cert_filename }}"
+        mode: "0400"
+      become: true
+      become_user: "{{ osc.owner | default(oracle_user) }}"
+
+    - name: import_certificate | Import PKCS12 certificates  # noqa  no-changed-when
+      ansible.builtin.shell:
+        cmd: |
+          set -eu
+          set -o pipefail
+          echo -e "$stdin" | "${ORACLE_HOME}/bin/orapki" wallet import_pkcs12 \
+                                -nologo -wallet "{{ owc.path }}" \
+                                -pkcs12file "{{ _cert_tempdir.path }}/{{ _cert_filename }}" \
+                                {{ owc_c.extra_args if owc_c.extra_args is defined }} \
+                                {{ '-pkcs12pwd  "${pkcs12pwd}"' if owc_c.password is defined }}
+      when:
+        - owc_c.type == 'pkcs12'
+      become: true
+      become_user: "{{ osc.owner | default(oracle_user) }}"
+      environment:
+        stdin: "{{ _oradb_manage_wallet_password }}"
+        pkcs12pwd: "{{ owc_c.password }}"
+        ORACLE_HOME: "{{ _oracle_home_db }}"
+
+    - name: import_certificate | Import regular certificates  # noqa  no-changed-when
+      ansible.builtin.shell:
+        cmd: |
+          set -eu
+          set -o pipefail
+          echo -e "$stdin" | "${ORACLE_HOME}/bin/orapki" wallet add \
+                                -nologo -wallet "{{ owc.path }}" \
+                                -cert "{{ _cert_tempdir.path }}/{{ _cert_filename }}" \
+                                {{ owc_c.extra_args if owc_c.extra_args is defined }}
+      when:
+        - owc_c.type == 'cert'
+      become: true
+      become_user: "{{ osc.owner | default(oracle_user) }}"
+      environment:
+        stdin: "{{ _oradb_manage_wallet_password }}"
+        ORACLE_HOME: "{{ _oracle_home_db }}"
+
+  always:
+    - name: "import_certificate | Cleanup certificate from {{ _cert_tempdir.path }}"
+      ansible.builtin.file:
+        path: "{{ _cert_tempdir.path }}"
+        state: absent
+
+- name: wallet_manage_certificate | include wallet_certificates_info.yml
+  ansible.builtin.include_tasks:
+    file: wallet_certificates_info.yml
+    apply:
+      tags: cert
+  tags: cert

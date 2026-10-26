@@ -14,6 +14,13 @@
                 or
                 (sqlni.home is undefined and sqlni.use_gi_home | default(false))
               - sqlni.use_gi_home | default(false) or (sqlni.home is defined and db_homes_config[sqlni.home] is defined)
+              # ORACLE_HOME must be installed (e.g. dedicated listener home, Out-of-Place Patching)
+              - sqlni.state | default('') == 'absent'
+                or sqlni.use_gi_home | default(false)
+                or (db_homes_installed | default([])
+                    | selectattr('home', 'equalto', sqlni.home)
+                    | rejectattr('state', 'equalto', 'absent')
+                    | list | length > 0)
               - sqlni.state is defined
               - sqlni.state in ['absent', 'present']
               - sqlni.sqlnet is defined
@@ -56,7 +63,13 @@
                 or
                 (tnsni.home is undefined and tnsni.use_gi_home | default(false))
               - tnsni.use_gi_home | default(false) or (tnsni.home is defined and db_homes_config[tnsni.home] is defined)
-              - db_homes_config[tnsni.home] is defined
+              # ORACLE_HOME must be installed (e.g. dedicated listener home, Out-of-Place Patching)
+              - tnsni.state | default('') == 'absent'
+                or tnsni.use_gi_home | default(false)
+                or (db_homes_installed | default([])
+                    | selectattr('home', 'equalto', tnsni.home)
+                    | rejectattr('state', 'equalto', 'absent')
+                    | list | length > 0)
               - tnsni.state is defined
               - tnsni.state in ['absent', 'present']
               - tnsni.tnsname is defined
@@ -100,6 +113,13 @@
                 or
                 (lsnri.home is undefined and lsnri.use_gi_home | default(false))
               - lsnri.use_gi_home | default(false) or (lsnri.home is defined and db_homes_config[lsnri.home] is defined)
+              # ORACLE_HOME must be installed (e.g. dedicated listener home, Out-of-Place Patching)
+              - lsnri.state | default('') == 'absent'
+                or lsnri.use_gi_home | default(false)
+                or (db_homes_installed | default([])
+                    | selectattr('home', 'equalto', lsnri.home)
+                    | rejectattr('state', 'equalto', 'absent')
+                    | list | length > 0)
               - lsnri.state is defined
               - lsnri.state in ['absent', 'present']
               - lsnri.listener_name is defined

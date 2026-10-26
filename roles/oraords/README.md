@@ -13,6 +13,7 @@ from yum Repository from Oracle.
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
+  - [oraords_apex_image_context](#oraords_apex_image_context)
   - [oraords_apex_image_path](#oraords_apex_image_path)
   - [oraords_db_pools](#oraords_db_pools)
   - [oraords_default_admin_user](#oraords_default_admin_user)
@@ -22,7 +23,6 @@ from yum Repository from Oracle.
   - [oraords_ords_bin](#oraords_ords_bin)
   - [oraords_ords_config](#oraords_ords_config)
   - [oraords_ords_logs](#oraords_ords_logs)
-  - [ords_config](#ords_config)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -36,6 +36,10 @@ from yum Repository from Oracle.
 
 ## Default Variables
 
+### oraords_apex_image_context
+
+APEX context path for Images.
+
 ### oraords_apex_image_path
 
 Directory for APEX Images on ORDS Host.
@@ -48,20 +52,25 @@ Attributes:
 
 db_pool: <Pool in ORDS>
 
-pdb_name: <Target PDB. Needed to find the Password s>
+admin_user: <Admin user for ORDS installation. Defaults to `oraords_default_admin_user`>
 
-port: <Listener Port>
+service: <Servicename of target. Mandatory>
 
-service: <servicename of target. Defaults to pdb_name>
+port: <Listener Port. Defaults to `oraords_default_port`>
 
-hostname: <Hostname for target. Defaults to `inventory_hostname`>
+host: <Hostname for target. Defaults to `inventory_hostname`>
+
+feature_db_api: <true / false (default)>
+
+feature_rest_enabled_sql: <true / false (default)>
+
+feature_sdw: <true / false (default)>
 
 #### Default value
 
 ```YAML
 oraords_db_pools:
   - db_pool: default
-    pdb_name: orclpdb
     admin_user: sys
     service: orclpdb
     port: 1521
@@ -104,14 +113,18 @@ oraords_oracle_home: >-
 
 ### oraords_ords_bin
 
+PATH for ords binary
+
 #### Default value
 
 ```YAML
 oraords_ords_bin: >-
-  /usr/local/bin
+  /opt/oracle/ords/bin
 ```
 
 ### oraords_ords_config
+
+ORDS configuration directory.
 
 #### Default value
 
@@ -122,16 +135,14 @@ oraords_ords_config: >-
 
 ### oraords_ords_logs
 
+ORDS logging directory.
+
 #### Default value
 
 ```YAML
 oraords_ords_logs: >-
   /etc/ords/logs
 ```
-
-### ords_config
-
-APEX context path for Images.
 
 ## Discovered Tags
 

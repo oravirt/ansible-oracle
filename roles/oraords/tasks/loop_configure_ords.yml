@@ -10,7 +10,7 @@
   tags:
     - ords_config
   environment:
-    ADMIN_USER: "{{ _loop_pool.admin_user | default(oraords_admin_user) }}"
+    ADMIN_USER: "{{ _loop_pool.admin_user | default(oraords_default_admin_user) }}"
     ADMIN_PASSWORD: "{{ oraords_db_pools_password[_loop_pool.db_pool]['admin_password'] }}"
     ORDS_PASSWORD: "{{ oraords_db_pools_password[_loop_pool.db_pool]['ords_password'] }}"
     APEX_IMAGE_PATH: "{{ oraords_apex_image_path | default('') }}"
@@ -29,7 +29,7 @@
           echo "log:                {{ oraords_ords_logs }}"
           echo "admin-user:         ${ADMIN_USER}"
           echo "db-pool:            ${DB_POOL}"
-          echo "db-hostname:        {{ _loop_pool.host }}"
+          echo "db-hostname:        {{ _loop_pool.host | default(inventory_hostname) }}"
           echo "db-port:            {{ _loop_pool.port | default(oraords_default_port) }}"
           echo "db-servicename:     {{ _loop_pool.service | mandatory }}"
           echo "APEX_IMAGE_PATH:    ${APEX_IMAGE_PATH}"
@@ -38,7 +38,7 @@
           if [ ${DB_POOL} = 'default' ] ; then
             DB_POOL_PARAM=""
           else
-            DB_POOL_PARAM="${DB_POOL}"
+            DB_POOL_PARAM="--db-pool ${DB_POOL}"
           fi
 
           {{ oraords_ords_bin }}/ords \
@@ -48,12 +48,12 @@
             --log-folder {{ oraords_ords_logs }} \
             ${DB_POOL_PARAM} \
             --admin-user "${ADMIN_USER}" \
-            --db-hostname "{{ _loop_pool.host | mandatory }}" \
+            --db-hostname "{{ _loop_pool.host | default(inventory_hostname) }}" \
             --db-port {{ _loop_pool.port | default(oraords_default_port) }} \
             --db-servicename {{ _loop_pool.service | mandatory }} \
             --feature-db-api {{ _loop_pool.feature_db_api | default(false) | ternary('true', 'false') }} \
             --feature-rest-enabled-sql {{ _loop_pool.feature_rest_enabled_sql | default(false) | ternary('true', 'false') }} \
-            --feature-sdw {{ _loop_pool.feature_sdw | default('false') | ternary('true', 'false') }} \
+            --feature-sdw {{ _loop_pool.feature_sdw | default(false) | ternary('true', 'false') }} \
             --proxy-user \
             --password-stdin <<EOF
           ${ADMIN_PASSWORD}

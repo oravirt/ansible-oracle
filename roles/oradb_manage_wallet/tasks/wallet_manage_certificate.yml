@@ -1,0 +1,26 @@
+---
+- name: wallet_manage_certificate | include wallet_check_certificate.yml
+  ansible.builtin.include_tasks:
+    file: wallet_check_certificate.yml
+    apply:
+      tags: cert
+  tags: cert
+
+- name: wallet_manage_certificate | include import_certificate.yml
+  ansible.builtin.include_tasks:
+    file: import_certificate.yml
+    apply:
+      tags: cert
+  when:
+    - owc_c.state | default('present') == 'present'
+    - wallet_refresh_required
+  tags: cert
+
+- name: wallet_manage_certificate | include remove_certificate.yml
+  ansible.builtin.include_tasks:
+    file: remove_certificate.yml
+    apply:
+      tags: cert
+  when:
+    - owc_c.state | default('present') == 'absent'
+  tags: cert

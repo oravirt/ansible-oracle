@@ -23,8 +23,6 @@
   become: true
   become_user: "{{ _grid_install_user }}"
 
-- name: loop_apply_single_opatch | Manage non opatchauto patches for GI
+- name: loop_apply_single_opatch | Flag non opatchauto patches for GI were applied
   ansible.builtin.set_fact:
-    _oraswgi_manage_patches_oneoff_removed: true
-  when:
-    - not _oraswgi_manage_patches_oneoff_removed | default(false)
+    _oraswgi_manage_patches_oneoff_applied: true

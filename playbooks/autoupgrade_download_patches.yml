@@ -1,0 +1,10 @@
+---
+- name: Download patches with Oracle AutoUpgrade
+  hosts: "{{ hostgroup | default('all') }}"
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Download patches
+      ansible.builtin.import_role:
+        name: opitzconsulting.ansible_oracle.autoupgrade
+        tasks_from: download_patches.yml

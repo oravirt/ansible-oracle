@@ -1,0 +1,74 @@
+---
+- name: autoupgrade | Assert variables
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _autoupgrade_home | length > 0
+      - autoupgrade_jar | length > 0
+      - autoupgrade_log_dir | length > 0
+      - oracle_user is defined
+
+- name: autoupgrade | Assert autoupgrade_download_patches
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - aup.target_version is defined
+      - aup.patch is defined
+      - aup.patch | string | length > 0
+    fail_msg: "target_version and patch are mandatory in autoupgrade_download_patches"
+  loop: "{{ autoupgrade_download_patches }}"
+  loop_control:
+    loop_var: aup
+    label: "{{ aup.target_version | default('') }}: {{ aup.patch | default('') }}"
+
+# The target host must be prepared by ansible-oracle (playbook os / role orahost).
+# autoupgrade does not create users. oracle_base is created in install.yml.
+- name: autoupgrade | Check oracle_user on target host
+  when:
+    - not _autoupgrade_run_local | bool
+  block:
+    - name: autoupgrade | Check oracle_user
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ oracle_user }}"
+        fail_key: false
+
+    - name: autoupgrade | Assert oracle_user
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - ansible_facts.getent_passwd[oracle_user] is not none
+        fail_msg: >-
+          oracle_user '{{ oracle_user }}' missing on {{ inventory_hostname }}.
+          Prepare the host with playbook opitzconsulting.ansible_oracle.os (role orahost) first.
+
+- name: autoupgrade | Check Java
+  ansible.builtin.command: "{{ _autoupgrade_java }} -version"
+  become: "{{ _autoupgrade_become }}"
+  become_user: "{{ oracle_user }}"
+  delegate_to: "{{ _autoupgrade_delegate_to }}"
+  run_once: "{{ _autoupgrade_run_local | bool }}"
+  register: _autoupgrade_java_res
+  changed_when: false
+  failed_when: false
+
+- name: autoupgrade | Assert Java
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _autoupgrade_java_res.rc == 0
+    fail_msg: >-
+      '{{ _autoupgrade_java }}' is not executable on
+      {{ _autoupgrade_run_local | bool | ternary('Ansible controller (autoupgrade_run_local: true)', inventory_hostname) }}.
+      Set {{ _autoupgrade_run_local | bool | ternary('autoupgrade_local_java_home', 'autoupgrade_java_home') }} or install Java.
+      {{ _autoupgrade_java_res.msg | default(_autoupgrade_java_res.stderr | default('')) }}
+
+- name: autoupgrade | Show variables
+  ansible.builtin.debug:
+    msg:
+      - "local execution:          {{ _autoupgrade_run_local }}"
+      - "autoupgrade home:         {{ _autoupgrade_home }}"
+      - "autoupgrade_jar:          {{ autoupgrade_jar }}"
+      - "autoupgrade_force_update: {{ autoupgrade_force_update }}"
+      - "java:                     {{ _autoupgrade_java }}"
+      - "java -version:            {{ _autoupgrade_java_res.stderr_lines | default([]) | first | default('') }}"

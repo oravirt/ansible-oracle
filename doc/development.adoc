@@ -14,7 +14,8 @@ A Pull-Request is only accepted, when `github-Actions` are valid.
 === Prepare a development environment
 
 IMPORTANT: This chapter shows, how the development envionment could look like. +
-You need an Ansible-Controller with an Editor or IDE of your own choice.
+You need an Ansible-Controller with an Editor or IDE of your own choice. +
+The examples assume Bash as your CLI.
 
 
 
@@ -59,7 +60,7 @@ python3.10 -m venv ~/venv/ansible-oracle
 .install Python modules
 ----
 . ~/venv/ansible-oracle/bin/activate
-pip --require-virtualenv -v install -r requirements_dev.txt
+pip --require-virtualenv -v install -r tools/dev/requirements_dev.txt
 ----
 
 .Start ansible-navigator
@@ -83,7 +84,7 @@ python3 -m venv ~/venv/ansible-doctor
 .install Python modules
 ----
 . ~/venv/ansible-doctor/bin/activate
-pip --require-virtualenv -v install -r requirements_doctor.txt
+pip --require-virtualenv -v install -r tools/dev/requirements_doctor.txt
 ----
 
 .Start ansible-doctor
@@ -163,6 +164,46 @@ pip3 install antsibull-changelog
 
 Changelogs for Collections: https://github.com/ansible-community/antsibull-changelog/blob/main/docs/changelogs.rst#releasing-a-new-version-of-a-collection
 
+=== Add PR references to fragments
+
+Each entry in a fragment should end with a reference to its Pull-Request, e.g. `(oravirt#599)`.
+`tools/release/fix_fragments.py` adds missing references to all fragments in `changelogs/fragments`.
+
+The Pull-Request is determined from the last commit of the fragment file via the GitHub API.
+If this commit is not part of a Pull-Request (e.g. not pushed yet), older commits of the fragment are used.
+The reference is appended to every entry that does not end with it, even if the entry already references an issue.
+
+----
+# show what would be changed
+tools/release/fix_fragments.py --dry-run
+
+# update the fragments
+tools/release/fix_fragments.py
+----
+
+Single fragments can be checked with `-f` / `--fragment`, e.g. by a developer after the Pull-Request for a new fragment has been created.
+The parameter accepts a path or a filename from `changelogs/fragments` and can be repeated.
+With `--dry-run` the script returns exit code 1 if the fragment needs to be updated.
+
+----
+# check a single fragment
+tools/release/fix_fragments.py --dry-run -f blanks-in-gi-responsefile.yml
+
+# update a single fragment
+tools/release/fix_fragments.py -f changelogs/fragments/blanks-in-gi-responsefile.yml
+----
+
+NOTE: The Pull-Request must exist on GitHub, otherwise the fragment is reported as `no pull request found`.
+
+Fragments without a Pull-Request and entries that cannot be updated automatically (e.g. broken quoting) are reported and must be fixed manually.
+The script returns exit code 1 in this case.
+
+Without `--fragment` all fragments in `changelogs/fragments` are processed.
+
+NOTE: Set `GITHUB_TOKEN` to avoid the rate limit of 60 unauthenticated GitHub API requests per hour.
+
+This must be done before `antsibull-changelog release`, because the release removes the fragments.
+
 === Creating new releases
 
 `antsibull-changelog release` reads `galaxy.yml` to get the release version automatically.
@@ -220,6 +261,38 @@ The following szenarios are existing in the `ansible-oracle profect.
 | golden | Create Golden-Image for installation from dbfs.
 |=======================
 
+=== Directory for installation media and patches
+
+The scenarios `dbfs`, `dbfs-ol9`, `download` and `golden` mount a local directory as `/vagrant` into the container.
+The local directory must be defined by `MOLECULE_SW_DIR`, there is no default. The path inside the container is always `/vagrant`.
+
+.Set the directory as environment variable
+----
+export MOLECULE_SW_DIR=/mnt/d/ORACLE/sw/linux64
+----
+
+.or permanently in `extensions/.env.yml` (ignored by git)
+----
+MOLECULE_SW_DIR: /mnt/d/ORACLE/sw/linux64
+----
+
+=== Taskfile
+
+`extensions/Taskfile.yml` wraps the molecule commands. The scenario is selected with `S=` (default: `default`).
+
+----
+cd extensions
+task --list
+task pull                      # pull container images before the 1st run
+task converge S=dbfs-ol9
+task converge S=dbfs-ol9 -- -vv  # arguments after -- are passed to molecule
+task login S=default H=ol9
+task destroy S=dbfs-ol9
+task collection                # reinstall collection after role changes
+----
+
+The tasks are also available from the repository root as `task molecule:<task>`.
+
 === Test OS roles
 
 IMPORTANT: This szenario is used, when changes at OS roles should be tested against different OS Distribuitions. +
@@ -244,6 +317,16 @@ IMPORTANT: Make sure that /vagrant has enough free space for installation media 
 export MOS_LOGIN=Username
 export MOS_PASSWORD=verySecret
 ----
+
+.or store them in `extensions/.env.yml` (ignored by git)
+----
+MOS_LOGIN: Username
+MOS_PASSWORD: 'verySecret'
+----
+
+Environment variables have precedence over `extensions/.env.yml`.
+Quote the password with `'` when it contains special characters like `:`, `#` or `"`.
+Restrict the access to the file with `chmod 600 extensions/.env.yml`.
 
 .Start download
 ----

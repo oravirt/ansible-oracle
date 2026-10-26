@@ -63,6 +63,9 @@
     - dbhome_patches.stdout_lines | select('match', item.patchid | string) | length > 0
   register: psuapplym
 
+- name: opatch lspatches
+  ansible.builtin.include_tasks: opatch_lsinv.yml
+
 - name: Manage opatchauto patches for DB (non-gi)
   opitzconsulting.ansible_oracle.oracle_opatch:
     oracle_home: "{{ oracle_home_db }}"

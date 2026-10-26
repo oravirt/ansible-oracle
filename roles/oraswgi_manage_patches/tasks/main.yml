@@ -199,10 +199,14 @@
         # filename: {{ osp_loop.filename | default('') }}
       vars:
         osp_loop: >-
-          {{ oracle_sw_patches | selectattr('patchid', 'equalto', gipl_loop.patchid) | default([]) | list | first }}
+          {%- if gipl_loop.unique_patchid is defined -%}
+          {{ oracle_sw_patches | selectattr('unique_patchid', 'defined') | selectattr('unique_patchid', 'equalto', gipl_loop.unique_patchid) | default([]) | list | first -}}
+          {%- else -%}
+          {{ oracle_sw_patches | selectattr('patchid', 'equalto', gipl_loop.patchid) | default([]) | list | first -}}
+          {%- endif -%}
         gi_patchlist: >-
-          {{ gi_patches[oracle_install_version_gi]['opatchauto'] | default([]) +
-          gi_patches[oracle_install_version_gi]['opatch'] | default([]) }}
+          {{ (gi_patches[oracle_install_version_gi]['opatchauto'] | default([])) +
+          (gi_patches[oracle_install_version_gi]['opatch'] | default([]) | selectattr('state', 'equalto', 'present')) }}
         # check if all subpatches of an autopatch are installed
         # _subpatch_missing_count == 0 => no need to copy the patch archive!
         _gi_patchlist_subpatches: |-

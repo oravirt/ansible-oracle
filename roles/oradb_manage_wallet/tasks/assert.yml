@@ -47,3 +47,30 @@
       when:
         - owc_dbc.0.state == 'present'
         - owc_dbc.1 is defined
+
+    # check certificates
+    - name: assert | assert certificates in oracle_wallet_config
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - owc_c.1.file is defined
+          - owc_c.1.type is defined
+          - owc_c.1.type is defined
+          - owc_c.1.type in ('pkcs12', 'cert')
+          - owc_c.1.state in ('present', 'absent')
+        fail_msg: attribute missing or invalid in wallet certificates
+      with_subelements:
+        - "{{ oracle_wallet_config }}"
+        - certificates
+        - flags:
+          skip_missing: true
+      loop_control:
+        label: >-
+          {{ owc_c.0.name | default('') }}
+          {{ owc_c.1.tns_name | default('') }}
+          {{ owc_c.1.state | default('') }}
+        loop_var: owc_c
+      when:
+        - owc_c.0.state == 'present'
+        - owc_c.1 is defined
+      tags: cert

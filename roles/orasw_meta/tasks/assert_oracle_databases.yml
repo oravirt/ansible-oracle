@@ -82,7 +82,7 @@
                 | selectattr('home','equalto',ass_dbh.home)
                 | selectattr('state','equalto','present')
                 | map(attribute='oracle_db_type',default='SI')
-                | unique | length) == 1
+                | unique | length) <= 1
           loop: "{{ db_homes_installed }}"
           loop_control:
             label: "{{ ass_dbh.home | default('') }}"

@@ -1,0 +1,43 @@
+---
+# @meta description: >
+# Manage Oracle AutoUpgrade.
+#
+# The role has no `tasks/main.yml`.
+# Each area of AutoUpgrade has its own task file, which must be called with `tasks_from`:
+#
+# | Task file | Description |
+# | --- | --- |
+# | `assert.yml` | Check variables and Java |
+# | `install.yml` | Install `autoupgrade.jar` into `autoupgrade_home` |
+# | `download_patches.yml` | Download patches from My Oracle Support with AutoUpgrade |
+# | `upgrade_analyze.yml` | Analyze phase for the Unplug/Plug upgrade of PDBs (`oracle_pdbs`): AutoUpgrade `analyze` |
+# | `upgrade_fixups.yml` | Fixups phase: AutoUpgrade `fixups` in the source CDB/PDBs |
+# | `upgrade_deploy.yml` | Unplug/Plug upgrade of PDBs: analyze phase + AutoUpgrade `deploy` |
+#
+# See `doc/guides/autoupgrade_upgrade.adoc` for the upgrade of PDBs.
+# @end
+# @meta author: [Thorsten Bruhns]
+galaxy_info:
+  role_name: autoupgrade
+  author: Thorsten Bruhns
+  description: Manage Oracle AutoUpgrade
+  company: OPITZ CONSULTING
+
+  license: license (MIT)
+
+  min_ansible_version: 2.14.0
+
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+        - "10"
+
+  galaxy_tags:
+    - database
+    - oracle
+
+dependencies:
+  - role: orahost_meta
+  - role: orasw_meta

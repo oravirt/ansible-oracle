@@ -1,0 +1,101 @@
+---
+# Unplug/Plug upgrade of the pending PDBs of one AutoUpgrade job (loop_var: aupjob)
+#
+# AutoUpgrade unplugs the PDBs from the source CDB, plugs them into the target CDB
+# and upgrades them there. The config file was created by the analyze phase.
+#
+# A failed job is resumed by AutoUpgrade with the next execution of the same config file.
+- name: upgrade_deploy_job | Upgrade PDBs
+  become: true
+  become_user: "{{ oracle_user }}"
+  block:
+    - name: upgrade_deploy_job | Logfiles of AutoUpgrade
+      ansible.builtin.debug:
+        msg:
+          - "{{ (_autoupgrade_upgrade_state[aupjob.name]['state'] == 'resume') | ternary('Resume of the unfinished', 'Unplug/Plug') }}
+             of {{ _autoupgrade_upgrade_state[aupjob.name]['pdbs'] }}
+             from {{ aupjob.source_cdb }} into {{ aupjob.target_cdb }} could take some time to complete."
+          - "Logfiles: {{ _autoupgrade_upgrade_log_dir }}"
+          - "Follow the progress on {{ inventory_hostname }} as {{ oracle_user }} with:"
+          - "tail -f {{ _autoupgrade_upgrade_recovery_dir }}/autoupgrade.log"
+
+    - name: upgrade_deploy_job | Run AutoUpgrade in mode deploy
+      ansible.builtin.command: >-
+        {{ _autoupgrade_java }}{{ _autoupgrade_java_opts }} -jar {{ _autoupgrade_jar_path }}
+        -config {{ _autoupgrade_upgrade_cfg }}
+        -mode deploy -noconsole
+      register: _autoupgrade_upgrade_deploy
+      changed_when: true
+      # failed_when: false => user friendly message in the next task (also for a timeout of async)
+      failed_when: false
+      async: "{{ autoupgrade_upgrade_timeout }}"
+      poll: "{{ autoupgrade_upgrade_poll }}"
+
+    - name: upgrade_deploy_job | AutoUpgrade failed
+      ansible.builtin.include_tasks: upgrade_error.yml
+      vars:
+        _autoupgrade_upgrade_result: "{{ _autoupgrade_upgrade_deploy }}"
+        _autoupgrade_upgrade_result_mode: deploy
+      when:
+        - _autoupgrade_upgrade_deploy.rc | default(1) != 0
+
+    - name: upgrade_deploy_job | Show output of AutoUpgrade
+      ansible.builtin.debug:
+        var: _autoupgrade_upgrade_deploy.stdout_lines
+
+    - name: upgrade_deploy_job | Read PDBs from source and target CDB
+      ansible.builtin.shell: |
+        set -eu
+        if ! pid=$(pgrep -f "^ora_pmon_${ORACLE_SID}$") ; then
+          exit 0
+        fi
+        exe=$(readlink "/proc/${pid}/exe")
+        ORACLE_HOME="${exe%/bin/oracle*}"
+        export ORACLE_HOME
+        echo "HOME=${ORACLE_HOME}"
+        "${ORACLE_HOME}/bin/sqlplus" -S -L /nolog <<EOF
+        connect / as sysdba
+        whenever sqlerror exit failure
+        set heading off feedback off pagesize 0 linesize 200
+        -- UNPLUGGED: PDB kept in the source CDB after the upgrade (keep_source_pdb)
+        select 'PDB=' || p.name || ':' || p.open_mode
+          from v\$pdbs p join cdb_pdbs d on d.pdb_id = p.con_id
+         where p.name <> 'PDB\$SEED' and d.status <> 'UNPLUGGED';
+        EOF
+      environment:
+        ORACLE_SID: "{{ aupcdb }}"
+      loop:
+        - "{{ aupjob.source_sid }}"
+        - "{{ aupjob.target_sid }}"
+      loop_control:
+        loop_var: aupcdb
+      register: _autoupgrade_upgrade_query
+      changed_when: false
+
+    - name: upgrade_deploy_job | Assert PDBs in target CDB
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _autoupgrade_upgrade_pdb_states | rejectattr('state', 'equalto', 'upgraded') | list | length == 0
+          - aupjob.pdbs | map(attribute='target_name') | map('upper')
+            | map('extract', _autoupgrade_upgrade_target_open_modes) | reject('equalto', 'READ WRITE')
+            | list | length == 0
+        fail_msg: >-
+          Unexpected state after the upgrade into target CDB {{ aupjob.target_cdb }}:
+          {{ _autoupgrade_upgrade_pdb_states | map(attribute='target_name')
+             | zip(_autoupgrade_upgrade_pdb_states | map(attribute='state')) | map('join', '=') | list }},
+          open modes in {{ aupjob.target_cdb }}: {{ _autoupgrade_upgrade_target_open_modes }}.
+          upgraded: OK. pending: still in source CDB {{ aupjob.source_cdb }} only.
+          conflict: the PDB exists in source CDB {{ aupjob.source_cdb }} again - was playbook manage_db
+          executed with oracle_pdbs in the source state during or after the upgrade? It creates a new, empty PDB.
+          Open mode other than READ WRITE: check the logfiles in {{ _autoupgrade_upgrade_log_dir }}.
+          Fix the problem and execute the deploy phase again - AutoUpgrade resumes the job.
+
+
+- name: upgrade_deploy_job | Next steps
+  ansible.builtin.debug:
+    msg:
+      - "PDBs {{ aupjob.pdbs | map(attribute='target_name') | list }} are open in {{ aupjob.target_cdb }}."
+      - "oracle_pdbs describes this state already => playbook manage_db can be executed again."
+      - "The attribute autoupgrade in oracle_pdbs can be removed."
+      - "Remove the source CDB {{ aupjob.source_cdb }} from oracle_databases (state: absent), when it is not needed anymore."
