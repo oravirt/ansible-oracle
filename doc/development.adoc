@@ -204,6 +204,25 @@ NOTE: Set `GITHUB_TOKEN` to avoid the rate limit of 60 unauthenticated GitHub AP
 
 This must be done before `antsibull-changelog release`, because the release removes the fragments.
 
+=== Collection version in requirements.yml
+
+The examples in `example/*/ansible/requirements.yml` must reference the collection version from `galaxy.yml`.
+The same is needed for the template `tools/release/requirements.yml`.
+`tools/release/galaxy_version.sh` checks or sets the version in all these files.
+
+----
+# check the versions
+tools/release/galaxy_version.sh check
+
+# set the version from galaxy.yml
+tools/release/galaxy_version.sh fix
+----
+
+`check` returns exit code 1 if a file does not use the version from `galaxy.yml`.
+`fix` changes only the version of the collection entry, comments in the files are kept.
+
+The script is also available as `task example:check` and `task example:fix` from the repository root.
+
 === Creating new releases
 
 `antsibull-changelog release` reads `galaxy.yml` to get the release version automatically.
@@ -214,6 +233,86 @@ NOTE: The whole release process should be done with a dedicated Pull-Request.
 ----
 antsibull-changelog release
 ----
+
+== Check dependencies with renovate
+
+IMPORTANT: This is optional and not needed for the normal development in `ansible-oracle`. +
+It is used by maintainers to find updates for pip modules and container images.
+
+`renovate` is part of `shell.nix`.
+The configuration is in `renovate.json`, the tasks are in `tools/renovate/Taskfile.yml`.
+
+=== Local checks
+
+The local checks read the working tree and do not change anything.
+No GitHub setup is needed.
+`renovate.json` is read from the working tree, but it must be tracked by git.
+
+----
+task renovate:check     # pip modules and container images
+task renovate:pip       # pip modules and pre-commit hooks
+task renovate:docker    # container images only
+task renovate:report    # show the result of the last run again
+task renovate:validate  # validate renovate.json
+----
+
+Dependencies which are pinned intentionally (e.g. `ansible-core` or the molecule base images) are disabled with `packageRules` in `renovate.json`.
+They are shown as `disabled` in the report.
+
+Tools which are used in requirements, in `.pre-commit-config.yaml` and in the github workflows (`ansible-doctor`, `ansible-lint`, `antsibull-changelog`) are grouped with `groupName`.
+An update changes all files in one branch, so the versions are always the same.
+The github workflow for `ansible-doctor` installs `tools/dev/requirements_doctor.txt`.
+The versions of github actions (e.g. `ansible/ansible-lint`) and of `pip install <module>==<version>` in the workflows are checked as well (only with `task renovate:check`).
+
+The pre-commit hooks are looked up with GitHub tags, which needs a token.
+The local checks use the token from `gh auth token`, if `gh` is logged in.
+
+=== Setup gh for renovate
+
+IMPORTANT: The GitHub CLI `gh` is only needed for running renovate against your fork on GitHub (`task renovate:fork`). +
+The local checks work without it.
+
+`gh` is part of `shell.nix`. Login once with your GitHub account:
+
+----
+gh auth login     # GitHub.com, HTTPS, login with a web browser
+gh auth status
+----
+
+The token of `gh` needs the scope `repo` for pushing branches into your fork.
+This is part of the default scopes of `gh auth login`.
+
+renovate reads the token from `RENOVATE_TOKEN`:
+
+----
+export RENOVATE_TOKEN=$(gh auth token)
+----
+
+=== Run renovate against your fork
+
+renovate clones your fork from GitHub, creates a branch for each update and pushes it together with a Pull-Request into your fork.
+The configuration is taken from `renovate.json` in `FORK_BASE` of the fork, not from your working tree.
+`renovate.json` and `tools/renovate/changelog_fragment.sh` must be pushed into `FORK_BASE` before the first run.
+Without `renovate.json` renovate skips the fork (`disabled-no-config`).
+
+`FORK_REPO` is the fork on GitHub, `FORK_BASE` the branch for the updates (default: `master`).
+
+----
+# show what would be done
+task renovate:fork:dry-run FORK_REPO=<github user>/ansible-oracle
+
+# create branches and Pull-Requests in the fork
+task renovate:fork FORK_REPO=<github user>/ansible-oracle
+----
+
+The branches can be tested locally after `git fetch origin`.
+
+The branches are named `pr/renovate/<update>`, so the `github-Actions` are started for each push.
+Each update adds a changelog fragment `changelogs/fragments/renovate-<dependency>.yml` in section `minor_changes`, created by `tools/renovate/changelog_fragment.sh`.
+The PR reference is added later with `tools/release/fix_fragments.py`.
+
+NOTE: renovate keeps the clones and its cache in `~/.cache/renovate`.
+The clone is reset by each run, do not use it as working copy.
 
 == Update Vagrantbox on vagrantcloud for examples
 

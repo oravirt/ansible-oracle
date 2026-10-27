@@ -1,0 +1,114 @@
+# Taskfile.yml
+# Local renovate checks - lookup only, nothing is changed in the repository.
+# fork: run renovate against the github fork - creates branches and PRs there.
+version: '3'
+
+vars:
+  RENOVATE_REPORT: .renovate-report.json
+  FORK_REPO: '{{.FORK_REPO | default "Rendanic/ansible-oracle"}}'
+  FORK_BASE: '{{.FORK_BASE | default "master"}}'
+
+env:
+  # keep clones and cache between runs (default is $TMPDIR, which differs per nix-shell)
+  RENOVATE_BASE_DIR: '{{.HOME}}/.cache/renovate'
+
+tasks:
+  validate:
+    desc: Validate renovate.json
+    cmds:
+      - renovate-config-validator --strict renovate.json
+
+  check:
+    desc: Check pip modules and docker images for updates (lookup only)
+    cmds:
+      - task: lookup
+        vars:
+          MANAGERS: '{{.MANAGERS | default ""}}'
+      - task: report
+
+  pip:
+    desc: Check pip modules and pre-commit hooks for updates (lookup only)
+    cmds:
+      - task: check
+        vars:
+          MANAGERS: '["pip_requirements","pep621","pre-commit"]'
+
+  docker:
+    desc: Check docker images for updates (lookup only)
+    cmds:
+      - task: check
+        vars:
+          MANAGERS: '["dockerfile","docker-compose","custom.regex"]'
+
+  lookup:
+    internal: true
+    env:
+      LOG_LEVEL: '{{.LOG_LEVEL | default "warn"}}'
+      RENOVATE_PLATFORM: local
+      # pre-commit hooks are looked up with github tags - token from gh if available
+      GITHUB_COM_TOKEN:
+        sh: gh auth token 2>/dev/null || true
+      # renovate.json is read from the working tree (must be tracked by git)
+      RENOVATE_ONBOARDING: 'false'
+      RENOVATE_DRY_RUN: lookup
+      RENOVATE_REPORT_TYPE: file
+      RENOVATE_REPORT_PATH: '{{.RENOVATE_REPORT}}'
+      # force overrides enabledManagers from renovate.json
+      RENOVATE_FORCE: '{{if .MANAGERS}}{"enabledManagers": {{.MANAGERS}}}{{else}}{}{{end}}'
+    cmds:
+      - renovate
+
+  fork:dry-run:
+    desc: Show what renovate would do on the github fork (FORK_REPO, FORK_BASE)
+    cmds:
+      - task: fork-run
+        vars:
+          DRY_RUN: full
+
+  fork:
+    desc: Run renovate on the github fork - creates branches and PRs (FORK_REPO, FORK_BASE)
+    prompt: Create renovate branches and PRs in {{.FORK_REPO}} ({{.FORK_BASE}})?
+    cmds:
+      - task: fork-run
+
+  fork-run:
+    internal: true
+    preconditions:
+      - sh: '[ -n "${RENOVATE_TOKEN:-}" ]'
+        msg: RENOVATE_TOKEN must contain a github token with write access to {{.FORK_REPO}}
+      - sh: '[ "{{.FORK_REPO | lower}}" = "{{.FORK_REPO | lower | trimPrefix "oravirt/"}}" ]'
+        msg: FORK_REPO must be a fork, not the upstream repository oravirt/ansible-oracle
+    env:
+      # no fork mode: branches and PRs are created in FORK_REPO, not in the upstream repository
+      RENOVATE_FORK_TOKEN: ''
+      LOG_LEVEL: '{{.LOG_LEVEL | default "info"}}'
+      RENOVATE_PLATFORM: github
+      RENOVATE_REPOSITORIES: '["{{.FORK_REPO}}"]'
+      RENOVATE_BASE_BRANCH_PATTERNS: '["{{.FORK_BASE}}"]'
+      # renovate.json is read from FORK_BASE in the fork - no run without it
+      RENOVATE_REQUIRE_CONFIG: required
+      RENOVATE_ONBOARDING: 'false'
+      # renovate skips forked repositories by default
+      RENOVATE_FORK_PROCESSING: enabled
+      # issues are disabled in the fork - force overrides config:recommended
+      RENOVATE_FORCE: '{"dependencyDashboard": false}'
+      # postUpgradeTasks in renovate.json: changelog fragment for antsibull-changelog
+      RENOVATE_ALLOWED_COMMANDS: '["^tools/renovate/changelog_fragment\\.sh "]'
+    cmds:
+      - renovate{{if .DRY_RUN}} --dry-run={{.DRY_RUN}}{{end}}
+
+  report:
+    desc: Show updates from the last renovate run
+    preconditions:
+      - test -f {{.RENOVATE_REPORT}}
+    cmds:
+      - |
+        jq -r '
+          .repositories[].packageFiles
+          | to_entries[] | .key as $mgr | .value[]
+          | .packageFile as $file | .deps[]
+          | ([ .updates[]? | "\(.newValue // .newDigest[0:12]) (\(.updateType))" ] | join(", ")) as $upd
+          | [ $mgr, $file, .depName, (.currentValue // "-"),
+              (if $upd != "" then $upd else (.skipReason // "up-to-date") end) ]
+          | @tsv' {{.RENOVATE_REPORT}} \
+        | sort | column -t -s $'\t' -N MANAGER,FILE,DEPENDENCY,CURRENT,UPDATES

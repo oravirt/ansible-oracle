@@ -13,6 +13,8 @@ pkgs.mkShell {
     pkgs.go-task
     pkgs.jq
     pkgs.yq
+    pkgs.gh   # needed for renovate
+    pkgs.renovate
 
   ];
 
