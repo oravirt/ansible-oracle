@@ -416,7 +416,10 @@ def ensure_grants(
     obj_privs = get_obj_privs(module, msg, cursor, schema, object_privs, grants_mode)
     if len(obj_privs) > 0:
         for o in obj_privs:
-            total_sql.append(o)
+            objpriv_sql = o
+            if container:
+                objpriv_sql += ' container=%s' % (container)
+            total_sql.append(objpriv_sql)
 
     # module.exit_json(msg=total_sql)
     exceptions_list = ['DBA']
