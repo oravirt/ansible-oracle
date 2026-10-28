@@ -956,6 +956,124 @@ releases:
     - typo-pkg-el9.yml
     - wrong-intersect.yml
     release_date: '2026-10-21'
+  4.16.0:
+    changes:
+      bugfixes:
+      - 'oracle_db.py: manage started state for the host RAC instance (oravirt#634)'
+      - 'oracle_grants.py: container aware object privs (oravirt#641)'
+      - 'oradb_manage_db: /etc/oratab gets a 2nd entry for a SID when the ORACLE_HOME
+        of the database was changed (oravirt#636)'
+      - 'oradb_manage_db: stop a listener running from an already removed ORACLE_HOME
+        (lsnrctl not available) by terminating the tnslsnr process (oravirt#636)'
+      - 'orasw_meta: assert for listener_installed, sqlnet_installed and tnsnames_installed
+        checks that home is in db_homes_installed (oravirt#635)'
+      - 'orasw_meta: assert for oracle_db_type in db_homes_installed fails for ORACLE_HOME
+        without database (oravirt#635)'
+      - 'orasw_meta: assert for tnsnames_installed fails for entries with use_gi_home:
+        true (oravirt#635)'
+      - 'oraswdb_install: installation of ORACLE_HOME without database fails with
+        ''list object has no element 0'' (oravirt#635)'
+      minor_changes:
+      - 'autoupgrade: PDBs with status UNPLUGGED in the source CDB (keep_source_pdb)
+        are ignored by the state check of the PDBs (oravirt#638)'
+      - 'autoupgrade: additional Java options for AutoUpgrade (autoupgrade_java_options),
+        e.g. a truststore for a proxy with TLS inspection (oravirt#639)'
+      - 'autoupgrade: autoupgrade_download_gold_image_rename renames downloaded Gold
+        Images to autoupgrade_download_gold_image_prefix + release (e.g. db_home_19.32.zip)
+        and creates a symlink with the original filename (oravirt#639)'
+      - 'autoupgrade: autoupgrade_download_latest downloads the latest autoupgrade.jar
+        on the Ansible controller, or on the target host when oracle_sw_copy is false
+        (oravirt#639)'
+      - 'autoupgrade: autoupgrade_run_local executes AutoUpgrade on the Ansible controller
+        (default true) or on the target host (false) for all task files (oravirt#639)'
+      - 'autoupgrade: autoupgrade_upgrade_restoration (default false) and autoupgrade.restoration
+        in oracle_pdbs control the Guaranteed Restore Point (upg1.restoration) (oravirt#638)'
+      - 'autoupgrade: global_log_dir per AutoUpgrade job (recovery data per job) (oravirt#638)'
+      - 'autoupgrade: install.yml checks the Python module pexpect on the host executing
+        AutoUpgrade (pexpect is not installed by the role) (oravirt#639)'
+      - 'autoupgrade: install.yml creates oracle_base on the target host - AutoUpgrade
+        can be used before the installation of the Oracle software (oravirt#639)'
+      - 'autoupgrade: keystore.yml checks the connection (proxy_check.yml), when the
+        keystore console reports a connection failure - a problem of the network/proxy
+        never changes the keystore and is not reported as invalid credentials anymore
+        (oravirt#639)'
+      - 'autoupgrade: proxy support with authentication for the download of autoupgrade.jar
+        and AutoUpgrade (autoupgrade_proxy_username, autoupgrade_proxy_password) (oravirt#639)'
+      - 'autoupgrade: proxy_check.yml - check of the connection to Oracle with the
+        proxy settings before the keystore/download of patches and before autoupgrade_download_latest,
+        with a hint for the cause of an error (e.g. 407 of the proxy) (oravirt#639)'
+      - 'autoupgrade: recovery data of AutoUpgrade - an unfinished deploy is resumed
+        by the deploy phase, recovery data of a finished deploy is cleared before
+        a new upgrade, autoupgrade_upgrade_clear_recovery_data discards it (oravirt#638)'
+      - 'autoupgrade: the analyze phase shows the logfiles and preupgrade reports
+        of the AutoUpgrade job (oravirt#638)'
+      - 'autoupgrade: upgrade_analyze.yml - analyze phase for the Unplug/Plug upgrade
+        of PDBs with AutoUpgrade analyze, configured with attribute autoupgrade in
+        oracle_pdbs (oracle_pdbs defines the end state in the target CDB) (oravirt#638)'
+      - 'autoupgrade: upgrade_deploy.yml - Unplug/Plug upgrade of PDBs with AutoUpgrade
+        deploy, the analyze phase is always executed first (oravirt#638)'
+      - 'autoupgrade: upgrade_fixups.yml - fixups phase (AutoUpgrade fixups) between
+        analyze and deploy phase (oravirt#638)'
+      - 'dev-environment: Update pip requirements (oravirt#642)'
+      - 'doc: new guide doc/guides/autoupgrade_upgrade.adoc (oravirt#638)'
+      - 'doc: new guide doc/guides/out_of_place_patching.adoc (oravirt#636)'
+      - 'examples: requirements.yml use ansible-oracle 4.15.0 (oravirt#642)'
+      - 'molecule: new scenario upgrade for the upgrade from 19c to 26ai (oravirt#638)'
+      - 'molecule: scenario download runs behind a Squid proxy with Basic authentication
+        and without route to the internet, side_effect.yml tests a wrong proxy password
+        (oravirt#639)'
+      - 'oradb_manage_db: Out-of-Place Patching - restart listener from new ORACLE_HOME
+        when home in listener_installed was changed (oravirt#636)'
+      - 'oradb_manage_db: Out-of-Place Patching - switch ORACLE_HOME of an existing
+        database by changing home in oracle_databases (Single Instance without Grid
+        Infrastructure/Oracle Restart only) (oravirt#636)'
+      - 'oradb_manage_db: switch_home.yml fails, when the release of the new ORACLE_HOME
+        differs (upgrade with role autoupgrade needed) (oravirt#638)'
+      - 'oraords: Adjust role to support multiple pools and oraords_sec (oravirt#643)'
+      - 'oraswdb_install: allow startup service after another service (oravirt#633)'
+      - 'playbooks: new autoupgrade_upgrade_analyze.yml, autoupgrade_upgrade_fixups.yml
+        and autoupgrade_upgrade.yml (oravirt#638)'
+      - 'release: new script tools/release/galaxy_version.sh to check and set the
+        collection version from galaxy.yml in requirements.yml (task example:check,
+        example:fix) (oravirt#642)'
+      - 'renovate: check github actions and pinned pip modules in github workflows
+        (oravirt#642)'
+      - 'renovate: configuration for pip modules and container images with local checks
+        (task renovate:check, renovate:pip, renovate:docker) (oravirt#642)'
+      - 'renovate: run against a fork on GitHub with branches pr/renovate/* and changelog
+        fragments (task renovate:fork) (oravirt#642)'
+      - 'renovate: update ansible-lint from 25.2.1 to 26.10.1 (oravirt#642)'
+      - 'renovate: update antsibull-changelog from 0.29.0 to 0.36.0 (oravirt#642)'
+      - 'renovate: update container image python in docker/Dockerfile from 3.10-slim-buster
+        to 3.11-slim-buster (oravirt#642)'
+      - 'renovate: update flake8 from 6.1.0 to 7.4.1 (oravirt#642)'
+      - 'renovate: update github actions: actions/checkout to v7, actions/setup-python
+        to v7, actions/stale to v11, tj-actions/changed-files to v47, artis3n/ansible_galaxy_collection
+        to v3 (oravirt#642)'
+      - 'renovate: update python-version in github workflows changelog-lint and python-lint
+        to 3.15 (oravirt#642)'
+      - 'renovate: update xmltodict from 0.13.0 to 0.15.1 (oravirt#642)'
+    fragments:
+    - ansible-dev.yml
+    - assert-db-homes-without-db.yml
+    - assert-net-homes-installed.yml
+    - autoupgrade-proxy-check.yml
+    - autoupgrade-update.yml
+    - autoupgrade-upgrade.yml
+    - container_objprivs.yml
+    - listener-deleted-home.yml
+    - ords_apex.yml
+    - out-of-place-patching.yml
+    - rac_started_state.yaml
+    - renovate-ansible-lint.yml
+    - renovate-antsibull-changelog.yml
+    - renovate-flake8.yml
+    - renovate-github-actions.yml
+    - renovate-python-image.yml
+    - renovate-xmltodict.yml
+    - renovate.yml
+    - service_dependency.yml
+    release_date: '2026-10-28'
   4.2.0:
     changes:
       breaking_changes:
