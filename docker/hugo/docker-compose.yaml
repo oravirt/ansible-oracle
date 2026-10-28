@@ -1,0 +1,25 @@
+# hugo for the website in website/ - used by website/Taskfile.yml
+services:
+
+  site:
+    # HUGO_IMAGE_TAG is the tag of the base image in Dockerfile (set by website/Taskfile.yml)
+    # => a new version in Dockerfile builds a new image automatically
+    image: "rendanic/hugo:${HUGO_IMAGE_TAG:-local}"
+    build:
+      context: .
+    # the image is built locally => no pull from a registry
+    pull_policy: never
+    command: server
+    network_mode: "host"
+    ports:
+      - "1313:1313"
+    volumes:
+      # repository root => the website is in /src/website
+      - ../..:/src
+    environment:
+      # HUGO_SOURCE: /src/website
+      # HUGO_CACHEDIR inside mount
+      # => prevent module download each time the container is started!
+      HUGO_CACHEDIR: /src/website/.cache
+
+    user: ubuntu
