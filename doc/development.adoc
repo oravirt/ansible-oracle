@@ -169,8 +169,9 @@ Changelogs for Collections: https://github.com/ansible-community/antsibull-chang
 Each entry in a fragment should end with a reference to its Pull-Request, e.g. `(oravirt#599)`.
 `tools/release/fix_fragments.py` adds missing references to all fragments in `changelogs/fragments`.
 
-The Pull-Request is determined from the last commit of the fragment file via the GitHub API.
-If this commit is not part of a Pull-Request (e.g. not pushed yet), older commits of the fragment are used.
+The Pull-Request is determined from the commits of the fragment file via the GitHub API, newest commit first.
+A merged Pull-Request of any of these commits wins over an open one.
+The open Release-Pull-Request is only used for fragments, which are not part of a merged Pull-Request.
 The reference is appended to every entry that does not end with it, even if the entry already references an issue.
 
 ----
@@ -200,7 +201,10 @@ The script returns exit code 1 in this case.
 
 Without `--fragment` all fragments in `changelogs/fragments` are processed.
 
-NOTE: Set `GITHUB_TOKEN` to avoid the rate limit of 60 unauthenticated GitHub API requests per hour.
+NOTE: Without a token the GitHub API allows only 60 requests per hour.
+The token is taken from `GITHUB_TOKEN` or `GH_TOKEN`.
+Without these variables the token stored by `gh` is used, when all fragments are processed (`gh auth token` or `~/.config/gh/hosts.yml` of the active account).
+An invalid token is ignored with a warning.
 
 This must be done before `antsibull-changelog release`, because the release removes the fragments.
 
@@ -225,14 +229,51 @@ The script is also available as `task example:check` and `task example:fix` from
 
 === Creating new releases
 
-`antsibull-changelog release` reads `galaxy.yml` to get the release version automatically.
-The execution is aborted, when a release with the version is existing in `CHANGELOG.rst`.
+`tools/release/build_release.sh` executes the whole release process.
 
 NOTE: The whole release process should be done with a dedicated Pull-Request.
 
+Requirements:
+
+* The release branch is named `pr/<major>.<minor>.<patch>`, e.g. `pr/4.16.0`.
+* `origin` is your fork on GitHub.
+* `gh` is logged in (`gh auth status`) and `.venv/antsibull` exists. Both are provided by `nix-shell`.
+* The script is executed in `nix-shell`, because the pre-commit hooks of the version commit need it.
+
 ----
-antsibull-changelog release
+nix-shell
+git switch -c pr/4.16.0
+tools/release/build_release.sh
 ----
+
+The script executes the following steps:
+
+. Read the version from the branch name (`pr/4.16.0` -> `4.16.0`) and set it in `galaxy.yml`.
+. Set the version in all `requirements.yml` with `tools/release/galaxy_version.sh fix`.
+. Commit `galaxy.yml` and all `requirements.yml` as `Release <version>`.
+  This is the initial commit for the Pull-Request, GitHub refuses a Pull-Request without commits.
+  Other changes in the working tree and the index are not part of this commit.
+  The step is skipped, when the version is already committed.
+. Push the branch to `origin`.
+. Create the Pull-Request `Release <version>` in `oravirt/ansible-oracle`. An existing open Pull-Request of the branch is used.
+. Add the PR references to the fragments with `tools/release/fix_fragments.py`.
+  The script is aborted, when fragments cannot be updated.
+. Create the changelog with `.venv/antsibull/bin/antsibull-changelog release`.
+  `antsibull-changelog` reads the version from `galaxy.yml` and aborts, when the release already exists in `CHANGELOG.rst`.
+  The fragments are removed.
+. Replace the description of the Pull-Request with the release notes of the new version (Markdown, `antsibull-changelog generate --only-latest`).
+
+The changes of fragments and changelog are not committed by the script.
+Review them, then commit and push them to the release branch.
+
+Options:
+
+`-r <owner/repo>`:: GitHub repository for the Pull-Request and the lookup of the fragment Pull-Requests (default: `oravirt/ansible-oracle`).
+`-i`:: Continue, when fragments cannot be updated by `fix_fragments.py`.
+
+A test against your fork is possible with `-i -r <your account>/ansible-oracle`.
+The fragments get the reference of the Release-Pull-Request in the fork or are skipped, because the Pull-Requests of the fragments are in `oravirt/ansible-oracle`.
+Revert all changes in the working tree after such a test.
 
 == Check dependencies with renovate
 
