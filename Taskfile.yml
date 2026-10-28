@@ -10,12 +10,28 @@ includes:
     dir: "{{.ROOT_DIR}}"
 
 tasks:
-  changelog-release:
-    desc: Create a new release with ansible-changelog
+  # Release process with tools/release/build_release.sh, see doc/development.adoc
+  # Options are passed after --, e.g. task release:pr -- -i -r <github user>/ansible-oracle
+  release:pr:
+    desc: Create the release pull request with changelog (branch pr/<version>)
     platforms: ["linux"]
     dir: "{{.TASKFILE_DIR}}"
     cmds:
-      - .venv/antsibull/bin/antsibull-changelog release
+      - tools/release/build_release.sh -m pr {{.CLI_ARGS}}
+
+  release:draft:
+    desc: Create tag and draft release for the release pull request
+    platforms: ["linux"]
+    dir: "{{.TASKFILE_DIR}}"
+    cmds:
+      - tools/release/build_release.sh -m release {{.CLI_ARGS}}
+
+  release:galaxy:
+    desc: Sync master of the fork and deploy a published release to Ansible Galaxy
+    platforms: ["linux"]
+    dir: "{{.TASKFILE_DIR}}"
+    cmds:
+      - tools/release/build_release.sh -m galaxy {{.CLI_ARGS}}
 
   example:check:
     desc: Check that requirements.yml use the version from galaxy.yml
