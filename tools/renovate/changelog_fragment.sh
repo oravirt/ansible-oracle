@@ -26,7 +26,7 @@ fragment="changelogs/fragments/renovate-${dep_sanitized}.yml"
 
 cat > "${fragment}" <<EOF
 ---
-trivial:
+minor_changes:
   - "renovate: update ${dep_name} from ${current_version} to ${new_version}"
 EOF
 

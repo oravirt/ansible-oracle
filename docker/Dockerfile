@@ -1,4 +1,4 @@
-FROM docker.io/library/python:3.10-slim-buster
+FROM docker.io/library/python:3.11-slim-buster
 
 ARG ansible_version
 ARG ansible_lint_version
