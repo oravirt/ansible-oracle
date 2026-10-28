@@ -15,7 +15,8 @@ The PR reference is appended to every entry that does not end with it,
 even if the entry already contains another reference (e.g. an issue number).
 
 Set GITHUB_TOKEN (or GH_TOKEN) to avoid the API rate limit for
-unauthenticated requests (60 requests/hour).
+unauthenticated requests (60 requests/hour). Without these variables the
+token stored by gh (GitHub CLI) is used, when all fragments are processed.
 
 This script was generated with AI assistance (Claude Code, Anthropic).
 """
@@ -24,6 +25,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import urllib.error
@@ -34,6 +36,7 @@ DEFAULT_REPO = "oravirt/ansible-oracle"
 ITEM_RE = re.compile(r"^(?P<indent>\s*-\s+)(?P<value>.*?)(?P<trail>\s*)$")
 
 _pr_cache = {}
+_token = None
 
 
 def git(*args, cwd):
@@ -54,9 +57,8 @@ def github_prs_for_commit(repo, sha):
             "X-GitHub-Api-Version": "2022-11-28",
         },
     )
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    if token:
-        req.add_header("Authorization", f"Bearer {token}")
+    if _token:
+        req.add_header("Authorization", f"Bearer {_token}")
 
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -70,6 +72,49 @@ def github_prs_for_commit(repo, sha):
 
     _pr_cache[sha] = prs
     return prs
+
+
+def gh_config_token():
+    """Read the token for github.com from the config of gh (hosts.yml)."""
+    config_dir = os.environ.get("GH_CONFIG_DIR") or Path(
+        os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
+    ) / "gh"
+    hosts = Path(config_dir) / "hosts.yml"
+    if not hosts.is_file():
+        return None
+    in_github = False
+    for line in hosts.read_text().splitlines():
+        if line and not line[0].isspace():
+            in_github = line.rstrip() == "github.com:"
+            continue
+        match = re.match(r"^\s+oauth_token:\s*(\S+)", line)
+        if in_github and match:
+            return match[1]
+    return None
+
+
+def stored_token():
+    """Token stored by gh: 'gh auth token' (keyring) or gh's hosts.yml."""
+    if shutil.which("gh"):
+        result = subprocess.run(
+            ["gh", "auth", "token", "--hostname", "github.com"],
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    return gh_config_token()
+
+
+def github_token(all_fragments):
+    """Token from environment, the stored one of gh only for all fragments."""
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token or not all_fragments:
+        return token
+    token = stored_token()
+    if not token:
+        print("no GitHub token found, API rate limit for unauthenticated "
+              "requests applies", file=sys.stderr)
+    return token
 
 
 def select_pr(repo, prs):
@@ -169,6 +214,9 @@ def main():
                         help="only show what would be changed, "
                              "exit code 1 if a fragment needs to be updated")
     args = parser.parse_args()
+
+    global _token
+    _token = github_token(all_fragments=not args.fragment)
 
     prefix = args.repo.split("/")[0]
     fragment_dir = repo_root / "changelogs" / "fragments"
