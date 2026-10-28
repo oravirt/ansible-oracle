@@ -78,6 +78,8 @@ oracle_gi_cluster_type: STANDARD
 
 **_dbcatemplate_**
 
+**_dotprofile_db_**
+
 **_listener_**
 
 **_listener2_**
