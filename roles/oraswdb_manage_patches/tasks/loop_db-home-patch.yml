@@ -44,7 +44,7 @@
     patch_version: "{{ item.patchversion | default(omit) }}"
     exclude_upi: "{{ item.excludeUPI | default(omit) }}"
     opatchauto: false
-    conflict_check: true
+    conflict_check: "{{ opatch_db_conflict_check }}"
     stop_processes: "{{ item.stop_processes | default(False) }}"
     ocm_response_file: "{{ ocm_response_file | default(omit) }}"
     output: verbose
@@ -61,6 +61,9 @@
     - dbhome_patches.stdout_lines | select('match', item.patchid | string) | length > 0
   register: psuapplym
 
+- name: opatch lspatches
+  ansible.builtin.include_tasks: opatch_lsinv.yml
+
 - name: Manage opatchauto patches for DB (non-gi)
   opitzconsulting.ansible_oracle.oracle_opatch:
     oracle_home: "{{ oracle_home_db }}"
@@ -68,10 +71,11 @@
     patch_id: "{{ item.1 }}"
     patch_version: "{{ item.1.patchversion | default(omit) }}"
     opatchauto: false
-    conflict_check: true
+    conflict_check: "{{ opatch_db_conflict_check }}"
     ocm_response_file: "{{ ocm_response_file | default(omit) }}"
     output: verbose
     state: "{{ item.0.state }}"
+    apply_options: "{{ item.0.apply_options | default(omit) }}"
   with_subelements:
     - "{{ db_homes_config[dbh.home]['opatchauto'] }}"
     - subpatches

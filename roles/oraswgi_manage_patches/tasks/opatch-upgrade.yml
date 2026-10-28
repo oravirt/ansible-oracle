@@ -36,7 +36,7 @@
 
     - name: Opatch-upgrade | Copy oracle opatch to server (www)
       ansible.builtin.get_url:
-        url: "{{ oracle_sw_source_www }}/{{ oop_loop.filename }}"
+        url: "{{ oop_loop.filesource | default(oracle_sw_source_www + '/' + oop_loop.filename, true) }}"
         dest: "{{ oracle_stage }}"
         mode: "0644"
         owner: "{{ _grid_install_user }}"
@@ -44,6 +44,7 @@
         force: true
         client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
         client_key: "{{ get_url_ssl_client_key | default(omit) }}"
+      environment: "{{ proxy_env }}"
       with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) }}"
       loop_control:
         loop_var: oop_loop
@@ -57,7 +58,7 @@
 
     - name: Opatch-upgrade | Copy oracle opatch to server (local)
       ansible.builtin.copy:
-        src: "{{ oracle_sw_source_local }}/{{ item.filename }}"
+        src: "{{ item.filesource | default(oracle_sw_source_local + '/' + item.filename, true) }}"
         dest: "{{ oracle_stage }}"
         mode: "0644"
         owner: "{{ _grid_install_user }}"

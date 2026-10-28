@@ -109,15 +109,32 @@ def check_db_exists(module, msg, oracle_home, db_name, sid, db_unique_name):
             checkdb = db_unique_name
         else:
             checkdb = db_name
-        command = "%s/bin/srvctl config database -d %s " % (oracle_home, checkdb)
-        (rc, stdout, stderr) = module.run_command(command)
+        if is_cluster:
+            # for cluster, assume SEHA and check if database is up at the local host
+            # (otherwise we can't datapatch it)
+            command = (
+                "%(oracle_home)s/bin/srvctl config database -d %(checkdb)s && \
+                %(oracle_home)s/bin/srvctl status database -d %(checkdb)s | \
+                grep -q %(shortname)s"
+                % {
+                    'oracle_home': oracle_home,
+                    'checkdb': checkdb,
+                    'shortname': os.uname()[1].split('.')[0],
+                }
+            )
+        else:
+            command = "%s/bin/srvctl config database -d %s" % (oracle_home, checkdb)
+
+        # cluster check command needs a shell, because we run multiple commands and pipe
+        (rc, stdout, stderr) = module.run_command(command, use_unsafe_shell=is_cluster)
+
         if rc != 0:
             if '%s' % (db_name) in stdout:  # <-- db doesn't exist
                 return False
             else:
                 msg = 'Error: command is  %s. stdout is %s' % (command, stdout)
                 return False
-        elif 'Database name: %s' % (db_name) in stdout:  # <-- Database already exist
+        else:
             return True
     else:
         existingdbs = []
@@ -305,6 +322,7 @@ def main():
     global port
     global output
     global cursor
+    global is_cluster
 
     cursor = None
 
@@ -352,6 +370,15 @@ def main():
         gimanaged = True
     else:
         gimanaged = False
+
+    # If gimanaged, check whether it's Oracle Restart or Oracle Clusterware
+    is_cluster = False
+    ocr_loc = '/etc/oracle/ocr.loc'
+    if gimanaged and os.path.exists(ocr_loc):
+        ocr_grep = subprocess.run(
+            ['grep', '-Piq', '^\\s*local_only\\s*=\\s*false', ocr_loc]
+        )
+        is_cluster = not bool(ocr_grep.returncode)
 
     # if not cx_oracle_exists:
     #     msg = (

@@ -1,0 +1,21 @@
+---
+- name: wallet_certificates_info | read target wallet
+  ansible.builtin.shell:
+    cmd: |
+      set -eu
+      "${ORACLE_HOME}/bin/orapki" wallet display -wallet "${wrl}" -complete -nologo
+  become: true
+  become_user: "{{ osc.owner | default(oracle_user) }}"
+  environment:
+    wrl: "{{ owc.path }}"
+    ORACLE_HOME: "{{ _oracle_home_db }}"
+  changed_when: false
+  register: _wallet_content
+
+- name: wallet_certificates_info | Extract certificates info
+  ansible.builtin.set_fact:
+    wallet_certs: "{{ _wallet_parsed | from_yaml }}"
+
+- name: wallet_certificates_info | Show wallet certificates
+  ansible.builtin.debug:
+    var: wallet_certs

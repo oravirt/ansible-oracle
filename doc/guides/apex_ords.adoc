@@ -29,13 +29,13 @@ Important Notes:
 Known Issues:
 
 - ADMIN password of INTERNAL Workspace is wrong after APEX upgrade
-  Silent script to reset ADMIN password depends on APEX Relöease. +
+  Silent script to reset ADMIN password depends on APEX Release. +
   There was no reliable solution found for the moment...
 
 ==== ORDS
 
 - OracleLinux 8 or 9 only
-- Installation with ords.rpm from `public-yum.oracle.com`
+- Installation with ords.rpm from the Oracle Linux _oracle/software_ repository on `yum.oracle.com`
 - Limited database configuration - see documentation
 
 === APEX Configuration
@@ -70,6 +70,10 @@ Could be set in each PDB.
 |`oraapex_default_temp_tablespace`
 | Default: `TEMP` +
 Could be set in each PDB.
+|`oraapex_image_path`
+| Default: `/i/` +
+Image path for `apxsilentins.sql`. +
+Could be set in each PDB.
 |=======================
 
 ==== APEX in PDB
@@ -80,6 +84,9 @@ APEX can be installed in each PDB.
 [options="header,footer"]
 |=======================
 |Value |Description
+| `state`
+| Must be `present`. +
+APEX is only installed in PDBs with `state: present`.
 | `apex_state`
 | State for APEX installation. +
 Only `present` supported at the moment.
@@ -98,6 +105,12 @@ Is used to download the Archive from Oracle.
 | Custom APEX Tablespace for files.
 | `oraapex_temp_tablespace`
 | Custom APEX temporary Tablespace.
+| `oraapex_image_path`
+| Custom image path for `apxsilentins.sql`.
+| `apex_use_cdn`
+| Default: `true` +
+Set the APEX `IMAGE_PREFIX` to the Oracle CDN `https://static.oracle.com/cdn/apex/<APEX Version>/`. +
+The images are not loaded from ORDS when the CDN is used.
 | `apex_patchid`
 | Patchid for _PSE BUNDLE FOR APEX_
 |=======================
@@ -119,22 +132,26 @@ oracle_pdbs:
 IMPORTANT: `oraapex` does not use the default passwords from `ansible-oracle`. +
 You have to define them in `dbpasswords`.
 
-The user `APEX_PUBLIC_ROUTER` is new in APEX 24.1. +
-`oraapex` checks for an existing password regardless of the version of APEX.
+`oraapex` needs the passwords for `APEX_PUBLIC_USER` and `APEX_REST_PUBLIC_USER`. +
+The keys could be written in lower or upper case. +
+`ords_public_user` is not used by `oraapex`, but could be referenced in `oraords_db_pools_password` (see ORDS Configuration).
 
-.Example `dbpasswords` for APEX in a PDB with mandatory values for `oraapex`
+The password of `APEX_LISTENER` is generated with the password lookup into `/tmp/passwordfile` on the Ansible controller.
+
+.Example `dbpasswords` for APEX in a PDB
 ----
 dbpasswords:
   CDB1:
     PDB1:
-      apex_public_router: ords123
       apex_public_user: ords123
       apex_rest_public_user: ords123
       ords_public_user: ords123
 ----
 
 IMPORTANT: Do not forget to download the APEX Patch when `apex_patchid` is set in `oracle_pdbs`. +
-`opatch_install` is very important, because these Patches are not applied with OPatch.
+The patch is not applied with OPatch. `oraapex` copies the patch into the APEX software directory and executes `catpatch.sql` in the PDB.
+
+`oraapex` expects the archive `p<apex_patchid>_<apex_version without dots>0_Generic.zip` in `oracle_sw_source_local`, e.g. `p36695709_2410_Generic.zip` for APEX 24.1.
 
 .Example `oracle_sw_patches`
 ----
@@ -143,7 +160,6 @@ oracle_sw_patches:
     patchid: 36695709
     version: 24.1
     description: PSE BUNDLE FOR APEX 24.1
-    opatch_needed: false
 ----
 
 ==== Playbook execution
@@ -160,26 +176,49 @@ IMPORTANT: The configuration of ORDS is limited to the following variables at th
 [options="header,footer"]
 |=======================
 |Value |Description
-| db_pool | Database Pool
-| pdb_name | PDB-Name of Target
+| db_pool | Database Pool. +
+`default` is the default pool of ORDS, all other names are created with `--db-pool`.
 | service | Database Service Name
-| port | Listener Port
-| host | Database Hostname
 |=======================
 
 .Optional variables in `oraords_db_pools`
 [options="header,footer"]
 |=======================
 |Value |Description
+| host | Database Hostname +
+Default: `{{ inventory_hostname }}`
+| port | Listener Port +
+Default: `oraords_default_port` (`1521`)
+| admin_user | Admin user for the ORDS installation +
+Default: `oraords_default_admin_user` (`sys`)
 | feature_db_api | true / false (Default)
 | feature_rest_enabled_sql | true / false (Default)
 | feature_sdw | true / false (Default)
 |=======================
 
+.Optional global variables for ORDS
+[options="header,footer"]
+|=======================
+|Value |Description
+|`oraords_apex_image_path`
+| Directory with the APEX images on the ORDS host (`standalone.static.path`). +
+The role fails, when `<oraords_apex_image_path>/css/apex.css` does not exist. +
+Not needed when APEX uses the CDN (`apex_use_cdn`).
+|`oraords_apex_image_context`
+| Context path for the APEX images (`standalone.static.context.path`)
+|`oraords_java_rpm`
+| Default: `java-21-openjdk`
+|`oraords_ords_bin`
+| Default: `/opt/oracle/ords/bin`
+|`oraords_ords_config`
+| Default: `/etc/ords/config`
+|`oraords_ords_logs`
+| Default: `/etc/ords/logs`
+|=======================
+
 ----
 oraords_db_pools:
   - db_pool: default
-    pdb_name: PDB1
     admin_user: sys
     service: pdb1
     port: 1521
@@ -196,10 +235,12 @@ Referencing `dbpasswords` helps to reduce redundancy for passwords.
 ----
 oraords_db_pools_password:
   default:
-    admin_password: "{{ dbpasswords['DB1']['sys'] }}"
-    ords_password: "{{ dbpasswords['DB1']['PDB1']['ords_public_user'] }}"
+    admin_password: "{{ dbpasswords['CDB1']['sys'] }}"
+    ords_password: "{{ dbpasswords['CDB1']['PDB1']['ords_public_user'] }}"
 ----
 
 ==== Playbook execution
 
 The Playbook `playbooks/manage_ords.yml` is used to install ORDS.
+
+NOTE: `ords install` is executed for each pool and the ORDS service is reloaded on every execution of the Playbook.

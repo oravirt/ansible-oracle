@@ -29,13 +29,17 @@ There are a lot of variables who are used by `orasw_meta`
   - [get_url_ssl_client_key](#get_url_ssl_client_key)
   - [grid_base](#grid_base)
   - [hostgroup](#hostgroup)
+  - [http_proxy](#http_proxy)
+  - [https_proxy](#https_proxy)
   - [install_from_nfs](#install_from_nfs)
   - [is_sw_source_local](#is_sw_source_local)
   - [listener_port](#listener_port)
   - [nfs_server_sw](#nfs_server_sw)
   - [nfs_server_sw_path](#nfs_server_sw_path)
+  - [no_proxy](#no_proxy)
   - [ocenv_bashrc_init](#ocenv_bashrc_init)
   - [ocenv_bashrc_init_section](#ocenv_bashrc_init_section)
+  - [opatch_conflict_check](#opatch_conflict_check)
   - [oracle_all_editions_options_state](#oracle_all_editions_options_state)
   - [oracle_asm_disk_string](#oracle_asm_disk_string)
   - [oracle_base](#oracle_base)
@@ -65,9 +69,11 @@ There are a lot of variables who are used by `orasw_meta`
   - [oracle_sw_source_www](#oracle_sw_source_www)
   - [orasw_meta_assert_oracle_databases](#orasw_meta_assert_oracle_databases)
   - [orasw_meta_cluster_hostgroup](#orasw_meta_cluster_hostgroup)
+  - [proxy_env](#proxy_env)
   - [set_oracle_all_editions_options_state](#set_oracle_all_editions_options_state)
   - [shell_aliases](#shell_aliases)
   - [shell_ps1](#shell_ps1)
+  - [use_proxy](#use_proxy)
 - [Discovered Tags](#discovered-tags)
 - [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
@@ -131,11 +137,13 @@ The dictionary holds data for:
 | Attribute | Description |
 | --- | --- |
 | imagename | Set an optional name for a golden Image to install from. The archiv is read from same directory as the normal installation medias from Oracle. |
+| filesource | `imagename` can be replaced/overridden by `filesource` to provide an absolute path/url to the golden image (when not available in the normal installation place) |
 | edition | allowed values: `SE`, `SE2`, `EE`. default value: <todo> |
 | opatch_minversion | Is needed for patching. Automatically installs a new version of OPatch, when existing version is older then `opatch_minversion` |
 | oracle_home | |
 | oracle_home_name | Mandatory variable, when `readonly_home: true`. Oracle allows only characters, numbers and '_' as value in `oracle_home_name`. Do _not_ use '-' as a value!|
-| opatch | |
+| opatchauto | Bundle patches to be installed/removed using opatchauto |
+| opatch | One-off patches to be installed/removed using opatch |
 | readonly_home | Should `ansible-oracle` install this ORACLE_HOME as readonly home? Do _NOT_ change this attribute for an installed ORACLE_HOME. default value: false|
 | version | The base version for the ORACLE_HOME. Use the version from the official 1st release of Oracle. |
 
@@ -153,6 +161,30 @@ db_homes_config:
     home: db1_base
     version: 19.3.0.0
     edition: EE
+  1931_se2:
+    oracle_home: /u01/app/oracle/product/19.0.0/dbhome_1
+    version: 19.3.0.0
+    edition: SE2
+    opatch_minversion: "12.2.0.1.51"
+    opatchauto:
+      - patchid: 39062956
+        patchversion: 19.31.0.0.260421
+        state: present
+        path: 39062956/39062956/39036936
+        subpatches:
+          - 39034528 # Database
+          - 39039430 # OCW
+          - 39055473 # ACFS
+          - 39107855 # Tomcat
+          - 39107825 # DBWLM
+        apply_options:
+          - "-deleteInactivePatches"
+    opatch:
+      - patchid: 39473469
+        state: present
+        path: 39473469/39473469/39473469
+        apply_options:
+          - "-force_conflict"
 ```
 
 ### db_homes_installed
@@ -325,6 +357,26 @@ The variable needs a refactoring.
 hostgroup: '{{ group_names[0] }}'
 ```
 
+### http_proxy
+
+Define the http proxy for downloads
+
+#### Default value
+
+```YAML
+http_proxy: ''
+```
+
+### https_proxy
+
+Define the https proxy for downloads
+
+#### Default value
+
+```YAML
+https_proxy: ''
+```
+
 ### install_from_nfs
 
 Mount NFS-Server for installation media?
@@ -379,6 +431,16 @@ _Important_
 nfs_server_sw_path: /orasw
 ```
 
+### no_proxy
+
+Define no_proxy list für downlads.
+
+#### Default value
+
+```YAML
+no_proxy: ''
+```
+
 ### ocenv_bashrc_init
 
 Add `ocenv.sh` to `bashrc` of oracle user?
@@ -401,6 +463,20 @@ Define the conntents to add to `.bashr` when `ocenv_bashrc_init: true`.
 ocenv_bashrc_init_section: |
   echo "execute ocenv to source Oracle Environment"
   alias ocenv='. "{{ dbenvdir }}/ocenv"'
+```
+
+### opatch_conflict_check
+
+When calling oracle_opatch for DB or GI, decide if analyze stage of
+opatch/opatchauto should be executed.
+Will be overridden by opatch_db_conflict_check and opatch_gi_conflict_check.
+
+**_Type:_** boolean<br />
+
+#### Default value
+
+```YAML
+opatch_conflict_check: true
 ```
 
 ### oracle_all_editions_options_state
@@ -860,9 +936,12 @@ oracle_stage_remote: '{{ oracle_stage }}'
 
 Defines the list of known Patches in `ansible-oracle`.
 
+Patch files are expected to be found by their `filename` under `oracle_sw_source_local`, or `oracle_sw_source_www` respectively,
+unless a `filesource` dict element provides a full path / complete URL to the patch file.
+
 Usage of this variable:
 
-If a complete software repository with pathches is used with a nfs-mount, this variable is not needed.
+If a complete software repository with patches is used with a nfs-mount, this variable is not needed.
 
 #### Default value
 
@@ -875,12 +954,14 @@ oracle_sw_patches: []
 ```YAML
 oracle_sw_patches:
   - filename: p28183653_122010_Linux-x86-64.zip
+    filesource: /mnt/patches/p28183653_122010_Linux-x86-64.zip
     patchid: 28183653
     version: 12.2.0.1
     patchversion: 12.2.0.1.180717
     description: GI-RU-July-2018
     creates: 28183653/28163133/files/suptools/orachk.zip
   - filename: p27468969_122010_Linux-x86-64.zip
+    filesource: https://downloadserver/patches?id=27468969
     patchid: 27468969
     version: 12.2.0.1
     patchversion: 12.2.0.1.180417
@@ -939,6 +1020,20 @@ Ansible Inventory hostgroup for RAC-Cluster.
 orasw_meta_cluster_hostgroup: ''
 ```
 
+### proxy_env
+
+This is an internal variable for downloading patches.
+Usually no need to change it.
+
+#### Default value
+
+```YAML
+proxy_env:
+  http_proxy: '{{ http_proxy }}'
+  https_proxy: '{{ https_proxy }}'
+  no_proxy: '{{ no_proxy }}'
+```
+
 ### set_oracle_all_editions_options_state
 
 Switch to globally enable/disable linking of edition independent database options
@@ -985,6 +1080,16 @@ Configure shell prompt for OS-User oracle
 
 ```YAML
 shell_ps1: "'[$LOGNAME'@'$ORACLE_SID `basename $PWD`]$'"
+```
+
+### use_proxy
+
+Enable Proxy for Download
+
+#### Default value
+
+```YAML
+use_proxy: false
 ```
 
 ## Discovered Tags

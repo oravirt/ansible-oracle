@@ -1,6 +1,14 @@
 # Taskfile.yml
 version: '3'
 
+includes:
+  molecule:
+    taskfile: extensions/Taskfile.yml
+    dir: extensions
+  renovate:
+    taskfile: tools/renovate/Taskfile.yml
+    dir: "{{.ROOT_DIR}}"
+
 tasks:
   changelog-release:
     desc: Create a new release with ansible-changelog
@@ -8,3 +16,13 @@ tasks:
     dir: "{{.TASKFILE_DIR}}"
     cmds:
       - .venv/antsibull/bin/antsibull-changelog release
+
+  example:check:
+    desc: Check that requirements.yml use the version from galaxy.yml
+    cmds:
+      - tools/release/galaxy_version.sh check
+
+  example:fix:
+    desc: Set version from galaxy.yml in requirements.yml
+    cmds:
+      - tools/release/galaxy_version.sh fix

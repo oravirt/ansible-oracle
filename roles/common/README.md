@@ -7,6 +7,7 @@ sets up the host generic stuff
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [common_packages](#common_packages)
+  - [common_packages_el10](#common_packages_el10)
   - [common_packages_el6](#common_packages_el6)
   - [common_packages_el7](#common_packages_el7)
   - [common_packages_el8](#common_packages_el8)
@@ -16,15 +17,21 @@ sets up the host generic stuff
   - [configure_motd](#configure_motd)
   - [configure_ntp](#configure_ntp)
   - [configure_public_yum_repo](#configure_public_yum_repo)
+  - [epel10_rpm](#epel10_rpm)
   - [epel6_rpm](#epel6_rpm)
   - [epel7_rpm](#epel7_rpm)
   - [epel8_rpm](#epel8_rpm)
   - [epel9_rpm](#epel9_rpm)
+  - [http_proxy](#http_proxy)
+  - [https_proxy](#https_proxy)
   - [install_os_packages](#install_os_packages)
   - [motd_template](#motd_template)
+  - [no_proxy](#no_proxy)
   - [ntp_type](#ntp_type)
   - [ol6_repo_file](#ol6_repo_file)
   - [ol7_repo_file](#ol7_repo_file)
+  - [proxy_env](#proxy_env)
+  - [use_proxy](#use_proxy)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
 - [License](#license)
@@ -46,6 +53,69 @@ This is an internal variable only. Do not define it!
 
 ```YAML
 common_packages: _unset_
+```
+
+### common_packages_el10
+
+List of RPMs for RHEL10 or OL10
+
+#### Default value
+
+```YAML
+common_packages_el10:
+  - bc
+  - binutils
+  - elfutils-libelf
+  - fontconfig
+  - glibc
+  - glibc-devel
+  - ksh
+  - libaio
+  - libgcc
+  - libibverbs
+  - libstdc++
+  - libvirt-libs
+  - libxcb
+  - libX11
+  - libXau
+  - libXi
+  - libXrender
+  - libXtst
+  - libxcrypt-compat
+  - make
+  - policycoreutils
+  - policycoreutils-python-utils
+  - smartmontools
+  - sysstat
+  - xz-devel
+  - autofs
+  - bind-utils
+  - ethtool
+  - expect
+  - git
+  - grubby
+  - initscripts
+  - libaio-devel
+  - libnsl
+  - libstdc++-devel
+  - lsof
+  - lvm2
+  - module-init-tools
+  - nc
+  - net-tools
+  - nfs-utils
+  - openssh-clients
+  - pam
+  - parted
+  - procps
+  - psmisc
+  - python3
+  - python3-pip
+  - rlwrap
+  - tar
+  - unzip
+  - util-linux-ng
+  - xfsprogs
 ```
 
 ### common_packages_el6
@@ -87,9 +157,7 @@ common_packages_el6:
   - twm
   - autofs
   - parted
-  - mlocate
   - ksh
-  - psmisc
 ```
 
 ### common_packages_el7
@@ -195,28 +263,23 @@ common_packages_el8:
 
 ### common_packages_el9
 
+List of RPMs for RHEL9 or OL9
+
 #### Default value
 
 ```YAML
 common_packages_el9:
-  - facter
-  - lsof
-  - nc
-  - rlwrap
-  - expect
-  - git
-  - lvm2
-  - xfsprogs
   - autofs
-  - parted
-  - mlocate
-  - python3
-  - python3-pip
   - bind-utils
   - binutils
   - ethtool
+  - expect
+  - facter
+  - fontconfig
+  - git
   - glibc
   - glibc-devel
+  - grubby
   - initscripts
   - ksh
   - libaio
@@ -225,24 +288,32 @@ common_packages_el9:
   - libnsl
   - libstdc++
   - libstdc++-devel
+  - lsof
+  - lvm2
   - make
+  - mlocate
   - module-init-tools
+  - nc
   - net-tools
   - nfs-utils
   - openssh-clients
   - pam
+  - parted
   - policycoreutils
   - policycoreutils-python-utils
   - procps
   - psmisc
+  - python3
+  - python3-pip
+  - rlwrap
   - smartmontools
   - sysstat
   - tar
   - unzip
   - util-linux-ng
+  - xfsprogs
   - xorg-x11-utils
   - xorg-x11-xauth
-  - grubby
 ```
 
 ### common_packages_sles
@@ -305,6 +376,16 @@ configure_ntp: true
 configure_public_yum_repo: true
 ```
 
+### epel10_rpm
+
+URL for epel-release-latest-10.noarch.rpm
+
+#### Default value
+
+```YAML
+epel10_rpm: oracle-epel-release-el10
+```
+
 ### epel6_rpm
 
 Url for epel-release-latest-6.noarch.rpm
@@ -338,12 +419,32 @@ epel8_rpm: https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rp
 
 ### epel9_rpm
 
-Url for epel-release-latest-8.noarch.rpm
+Url for epel-release-latest-9.noarch.rpm
 
 #### Default value
 
 ```YAML
 epel9_rpm: oracle-epel-release-el9
+```
+
+### http_proxy
+
+Define the http proxy for downloads
+
+#### Default value
+
+```YAML
+http_proxy: ''
+```
+
+### https_proxy
+
+Define the https proxy for downloads
+
+#### Default value
+
+```YAML
+https_proxy: ''
 ```
 
 ### install_os_packages
@@ -362,6 +463,16 @@ Used templatename for Message of the day
 
 ```YAML
 motd_template: motd.j2
+```
+
+### no_proxy
+
+Define no_proxy list für downlads.
+
+#### Default value
+
+```YAML
+no_proxy: ''
 ```
 
 ### ntp_type
@@ -392,6 +503,30 @@ The variable is used to cleanup the yum repolist for old installations.
 
 ```YAML
 ol7_repo_file: public-yum-ol7.repo
+```
+
+### proxy_env
+
+This is an internal variable for downloading patches.
+Usually no need to change it.
+
+#### Default value
+
+```YAML
+proxy_env:
+  http_proxy: '{{ http_proxy }}'
+  https_proxy: '{{ https_proxy }}'
+  no_proxy: '{{ no_proxy }}'
+```
+
+### use_proxy
+
+Enable Proxy for Download
+
+#### Default value
+
+```YAML
+use_proxy: false
 ```
 
 ## Discovered Tags

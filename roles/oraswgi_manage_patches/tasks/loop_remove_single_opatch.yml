@@ -28,9 +28,13 @@
         patch_version: "{{ gip_opatch.patchversion | default(omit) }}"
         opatchauto: false
         rolling: "{{ gip_opatch.rolling | default(True) }}"
-        conflict_check: true
+        conflict_check: "{{ opatch_gi_conflict_check }}"
         ocm_response_file: "{{ _oraswgi_manage_patches_ocm_response_file | default(omit) }}"
         output: verbose
         state: "{{ gip_opatch.state }}"
       become: true
       become_user: "{{ _grid_install_user }}"
+
+    - name: loop_remove_single_opatch | Flag non opatchauto patches for GI were applied
+      ansible.builtin.set_fact:
+        _oraswgi_manage_patches_oneoff_removed: true

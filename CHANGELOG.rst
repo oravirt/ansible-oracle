@@ -4,6 +4,69 @@ opitzconsulting.ansible\_oracle Release Notes
 
 .. contents:: Topics
 
+v4.15.0
+=======
+
+Minor Changes
+-------------
+
+- Add EPEL repo definition RPM for OL10/RHEL10 (oravirt#625)
+- Allow for installation of optional OS packages (new list variable `extra_packages`) (oravirt#624)
+- Correct description of variable common_packages_el9 (oravirt#572)
+- Correct path to requirements_*.txt in examples (oravirt#620)
+- Documentation for APEX and ORDS aligned with roles oraapex and oraords (oravirt#629)
+- New role autoupgrade: install Oracle AutoUpgrade and download patches with AutoUpgrade (tasks_from install.yml, download_patches.yml) (oravirt#630)
+- Overview of inventory settings for installing and patching Oracle RDBMS (oravirt#587)
+- Prepare support for RHEL/OL 10 (oravirt#619)
+- `apply_options` attribute added to db_homes_config and gi_patches_config to set opatch and opatchauto options (oravirt#605)
+- `get_url` downloads now consider `http_proxy`, `https_proxy` and `no_proxy` (oravirt#567) (oravirt#586)
+- `is_sw_source_local` and `oracle_sw_copy` booleans are now recognized by cx_oracle role, too (oravirt#601)
+- `pip install` now considers `https_proxy` variable (oravirt#567) (oravirt#586)
+- added support for client certificates to installation of cx_oracle (oravirt#579)
+- autoupgrade: keystore.yml creates/updates the AutoUpgrade keystore with mos_username / mos_password non-interactively (recreated when the keystore password changed) (oravirt#630)
+- autoupgrade: optional download of the latest autoupgrade.jar into the software repository (autoupgrade_download_latest), download on the Ansible controller (autoupgrade_download_run_local) (oravirt#630)
+- development docs improved. Added fix_fragments.py as helper (oravirt#631)
+- opatch patches don't need to be downloaded if they're only intended to be removed (opatchauto patches need to be downloaded, though) (oravirt#610)
+- oradb_manage_wallets: import certificates feature (oravirt#618)
+- pre-commit: Upgrade to 4.7.0 (oravirt#628)
+- sshd does not accept False for permitTunnel. Use 'no' instead. (oravirt#571)
+- when calling oracle_opatch module, conflict check can no be switched on/off by variables opatch_gi_conflict_check, opatch_db_conflict_check or opatch_conflict_check (oravirt#584)
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- devsec collection removed from galaxy.yml. Add it to your requirements.yml within your inventory (oravirt#570)
+
+Bugfixes
+--------
+
+- Add fontconfig to required packages for 19c on OL9, else DBCA crashes. (oravirt#612)
+- As of GI 19.31 blanks are not allowed around commas in oracle.install.asm.diskGroup.disks (oravirt#598) (oravirt#599)
+- Ensure oracle_tmp_stage is present at all cluster nodes when patching GI (oravirt#589)
+- Fixed _JAVA_OPTIONS in script_env (oravirt#589)
+- GI stack has to be started after opatch removed patches, subsequent opatchauto run fails otherwise (oravirt#610)
+- On cluster setups, datapatch assumes the database to exist only if it's defined AND running at the local host (oravirt #573) (oravirt#574)
+- On cluster setups, srvctl now starts the databases at the local host (oravirt #573) (oravirt#574)
+- Refresh list of applied patches after patch removal (oravirt#610)
+- cxoracle: fix for non-staged cx_oracle install (oravirt#614)
+- intersect has to be removed to address all cluster nodes to setup stage temp (oravirt#602) (oravirt#603)
+- oracle_sw_patches must be addressed by their unique_patchid, if provided (oravirt#610)
+- oradb_manage_db: allow for configuring supplemental_logging (oravirt#611)
+- oraords: admin_user in oraords_db_pools defaults to oraords_default_admin_user (variable oraords_admin_user did not exist) (oravirt#629)
+- oraords: feature_sdw defaults to false (string 'false' was evaluated as true) (oravirt#629)
+- oraords: host in oraords_db_pools defaults to inventory_hostname (oravirt#629)
+- oraords: oraords_ords_bin points to /opt/oracle/ords/bin, the ORDS RPM does not install into /usr/local/bin (oravirt#629)
+- oraords: supported platforms in meta are EL 8 and 9 (oravirt#629)
+- oraords: use --db-pool for ORDS pools other than default (oravirt#629)
+- orasw_download_patches: download all APEX versions from oracle_databases and oracle_pdbs, not only the last one (oravirt#629)
+- oraswdb_install: fix path for one-off patches with unique_patch_id (oravirt#613)
+- overhead of huge pages per instance was estimated to low, it has to be 4 according to MOS KB151310 and is now configurable (oravirt#577)
+- roles/orahost_storage/templates/setup-udev.sh: check for already existing udev rules removed (oravirt#592) (oravirt#596)
+- roles/orahost_storage/templates/setup-udev.sh: device type preceedence reordered (oravirt#592) (oravirt#596)
+- roles/orahost_storage/templates/setup-udev.sh: ensure dm- and nvme-devices are prefixed correctly (oravirt#592) (oravirt#596)
+- roles/orahost_storage/templates/setup-udev.sh: hard coded skip of /dev/sda removed (oravirt#592) (oravirt#596)
+- roles/orahost_storage/templates/setup-udev.sh: nvme support added (oravirt#592) (oravirt#596)
+
 v4.14.0
 =======
 

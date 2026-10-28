@@ -1,0 +1,37 @@
+---
+# Unplug/Plug upgrade of ORCLPDB1 from 19c into 26ai with AutoUpgrade
+#
+# converge:    install 19c and 26ai ORACLE_HOME, create DB2 (19c) with ORCLPDB1
+#              and the empty target CDB DB1 (26ai)
+# side-effect: oracle_pdbs => end state, analyze + fixups + deploy phase (AUTOUPGRADE_PHASE), no manage_db!
+# verify:      ORCLPDB1 is open in DB1 (26ai)
+dependency:
+  name: galaxy
+  enabled: true
+
+driver:
+  name: docker
+platforms:
+  - name: dbfs-upg
+    image: "${MOLECULE_IMAGE:-quay.io/rendanic/docker-ol9-ansible:latest}"
+    pre_build_image: true
+    # The following 4 lines are needed only for making systemd work
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - ${MOLECULE_SW_DIR}:/vagrant:ro
+    cgroupns_mode: host
+    privileged: true
+
+verifier:
+  name: ansible
+
+provisioner:
+  name: ansible
+  env:
+    # needed for oracle_sw_source_local in host_vars/dbfs-upg.yml
+    MOLECULE_SW_DIR: ${MOLECULE_SW_DIR}
+  inventory:
+    links:
+      group_vars: ../shared_config/inventory/group_vars/
+      host_vars: ../shared_config/inventory/host_vars/

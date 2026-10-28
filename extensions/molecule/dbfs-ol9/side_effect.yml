@@ -6,13 +6,19 @@
     is_sw_source_local: true
     oracle_sw_copy: true
     oracle_sw_unpack: true
+    # converge.yml does not patch => patching is tested here
+    # oraswdb_manage_patches needs apply_patches_db AND apply_patches in db_homes_installed
+    apply_patches_db: true
     db_homes_installed:
       - home: db19-si-ee
         state: present
         apply_patches: true
 
-- name: Side-Effect - DB-Patching 19.20
+# 2nd run: nothing should be changed
+- name: Side-Effect - DB-Patching 19c
   ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.opatch
+  vars:
+    apply_patches_db: true
 
 - name: Side-Effect - Manage-DB
   ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db
@@ -27,6 +33,8 @@
         oracle_database_type: MULTIPURPOSE
         redolog_size: 50M
         redolog_groups: 3
+        datafile_dest: /u01/app/oracle/oradata
+        recoveryfile_dest: /u01/app/oracle//fra
         listener_name: LISTENER
         listener_port: &cdb_listener_port 1521
         archivelog: false
@@ -56,6 +64,8 @@
             content: undo
             state: present
         init_parameters:
+          # needed by oradb_manage_tablespace without explicit datafiles
+          - {name: db_create_file_dest, value: '/u01/app/oracle/oradata', scope: both, state: present}
           - {name: recyclebin, value: 'off', scope: spfile, state: present}
           - {name: sga_target, value: '1808M', scope: spfile, state: present}
 

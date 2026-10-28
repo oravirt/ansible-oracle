@@ -1,0 +1,13 @@
+---
+# My Oracle Support credentials:
+# 1. environment variables MOS_LOGIN / MOS_PASSWORD
+# 2. MOS_LOGIN / MOS_PASSWORD from molecule env file (default: extensions/.env.yml)
+_molecule_env: >-
+  {{ (lookup('ansible.builtin.file', lookup('ansible.builtin.env', 'MOLECULE_ENV_FILE'), errors='ignore')
+      | default('', true) | from_yaml) or {} }}
+mos_login: >-
+  {{ lookup('ansible.builtin.env', 'MOS_LOGIN') | default(_molecule_env['MOS_LOGIN'] | default(''), true) }}
+mos_password: >-
+  {{ lookup('ansible.builtin.env', 'MOS_PASSWORD') | default(_molecule_env['MOS_PASSWORD'] | default(''), true) }}
+# orasw_download_patches uses mos_login, autoupgrade uses mos_username
+mos_username: "{{ mos_login }}"

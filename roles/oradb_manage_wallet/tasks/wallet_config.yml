@@ -17,6 +17,27 @@
         wrl: "{{ owc.path }}"
         ORACLE_HOME: "{{ _oracle_home_db }}"
 
+    - name: wallet_manage_certificate | include wallet_certificates_info.yml
+      ansible.builtin.include_tasks:
+        file: wallet_certificates_info.yml
+        apply:
+          tags:
+            - cert
+      tags: cert
+
+    - name: wallet_config | include wallet_manage_certificate.yml
+      ansible.builtin.include_tasks: wallet_manage_certificate.yml
+      with_items:
+        - "{{ owc.certificates }}"
+      loop_control:
+        label: >-
+          type: {{ owc_c.type | default('') }}
+          file: {{ owc_c.file | default('') }}
+        loop_var: owc_c
+      when:
+        - owc.certificates is defined
+      tags: cert
+
     - name: wallet_config | include wallet_manage_dbcredential.yml
       ansible.builtin.include_tasks: wallet_manage_dbcredential.yml
 

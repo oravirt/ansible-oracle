@@ -10,7 +10,7 @@
   tags:
     - ords_config
   environment:
-    ADMIN_USER: "{{ _loop_pool.admin_user | default(oraords_admin_user) }}"
+    ADMIN_USER: "{{ _loop_pool.admin_user | default(oraords_default_admin_user) }}"
     ADMIN_PASSWORD: "{{ oraords_db_pools_password[_loop_pool.db_pool]['admin_password'] }}"
     ORDS_PASSWORD: "{{ oraords_db_pools_password[_loop_pool.db_pool]['ords_password'] }}"
     APEX_IMAGE_PATH: "{{ oraords_apex_image_path | default('') }}"
@@ -49,12 +49,12 @@
             --log-folder {{ oraords_ords_logs }} \
             ${DB_POOL_PARAM} \
             --admin-user "${ADMIN_USER}" \
-            --db-hostname "{{ _loop_pool.host | mandatory }}" \
+            --db-hostname "{{ _loop_pool.host | default(inventory_hostname) }}" \
             --db-port {{ _loop_pool.port | default(oraords_default_port) }} \
             --db-servicename {{ _loop_pool.service | mandatory }} \
             --feature-db-api {{ _loop_pool.feature_db_api | default(false) | ternary('true', 'false') }} \
             --feature-rest-enabled-sql {{ _loop_pool.feature_rest_enabled_sql | default(false) | ternary('true', 'false') }} \
-            --feature-sdw {{ _loop_pool.feature_sdw | default('false') | ternary('true', 'false') }} \
+            --feature-sdw {{ _loop_pool.feature_sdw | default(false) | ternary('true', 'false') }} \
             --proxy-user \
             --password-stdin <<EOF
           ${ADMIN_PASSWORD}

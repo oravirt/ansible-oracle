@@ -1,0 +1,17 @@
+# {{ ansible_managed }}
+global.global_log_dir={{ autoupgrade_log_dir }}
+global.keystore={{ autoupgrade_keystore }}
+global.download_folder={{ autoupgrade_download_dir }}
+{% for aup in _autoupgrade_download_list %}
+
+patch{{ loop.index }}.target_version={{ aup.target_version }}
+patch{{ loop.index }}.platform={{ aup.platform | default(autoupgrade_download_platform) }}
+patch{{ loop.index }}.patch={{ aup.patch }}
+{% set gold_image = aup.gold_image | default(autoupgrade_download_gold_image) %}
+{% if gold_image is boolean %}
+{%   set gold_image = gold_image | ternary('YES', 'NO') %}
+{% endif %}
+{% if gold_image | string | length > 0 %}
+patch{{ loop.index }}.gold_image={{ gold_image | upper }}
+{% endif %}
+{% endfor %}

@@ -1,0 +1,55 @@
+---
+- name: Converge
+  hosts: all
+  gather_facts: true
+  any_errors_fatal: true
+  vars:
+    patch_before_rootsh: true
+    apply_patches_db: false
+
+    db_homes_installed:
+      - home: db19-si-ee
+        state: present
+        apply_patches: false
+  tasks:
+
+    # install missing cron on rhel10 container
+    - name: Install cron on RHEL/OL10
+      ansible.builtin.package:
+        name: cronie
+      when:
+        - ansible_os_family == 'RedHat'
+        - ansible_distribution_major_version | int == 10
+
+    # the container image is based on an older OL10 release.
+    # Installing packages pulls a newer openssl-libs and the old ssh-keygen
+    # fails with 'OpenSSL version mismatch' => update openssh first
+    - name: Update openssh on RHEL/OL10
+      ansible.builtin.package:
+        name:
+          - openssh
+          - openssh-clients
+        state: latest  # noqa package-latest
+      when:
+        - ansible_os_family == 'RedHat'
+        - ansible_distribution_major_version | int == 10
+
+- name: Converge os
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.os
+
+- name: Converge swdb
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swdb
+  vars:
+    # copy installation media and patches from the Ansible controller
+    # => source is oracle_sw_source_local from host_vars/dbfs-ol10.yml
+    oracle_sw_copy: true
+    is_sw_source_local: true
+
+- name: Converge sql_zauberkasten
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.sql_zauberkasten
+
+- name: Converge manage_db
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db
+
+- name: Converge manage_ords
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_ords

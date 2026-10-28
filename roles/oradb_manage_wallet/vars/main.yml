@@ -7,3 +7,59 @@ _oradb_manage_wallet_dbpassword_loopvar: >-
 
 _oradb_manage_wallet_dbpassword: >-
   {{ dbpasswords[owc_d.db_name][owc_d.db_user] | default(default_dbpass) }}
+
+_wallet_parsed: |
+      {% set ns = namespace(
+           result={
+             'usercerts': [],
+             'reqcerts': [],
+             'trustedcerts': []
+           },
+           section=''
+         )
+      %}
+
+      {% for line in _wallet_content.stdout_lines %}
+
+      {% if 'Requested Certificates:' in line %}
+      {% set ns.section = 'reqcerts' %}
+
+      {% elif 'User Certificates:' in line %}
+      {% set ns.section = 'usercerts' %}
+
+      {% elif 'Trusted Certificates:' in line %}
+      {% set ns.section = 'trustedcerts' %}
+
+      {% elif line.startswith('Subject:') %}
+      {% set cert = {
+            'subject': line | regex_replace('^Subject:\\s*', ''),
+            'issuer': '',
+            'serial': '',
+            'sha': ''
+         }
+      %}
+      {% set ns.current = cert %}
+      {% set _ = ns.result[ns.section].append(ns.current) %}
+
+      {% elif line.startswith('Issuer:') and ns.current is defined %}
+      {% set _ = ns.current.update({
+            'issuer': line | regex_replace('^Issuer:\\s*', '')
+         })
+      %}
+
+      {% elif line.startswith('Serial Number:') and ns.current is defined %}
+      {% set _ = ns.current.update({
+            'serial': line | regex_replace('^Serial Number:\\s*', '') | regex_replace(':', '') | upper
+         })
+      %}
+
+      {% elif line.startswith('SHA digest:') and ns.current is defined %}
+      {% set _ = ns.current.update({
+            'sha': line | regex_replace('^SHA digest:\\s*', '')
+         })
+      %}
+
+      {% endif %}
+      {% endfor %}
+
+      {{ ns.result }}

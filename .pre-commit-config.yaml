@@ -3,7 +3,7 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
         exclude: ^roles/.*/README.md
@@ -26,7 +26,7 @@ repos:
         files: ^plugins/modules/.*\.py$
 
   - repo: https://github.com/pycqa/flake8
-    rev: '6.1.0'
+    rev: '7.4.1'
     hooks:
       - id: flake8
 
@@ -37,7 +37,7 @@ repos:
       # - id: shfmt
 
   - repo: https://github.com/ansible-community/antsibull-changelog.git
-    rev: 0.29.0
+    rev: 0.36.0
     hooks:
       - id: antsibull-changelog-lint
 
@@ -50,9 +50,11 @@ repos:
           - ansible-core
 
   - repo: https://github.com/ansible-community/ansible-lint.git
-    rev: v25.2.1
+    rev: v26.10.1
     hooks:
       - id: ansible-lint
+        # hook requires python3.14 - use python from nix-shell
+        language_version: python3
         entry: ansible-lint --force-color -p
         files: \.(yaml|yml)$
         pass_filenames: false

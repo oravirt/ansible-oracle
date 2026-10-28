@@ -12,6 +12,10 @@ Install cx_Oracle with pip
   - [extra_args](#extra_args)
   - [http_proxy](#http_proxy)
   - [install_cx_oracle](#install_cx_oracle)
+  - [install_from_nfs](#install_from_nfs)
+  - [is_sw_source_local](#is_sw_source_local)
+  - [oracle_stage](#oracle_stage)
+  - [oracle_sw_copy](#oracle_sw_copy)
   - [use_proxy](#use_proxy)
 - [Discovered Tags](#discovered-tags)
 - [Dependencies](#dependencies)
@@ -72,6 +76,46 @@ Install cx_Oracle?
 
 ```YAML
 install_cx_oracle: true
+```
+
+### install_from_nfs
+
+Mount NFS-Server for installation media?
+
+`nfs_server_sw` and `nfs_server_sw_path` are needed, when `install_from_nfs: true`
+
+#### Default value
+
+```YAML
+install_from_nfs: false
+```
+
+### is_sw_source_local
+
+#### Default value
+
+```YAML
+is_sw_source_local: true
+```
+
+### oracle_stage
+
+Defines the base directory for response files, configuration firles etc. for `ansible-oracle`.
+
+There is usually no need to change this variable.
+
+#### Default value
+
+```YAML
+oracle_stage: /u01/stage
+```
+
+### oracle_sw_copy
+
+#### Default value
+
+```YAML
+oracle_sw_copy: '{% if install_from_nfs %}false{% else %}true{% endif %}'
 ```
 
 ### use_proxy
