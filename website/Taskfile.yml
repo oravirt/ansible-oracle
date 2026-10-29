@@ -41,7 +41,7 @@ vars:
   LYCHEE_IMAGE: 'lycheeverse/lychee:{{.LYCHEE_VERSION}}'
   PUPPETEER_IMAGE: 'ghcr.io/puppeteer/puppeteer:{{.PUPPETEER_VERSION}}'
   # templates copied from Docsy, compared with the Docsy version from go.mod by "task docsy:diff"
-  DOCSY_OVERRIDES: layouts/partials/navbar.html layouts/partials/footer/center.html
+  DOCSY_OVERRIDES: layouts/partials/navbar.html layouts/partials/footer/center.html layouts/partials/page-meta-lastmod.html
 # No "sh:" variables with TASKFILE_DIR here: the vars of an included Taskfile are
 # evaluated for all tasks of the root Taskfile, TASKFILE_DIR is wrong there.
 
@@ -78,6 +78,8 @@ tasks:
     env:
       HUGO_IMAGE_TAG: '{{.HUGO_IMAGE_TAG}}'
     cmds:
+      # last commit of the sources for "Last modified" of the pages of content/docs/_content.gotmpl
+      - scripts/gitinfo.py
       - '{{.COMPOSE}} -f {{.COMPOSE_FILE}} run --rm -u {{.COMPOSE_USER}} site -s /src/website {{.ARGS}}'
 
   clean:

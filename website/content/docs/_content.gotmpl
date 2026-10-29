@@ -94,14 +94,21 @@
     {{ $raw = replace $raw (index . 0) $new }}
   {{ end }}
 
-  {{ $.AddPage (dict
+  {{/* hugo would use the git info of this file => last commit of the source from data/gitinfo.json (scripts/gitinfo.py) */}}
+  {{ $git := index (hugo.Data.gitinfo | default dict) (lower $p.src) }}
+  {{ $page := dict
     "path" $p.path
     "title" $title
     "weight" ($p.cfg.weight | default 100)
     "params" (dict
       "github_subdir" "/"
       "path_base_for_github_subdir" (dict "from" "^.*$" "to" $p.src)
+      "source_git" ($git | default false)
     )
     "content" (dict "mediaType" (cond $isMD "text/markdown" "text/asciidoc") "value" $raw)
-  ) }}
+  }}
+  {{ with $git }}
+    {{ $page = merge $page (dict "dates" (dict "lastmod" (time.AsTime .date))) }}
+  {{ end }}
+  {{ $.AddPage $page }}
 {{ end }}
