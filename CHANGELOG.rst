@@ -4,6 +4,15 @@ opitzconsulting.ansible\_oracle Release Notes
 
 .. contents:: Topics
 
+v4.17.1
+=======
+
+Bugfixes
+--------
+
+- oraswdb_manage_patches: Bugfix for empty orasw_meta_cluster_hostgroup (oravirt#657)
+- oraswgi_manage_patches: Bugfix for empty orasw_meta_cluster_hostgroup (oravirt#657)
+
 v4.17.0
 =======
 
