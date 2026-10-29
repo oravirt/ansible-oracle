@@ -533,15 +533,20 @@ No GitHub setup is needed.
 `renovate.json` is read from the working tree, but it must be tracked by git.
 
 ----
-task renovate:check     # pip modules and container images
+task renovate:check     # pip modules, container images, collections and github actions
 task renovate:pip       # pip modules and pre-commit hooks
 task renovate:docker    # container images only
+task renovate:galaxy    # collections in galaxy.yml and requirements.yml
 task renovate:report    # show the result of the last run again
 task renovate:validate  # validate renovate.json
 ----
 
 Dependencies which are pinned intentionally (e.g. `ansible-core` or the molecule base images) are disabled with `packageRules` in `renovate.json`.
 They are shown as `disabled` in the report.
+
+The collections in `dependencies` of `galaxy.yml` are checked against Ansible Galaxy.
+`community.general` is disabled, because the version range is set intentionally.
+`opitzconsulting.ansible_oracle` in `requirements.yml` is disabled, because the version is set by `tools/release/galaxy_version.sh` (see <<Collection version in requirements.yml>>).
 
 Tools which are used in requirements, in `.pre-commit-config.yaml` and in the github workflows (`ansible-doctor`, `ansible-lint`, `antsibull-changelog`) are grouped with `groupName`.
 An update changes all files in one branch, so the versions are always the same.
