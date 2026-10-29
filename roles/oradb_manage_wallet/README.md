@@ -21,7 +21,7 @@ Define a password for the wallet in `oracle_wallet_password`.
 
 ## Requirements
 
-- Minimum Ansible version: `2.15.0`
+- Minimum Ansible version: `2.16.0`
 
 ## Default Variables
 

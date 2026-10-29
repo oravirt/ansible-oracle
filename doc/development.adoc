@@ -545,7 +545,13 @@ Dependencies which are pinned intentionally (e.g. `ansible-core` or the molecule
 They are shown as `disabled` in the report.
 
 The collections in `dependencies` of `galaxy.yml` are checked against Ansible Galaxy.
-`community.general` is disabled, because the version range is set intentionally.
+`community.general` and `community.crypto` are disabled, because the version ranges are set intentionally.
+
+Renovate does not know `requires_ansible` of a collection and proposes versions, which need a newer ansible-core than `requires_ansible` in `meta/runtime.yml`.
+`task renovate:galaxy` therefore runs `tools/renovate/galaxy_requires.py` (`task renovate:galaxy:requires`) after the renovate check.
+It shows `requires_ansible` of each dependency in `galaxy.yml` and the newest version which can be installed with the minimum ansible-core version.
+The script fails, when a dependency needs a newer ansible-core.
+Only update to the version in column `COMPATIBLE`.
 `opitzconsulting.ansible_oracle` in `requirements.yml` is disabled, because the version is set by `tools/release/galaxy_version.sh` (see <<Collection version in requirements.yml>>).
 
 Tools which are used in requirements, in `.pre-commit-config.yaml` and in the github workflows (`ansible-doctor`, `ansible-lint`, `antsibull-changelog`) are grouped with `groupName`.

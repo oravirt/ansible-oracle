@@ -70,7 +70,7 @@ See `doc/guides/autoupgrade_upgrade.adoc` for the upgrade of PDBs.
 
 ## Requirements
 
-- Minimum Ansible version: `2.14.0`
+- Minimum Ansible version: `2.16.0`
 
 ## Default Variables
 
