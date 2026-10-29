@@ -2,7 +2,7 @@
 
 Install/Remove Patches from Oracle Database Homes
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -54,5 +54,4 @@ license (MIT)
 ## Author
 
 - Mikael Sandström
-
 - Thorsten Bruhns

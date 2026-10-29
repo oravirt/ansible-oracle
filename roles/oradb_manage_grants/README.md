@@ -2,7 +2,7 @@
 
 Manage grants for users in Oracle Databases
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Discovered Tags](#discovered-tags)

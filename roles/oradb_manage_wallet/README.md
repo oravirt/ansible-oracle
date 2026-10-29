@@ -5,7 +5,7 @@ Manage Wallets for Oracle with `mkstore` and `orapki`.
 Multiple wallets with different locations are possible.
 Define a password for the wallet in `oracle_wallet_password`.
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)

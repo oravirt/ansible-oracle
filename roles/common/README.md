@@ -2,7 +2,7 @@
 
 sets up the host generic stuff
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -403,8 +403,7 @@ Url for epel-release-latest-7.noarch.rpm
 #### Default value
 
 ```YAML
-epel7_rpm: 
-  https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/e/epel-release-7-14.noarch.rpm
+epel7_rpm: https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/e/epel-release-7-14.noarch.rpm
 ```
 
 ### epel8_rpm

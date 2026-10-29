@@ -2,7 +2,7 @@
 
 Role to configure the storage for oracle.
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -103,7 +103,7 @@ Deprecated variable. Use `partition_devices` as replacement.
 #### Default value
 
 ```YAML
-use_partition_devices: '{{ partition_devices }}'
+use_partition_devices: true
 ```
 
 ## Discovered Tags

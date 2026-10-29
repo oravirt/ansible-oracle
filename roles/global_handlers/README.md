@@ -5,7 +5,7 @@ Collection of handlers includeable by other roles.
 Make them available to your role by including it into the
 dependency list in meta/main.yml of your role, for instance.
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)

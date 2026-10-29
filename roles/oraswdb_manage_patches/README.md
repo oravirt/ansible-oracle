@@ -2,7 +2,7 @@
 
 Manage Patch Installation in Database ORACLE_HOMEs.
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)

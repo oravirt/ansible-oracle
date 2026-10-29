@@ -7,7 +7,7 @@ _Important_
 All variables in this role are internal use only.
 Do not set them in inventory!
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Discovered Tags](#discovered-tags)

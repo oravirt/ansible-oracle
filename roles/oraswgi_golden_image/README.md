@@ -2,7 +2,7 @@
 
 Create Golden-Images from Oracle Grid-Infrastructure/Restart
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -47,8 +47,7 @@ Filename of created Image archive.
 ```YAML
 oraswgi_golden_image_filename: >-
   {% if oracle_install_option_gi == 'CRS_CONFIG' -%}
-  gi_{% else %}restart_{% endif %}{{ oracle_install_version_gi | split('.') | first
-  }}.zip
+  gi_{% else %}restart_{% endif %}{{ oracle_install_version_gi | split('.') | first }}.zip
 ```
 
 ## Discovered Tags

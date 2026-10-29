@@ -9,7 +9,7 @@ Known Issues from Oracle:
 - TOP Note: Solutions for Typical Grid Infrastructure/RAC Database runInstaller/DBCA for RAC Issues (Doc ID 1056713.1)
 - INS-06006 GI RunInstaller Fails If OpenSSH Is Upgraded to 8.x (Doc ID 2555697.1)
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -64,8 +64,7 @@ cvuqdisk_rpm: cvuqdisk-1.0.10-1.rpm
 #### Default value
 
 ```YAML
-default_dbpass: '{% if item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd
-  }}{% else %}Oracle123{% endif %}'
+default_dbpass: '{% if item.0.oracle_db_passwd is defined %}{{ item.0.oracle_db_passwd }}{% else %}Oracle123{% endif %}'
 ```
 
 ### default_gipass
@@ -112,8 +111,7 @@ oracle_asm_init_dg: crs
 #### Default value
 
 ```YAML
-oracle_asm_storage_option: "{% if oracle_install_version_gi is version('12.2', '>=')
-  %}FLEX_ASM_STORAGE{% else %}LOCAL_ASM_STORAGE{% endif %}"
+oracle_asm_storage_option: "{% if oracle_install_version_gi is version('12.2', '>=') %}FLEX_ASM_STORAGE{% else %}LOCAL_ASM_STORAGE{% endif %}"
 ```
 
 ### oracle_cluster_mgmdb
