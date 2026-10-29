@@ -16,7 +16,7 @@ Each area of AutoUpgrade has its own task file, which must be called with `tasks
 
 See `doc/guides/autoupgrade_upgrade.adoc` for the upgrade of PDBs.
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -474,8 +474,7 @@ Value for `global.global_log_dir` in the AutoUpgrade config files.
 ```YAML
 autoupgrade_log_dir: >-
   {{ _autoupgrade_run_local | bool
-     | ternary(_autoupgrade_home + '/log', oracle_base + '/cfgtoollogs/autoupgrade')
-  }}
+     | ternary(_autoupgrade_home + '/log', oracle_base + '/cfgtoollogs/autoupgrade') }}
 ```
 
 ### autoupgrade_proxy_check

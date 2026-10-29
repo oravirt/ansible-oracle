@@ -2,7 +2,7 @@
 
 Role to configure the hostsystem for ansible-oracle
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -93,8 +93,7 @@ Name / Url for rpm oracleasm-support for RHEL6/OL6.
 #### Default value
 
 ```YAML
-asmlib_rpm_el6: 
-  http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.4-1.el6.x86_64.rpm
+asmlib_rpm_el6: http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.4-1.el6.x86_64.rpm
 ```
 
 ### asmlib_rpm_el7
@@ -104,8 +103,7 @@ Name / Url for rpm oracleasm-support for RHEL7/OL7.
 #### Default value
 
 ```YAML
-asmlib_rpm_el7: 
-  http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.12-1.el7.x86_64.rpm
+asmlib_rpm_el7: http://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.12-1.el7.x86_64.rpm
 ```
 
 ### asmlib_rpm_el8
@@ -115,8 +113,7 @@ Name / Url for rpm oracleasm-support for RHEL8/OL8.
 #### Default value
 
 ```YAML
-asmlib_rpm_el8: 
-  https://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.17-1.el8.x86_64.rpm
+asmlib_rpm_el8: https://download.oracle.com/otn_software/asmlib/oracleasmlib-2.0.17-1.el8.x86_64.rpm
 ```
 
 ### asmlib_rpm_sles
@@ -126,8 +123,7 @@ Name / Url for rpm oracleasm-support for SLES.
 #### Default value
 
 ```YAML
-asmlib_rpm_sles: 
-  http://oss.oracle.com/projects/oracleasm-support/dist/files/RPMS/sles12/amd64/2.1.8/oracleasm-support-2.1.8-1.SLE12.x86_64.rpm
+asmlib_rpm_sles: http://oss.oracle.com/projects/oracleasm-support/dist/files/RPMS/sles12/amd64/2.1.8/oracleasm-support-2.1.8-1.SLE12.x86_64.rpm
 ```
 
 ### asmlibsupport_rpm
@@ -144,8 +140,7 @@ Set the used variables `asmlibsupport_rpm_el6`, `asmlibsupport_rpm_el7` or `asml
 #### Default value
 
 ```YAML
-asmlibsupport_rpm: Value from `asmlibsupport_rpm_el6`, `asmlibsupport_rpm_el7` or
-  `asmlibsupport_rpm_el8`
+asmlibsupport_rpm: Value from `asmlibsupport_rpm_el6`, `asmlibsupport_rpm_el7` or `asmlibsupport_rpm_el8`
 ```
 
 ### asmlibsupport_rpm_el6
@@ -153,8 +148,7 @@ asmlibsupport_rpm: Value from `asmlibsupport_rpm_el6`, `asmlibsupport_rpm_el7` o
 #### Default value
 
 ```YAML
-asmlibsupport_rpm_el6: 
-  http://oss.oracle.com/projects/oracleasm-support/dist/files/RPMS/rhel6/amd64/2.1.8/oracleasm-support-2.1.8-1.el6.x86_64.rpm
+asmlibsupport_rpm_el6: http://oss.oracle.com/projects/oracleasm-support/dist/files/RPMS/rhel6/amd64/2.1.8/oracleasm-support-2.1.8-1.el6.x86_64.rpm
 ```
 
 ### asmlibsupport_rpm_el7
@@ -162,8 +156,7 @@ asmlibsupport_rpm_el6:
 #### Default value
 
 ```YAML
-asmlibsupport_rpm_el7: 
-  https://yum.oracle.com/repo/OracleLinux/OL7/latest/x86_64/getPackage/oracleasm-support-2.1.11-2.el7.x86_64.rpm
+asmlibsupport_rpm_el7: https://yum.oracle.com/repo/OracleLinux/OL7/latest/x86_64/getPackage/oracleasm-support-2.1.11-2.el7.x86_64.rpm
 ```
 
 ### asmlibsupport_rpm_el8
@@ -171,8 +164,7 @@ asmlibsupport_rpm_el7:
 #### Default value
 
 ```YAML
-asmlibsupport_rpm_el8: 
-  https://yum.oracle.com/repo/OracleLinux/OL8/latest/x86_64/getPackage/oracleasm-support-2.1.11-2.el8.x86_64.rpm
+asmlibsupport_rpm_el8: https://yum.oracle.com/repo/OracleLinux/OL8/latest/x86_64/getPackage/oracleasm-support-2.1.11-2.el8.x86_64.rpm
 ```
 
 ### configure_etc_hosts
@@ -322,8 +314,7 @@ Set IP to 2nd Interface on virtualbox and 1st for all otehr installations
 #### Default value
 
 ```YAML
-etc_hosts_ip: "{% if 'virtualbox' in ansible_virtualization_type %}{{ ansible_all_ipv4_addresses[1]
-  }}{% else %}{{ ansible_default_ipv4.address }}{% endif %}"
+etc_hosts_ip: "{% if 'virtualbox' in ansible_virtualization_type %}{{ ansible_all_ipv4_addresses[1] }}{% else %}{{ ansible_default_ipv4.address }}{% endif %}"
 ```
 
 ### extra_hugepages_per_instance
@@ -355,8 +346,7 @@ extrarepos_disabled: '[]'
 #### Default value
 
 ```YAML
-extrarepos_enabled: "{%- if ansible_distribution == 'OracleLinux' -%}ol{{ ansible_distribution_major_version
-  }}_addons{%- else -%}{%- endif %}"
+extrarepos_enabled: "{%- if ansible_distribution == 'OracleLinux' -%}ol{{ ansible_distribution_major_version }}_addons{%- else -%}{%- endif %}"
 ```
 
 ### firewall_service
@@ -380,8 +370,7 @@ grid_users:
   - username: grid
     uid: 54320
     primgroup: '{{ oracle_group }}'
-    othergroups: '{{ asmadmin_group }},{{ asmdba_group }},{{ asmoper_group }},{{ dba_group
-      }}'
+    othergroups: '{{ asmadmin_group }},{{ asmdba_group }},{{ asmoper_group }},{{ dba_group }}'
 ```
 
 ### host_fs_layout
@@ -533,8 +522,7 @@ This is an internal variable. Do not change it!
 ```YAML
 oracle_hugepages:
   - {name: vm.nr_hugepages, value: '{{ nr_hugepages }}'}
-  - {name: vm.hugetlb_shm_group, value: "{{ oracle_user_getent['ansible_facts']['getent_passwd'][oracle_user][2]
-      }}"}
+  - {name: vm.hugetlb_shm_group, value: "{{ oracle_user_getent['ansible_facts']['getent_passwd'][oracle_user][2] }}"}
 ```
 
 ### oracle_hugepages_sysctl_file
@@ -761,8 +749,7 @@ oracle_users:
   - username: oracle
     uid: 54321
     primgroup: '{{ oracle_group }}'
-    othergroups: '{{ dba_group }},{{ asmadmin_group }},{{ asmdba_group }},{{ asmoper_group
-      }},backupdba,dgdba,kmdba,{{ oper_group }}'
+    othergroups: '{{ dba_group }},{{ asmadmin_group }},{{ asmdba_group }},{{ asmoper_group }},backupdba,dgdba,kmdba,{{ oper_group }}'
 ```
 
 ### os_family_supported
@@ -772,8 +759,7 @@ Support is limited to RHE/OL and SuSE
 #### Default value
 
 ```YAML
-os_family_supported: "{% if ansible_os_family == 'Suse' %}Suse{% else %}RedHat{% endif
-  %}"
+os_family_supported: "{% if ansible_os_family == 'Suse' %}Suse{% else %}RedHat{% endif %}"
 ```
 
 ### os_min_supported_version
@@ -783,8 +769,7 @@ Minimum supported versions for SLES is 12.1 and RHEL/OL >= 6.4
 #### Default value
 
 ```YAML
-os_min_supported_version: "{% if ansible_os_family == 'Suse' %}12.1{% else %}6.4{%
-  endif %}"
+os_min_supported_version: "{% if ansible_os_family == 'Suse' %}12.1{% else %}6.4{% endif %}"
 ```
 
 ### percent_hugepages

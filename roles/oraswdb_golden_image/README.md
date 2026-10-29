@@ -2,7 +2,7 @@
 
 Create Golden-Images from Oracle Database Homes and Oracle Grid-Infrastructure/Restart
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)

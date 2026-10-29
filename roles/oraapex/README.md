@@ -12,7 +12,7 @@ Limitations:
 
 Documentation: https://github.com/oravirt/ansible-oracle/blob/master/doc/guides/apex_ords.adoc
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -113,7 +113,6 @@ the images for ORDS. This should not be done on production setups!
 license (MIT)
 
 ## Author
-
 
 
 - Thorsten Bruhns

@@ -4,7 +4,7 @@ Manage Statspack in Oracle.
 
 Not RAC aware at the moment.
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)

@@ -2,7 +2,7 @@
 
 Create, modify and remove Oracle Databases
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)

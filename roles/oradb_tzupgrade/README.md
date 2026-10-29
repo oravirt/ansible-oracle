@@ -2,7 +2,7 @@
 
 Manage timezone upgrades for an Oracle Database
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Dependencies](#dependencies)

@@ -2,7 +2,7 @@
 
 Manage roles in Oracle
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Discovered Tags](#discovered-tags)

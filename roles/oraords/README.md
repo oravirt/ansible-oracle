@@ -9,7 +9,7 @@ ORACLE_HOME: {{ oracle_base }}/product/ords
 This role is limited to Oracle Linux, due to installation
 from yum Repository from Oracle.
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
