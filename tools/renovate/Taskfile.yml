@@ -46,6 +46,12 @@ tasks:
       - task: check
         vars:
           MANAGERS: '["ansible-galaxy"]'
+      - task: galaxy:requires
+
+  galaxy:requires:
+    desc: Check requires_ansible of the collections in galaxy.yml against meta/runtime.yml
+    cmds:
+      - tools/renovate/galaxy_requires.py
 
   lookup:
     internal: true
