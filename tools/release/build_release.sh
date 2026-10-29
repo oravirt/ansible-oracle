@@ -16,6 +16,8 @@ set -o pipefail
 # - create the tag v<version> for the release pull request
 #   (merge commit, or last commit of the pull request when it is still open)
 # - create a draft release with the description of the pull request
+# - update the website with tools/release/build_website.sh -m push
+#   (only for oravirt/ansible-oracle, skipped for tests against a fork)
 #
 # Mode galaxy:
 # - sync master of the fork of the gh user with master of the upstream
@@ -26,10 +28,15 @@ set -o pipefail
 # - in this case start the workflow 'Deploy Collection' in the fork and
 #   watch it, when the version is not on Ansible Galaxy yet
 #
-# Usage: build_release.sh -m pr|release|galaxy [-i] [-r <owner/repo>]
+# Mode docs:
+# - update the website with tools/release/build_website.sh -m push, like the
+#   last step of mode release (no release branch needed)
+#
+# Usage: build_release.sh -m pr|release|galaxy|docs [-i] [-r <owner/repo>]
 #
 #   -m  pr: create the release pull request, release: create the draft release,
-#       galaxy: sync master of the fork with the upstream repository
+#       galaxy: sync master of the fork with the upstream repository,
+#       docs: update the website
 #   -i  ignore changelog fragments without pull request reference
 #       (useful for tests against a fork)
 #   -r  GitHub repository for the pull request and release, source for the
@@ -41,7 +48,8 @@ workdir=$(dirname "$0")
 cd "${workdir}/../.." || exit 1
 
 galaxy="galaxy.yml"
-repo="oravirt/ansible-oracle"
+upstream_repo="oravirt/ansible-oracle"
+repo="${upstream_repo}"
 remote="origin"
 antsibull=".venv/antsibull/bin/antsibull-changelog"
 collection="opitzconsulting/ansible_oracle"
@@ -51,7 +59,7 @@ mode=""
 pr_url=""
 
 function usage() {
-  echo "Usage: $0 -m pr|release|galaxy [-i] [-r <owner/repo>]"
+  echo "Usage: $0 -m pr|release|galaxy|docs [-i] [-r <owner/repo>]"
   exit 2
 }
 
@@ -235,6 +243,16 @@ function create_release() {
   esac
 }
 
+# the website is built from the local checkout and published at once
+function update_website() {
+  if [ "${repo,,}" != "${upstream_repo,,}" ] ; then
+    echo "Website is only updated for ${upstream_repo}, skipped for ${repo}"
+    return
+  fi
+  echo "Updating the website"
+  tools/release/build_website.sh -m push
+}
+
 # without --force: gh refuses the sync, when master of the fork has own commits
 function sync_fork() {
   local fork
@@ -359,9 +377,13 @@ case "${mode}" in
     ;;
   release)
     create_release
+    update_website
     ;;
   galaxy)
     sync_fork
+    ;;
+  docs)
+    update_website
     ;;
   *)
     usage

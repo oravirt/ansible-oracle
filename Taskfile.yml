@@ -20,11 +20,18 @@ tasks:
       - tools/release/build_release.sh -m pr {{.CLI_ARGS}}
 
   release:draft:
-    desc: Create tag and draft release for the release pull request
+    desc: Create tag and draft release for the release pull request, update the website
     platforms: ["linux"]
     dir: "{{.TASKFILE_DIR}}"
     cmds:
       - tools/release/build_release.sh -m release {{.CLI_ARGS}}
+
+  release:docs:
+    desc: Update the website (build_website.sh -m push)
+    platforms: ["linux"]
+    dir: "{{.TASKFILE_DIR}}"
+    cmds:
+      - tools/release/build_release.sh -m docs {{.CLI_ARGS}}
 
   release:galaxy:
     desc: Sync master of the fork and deploy a published release to Ansible Galaxy

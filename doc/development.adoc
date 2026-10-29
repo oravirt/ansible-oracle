@@ -382,6 +382,7 @@ The script is also available as `task example:check` and `task example:fix` from
 `-m pr`:: Create the Release-Pull-Request with changelog.
 `-m release`:: Create the tag and a draft release for the Release-Pull-Request.
 `-m galaxy`:: Sync `master` of your fork with `master` of the upstream repository.
+`-m docs`:: Update the website, without creating a release.
 
 NOTE: The whole release process should be done with a dedicated Pull-Request.
 
@@ -436,8 +437,27 @@ The script executes the following steps:
   An existing tag is used, when it points to the same commit, otherwise the script is aborted.
 . Create the draft release `Release <version>` with the description of the Pull-Request as text.
   The text of an existing draft release is updated, an already published release aborts the script.
+. Update the website with `tools/release/build_website.sh -m push`, see link:website.adoc[website.adoc].
+  The website is built from the local checkout of the release branch and published at once.
+  This step is skipped for tests against a fork (`-r` other than `oravirt/ansible-oracle`).
 
 The draft release must be published manually on GitHub.
+
+NOTE: The website step needs `docker`, `rsync` and `task` and committed sources in `website/`, `doc/`, `roles/` and `docker/hugo/`.
+When it fails, fix the problem and run `-m release` again: the existing tag and draft release are reused.
+
+==== Update the website (`-m docs`)
+
+----
+tools/release/build_release.sh -m docs
+----
+
+Builds and publishes the website with `tools/release/build_website.sh -m push`, like the last step of `-m release`.
+Use it to update the website without a release, e.g. after changes in `doc/` or `website/`, or to repeat a failed website step of `-m release`.
+No release branch is needed, the website is built from the current local checkout.
+The step is skipped with `-r` other than `oravirt/ansible-oracle`.
+
+For more options (commit only, Pull-Request in the website repository) use `tools/release/build_website.sh` directly, see link:website.adoc[website.adoc].
 
 ==== Sync fork (`-m galaxy`)
 
@@ -468,7 +488,8 @@ Options are passed after `--`.
 
 ----
 task release:pr        # -m pr
-task release:draft     # -m release
+task release:draft     # -m release (incl. website)
+task release:docs      # -m docs
 task release:galaxy    # -m galaxy
 ----
 
@@ -489,7 +510,7 @@ Revert all changes in the working tree after the test.
 
 ==== Options
 
-`-m pr|release|galaxy`:: Mode of the script, see above.
+`-m pr|release|galaxy|docs`:: Mode of the script, see above.
 `-r <owner/repo>`:: GitHub repository for the Pull-Request, the release, the lookup of the fragment Pull-Requests and source of the fork sync (default: `oravirt/ansible-oracle`).
 `-i`:: Continue, when fragments cannot be updated by `fix_fragments.py` (only `-m pr`).
 
