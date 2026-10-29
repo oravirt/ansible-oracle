@@ -4,6 +4,31 @@ opitzconsulting.ansible\_oracle Release Notes
 
 .. contents:: Topics
 
+v4.17.0
+=======
+
+Minor Changes
+-------------
+
+- doc: development guide describes nix-shell as recommended development environment and the local Ansible-Controller as separate option (oravirt#645)
+- orahost, orahost_meta, orahost_ssh: ssh_key_type, ssh_key_bits, ssh_key_file of user's ssh key can now be configured (oravirt#561)
+- orahost_meta, orahost_ssh: host key types can now be configured (oravirt#561)
+- release: new tasks release:pr, release:draft and release:galaxy, task changelog-release removed (oravirt#645)
+- release: tools/release/build_release.sh with mode galaxy - sync master of the fork with upstream and start the workflow Deploy Collection, when the latest release points to the last commit and the version is not on Ansible Galaxy (oravirt#645)
+- release: tools/release/build_release.sh with mode pr - set version from branch pr/<version>, commit the version, create the release pull request, add PR references to fragments, create the changelog and write the release notes into the pull request (oravirt#645)
+- release: tools/release/build_release.sh with mode release - create tag v<version> and a draft release with the description of the release pull request (oravirt#645)
+
+Bugfixes
+--------
+
+- Add orahost_meta_tmpdir and orahost_meta_java_options to dbhome's opatchauto call to enable non-default tmp dir, e.g. on hardened systems (oravirt#604)
+- Ensure glibc-langpack-en is installed and LANG is forced to en_US.UTF-8 in oracle_db and oracle_datapatch modeules (oravirt#648)
+- Ensure stage tmp is available on all cluster nodes because opatchauto runs remote checks from there (oravirt#604)
+- fixed typos in docs (oravirt#646)
+- oradb_manage_db: add missing tag for creating the listener auto-startup profile (oravirt#647)
+- orahost_ssh: file group of user's keyfile forced to {{ oracle_group }} (oravirt#561)
+- orahost_ssh: if only a subset of cluster nodes are in the play, key exchange failed (oravirt#561)
+
 v4.16.0
 =======
 
