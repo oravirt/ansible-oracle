@@ -33,6 +33,7 @@ Meta role used by other roles to share variable defaults.
   - [orahost_ssh_hostkeytypes](#orahost_ssh_hostkeytypes)
   - [orahost_ssh_key_size](#orahost_ssh_key_size)
   - [orahost_ssh_key_type](#orahost_ssh_key_type)
+  - [orasw_meta_primary_node](#orasw_meta_primary_node)
   - [role_separation](#role_separation)
   - [scripts_folder](#scripts_folder)
   - [sysctl_kernel_sem_force](#sysctl_kernel_sem_force)
@@ -434,6 +435,29 @@ SSH key type for oracle and grid users' SSH Keys
 
 ```YAML
 orahost_ssh_key_type: rsa
+```
+
+### orasw_meta_primary_node
+
+The state of orasw_meta_primary_node is:
+Single-Instance / Oracle Restart: true
+Cluster 1st node: true
+Cluster other nodes: false
+
+**_Type:_** boolean<br />
+
+#### Default value
+
+```YAML
+orasw_meta_primary_node: >
+  {%- if oracle_install_option_gi | default('') | upper != 'CRS_CONFIG' -%}
+    {%- set _orasw_meta_primary_node = true -%}
+  {%- elif groups[orasw_meta_cluster_hostgroup][0] == inventory_hostname -%}
+    {%- set _orasw_meta_primary_node = true -%}
+  {%- else -%}
+    {%- set _orasw_meta_primary_node = false -%}
+  {%- endif -%}
+  {{ _orasw_meta_primary_node }}
 ```
 
 ### role_separation
