@@ -33,7 +33,7 @@ Documentation: https://github.com/oravirt/ansible-oracle/blob/master/doc/guides/
 
 ## Requirements
 
-- Minimum Ansible version: `2.15.0`
+- Minimum Ansible version: `2.16.0`
 
 ## Default Variables
 

@@ -30,8 +30,8 @@
 
 ## Pre-requisites
 
-* Ansible Version >= 2.14
+* Ansible Version >= 2.16
 
-  Version 2.14 or newer of Ansible is recommended
+  Version 2.16 or newer of Ansible is recommended
 * Oracle Linux (or any RHEL-based Linux System) >= 8
 * Oracle Database/Grid Infrastructure 21.3.0.0, 19.3.0.0
