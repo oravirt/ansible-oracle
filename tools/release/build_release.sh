@@ -4,39 +4,48 @@ set -o pipefail
 
 # Shellscript for managing releases in ansible-oracle
 #
+# Releases are built from master or from a maintenance branch release/<major>.x
+# (e.g. release/4.x). The branch is the base of the release pull request.
+#
 # Mode pr:
 # - set the collection version in galaxy.yml from the current branch
 #   (pr/<version>) and update all requirements.yml with galaxy_version.sh
 # - commit the new version as initial commit for the release pull request
-# - push the branch to origin and create the release pull request
+# - push the branch to origin and create the release pull request against the
+#   base branch (option -b, default: see base_branch)
 # - add pull request references to the changelog fragments
 # - create the changelog and write the new release notes into the pull request
 #
 # Mode release:
 # - create the tag v<version> for the release pull request
 #   (merge commit, or last commit of the pull request when it is still open)
-# - create a draft release with the description of the pull request
+# - create a draft release with the description of the pull request,
+#   only releases from master are marked as latest release
 # - update the website with tools/release/build_website.sh -m push
-#   (only for oravirt/ansible-oracle, skipped for tests against a fork)
+#   (only for releases from master of oravirt/ansible-oracle)
 #
 # Mode galaxy:
-# - sync master of the fork of the gh user with master of the upstream
-#   repository at once, to take over a release merged in upstream without
-#   waiting (only on GitHub, nothing is changed locally)
-# - when the last commit is a release commit (Release <version>), check that
-#   the latest release of the upstream repository points to this commit
-# - in this case start the workflow 'Deploy Collection' in the fork and
+# - take the release (option -t, default: latest release) of the upstream
+#   repository and search the branch with the release commit as last commit
+#   (master or release/<major>.x)
+# - sync this branch of the fork of the gh user with the upstream repository
+#   (the branch is created in the fork, when it is missing)
+# - start the workflow 'Deploy Collection' in the fork for this branch and
 #   watch it, when the version is not on Ansible Galaxy yet
+#   (only on GitHub, nothing is changed locally)
 #
 # Mode docs:
 # - update the website with tools/release/build_website.sh -m push, like the
 #   last step of mode release (no release branch needed)
 #
-# Usage: build_release.sh -m pr|release|galaxy|docs [-i] [-r <owner/repo>]
+# Usage: build_release.sh -m pr|release|galaxy|docs [-b <branch>] [-t <tag>] [-n] [-i] [-r <owner/repo>]
 #
 #   -m  pr: create the release pull request, release: create the draft release,
-#       galaxy: sync master of the fork with the upstream repository,
+#       galaxy: sync the fork and deploy the release to Ansible Galaxy,
 #       docs: update the website
+#   -b  base branch of the release pull request (only -m pr)
+#   -t  release tag for -m galaxy, e.g. v4.17.1 (default: latest release)
+#   -n  dry-run: show what would be done, nothing is changed locally or on GitHub
 #   -i  ignore changelog fragments without pull request reference
 #       (useful for tests against a fork)
 #   -r  GitHub repository for the pull request and release, source for the
@@ -51,16 +60,29 @@ galaxy="galaxy.yml"
 upstream_repo="oravirt/ansible-oracle"
 repo="${upstream_repo}"
 remote="origin"
+default_branch="master"
 antsibull=".venv/antsibull/bin/antsibull-changelog"
 collection="opitzconsulting/ansible_oracle"
 deploy_workflow="Deploy Collection"
 ignore_fragments=false
+dry_run=false
 mode=""
+base=""
+release_tag=""
 pr_url=""
 
 function usage() {
-  echo "Usage: $0 -m pr|release|galaxy|docs [-i] [-r <owner/repo>]"
+  echo "Usage: $0 -m pr|release|galaxy|docs [-b <branch>] [-t <tag>] [-n] [-i] [-r <owner/repo>]"
   exit 2
+}
+
+# execute a command, which changes something locally or on GitHub
+function run() {
+  if [ "${dry_run}" = true ] ; then
+    echo "DRY-RUN: $*"
+  else
+    "$@"
+  fi
 }
 
 function branch_version() {
@@ -71,9 +93,55 @@ function branch_version() {
   echo "${BASH_REMATCH[1]}"
 }
 
+# $1: repository, $2: branch
+function branch_exists() {
+  gh api "repos/$1/branches/$2" --silent 2>/dev/null
+}
+
+# $1: branch, version of the collection in galaxy.yml of this branch in repo
+function repo_galaxy_version() {
+  gh api -H "Accept: application/vnd.github.raw" "repos/${repo}/contents/${galaxy}?ref=$1" \
+    | sed -n -E "s/^version:\s*([^[:space:]]+).*/\1/p"
+}
+
+# Default base branch for the version:
+# - master, when the major version is the same or higher than on master
+# - release/<major>.x for an older major version
+function base_branch() {
+  local major master_version
+  major=${version%%.*}
+  master_version=$(repo_galaxy_version "${default_branch}")
+
+  if [ "${major}" -ge "${master_version%%.*}" ] ; then
+    echo "${default_branch}"
+  elif branch_exists "${repo}" "release/${major}.x" ; then
+    echo "release/${major}.x"
+  else
+    echo "No branch release/${major}.x in ${repo} for version ${version} (${default_branch}: ${master_version}), use -b" >&2
+    return 1
+  fi
+}
+
+# the pull request may only contain the commits of the release branch
+function check_base() {
+  local base_remote
+  if ! branch_exists "${repo}" "${base}" ; then
+    echo "Base branch ${base} does not exist in ${repo}" >&2
+    return 1
+  fi
+
+  base_remote=$(repo_remote)
+  git fetch --quiet "${base_remote}" "${base}"
+  if ! git merge-base --is-ancestor FETCH_HEAD HEAD ; then
+    echo "${branch} is not based on the current ${base} of ${repo}, rebase it onto ${base_remote}/${base}" >&2
+    return 1
+  fi
+  echo "Base branch: ${base} of ${repo}"
+}
+
 function set_galaxy_version() {
   echo "Using version from branch: ${version}"
-  sed -i -E "s/^version:.*/version: ${version}/" "${galaxy}"
+  run sed -i -E "s/^version:.*/version: ${version}/" "${galaxy}"
   grep -E "^version:" "${galaxy}"
 }
 
@@ -105,7 +173,7 @@ function find_pull_request() {
   esac
 
   gh pr list --repo "${repo}" --head "${branch}" --state all \
-    --json number,url,state,body,headRefOid,mergeCommit,headRepositoryOwner \
+    --json number,url,state,body,headRefOid,mergeCommit,headRepositoryOwner,baseRefName \
     | jq -c --arg owner "$(remote_owner)" --argjson states "${states}" \
       '[.[] | select(.headRepositoryOwner.login == $owner)
             | select(.state as $s | $states | index($s))] | .[0] // empty'
@@ -117,32 +185,42 @@ function commit_version() {
   files=$(git ls-files -- "${galaxy}" '*requirements.yml')
 
   # shellcheck disable=SC2086
-  if git diff --quiet HEAD -- ${files} ; then
+  if [ "${dry_run}" = false ] && git diff --quiet HEAD -- ${files} ; then
     echo "Version ${version} already committed"
     return
   fi
   echo "Committing version ${version}"
   # shellcheck disable=SC2086
-  git commit --only -m "Release ${version}" -- ${files}
+  run git commit --only -m "Release ${version}" -- ${files}
 }
 
 function push_branch() {
   echo "Pushing ${branch} to ${remote}"
-  git push --set-upstream "${remote}" "${branch}"
+  run git push --set-upstream "${remote}" "${branch}"
 }
 
 function create_pull_request() {
-  local head
+  local head pr
   head="$(remote_owner):${branch}"
 
-  pr_url=$(find_pull_request open | jq -r '.url // empty')
-  if [ -n "${pr_url}" ] ; then
+  pr=$(find_pull_request open)
+  if [ -n "${pr}" ] ; then
+    pr_url=$(jq -r '.url' <<< "${pr}")
     echo "Pull request already exists: ${pr_url}"
+    if [ "$(jq -r '.baseRefName' <<< "${pr}")" != "${base}" ] ; then
+      echo "The pull request is based on $(jq -r '.baseRefName' <<< "${pr}"), not on ${base}" >&2
+      return 1
+    fi
     return
   fi
 
-  echo "Creating pull request in ${repo} for ${head}"
-  pr_url=$(gh pr create --repo "${repo}" --head "${head}" \
+  echo "Creating pull request in ${repo} for ${head} against ${base}"
+  if [ "${dry_run}" = true ] ; then
+    run gh pr create --repo "${repo}" --base "${base}" --head "${head}" --title "Release ${version}"
+    pr_url="<new pull request>"
+    return
+  fi
+  pr_url=$(gh pr create --repo "${repo}" --base "${base}" --head "${head}" \
     --title "Release ${version}" \
     --body "Release ${version} of opitzconsulting.ansible_oracle")
   echo "${pr_url}"
@@ -150,6 +228,10 @@ function create_pull_request() {
 
 function fix_fragments() {
   echo "Adding pull request references to changelog fragments"
+  if [ "${dry_run}" = true ] ; then
+    tools/release/fix_fragments.py --repo "${repo}" --dry-run || true
+    return
+  fi
   if ! tools/release/fix_fragments.py --repo "${repo}" ; then
     if [ "${ignore_fragments}" = true ] ; then
       echo "Ignoring problems with changelog fragments"
@@ -162,12 +244,16 @@ function fix_fragments() {
 
 function make_changelog() {
   echo "Starting antsibull-changelog release"
-  "${antsibull}" release
+  run "${antsibull}" release
 }
 
 # release notes of the new version only, as pull request description
 function update_pull_request() {
   local notes
+  if [ "${dry_run}" = true ] ; then
+    run gh pr edit "${pr_url}" --body-file "<release notes of ${version}>"
+    return
+  fi
   notes=$(mktemp)
   trap 'rm -f "${notes}"' RETURN
 
@@ -191,7 +277,7 @@ function create_tag() {
   existing=$(git rev-parse --quiet --verify "refs/tags/${tag}^{commit}" || true)
   if [ -z "${existing}" ] ; then
     echo "Creating tag ${tag} for commit ${commit}"
-    git tag "${tag}" "${commit}"
+    run git tag "${tag}" "${commit}"
   elif [ "${existing}" != "${commit}" ] ; then
     echo "Tag ${tag} already exists for commit ${existing}, expected ${commit}" >&2
     return 1
@@ -200,11 +286,11 @@ function create_tag() {
   fi
 
   echo "Pushing tag ${tag} to ${tag_remote}"
-  git push "${tag_remote}" "refs/tags/${tag}"
+  run git push "${tag_remote}" "refs/tags/${tag}"
 }
 
 function create_release() {
-  local pr commit number is_draft notes
+  local pr commit number is_draft notes latest
   pr=$(find_pull_request merged)
   if [ -z "${pr}" ] ; then
     echo "No open or merged pull request found for ${branch} in ${repo}" >&2
@@ -212,11 +298,13 @@ function create_release() {
   fi
 
   number=$(jq -r '.number' <<< "${pr}")
+  base=$(jq -r '.baseRefName' <<< "${pr}")
+  echo "Pull request $(jq -r '.url' <<< "${pr}") against ${base}"
   if [ "$(jq -r '.state' <<< "${pr}")" = "MERGED" ] ; then
     commit=$(jq -r '.mergeCommit.oid' <<< "${pr}")
   else
     commit=$(jq -r '.headRefOid' <<< "${pr}")
-    echo "Pull request $(jq -r '.url' <<< "${pr}") is not merged, using its last commit"
+    echo "Pull request is not merged, using its last commit"
   fi
 
   create_tag "${commit}" "${number}"
@@ -225,11 +313,19 @@ function create_release() {
   trap 'rm -f "${notes}"' RETURN
   jq -j '.body' <<< "${pr}" > "${notes}"
 
+  # releases of maintenance branches must not replace the latest release of master
+  if [ "${base}" = "${default_branch}" ] ; then
+    latest="--latest"
+  else
+    latest="--latest=false"
+    echo "Release from ${base} is not marked as latest release"
+  fi
+
   is_draft=$(gh release view "${tag}" --repo "${repo}" --json isDraft --jq '.isDraft' 2>/dev/null || true)
   case "${is_draft}" in
     true)
       echo "Updating draft release ${tag} in ${repo}"
-      gh release edit "${tag}" --repo "${repo}" --notes-file "${notes}"
+      run gh release edit "${tag}" --repo "${repo}" --notes-file "${notes}" "${latest}"
       ;;
     false)
       echo "Release ${tag} is already published in ${repo}" >&2
@@ -237,7 +333,7 @@ function create_release() {
       ;;
     *)
       echo "Creating draft release ${tag} in ${repo}"
-      gh release create "${tag}" --repo "${repo}" --draft --verify-tag \
+      run gh release create "${tag}" --repo "${repo}" --draft --verify-tag "${latest}" \
         --title "Release ${version}" --notes-file "${notes}"
       ;;
   esac
@@ -249,13 +345,29 @@ function update_website() {
     echo "Website is only updated for ${upstream_repo}, skipped for ${repo}"
     return
   fi
+  if [ -n "${base}" ] && [ "${base}" != "${default_branch}" ] ; then
+    echo "Website is only updated for releases from ${default_branch}, skipped for ${base}"
+    return
+  fi
   echo "Updating the website"
-  tools/release/build_website.sh -m push
+  run tools/release/build_website.sh -m push
 }
 
-# without --force: gh refuses the sync, when master of the fork has own commits
+# $1: repository, $2: release commit
+# branch of repo with the release commit as last commit: master or release/<major>.x
+function release_branch() {
+  local candidate
+  for candidate in "${default_branch}" "release/${release_version%%.*}.x" ; do
+    if [ "$(gh api "repos/$1/branches/${candidate}" --jq '.commit.sha' 2>/dev/null)" = "$2" ] ; then
+      echo "${candidate}"
+      return
+    fi
+  done
+}
+
+# without --force: gh refuses the sync, when the branch of the fork has own commits
 function sync_fork() {
-  local fork
+  local fork commit release_br fork_commit
   fork="$(gh api user --jq '.login')/${repo#*/}"
 
   if [ "${fork,,}" = "${repo,,}" ] ; then
@@ -263,37 +375,41 @@ function sync_fork() {
     return 1
   fi
 
-  echo "Syncing master of ${fork} with ${repo}"
-  gh repo sync "${fork}" --source "${repo}" --branch master
-  check_release "${fork}"
-}
-
-# $1: fork with the synced master
-function check_release() {
-  local fork=$1 commit subject release_tag release_commit
-  commit=$(gh api "repos/${fork}/commits/master" --jq '.sha')
-  subject=$(gh api "repos/${fork}/commits/master" --jq '.commit.message | split("\n")[0]')
-  echo "master of ${fork}: ${commit:0:8} ${subject}"
-
-  if [[ ! "${subject}" =~ ^Release\ [0-9]+\.[0-9]+\.[0-9]+$ ]] ; then
-    echo "Last commit is not a release commit"
-    return
-  fi
-
-  # latest published release, drafts and pre-releases are ignored by GitHub
-  release_tag=$(gh release view --repo "${repo}" --json tagName --jq '.tagName' 2>/dev/null || true)
   if [ -z "${release_tag}" ] ; then
-    echo "No published release found in ${repo}"
+    # latest published release, drafts and pre-releases are ignored by GitHub
+    release_tag=$(gh release view --repo "${repo}" --json tagName --jq '.tagName' 2>/dev/null || true)
+    if [ -z "${release_tag}" ] ; then
+      echo "No published release found in ${repo}" >&2
+      return 1
+    fi
+  fi
+  release_version=${release_tag#v}
+  commit=$(gh api "repos/${repo}/commits/${release_tag}" --jq '.sha')
+  echo "Release ${release_tag} of ${repo}: ${commit:0:8}"
+
+  release_br=$(release_branch "${repo}" "${commit}")
+  if [ -z "${release_br}" ] ; then
+    echo "Release ${release_tag} is not the last commit of ${default_branch} or release/${release_version%%.*}.x in ${repo}, no deployment"
     return
   fi
-  release_commit=$(gh api "repos/${repo}/commits/${release_tag}" --jq '.sha')
+  echo "Release ${release_tag} is the last commit of ${release_br}"
 
-  if [ "${release_commit}" = "${commit}" ] ; then
-    echo "Latest release ${release_tag} of ${repo} is the last commit of ${fork}"
-    deploy_collection "${fork}" "${release_tag#v}"
+  if branch_exists "${fork}" "${release_br}" ; then
+    echo "Syncing ${release_br} of ${fork} with ${repo}"
+    run gh repo sync "${fork}" --source "${repo}" --branch "${release_br}"
   else
-    echo "Latest release ${release_tag} of ${repo} points to ${release_commit:0:8}, not to the last commit ${commit:0:8}"
+    echo "Creating ${release_br} in ${fork}"
+    run gh api "repos/${fork}/git/refs" -f "ref=refs/heads/${release_br}" -f "sha=${commit}" --silent
   fi
+
+  if [ "${dry_run}" = false ] ; then
+    fork_commit=$(gh api "repos/${fork}/branches/${release_br}" --jq '.commit.sha')
+    if [ "${fork_commit}" != "${commit}" ] ; then
+      echo "${release_br} of ${fork} is ${fork_commit:0:8}, not the release commit ${commit:0:8}" >&2
+      return 1
+    fi
+  fi
+  deploy_collection "${fork}" "${release_br}"
 }
 
 # $1: version
@@ -311,24 +427,25 @@ function galaxy_has_version() {
   esac
 }
 
-# $1: fork, $2: version
+# $1: fork, $2: branch with the release
 function deploy_collection() {
-  local fork=$1 deploy_version=$2 started run_id
+  local fork=$1 deploy_branch=$2 started run_id
 
-  if galaxy_has_version "${deploy_version}" ; then
-    echo "Version ${deploy_version} of ${collection} is already on Ansible Galaxy"
+  if galaxy_has_version "${release_version}" ; then
+    echo "Version ${release_version} of ${collection} is already on Ansible Galaxy"
     return
   fi
 
   # small offset for differences between local and GitHub clock
   started=$(date -u -d '-30 seconds' +%Y-%m-%dT%H:%M:%SZ)
-  echo "Starting workflow '${deploy_workflow}' in ${fork} for ${deploy_version}"
-  gh workflow run "${deploy_workflow}" --repo "${fork}" --ref master
+  echo "Starting workflow '${deploy_workflow}' in ${fork} on ${deploy_branch} for ${release_version}"
+  run gh workflow run "${deploy_workflow}" --repo "${fork}" --ref "${deploy_branch}"
+  [ "${dry_run}" = false ] || return 0
 
   # gh workflow run does not return the id of the new run
   for _ in $(seq 1 30) ; do
     run_id=$(gh run list --repo "${fork}" --workflow "${deploy_workflow}" \
-      --event workflow_dispatch --branch master --limit 5 \
+      --event workflow_dispatch --branch "${deploy_branch}" --limit 5 \
       --json databaseId,createdAt \
       --jq "[.[] | select(.createdAt >= \"${started}\")] | .[0].databaseId // empty")
     [ -n "${run_id}" ] && break
@@ -347,11 +464,14 @@ function deploy_collection() {
   gh run view "${run_id}" --repo "${fork}"
 }
 
-while getopts "im:r:" opt ; do
+while getopts "b:im:nr:t:" opt ; do
   case "${opt}" in
+    b) base="${OPTARG}" ;;
     i) ignore_fragments=true ;;
     m) mode="${OPTARG}" ;;
+    n) dry_run=true ;;
     r) repo="${OPTARG}" ;;
+    t) release_tag="${OPTARG}" ;;
     *) usage ;;
   esac
 done
@@ -363,11 +483,14 @@ if [ "${mode}" = pr ] || [ "${mode}" = release ] ; then
   version=$(branch_version)
   tag="v${version}"
 fi
+[ "${dry_run}" = false ] || echo "Dry-run: nothing is changed locally or on GitHub"
 
 case "${mode}" in
   pr)
+    [ -n "${base}" ] || base=$(base_branch)
+    check_base
     set_galaxy_version
-    tools/release/galaxy_version.sh fix
+    run tools/release/galaxy_version.sh fix
     commit_version
     push_branch
     create_pull_request
