@@ -39,6 +39,9 @@ The content adapter `website/content/docs/_content.gotmpl` creates the pages fro
 * Relative links between the documents (AsciiDoc `link:` macro or Markdown link to a `.adoc` or `.md` file) are rewritten to the pages of the website.
   Links to files without a page point to GitHub.
 * The "Edit this page" link points to the source file below `doc/` or `roles/`.
+* "Last modified" shows the last commit of the source file.
+  `scripts/gitinfo.py` writes it to `website/data/gitinfo.json` before each build
+  (hugo would show the commit of the content adapter instead).
 * A new file in `doc/guides/` appears automatically.
   New files in other directories need a rule in `$rules` of the content adapter.
 

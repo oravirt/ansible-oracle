@@ -1,0 +1,20 @@
+{{/*
+  Copy of Docsy v0.10.0 layouts/partials/page-meta-lastmod.html
+  Pages of content/docs/_content.gotmpl have the git info of the content adapter.
+  Their source file's last commit is in .Params.source_git (false: not committed => no line).
+*/ -}}
+{{ $git := .GitInfo -}}
+{{ if isset .Params "source_git" -}}
+  {{ $git = false -}}
+  {{ with .Params.source_git }}{{ $git = dict "Hash" .hash "AbbreviatedHash" .short "Subject" .subject }}{{ end -}}
+{{ end -}}
+{{ if and $git .Site.Params.github_repo -}}
+<div class="td-page-meta__lastmod">
+  {{ T "post_last_mod" }} {{ .Lastmod.Format .Site.Params.time_format_default -}}
+  {{ with $git }}: {{/* Trim WS */ -}}
+    <a href="{{ $.Site.Params.github_repo }}/commit/{{ .Hash }}">
+      {{- .Subject }} ({{ .AbbreviatedHash }}) {{- /* Trim WS */ -}}
+    </a>
+  {{- end }}
+</div>
+{{ end -}}
