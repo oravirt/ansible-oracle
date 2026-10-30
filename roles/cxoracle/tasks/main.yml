@@ -1,7 +1,7 @@
 # cxoracle-install playbook
 ---
 - name: Installation block
-  when: install_cx_oracle
+  when: install_cx_oracle | bool
   tags: cx_oracle
   block:
     - name: cx_oracle | Get final installation source
@@ -24,8 +24,8 @@
         dest: "{{ _cxoracle_tempdir.path }}/{{ _cx_oracle_filename }}"
         mode: 0644
       when:
-        - is_sw_source_local
-        - oracle_sw_copy
+        - is_sw_source_local | bool
+        - oracle_sw_copy | bool
         - _cx_oracle_source is match('^(file://)?/')
 
     # Accept only if src is of a supported protocol (http, https, ftp)
@@ -39,8 +39,8 @@
         client_key: "{{ get_url_ssl_client_key | default(omit) }}"
       environment: "{{ proxy_env | default(omit) }}"
       when:
-        - not is_sw_source_local
-        - oracle_sw_copy
+        - not is_sw_source_local | bool
+        - oracle_sw_copy | bool
         - _cx_oracle_source is match('^(http(s)?|ftp)://')
 
     # The ansible-oracle modules are using Python3 only

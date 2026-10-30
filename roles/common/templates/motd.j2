@@ -5,10 +5,8 @@ Welcome to {{ ansible_hostname }}
 
 FQDN: {{ ansible_fqdn }}
 IP's:
-{% if a != 'lo' and hostvars[inventory_hostname]['ansible_'~a]['ipv4']['address'] is defined %}
-{% if a != 'lo' %}
+{% for a in ansible_interfaces | sort if a != 'lo' and hostvars[inventory_hostname]['ansible_'~a]['ipv4']['address'] is defined %}
 {{a}}: {{ hostvars[inventory_hostname]['ansible_'~a]['ipv4']['address'] }}
-{% endif %}
 {% endfor %}
 
 Processor: {% for processor in ansible_processor %}{% if loop.last %}{{ processor }} {% endif %}

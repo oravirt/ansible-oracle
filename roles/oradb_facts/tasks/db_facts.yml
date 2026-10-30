@@ -50,7 +50,7 @@
           Set oradb_facts_ignore_unreachable=false in oracle_databases
           to disable this fail task.
       when:
-        - not _odb_loop_helper.oradb_facts_ignore_unreachable | default(false)
+        - not _odb_loop_helper.oradb_facts_ignore_unreachable | default(false) | bool
 
     - name: Write empty facts to oracledb.db_unique_name (rescue from failure above)
       ansible.builtin.set_fact:

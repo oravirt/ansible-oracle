@@ -2,7 +2,7 @@
 - name: Assert oracle_home_db
   ansible.builtin.assert:
     that:
-      - _oracle_home_db | length > 0
+      - _oracle_home_db | default('', true) | length > 0
     quiet: true
   tags: always
 
@@ -12,7 +12,7 @@
   ansible.builtin.assert:
     quiet: true
     that:
-      - _oradb_manage_db_dbca_sys_pass | length > 0
+      - _oradb_manage_db_dbca_sys_pass | default('', true) | length > 0
     fail_msg: Please set dbpasswords and/or default_dbpass in inventory.
   when:
     - odb.state in ('present', 'absent')
@@ -25,7 +25,7 @@
 
 - name: manage_db | Deploy ocenv.sh
   ansible.builtin.include_tasks: ocenv.yml
-  when: deploy_ocenv
+  when: deploy_ocenv | bool
   tags:
     - always
 
@@ -72,7 +72,7 @@
   when:
     - odb.state == 'present'
     - odb.dbca_templatename is defined
-    - odb.dbca_copy_template | default(true)
+    - odb.dbca_copy_template | default(true) | bool
     - odb.dbca_templatename not in('New_Database.dbt','General_Purpose.dbc')
   with_items:
     - "{{ odb.dbca_templatename }}"
@@ -144,7 +144,7 @@
           Set oradb_facts_ignore_unreachable=false in oracle_databases
           to disable this fail task.qq
       when:
-        - not _odb_loop_helper.oradb_facts_ignore_unreachable | default(false)
+        - not _odb_loop_helper.oradb_facts_ignore_unreachable | default(false) | bool
 
 - name: manage_db | Customize oratab for autostart
   ansible.builtin.lineinfile:
@@ -153,7 +153,7 @@
     regexp: "^{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}:"
     line: "{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}:{{ _oracle_home_db }}:Y"
     state: present
-  when: autostartup_service and not olrloc.stat.exists and odb.state == 'present'
+  when: autostartup_service | bool and not olrloc.stat.exists and odb.state == 'present'
   tags: update_oratab
 
 - name: manage_db | Customize oratab for autostart
@@ -161,7 +161,7 @@
     dest: /etc/oratab
     line: "{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}:{{ _oracle_home_db }}:N"
     state: absent
-  when: autostartup_service and not olrloc.stat.exists and odb.state == 'present'
+  when: autostartup_service | bool and not olrloc.stat.exists and odb.state == 'present'
   become: true
   tags: update_oratab
 

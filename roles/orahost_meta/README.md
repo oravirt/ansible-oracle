@@ -265,9 +265,9 @@ Usually passed to shell: or command: through "environment:" keyword
 
 ```YAML
 oracle_script_env:
-  CV_ASSUME_DISTID: '{{ orahost_meta_cv_assume_distid }}'
-  TMPDIR: '{{ orahost_meta_tmpdir }}'
-  _JAVA_OPTIONS: '{{ orahost_meta_java_options }}'
+  CV_ASSUME_DISTID: "{{ orahost_meta_cv_assume_distid | default('', true) }}"
+  TMPDIR: "{{ orahost_meta_tmpdir | default('', true) }}"
+  _JAVA_OPTIONS: "{{ orahost_meta_java_options | default('', true) }}"
 ```
 
 ### oracle_seclimits

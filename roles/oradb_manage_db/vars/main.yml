@@ -34,15 +34,9 @@ _oradb_manage_db_recoveryfile_dest: "{% if odb.storage_type | upper == 'FS' %}{{
                     {%- elif odb.storage_type | upper == 'ASM' %}{{ oracle_reco_dir_asm }}\
                     {%- endif %}"
 
-_oradb_manage_db_create_listener: "{%- if oracle_install_option_gi is defined -%}\
-                      False\
-                  {%- elif oracle_install_option_gi is undefined -%}\
-                        {%- if odb is defined and odb.listener_name is defined -%}\
-                            True\
-                        {%- else -%}\
-                            False\
-                        {%- endif -%}\
-                    {%- endif -%}"
+_oradb_manage_db_create_listener: >-
+  {{ oracle_install_option_gi | default('') | length == 0
+  and odb is defined and odb.listener_name is defined }}
 
 _oradb_manage_db_listener_loop_helper: |-
   {{ lsnrinst | default(tnsinst) | default(sqlnetinst) | default({}) }}

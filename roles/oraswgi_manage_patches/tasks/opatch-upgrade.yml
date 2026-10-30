@@ -53,8 +53,8 @@
         label: >-
           filename: {{ oop_loop.filename | default('') }}
       when:
-        - oracle_sw_copy
-        - not is_sw_source_local
+        - oracle_sw_copy | bool
+        - not is_sw_source_local | bool
       tags:
         - oragridopatchget
 
@@ -68,8 +68,8 @@
         force: true
       with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) }}"
       when:
-        - oracle_sw_copy
-        - is_sw_source_local
+        - oracle_sw_copy | bool
+        - is_sw_source_local | bool
       tags:
         - oragridpatchpush
 
@@ -82,7 +82,7 @@
         group: "{{ oracle_group }}"
       with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) }}"
       when:
-        - oracle_sw_copy
+        - oracle_sw_copy | bool
       tags:
         - oragridpatchunpack
 
@@ -95,7 +95,7 @@
         group: "{{ oracle_group }}"
       with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', oracle_install_version_gi) }}"
       when:
-        - not oracle_sw_copy
+        - not oracle_sw_copy | bool
       tags:
         - oragridpatchunpack
 
