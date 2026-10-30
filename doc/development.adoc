@@ -460,7 +460,9 @@ The script executes the following steps:
 . Search the Pull-Request of the release branch from your fork, open or merged.
 . Create the tag `v<version>` (e.g. `v4.16.0`) like the existing release tags.
   The tag points to the merge commit of the Pull-Request.
-  When the Pull-Request is still open, the last commit of the Pull-Request is used.
+  The Pull-Request must be merged before, otherwise the script is aborted:
+  a rebase merge creates new commits, so a tag on the last commit of the open Pull-Request would not be part of the branch.
+  Only for tests against a fork (`-r`) the last commit of an open Pull-Request is used.
 . Push the tag to the git remote of the GitHub repository (e.g. `upstream` for `oravirt/ansible-oracle`).
   An existing tag is used, when it points to the same commit, otherwise the script is aborted.
 . Create the draft release `Release <version>` with the description of the Pull-Request as text.
@@ -506,8 +508,9 @@ The fork is `<gh user>/ansible-oracle`, the user is taken from the login of `gh`
 . Take the release from `-t` or the latest published release of the upstream repository.
   Draft releases are ignored, so the release must be published before.
   A release from a maintenance branch is not the latest release, use `-t` for it.
-. Search the branch with the release commit as last commit: `master` or `release/<major>.x`.
-  When the branch has newer commits than the release, nothing is deployed.
+. Search the branch with the content of the release as last commit: `master` or `release/<major>.x`.
+  The content (git tree) is compared and not the commit, because a rebase merge creates new commits with the same content.
+  When the branch has newer changes than the release, nothing is deployed.
 . Sync this branch in the fork with the upstream repository (`gh repo sync`).
   When the branch does not exist in the fork (e.g. `release/4.x`), it is created at the release commit.
 . Start the workflow `Deploy Collection` in the fork on this branch, which uploads the collection to Ansible Galaxy.

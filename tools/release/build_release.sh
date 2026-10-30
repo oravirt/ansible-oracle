@@ -17,8 +17,8 @@ set -o pipefail
 # - create the changelog and write the new release notes into the pull request
 #
 # Mode release:
-# - create the tag v<version> for the release pull request
-#   (merge commit, or last commit of the pull request when it is still open)
+# - create the tag v<version> for the merged release pull request
+#   (for tests against a fork also the last commit of an open pull request)
 # - create a draft release with the description of the pull request,
 #   only releases from master are marked as latest release
 # - update the website with tools/release/build_website.sh -m push
@@ -26,8 +26,9 @@ set -o pipefail
 #
 # Mode galaxy:
 # - take the release (option -t, default: latest release) of the upstream
-#   repository and search the branch with the release commit as last commit
-#   (master or release/<major>.x)
+#   repository and search the branch with the content of the release as last
+#   commit (master or release/<major>.x), the trees are compared, because a
+#   rebase merge creates new commits
 # - sync this branch of the fork of the gh user with the upstream repository
 #   (the branch is created in the fork, when it is missing)
 # - start the workflow 'Deploy Collection' in the fork for this branch and
@@ -302,9 +303,13 @@ function create_release() {
   echo "Pull request $(jq -r '.url' <<< "${pr}") against ${base}"
   if [ "$(jq -r '.state' <<< "${pr}")" = "MERGED" ] ; then
     commit=$(jq -r '.mergeCommit.oid' <<< "${pr}")
+  elif [ "${repo,,}" = "${upstream_repo,,}" ] ; then
+    # a rebase merge creates new commits, the tag would not be part of the branch
+    echo "Pull request is not merged yet, merge it before creating the release" >&2
+    return 1
   else
     commit=$(jq -r '.headRefOid' <<< "${pr}")
-    echo "Pull request is not merged, using its last commit"
+    echo "Pull request is not merged, using its last commit (test against a fork)"
   fi
 
   create_tag "${commit}" "${number}"
@@ -353,13 +358,21 @@ function update_website() {
   run tools/release/build_website.sh -m push
 }
 
+# $1: repository, $2: commit
+function commit_tree() {
+  gh api "repos/$1/git/commits/$2" --jq '.tree.sha' 2>/dev/null
+}
+
 # $1: repository, $2: release commit
-# branch of repo with the release commit as last commit: master or release/<major>.x
+# branch of repo with the content of the release as last commit: master or release/<major>.x
+# The trees are compared, the commit differs after a rebase merge of the release pull request.
 function release_branch() {
-  local candidate
+  local candidate head release_tree
+  release_tree=$(commit_tree "$1" "$2")
   for candidate in "${default_branch}" "release/${release_version%%.*}.x" ; do
-    if [ "$(gh api "repos/$1/branches/${candidate}" --jq '.commit.sha' 2>/dev/null)" = "$2" ] ; then
-      echo "${candidate}"
+    head=$(gh api "repos/$1/branches/${candidate}" --jq '.commit.sha' 2>/dev/null) || continue
+    if [ "$(commit_tree "$1" "${head}")" = "${release_tree}" ] ; then
+      echo "${candidate} ${head}"
       return
     fi
   done
@@ -367,7 +380,7 @@ function release_branch() {
 
 # without --force: gh refuses the sync, when the branch of the fork has own commits
 function sync_fork() {
-  local fork commit release_br fork_commit
+  local fork commit release_br branch_commit fork_commit
   fork="$(gh api user --jq '.login')/${repo#*/}"
 
   if [ "${fork,,}" = "${repo,,}" ] ; then
@@ -387,25 +400,29 @@ function sync_fork() {
   commit=$(gh api "repos/${repo}/commits/${release_tag}" --jq '.sha')
   echo "Release ${release_tag} of ${repo}: ${commit:0:8}"
 
-  release_br=$(release_branch "${repo}" "${commit}")
+  read -r release_br branch_commit <<< "$(release_branch "${repo}" "${commit}")"
   if [ -z "${release_br}" ] ; then
     echo "Release ${release_tag} is not the last commit of ${default_branch} or release/${release_version%%.*}.x in ${repo}, no deployment"
     return
   fi
-  echo "Release ${release_tag} is the last commit of ${release_br}"
+  if [ "${branch_commit}" = "${commit}" ] ; then
+    echo "Release ${release_tag} is the last commit of ${release_br}"
+  else
+    echo "Release ${release_tag} has the same content as the last commit ${branch_commit:0:8} of ${release_br}"
+  fi
 
   if branch_exists "${fork}" "${release_br}" ; then
     echo "Syncing ${release_br} of ${fork} with ${repo}"
     run gh repo sync "${fork}" --source "${repo}" --branch "${release_br}"
   else
     echo "Creating ${release_br} in ${fork}"
-    run gh api "repos/${fork}/git/refs" -f "ref=refs/heads/${release_br}" -f "sha=${commit}" --silent
+    run gh api "repos/${fork}/git/refs" -f "ref=refs/heads/${release_br}" -f "sha=${branch_commit}" --silent
   fi
 
   if [ "${dry_run}" = false ] ; then
     fork_commit=$(gh api "repos/${fork}/branches/${release_br}" --jq '.commit.sha')
-    if [ "${fork_commit}" != "${commit}" ] ; then
-      echo "${release_br} of ${fork} is ${fork_commit:0:8}, not the release commit ${commit:0:8}" >&2
+    if [ "${fork_commit}" != "${branch_commit}" ] ; then
+      echo "${release_br} of ${fork} is ${fork_commit:0:8}, not ${branch_commit:0:8} of ${repo}" >&2
       return 1
     fi
   fi
