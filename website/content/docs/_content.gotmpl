@@ -1,0 +1,114 @@
+{{/*
+  Creates the documentation pages from ../doc and ../roles without copying them.
+  Both directories are mounted below assets/ in hugo.yaml.
+*/}}
+
+{{/* glob below assets/ => section below /docs/ */}}
+{{ $rules := slice
+  (dict "glob" "doc/featurelist.adoc" "section" "features")
+  (dict "glob" "doc/guides/*.adoc" "section" "guides")
+  (dict "glob" "doc/README-ansible.adoc" "section" "guides")
+  (dict "glob" "doc/vagrant.adoc" "section" "guides/vagrant")
+  (dict "glob" "doc/vagrant_basics.md" "section" "guides/vagrant")
+  (dict "glob" "doc/development.adoc" "section" "development")
+  (dict "glob" "doc/website.adoc" "section" "development")
+  (dict "glob" "doc/roles.adoc" "section" "roles")
+  (dict "glob" "roles/*/README.md" "section" "roles")
+}}
+
+{{/*
+  Optional settings per source file (key in lower case):
+  title  - page title, the first heading stays in the content
+  slug   - last part of the URL (default: file name, directory name for README.md)
+  weight - order in the navigation (default: 100)
+*/}}
+{{ $settings := dict
+  "doc/featurelist.adoc" (dict "weight" 10)
+  "doc/guides/beginner.adoc" (dict "weight" 10)
+  "doc/guides/advanced.adoc" (dict "weight" 20)
+  "doc/readme-ansible.adoc" (dict "slug" "ansible-container" "weight" 30)
+  "doc/guides/local-install-howto.adoc" (dict "weight" 40)
+  "doc/guides/install-and-patch-settings.adoc" (dict "weight" 50)
+  "doc/guides/apex_ords.adoc" (dict "weight" 60)
+  "doc/guides/autoupgrade.adoc" (dict "weight" 70)
+  "doc/guides/autoupgrade_upgrade.adoc" (dict "weight" 80)
+  "doc/guides/out_of_place_patching.adoc" (dict "weight" 90)
+  "doc/guides/restart_rac.adoc" (dict "weight" 100)
+  "doc/vagrant.adoc" (dict "title" "Vagrant on Windows" "slug" "windows" "weight" 10)
+  "doc/vagrant_basics.md" (dict "title" "Vagrant Basics" "weight" 20)
+  "doc/development.adoc" (dict "title" "How to develop" "weight" 10)
+  "doc/website.adoc" (dict "title" "Website" "weight" 20)
+  "doc/roles.adoc" (dict "title" "Overview" "slug" "overview" "weight" 1)
+}}
+
+{{ $repo := "https://github.com/oravirt/ansible-oracle/blob/master/" }}
+
+{{/* 1st pass: source file => page, needed to rewrite the links between the documents */}}
+{{ $urls := newScratch }}
+{{ $pages := slice }}
+{{ range $rule := $rules }}
+  {{ range resources.Match $rule.glob }}
+    {{ $src := strings.TrimPrefix "/" .Name }}
+    {{ $cfg := index $settings (lower $src) | default dict }}
+    {{ $slug := path.BaseName $src | lower }}
+    {{ if eq (path.Base $src) "README.md" }}
+      {{ $slug = path.Base (path.Dir $src) }}
+    {{ end }}
+    {{ $path := printf "%s/%s" $rule.section ($cfg.slug | default $slug) }}
+    {{ $urls.SetInMap "urls" (lower $src) (printf "/docs/%s/" $path) }}
+    {{ $pages = $pages | append (dict "res" . "src" $src "path" $path "cfg" $cfg) }}
+  {{ end }}
+{{ end }}
+
+{{/* 2nd pass: create the pages */}}
+{{ range $p := $pages }}
+  {{ $raw := $p.res.Content }}
+  {{ $isMD := eq (path.Ext $p.src) ".md" }}
+
+  {{ $title := $p.cfg.title }}
+  {{ if not $title }}
+    {{ $m := findRESubmatch `(?m)^(=+|#+)\s+(.+)$` $raw 1 }}
+    {{ if $m }}
+      {{ $title = index $m 0 2 }}
+      {{ $level := len (index $m 0 1) }}
+      {{ $siblings := findRE (printf `(?m)^(?:={%d}|#{%d})\s` $level $level) $raw 2 }}
+      {{/* '= x' or the only heading of its level => it is the page title, so drop it from the body */}}
+      {{ if or (eq $level 1) (eq (len $siblings) 1) }}
+        {{ $raw = replaceRE `(?m)^(?:=+|#+)\s+.+\n` "" $raw 1 }}
+        {{/* title was '== x' => shift the following sections up, so the page starts with h2 */}}
+        {{ if and (not $isMD) (gt $level 1) }}
+          {{ $raw = printf ":leveloffset: %d\n%s" (sub 1 $level) $raw }}
+        {{ end }}
+      {{ end }}
+    {{ else }}
+      {{ $title = path.BaseName $p.src }}
+    {{ end }}
+  {{ end }}
+
+  {{/* relative links (not "/", "#", "{attribute}" or with ":" like https:): page on the website or file on GitHub */}}
+  {{ $re := cond $isMD `\]\(([^)#\s:/{][^)#\s:]*)(#[^)]*)?\)` `link:([^\[\s:#/{][^\[\s:#]*)(#[^\[]*)?\[` }}
+  {{ range findRESubmatch $re $raw }}
+    {{ $target := path.Join (path.Dir $p.src) (index . 1) }}
+    {{ $url := index ($urls.Get "urls") (lower $target) | default (printf "%s%s" $repo $target) }}
+    {{ $new := cond $isMD (printf "](%s%s)" $url (index . 2)) (printf "link:%s%s[" $url (index . 2)) }}
+    {{ $raw = replace $raw (index . 0) $new }}
+  {{ end }}
+
+  {{/* hugo would use the git info of this file => last commit of the source from data/gitinfo.json (scripts/gitinfo.py) */}}
+  {{ $git := index (hugo.Data.gitinfo | default dict) (lower $p.src) }}
+  {{ $page := dict
+    "path" $p.path
+    "title" $title
+    "weight" ($p.cfg.weight | default 100)
+    "params" (dict
+      "github_subdir" "/"
+      "path_base_for_github_subdir" (dict "from" "^.*$" "to" $p.src)
+      "source_git" ($git | default false)
+    )
+    "content" (dict "mediaType" (cond $isMD "text/markdown" "text/asciidoc") "value" $raw)
+  }}
+  {{ with $git }}
+    {{ $page = merge $page (dict "dates" (dict "lastmod" (time.AsTime .date))) }}
+  {{ end }}
+  {{ $.AddPage $page }}
+{{ end }}

@@ -1,0 +1,198 @@
+# Taskfile.yml
+#
+# Build and test the website (hugo + Docsy) for ansible-oracle.
+# Everything runs in containers, see doc/website.adoc.
+#
+# Examples:
+#   task                       # list all tasks
+#   task serve                 # live server on http://localhost:1313
+#   task build                 # build the page into public/
+#   task test                  # build + check internal links
+#   task test:a11y             # build + accessibility check (WCAG 2 AA)
+#   task publish               # build + commit in the clone of the website repository
+#   task publish:push          # ... and push => GitHub Pages publishes the website
+#   task publish -- -f         # options of tools/release/build_website.sh after --
+#   task build COMPOSE=podman-compose COMPOSE_USER=root
+version: '3'
+
+vars:
+  # docker compose or podman-compose (see doc/website.adoc)
+  COMPOSE: '{{.COMPOSE | default "docker compose"}}'
+  # ubuntu(1000) for docker, root for rootless podman
+  COMPOSE_USER: '{{.COMPOSE_USER | default "ubuntu"}}'
+  # Dockerfile and compose file of the hugo container
+  COMPOSE_FILE: '{{.TASKFILE_DIR}}/../docker/hugo/docker-compose.yaml'
+  # docker or podman for the check containers
+  CONTAINER_CMD: '{{.CONTAINER_CMD | default "docker"}}'
+  # check containers write as current user (caches below .cache/)
+  UID:
+    sh: id -u
+  # baseURL from hugo.yaml, needed to map the sitemap to the local server
+  BASE_URL: https://www.ansible-oracle.eu
+  # versions are updated by renovate (custom.regex in renovate.json)
+  # renovate: datasource=docker depName=lycheeverse/lychee
+  LYCHEE_VERSION: 0.24.2
+  # renovate: datasource=docker depName=ghcr.io/puppeteer/puppeteer
+  PUPPETEER_VERSION: 25.16.0
+  # renovate: datasource=npm depName=pa11y-ci
+  PA11Y_CI_VERSION: 5.0.0
+  # renovate: datasource=npm depName=http-server
+  HTTP_SERVER_VERSION: 14.1.1
+  LYCHEE_IMAGE: 'lycheeverse/lychee:{{.LYCHEE_VERSION}}'
+  PUPPETEER_IMAGE: 'ghcr.io/puppeteer/puppeteer:{{.PUPPETEER_VERSION}}'
+  # templates copied from Docsy, compared with the Docsy version from go.mod by "task docsy:diff"
+  DOCSY_OVERRIDES: layouts/partials/navbar.html layouts/partials/footer/center.html layouts/partials/page-meta-lastmod.html
+# No "sh:" variables with TASKFILE_DIR here: the vars of an included Taskfile are
+# evaluated for all tasks of the root Taskfile, TASKFILE_DIR is wrong there.
+
+tasks:
+  default:
+    cmds:
+      - task --list
+    silent: true
+
+  # ---------------------------------------------------------------- hugo
+
+  serve:
+    desc: Start hugo live server on http://localhost:1313 (drafts included)
+    dir: '{{.TASKFILE_DIR}}'
+    cmds:
+      - task: hugo
+        vars: { ARGS: 'server --buildDrafts {{.CLI_ARGS}}' }
+
+  build:
+    desc: Build the page into public/
+    dir: '{{.TASKFILE_DIR}}'
+    cmds:
+      - task: hugo
+        vars: { ARGS: '--cleanDestinationDir {{.CLI_ARGS}}' }
+
+  hugo:
+    internal: true
+    dir: '{{.TASKFILE_DIR}}'
+    vars:
+      # tag of the base image in docker/hugo/Dockerfile, e.g. 0.134.3-ext-ubuntu
+      # => a new version in the Dockerfile builds a new image automatically
+      HUGO_IMAGE_TAG:
+        sh: sed -n 's/^FROM .*:\([^ ]*\).*/\1/p' '{{.TASKFILE_DIR}}/../docker/hugo/Dockerfile'
+    env:
+      HUGO_IMAGE_TAG: '{{.HUGO_IMAGE_TAG}}'
+    cmds:
+      # last commit of the sources for "Last modified" of the pages of content/docs/_content.gotmpl
+      - scripts/gitinfo.py
+      - '{{.COMPOSE}} -f {{.COMPOSE_FILE}} run --rm -u {{.COMPOSE_USER}} site -s /src/website {{.ARGS}}'
+
+  clean:
+    desc: Remove build results (the module cache in .cache is kept)
+    dir: '{{.TASKFILE_DIR}}'
+    cmds:
+      - rm -rf public resources .hugo_build.lock
+
+  clean:all:
+    desc: Remove build results and all caches
+    dir: '{{.TASKFILE_DIR}}'
+    cmds:
+      - task: clean
+      - rm -rf .cache
+
+  # ---------------------------------------------------------------- docsy
+
+  docsy:diff:
+    desc: Show the differences between the copied Docsy templates and the Docsy version in go.mod
+    dir: '{{.TASKFILE_DIR}}'
+    vars:
+      DOCSY_VERSION:
+        sh: awk '$1 == "github.com/google/docsy" {print $2}' '{{.TASKFILE_DIR}}/go.mod'
+    cmds:
+      - for: { var: DOCSY_OVERRIDES }
+        cmd: >-
+          curl -sSf https://raw.githubusercontent.com/google/docsy/{{.DOCSY_VERSION}}/{{.ITEM}}
+          | diff -u --label 'docsy {{.DOCSY_VERSION}}/{{.ITEM}}' - --label 'website/{{.ITEM}}' {{.ITEM}} || true
+
+  # ---------------------------------------------------------------- content
+
+  doctor:
+    desc: Generate roles/*/README.md with ansible-doctor (source of the role pages)
+    dir: '{{.TASKFILE_DIR}}/..'
+    preconditions:
+      - sh: test -x .venv/ansible-doctor/bin/ansible-doctor
+        msg: 'ansible-doctor not found in .venv/ansible-doctor - start nix-shell in the repository root'
+    cmds:
+      - .venv/ansible-doctor/bin/ansible-doctor --force --recursive
+
+  # ---------------------------------------------------------------- publish
+  # tools/release/build_website.sh, options after --:
+  #   -a accessibility check, -f allow uncommitted changes and a missing legal notice,
+  #   -r <owner/repo> website repository, -d <dir> clone of the website repository
+
+  publish:
+    desc: Build the website and commit it in the clone of the website repository (nothing is pushed)
+    dir: '{{.TASKFILE_DIR}}/..'
+    cmds:
+      - tools/release/build_website.sh -m local {{.CLI_ARGS}}
+
+  publish:push:
+    desc: Build the website, commit and push it to the website repository (GitHub Pages)
+    dir: '{{.TASKFILE_DIR}}/..'
+    cmds:
+      - tools/release/build_website.sh -m push {{.CLI_ARGS}}
+
+  publish:pr:
+    desc: Build the website and create a pull request in the website repository
+    dir: '{{.TASKFILE_DIR}}/..'
+    cmds:
+      - tools/release/build_website.sh -m pr {{.CLI_ARGS}}
+
+  # ---------------------------------------------------------------- tests
+
+  test:
+    desc: Build the page and check all internal links
+    cmds:
+      - task: build
+      - task: check:links
+
+  test:a11y:
+    desc: Build the page and check accessibility of all pages (WCAG 2 AA, takes some minutes)
+    cmds:
+      - task: build
+      - task: check:a11y
+
+  test:all:
+    desc: Build the page, check links and accessibility
+    cmds:
+      - task: build
+      - task: check:links
+      - task: check:a11y
+
+  check:links:
+    desc: Check internal links in public/ (no build)
+    dir: '{{.TASKFILE_DIR}}'
+    preconditions: &public
+      - sh: test -f public/index.html
+        msg: 'public/ not found - run "task build" first'
+    cmds:
+      - '{{.CONTAINER_CMD}} run --rm -u {{.UID}} -v ./public:/public:ro {{.LYCHEE_IMAGE}} --offline --no-progress --root-dir /public "/public/**/*.html"'
+
+  check:links:external:
+    desc: Check internal and external links in public/ (no build, needs internet)
+    dir: '{{.TASKFILE_DIR}}'
+    preconditions: *public
+    cmds:
+      - '{{.CONTAINER_CMD}} run --rm -u {{.UID}} -v ./public:/public:ro {{.LYCHEE_IMAGE}} --no-progress --root-dir /public --max-concurrency 8 "/public/**/*.html"'
+
+  check:a11y:
+    desc: Check accessibility of all pages in sitemap.xml with pa11y-ci (no build)
+    dir: '{{.TASKFILE_DIR}}'
+    preconditions: *public
+    cmds:
+      - mkdir -p .cache/a11y
+      # npm and the chrome of pa11y are cached in .cache/a11y
+      - >-
+        {{.CONTAINER_CMD}} run --rm --init -u {{.UID}} -e HOME=/cache
+        -v ./public:/public:ro -v ./.pa11yci.json:/config/.pa11yci.json:ro -v ./.cache/a11y:/cache
+        {{.PUPPETEER_IMAGE}} sh -c '
+        npx --yes http-server@{{.HTTP_SERVER_VERSION}} /public -p 8080 -s &
+        sleep 3;
+        npx --yes pa11y-ci@{{.PA11Y_CI_VERSION}} --config /config/.pa11yci.json
+        --sitemap http://localhost:8080/sitemap.xml
+        --sitemap-find {{.BASE_URL}} --sitemap-replace http://localhost:8080 {{.CLI_ARGS}}'

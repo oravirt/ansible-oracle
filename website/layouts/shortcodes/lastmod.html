@@ -1,0 +1,7 @@
+{{- /* Date of the last change of the page: git commit, file time for uncommitted files */ -}}
+{{- $date := .Page.Lastmod -}}
+{{- if $date.IsZero -}}
+  {{- with .Page.File }}{{ $date = (os.Stat (path.Join "content" .Path)).ModTime }}{{ end -}}
+{{- end -}}
+<time datetime="{{ $date.Format "2006-01-02" }}">{{ $date.Format "2 January 2006" }}</time>
+{{- /* Trim WS */ -}}

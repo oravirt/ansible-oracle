@@ -23,6 +23,7 @@
     "pre-commit",
     "github-actions",
     "ansible-galaxy",
+    "gomod",
     "custom.regex"
   ],
   "pre-commit": {
@@ -77,6 +78,19 @@
       "description": "antsibull-changelog: same version in requirements, pre-commit and workflow",
       "matchPackageNames": ["antsibull-changelog", "ansible-community/antsibull-changelog"],
       "groupName": "antsibull-changelog"
+    },
+    {
+      "description": "Docsy: theme and dependencies module together (website/go.mod), check the copied templates with 'task website:docsy:diff'",
+      "matchManagers": ["gomod"],
+      "matchPackageNames": ["github.com/google/docsy", "github.com/google/docsy/dependencies"],
+      "groupName": "docsy",
+      "enabled": true
+    },
+    {
+      "description": "website/go.mod: the go directive is not used by hugo",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["golang"],
+      "enabled": false
     }
   ],
   "customManagers": [
@@ -106,6 +120,14 @@
         "pip install (?<depName>[A-Za-z0-9._-]+)==(?<currentValue>[\\w.-]+)"
       ],
       "datasourceTemplate": "pypi"
+    },
+    {
+      "description": "Versions in Taskfiles with a '# renovate: datasource=... depName=...' comment above",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)Taskfile\\.ya?ml$/"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*[A-Z0-9_]+:\\s*['\"]?(?<currentValue>[\\w.-]+)"
+      ]
     }
   ]
 }

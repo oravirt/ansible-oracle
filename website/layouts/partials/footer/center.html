@@ -1,0 +1,27 @@
+{{/* Docsy v0.10.0 footer/center.html + links to legal notice, privacy and accessibility */ -}}
+{{ partial "footer/copyright.html"  . -}}
+
+{{ with .Site.Params.privacy_policy -}}
+  <span class="ms-2"><a href="{{ . }}" target="_blank" rel="noopener">{{ T "footer_privacy_policy" }}</a></span>
+{{- end -}}
+
+{{/* GetPage returns nothing for a draft => no link until the page is published */ -}}
+{{ $legal := slice -}}
+{{ range slice "/legal-notice" "/privacy" "/accessibility" -}}
+  {{ with site.GetPage . }}{{ $legal = $legal | append . }}{{ end -}}
+{{ end -}}
+{{ with $legal -}}
+<nav aria-label="Legal" class="td-footer__legal mt-2">
+  <ul class="list-inline mb-0">
+    {{ range . -}}
+    <li class="list-inline-item"><a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a></li>
+    {{ end -}}
+  </ul>
+</nav>
+{{- end }}
+
+{{ if or .Site.Params.ui.footer_about_enable (eq .Site.Params.ui.footer_about_disable false) -}}
+  {{ with .Site.GetPage "about" -}}
+    <p class="td-footer__about mt-2"><a href="{{ .RelPermalink }}">{{ .Title }}</a></p>
+  {{- end -}}
+{{ end -}}

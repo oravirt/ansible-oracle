@@ -1,0 +1,196 @@
+---
+baseURL: 'https://www.ansible-oracle.eu/'
+languageCode: en-us
+title: ansible-oracle Project
+# theme: github.com/google/docsy
+
+enableGitInfo: true
+
+privacy:
+  disqus:
+    disable: true
+  googleAnalytics:
+    disable: true
+  instagram:
+    disable: true
+  twitter:
+    disable: true
+  vimeo:
+    disable: true
+  youtube:
+    disable: true
+
+params:
+  taxonomy:
+    # set taxonomyCloud = [] to hide taxonomy clouds
+    taxonomyCloud: []
+
+    # If used, must have same length as taxonomyCloud
+    taxonomyCloudTitle: []
+
+    # set taxonomyPageHeader = [] to hide taxonomies on the page headers
+    taxonomyPageHeader: []
+
+  # First one is picked as the Twitter card image if not set on page.
+  # images: [images/project-illustration.png]
+
+  # Menu title if your navbar has a versions selector to access old versions of your site.
+  # This menu appears only if you have at least one [params.versions] set.
+  version_menu: Releases
+
+  # Flag used in the "version-banner" partial to decide whether to display a
+  # banner on every page indicating that this is an archived version of the docs.
+  # Set this flag to "true" if you want to display the banner.
+  archived_version: false
+
+  # The version number for the version of the docs represented in this doc set.
+  # Used in the "version-banner" partial to display a version number for the
+  # current doc set.
+  version: 0.0
+
+  # A link to latest version of the docs. Used in the "version-banner" partial to
+  # point people to the main doc site.
+  url_latest_version: https://www.ansible-oracle.eu
+
+  # Repository configuration (URLs for in-page links to opening issues and suggesting changes)
+  github_repo: https://github.com/oravirt/ansible-oracle
+
+  # An optional link to a related project repo. For example, the sibling repository where your product code lives.
+  github_project_repo: https://github.com/oravirt/ansible-oracle
+
+  # Specify a value here if your content directory is not in your repo's root directory
+  github_subdir: website
+
+  # Uncomment this if your GitHub repo does not have "main" as the default branch,
+  # or specify a new value if you want to reference another branch in your GitHub links
+  github_branch: master
+
+  # Google Custom Search Engine ID. Remove or comment out to disable search.
+  # gcs_engine_id:
+
+  # Enable Lunr.js offline search
+  offlineSearch: false
+
+  # Enable syntax highlighting and copy buttons on code blocks with Prism
+  prism_syntax_highlighting: true
+
+  copyright:
+    authors: Thorsten Bruhns | [MIT](https://github.com/oravirt/ansible-oracle/blob/master/LICENSE)
+    from_year: 2016
+
+  # privacy_policy: "https://policies.google.com/privacy"
+
+  # User interface configuration
+  ui:
+    # Set to true to disable breadcrumb navigation.
+    breadcrumb_disable: false
+    # Set to false if you don't want to display a logo (/assets/icons/logo.svg) in the top navbar
+    navbar_logo: true
+    # Set to true if you don't want the top navbar to be translucent when over a `block/cover`, like on the homepage.
+    navbar_translucent_over_cover_disable: true
+    # Enable to show the side bar menu in its compact state.
+    sidebar_menu_compact: false
+    # Set to true to hide the sidebar search box (the top nav search box will still be displayed if search is enabled)
+    sidebar_search_disable: true
+
+    # Adds a H2 section titled "Feedback" to the bottom of each doc. The responses are sent to Google Analytics as events.
+    # This feature depends on [services.googleAnalytics] and will be disabled if "services.googleAnalytics.id" is not set.
+    # If you want this feature, but occasionally need to remove the "Feedback" section from a single page,
+    # add "hide_feedback: true" to the page's front matter.
+    feedback:
+      enable: false
+      # The responses that the user sees after clicking "yes" (the page was helpful) or "no" (the page was not helpful).
+      'yes': >-
+        Glad to hear it! Please <a href="https://github.com/oravirt/ansible-oracle/issues/new">tell us how we can improve</a>.
+      'no': >-
+        Sorry to hear that. Please <a href="https://github.com/oravirt/ansible-oracle/issues/new">tell us how we can improve</a>.
+
+    # Adds a reading time to the top of each doc.
+    # If you want this feature, but occasionally need to remove the Reading time from a single page,
+    # add "hide_readingtime: true" to the page's front matter
+    readingtime:
+      enable: false
+
+  links:
+    # Developer relevant links. These will show up on right side of footer and in the community page if you have one.
+    developer:
+      - name: GitHub
+        url: https://github.com/oravirt/ansible-oracle
+        icon: fab fa-github
+        desc: Development takes place here!
+
+outputs:
+  home:
+    - HTML
+    - print
+  section:
+    - HTML
+    - print
+
+module:
+  proxy: direct
+  # doc/ and roles/ are used by content/docs/_content.gotmpl
+  # A custom mount replaces the default mount of its target => content and assets are listed again.
+  mounts:
+    - {source: content, target: content}
+    - {source: assets, target: assets}
+    - {source: ../doc, target: assets/doc}
+    - {source: ../roles, target: assets/roles}
+  hugoVersion:
+    extended: true
+    min: 0.156.0
+  imports:
+    - path: github.com/google/docsy
+      disable: false
+    - path: github.com/google/docsy/dependencies
+      disable: false
+
+# Markup configure section
+# See https://gohugo.io/getting-started/configuration-markup/
+markup:
+  defaultMarkdownHandler: goldmark
+  # code blocks are highlighted by Prism (light theme, see assets/scss/_styles_project.scss),
+  # not by the dark default style of Chroma
+  highlight:
+    codeFences: false
+  goldmark:
+    renderer:
+      unsafe: true
+  tableOfContents:
+    startLevel: 2
+    endLevel: 6
+    ordered: false
+  asciidocExt:
+    backend: html5
+    extensions: []
+    failureLevel: fatal
+    noHeaderOrFooter: true
+    preserveTOC: false
+    safeMode: unsafe
+    sectionNumbers: false
+    trace: false
+    verbose: false
+    workingFolderCurrent: false
+    attributes: {}
+
+security:
+  exec:
+    allow:
+      - ^asciidoctor$
+      - ^git$
+      - ^go$
+      - postcss
+    # Hugo default + GEM_*: asciidoctor in docker/hugo is installed below GEM_HOME=/usr/local/bundle
+    osEnv:
+      - '(?i)^((HTTPS?|NO)_PROXY|PATH(EXT)?|APPDATA|TE?MP|TERM|GO\w+|(XDG_CONFIG_)?HOME|USERPROFILE|SSH_AUTH_SOCK|DISPLAY|LANG|SYSTEMDRIVE|GEM_\w+)$'
+  # funcs:
+  #   getenv: ['^HUGO_']
+
+menu:
+  main:
+    - name: Github
+      weight: 50
+      url: 'https://github.com/oravirt/ansible-oracle'
+    - name: Releases
+      weight: 49
+      url: https://github.com/oravirt/ansible-oracle/releases
