@@ -127,8 +127,8 @@
   when:
     - _orasw_meta_primary_node | bool or _oraswdb_install_home_type=='SI'
     - dbh.state == 'present'
-    - is_sw_source_local
-    - oracle_sw_copy
+    - is_sw_source_local | bool
+    - oracle_sw_copy | bool
     - not _oraswdb_install_dbh_stat.stat.exists
   tags:
     - oradbsw
@@ -154,8 +154,8 @@
   when:
     - _orasw_meta_primary_node | bool or _oraswdb_install_home_type=='SI'
     - dbh.state == 'present'
-    - not is_sw_source_local
-    - oracle_sw_copy
+    - not is_sw_source_local | bool
+    - oracle_sw_copy | bool
     - not _oraswdb_install_dbh_stat.stat.exists
   tags:
     - oradbsw
@@ -199,8 +199,8 @@
   become: true
   when:
     - dbh.state == 'present'
-    - oracle_sw_copy
-    - oraswdb_install_remove_install_images
+    - oracle_sw_copy | bool
+    - oraswdb_install_remove_install_images | bool
 
 - name: install_home_db | Unmount nfs share with installation media
   ansible.builtin.include_role:
@@ -217,7 +217,7 @@
   tags: autostartup_service
 
 - ansible.builtin.include_tasks: "{{ hostinitdaemon }}.yml"  # noqa name[missing]
-  when: autostartup_service
+  when: autostartup_service | bool
   tags:
     - autostartup_service
     - always

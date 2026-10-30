@@ -39,7 +39,7 @@
       {{ [__orahost_kernel_semmns | int, __orahost_current_semmns | int] | max }}
       {{ [__orahost_kernel_semopm | int, __orahost_current_semopm | int] | max }}
       {{ [__orahost_kernel_semmni | int, __orahost_current_semmni | int] | max }}
-  when: not sysctl_kernel_sem_force
+  when: not sysctl_kernel_sem_force | bool
 
 - name: calculate_kernel_semaphores | Force kernel.sem settings
   ansible.builtin.set_fact:
@@ -48,4 +48,4 @@
       {{ __orahost_kernel_semmns }}
       {{ __orahost_kernel_semopm }}
       {{ __orahost_kernel_semmni }}
-  when: sysctl_kernel_sem_force
+  when: sysctl_kernel_sem_force | bool

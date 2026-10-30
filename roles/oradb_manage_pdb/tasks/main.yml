@@ -40,10 +40,10 @@
       when:
         - _orasw_meta_primary_node | bool
         - oracle_databases is defined
-        - odb[0].oracle_db_name
+        - odb[0].oracle_db_name | default('') | length > 0
         - oracle_pdbs is defined
-        - odb[1].cdb
+        - odb[1].cdb | default('') | length > 0
         - odb[0].state|upper == 'PRESENT'
         - odb[1].cdb == odb[0].oracle_db_name
-        - odb[0].is_container
+        - odb[0].is_container | default(false) | bool
         - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'

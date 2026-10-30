@@ -2,8 +2,8 @@
 - name: Default Destinations for RMAN
   ansible.builtin.assert:
     that:
-      - oradb_rman_controlfile_autobackup_disk_default
-      - oradb_rman_channel_disk_default
+      - oradb_rman_controlfile_autobackup_disk_default | default('', true) | length > 0
+      - oradb_rman_channel_disk_default | default('', true) | length > 0
 
 - name: Warn if old style password variable is used
   ansible.builtin.debug:
@@ -32,7 +32,7 @@
     loop_var: odb
     label: "oracle_db_name {{ odb.oracle_db_name }}"
   when:
-    - odb.rman_wallet | default(false)
+    - odb.rman_wallet | default(false) | bool
   tags:
     - assert
 

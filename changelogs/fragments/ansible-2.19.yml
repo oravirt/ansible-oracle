@@ -1,0 +1,28 @@
+---
+major_changes:
+  - "Support for ansible-core 2.19 (see doc/guides/breaking_changes.adoc)"
+breaking_changes:
+  - "orasw_meta_internal: oracle_sw_copy and oracle_sw_unpack are now real booleans. With install_from_nfs: true the defaults evaluate to false as documented, before they were always true (see doc/guides/breaking_changes.adoc)"
+  - "cxoracle: oracle_sw_copy is now a real boolean. With install_from_nfs: true the default evaluates to false as documented, before it was always true"
+minor_changes:
+  - "all roles: boolean variables from the inventory are evaluated with '| bool' in conditionals, strings like 'yes' or -e var=false work with ansible-core 2.19"
+  - "orasw_meta_internal: replace deprecated magic variable play_hosts with ansible_play_batch in cluster_master"
+  - "os_vagrant.yml, os_racattack.yml: replace deprecated magic variable play_hosts with ansible_play_batch"
+bugfixes:
+  - "oradb_manage_db: _oradb_manage_db_create_listener returns a boolean instead of a string (ansible-core 2.19)"
+  - "oraswgi_install: _oraswgi_install_init_dg_exists returns a boolean instead of a string (ansible-core 2.19)"
+  - "orasw_meta_internal: oracle_patch_install and oracle_stage_install use oracle_stage_remote when oracle_sw_copy and oracle_sw_unpack are false"
+  - "oraswdb_install: installation of ORACLE_HOME 19c failed without opatch or opatchauto patches in db_homes_config, because an empty template is None in ansible-core 2.19"
+  - "oradb_manage_db: assert for sys password and ORACLE_HOME failed with 'NoneType has no len()' instead of the fail_msg in ansible-core 2.19"
+  - "oraswdb_install, oraswgi_install: directories were created with mode 1407 instead of 0775 in ansible-core 2.19, because the unquoted mode 775 is passed as integer (decimal) through a template"
+  - "oraswdb_install, oradb_manage_parameters: with_nested with dummy list \"\" skipped the task in ansible-core 2.19 (installation media not extracted, database not restarted after spfile changes). Use [\"\"] instead"
+  - "orahost_meta: oracle_script_env set _JAVA_OPTIONS=None (runInstaller: 'Unrecognized option: None') and CV_ASSUME_DISTID=None in ansible-core 2.19, because an empty template is None"
+  - "oraswdb_manage_patches, oraswgi_manage_patches: _JAVA_OPTIONS=None in ansible-core 2.19"
+  - "oraswdb_manage_patches, oraswgi_manage_patches, oraswgi_install, orahost_ssh: loops over groups[orasw_meta_cluster_hostgroup] failed with an undefined loop variable in delegate_to for single instance in ansible-core 2.19. Use default([]) for the loop"
+  - "orahost: Disable firewall failed with 'Conditional result was derived from value of type list' in ansible-core 2.19"
+  - "oradb_manage_pdb: conditionals on oracle_db_name, cdb and is_container failed in ansible-core 2.19, because they are not booleans"
+  - "oradb_rman: use '| bool' for rman_wallet in conditionals"
+  - "oradb_rman: assert for default RMAN destinations failed in ansible-core 2.19, because the conditionals are strings"
+  - "oraswdb_install: swap check for 19c with prepatching failed with 'Template delimiters are not supported in expressions' in ansible-core 2.19"
+  - "common: fix Jinja syntax error in motd.j2 (missing for loop over ansible_interfaces), sort interfaces for a stable /etc/motd"
+  - "oraswdb_install: fix Jinja syntax error in db-install.rsp.12.1.0.1.j2 ('andif' instead of 'endif')"

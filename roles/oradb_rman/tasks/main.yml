@@ -7,7 +7,7 @@
     - assert
 
 - name: configure autofs for RMAN
-  when: oradb_rman_autofs
+  when: oradb_rman_autofs | bool
   tags: autofs
   block:
     # autofs is configured in a special way to mount the shares with needed parameters
@@ -134,7 +134,7 @@
   loop_control:
     loop_var: odb
     label: "oracle_db_name {{ odb.oracle_db_name | default('') }}"
-  when: odb.rman_wallet
+  when: odb.rman_wallet | bool
   tags:
     - tns
 
@@ -194,7 +194,7 @@
     label: "oracle_db_name {{ odb.oracle_db_name | default('') }}"
   when:
     - odb.rman_tnsalias is defined
-    - odb.rman_wallet
+    - odb.rman_wallet | bool
   tags:
     - wallet
     - wallet_contents
@@ -214,7 +214,7 @@
     - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_wallet', 'defined') }}"
   when:
     - odb.rman_tnsalias is defined
-    - odb.rman_wallet
+    - odb.rman_wallet | bool
     - not wallet_created.changed
   changed_when: false  # does not change anything in System
   loop_control:
@@ -242,7 +242,7 @@
   with_items:
     - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_wallet', 'defined') }}"
   when:
-    - odb.rman_wallet
+    - odb.rman_wallet | bool
     - odb.rman_tnsalias is defined
     - odb.rman_user is defined
     - "wallet_created.changed or ((': ' + odb.rman_tnsalias + ' ' + odb.rman_user) not in (wallet_contents.results[loopidx].stdout | default('')))"
@@ -271,7 +271,7 @@
   with_items:
     - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_wallet', 'defined') }}"
   when:
-    - odb.rman_wallet | default(false)
+    - odb.rman_wallet | default(false) | bool
     - not wallet_created.changed
     - not wallet_credential_added.changed
   loop_control:
@@ -438,5 +438,5 @@
     state: directory
     owner: "{{ oracle_user }}"
     mode: '0755'
-  when: oradb_rman_cron_mkjob
+  when: oradb_rman_cron_mkjob | bool
   tags: rmancron

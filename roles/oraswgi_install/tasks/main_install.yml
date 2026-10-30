@@ -15,8 +15,8 @@
   ansible.builtin.include_tasks: "{{ www_download_bin }}.yml"  # noqa name[missing]
   when:
     - _orasw_meta_primary_node | bool
-    - not is_sw_source_local
-    - oracle_sw_copy
+    - not is_sw_source_local | bool
+    - oracle_sw_copy | bool
 
 - name: main_install | Copy oracle installfiles to server (GI) (local)
   ansible.builtin.copy:
@@ -32,8 +32,8 @@
   when:
     - _orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
-    - is_sw_source_local
-    - oracle_sw_copy
+    - is_sw_source_local | bool
+    - oracle_sw_copy | bool
 
 # root.sh is executed on all cluster nodes.
 # => Do NOT limit the following include to 1st node!

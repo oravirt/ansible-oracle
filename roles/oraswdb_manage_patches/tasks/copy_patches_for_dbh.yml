@@ -27,6 +27,6 @@
       filename: {{ osp_loop.filename }}
       unique_patchid: {{ osp_loop.unique_patchid | default('') }}
   when:
-    - apply_patches_db
+    - apply_patches_db | bool
     - dhc_opatch.state == 'present'
     - osp_loop.unique_patchid | default(0) == dhc_opatch.excludeUPI | default(0)

@@ -7,14 +7,14 @@
     creates: "{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates }}"
   with_nested:
     - "{{ _oraswdb_install_oracle_sw_image_db }}"
-    - ""  # dummy to force item.0 instead of item.
+    - [""]  # dummy to force item.0 instead of item.
   become: true
   become_user: "{{ oracle_user }}"
   when:
     - _orasw_meta_primary_node | bool
     - item[0].version == db_homes_config[dbh.home]['version']
-    - oracle_sw_copy
-    - oracle_sw_unpack
+    - oracle_sw_copy | bool
+    - oracle_sw_unpack | bool
   tags:
     - oradbswunpack
 
@@ -26,14 +26,14 @@
     creates: "{{ oracle_stage }}/{{ item[0].version }}/{{ item[0].creates }}"
   with_nested:
     - "{{ _oraswdb_install_oracle_sw_image_db }}"
-    - ""  # dummy to force item.0 instead of item.
+    - [""]  # dummy to force item.0 instead of item.
   become: true
   become_user: "{{ oracle_user }}"
   when:
     - _orasw_meta_primary_node | bool
     - item[0].version == db_homes_config[dbh.home]['version']
-    - not oracle_sw_copy
-    - oracle_sw_unpack
+    - not oracle_sw_copy | bool
+    - oracle_sw_unpack | bool
   tags:
     - oradbswunpack
 

@@ -26,6 +26,7 @@
 3. [Upgrade of PDBs with AutoUpgrade (Unplug/Plug)](doc/guides/autoupgrade_upgrade.adoc)
 4. [How to develop in ansible-oracle](doc/development.adoc)
 5. [List of roles in ansible-oracle](doc/roles.adoc)
+6. [Breaking Changes - Upgrade Guide](doc/guides/breaking_changes.adoc)
 
 
 ## Pre-requisites
