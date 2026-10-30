@@ -21,7 +21,7 @@
       skip_missing: true
   environment: "{{ _oracle_env_cdb }}"
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_databases is defined
     - odb.0.state == 'present'
     - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
@@ -62,7 +62,7 @@
       skip_missing: true
   environment: "{{ _oracle_env_pdb }}"
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_pdbs is defined
     - opdb.0 is defined
     - opdb.0.state == 'present'
@@ -110,7 +110,7 @@
       skip_missing: true
   environment: "{{ _oracle_env }}"
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_databases is defined
     - odb.0.state == 'present'
     - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
@@ -151,7 +151,7 @@
       skip_missing: true
   environment: "{{ _oracle_env_pdb }}"
   when:
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
     - oracle_pdbs is defined
     - opdb.0 is defined
     - opdb.0.state == 'present'
