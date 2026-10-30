@@ -2,7 +2,7 @@
 
 SSH Setup for Oracle Grid-Infrastructure installations.
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -30,7 +30,7 @@ Example for oracle:
 #### Default value
 
 ```YAML
-orahost_ssh_keyname: id_ed25519
+orahost_ssh_keyname: id_{{ orahost_ssh_key_type }}
 ```
 
 ## Dependencies

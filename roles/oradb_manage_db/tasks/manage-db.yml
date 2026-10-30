@@ -49,7 +49,9 @@
     label: >-
       db_name: {{ odb.oracle_db_name | default('') }}
       listener: {{ odb.listener_name | default('') }}
-  tags: listener2
+  tags:
+    - listener2
+    - dotprofile_db
 
 - name: state
   ansible.builtin.debug:
@@ -147,6 +149,8 @@
 - name: manage_db | Customize oratab for autostart
   ansible.builtin.lineinfile:
     dest: /etc/oratab
+    # regexp: replace an existing entry for the SID (e.g. with a different ORACLE_HOME)
+    regexp: "^{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}:"
     line: "{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}:{{ _oracle_home_db }}:Y"
     state: present
   when: autostartup_service and not olrloc.stat.exists and odb.state == 'present'

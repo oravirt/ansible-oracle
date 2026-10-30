@@ -843,6 +843,278 @@ releases:
     - rootcrs-missing.yml
     - seha-home-installation.yml
     release_date: '2026-01-31'
+  4.15.0:
+    changes:
+      breaking_changes:
+      - devsec collection removed from galaxy.yml. Add it to your requirements.yml
+        within your inventory (oravirt#570)
+      bugfixes:
+      - Add fontconfig to required packages for 19c on OL9, else DBCA crashes. (oravirt#612)
+      - As of GI 19.31 blanks are not allowed around commas in oracle.install.asm.diskGroup.disks
+        (oravirt#598) (oravirt#599)
+      - Ensure oracle_tmp_stage is present at all cluster nodes when patching GI (oravirt#589)
+      - Fixed _JAVA_OPTIONS in script_env (oravirt#589)
+      - GI stack has to be started after opatch removed patches, subsequent opatchauto
+        run fails otherwise (oravirt#610)
+      - 'On cluster setups, datapatch assumes the database to exist only if it''s
+        defined AND running at the local host (oravirt #573) (oravirt#574)'
+      - 'On cluster setups, srvctl now starts the databases at the local host (oravirt
+        #573) (oravirt#574)'
+      - Refresh list of applied patches after patch removal (oravirt#610)
+      - 'cxoracle: fix for non-staged cx_oracle install (oravirt#614)'
+      - intersect has to be removed to address all cluster nodes to setup stage temp
+        (oravirt#602) (oravirt#603)
+      - oracle_sw_patches must be addressed by their unique_patchid, if provided (oravirt#610)
+      - 'oradb_manage_db: allow for configuring supplemental_logging (oravirt#611)'
+      - 'oraords: admin_user in oraords_db_pools defaults to oraords_default_admin_user
+        (variable oraords_admin_user did not exist) (oravirt#629)'
+      - 'oraords: feature_sdw defaults to false (string ''false'' was evaluated as
+        true) (oravirt#629)'
+      - 'oraords: host in oraords_db_pools defaults to inventory_hostname (oravirt#629)'
+      - 'oraords: oraords_ords_bin points to /opt/oracle/ords/bin, the ORDS RPM does
+        not install into /usr/local/bin (oravirt#629)'
+      - 'oraords: supported platforms in meta are EL 8 and 9 (oravirt#629)'
+      - 'oraords: use --db-pool for ORDS pools other than default (oravirt#629)'
+      - 'orasw_download_patches: download all APEX versions from oracle_databases
+        and oracle_pdbs, not only the last one (oravirt#629)'
+      - 'oraswdb_install: fix path for one-off patches with unique_patch_id (oravirt#613)'
+      - overhead of huge pages per instance was estimated to low, it has to be 4 according
+        to MOS KB151310 and is now configurable (oravirt#577)
+      - 'roles/orahost_storage/templates/setup-udev.sh: check for already existing
+        udev rules removed (oravirt#592) (oravirt#596)'
+      - 'roles/orahost_storage/templates/setup-udev.sh: device type preceedence reordered
+        (oravirt#592) (oravirt#596)'
+      - 'roles/orahost_storage/templates/setup-udev.sh: ensure dm- and nvme-devices
+        are prefixed correctly (oravirt#592) (oravirt#596)'
+      - 'roles/orahost_storage/templates/setup-udev.sh: hard coded skip of /dev/sda
+        removed (oravirt#592) (oravirt#596)'
+      - 'roles/orahost_storage/templates/setup-udev.sh: nvme support added (oravirt#592)
+        (oravirt#596)'
+      minor_changes:
+      - Add EPEL repo definition RPM for OL10/RHEL10 (oravirt#625)
+      - Allow for installation of optional OS packages (new list variable `extra_packages`)
+        (oravirt#624)
+      - Correct description of variable common_packages_el9 (oravirt#572)
+      - Correct path to requirements_*.txt in examples (oravirt#620)
+      - Documentation for APEX and ORDS aligned with roles oraapex and oraords (oravirt#629)
+      - 'New role autoupgrade: install Oracle AutoUpgrade and download patches with
+        AutoUpgrade (tasks_from install.yml, download_patches.yml) (oravirt#630)'
+      - Overview of inventory settings for installing and patching Oracle RDBMS (oravirt#587)
+      - Prepare support for RHEL/OL 10 (oravirt#619)
+      - '`apply_options` attribute added to db_homes_config and gi_patches_config
+        to set opatch and opatchauto options (oravirt#605)'
+      - '`get_url` downloads now consider `http_proxy`, `https_proxy` and `no_proxy`
+        (oravirt#567) (oravirt#586)'
+      - '`is_sw_source_local` and `oracle_sw_copy` booleans are now recognized by
+        cx_oracle role, too (oravirt#601)'
+      - '`pip install` now considers `https_proxy` variable (oravirt#567) (oravirt#586)'
+      - added support for client certificates to installation of cx_oracle (oravirt#579)
+      - 'autoupgrade: keystore.yml creates/updates the AutoUpgrade keystore with mos_username
+        / mos_password non-interactively (recreated when the keystore password changed)
+        (oravirt#630)'
+      - 'autoupgrade: optional download of the latest autoupgrade.jar into the software
+        repository (autoupgrade_download_latest), download on the Ansible controller
+        (autoupgrade_download_run_local) (oravirt#630)'
+      - development docs improved. Added fix_fragments.py as helper (oravirt#631)
+      - opatch patches don't need to be downloaded if they're only intended to be
+        removed (opatchauto patches need to be downloaded, though) (oravirt#610)
+      - 'oradb_manage_wallets: import certificates feature (oravirt#618)'
+      - 'pre-commit: Upgrade to 4.7.0 (oravirt#628)'
+      - sshd does not accept False for permitTunnel. Use 'no' instead. (oravirt#571)
+      - when calling oracle_opatch module, conflict check can no be switched on/off
+        by variables opatch_gi_conflict_check, opatch_db_conflict_check or opatch_conflict_check
+        (oravirt#584)
+    fragments:
+    - apex-ords-doc.yml
+    - autoupgrade.yml
+    - blanks-in-gi-responsefile.yml
+    - dev-docs.yml
+    - devsec.yml
+    - doc-dev-reqs-path.yml
+    - doc-install-patch.yml
+    - download_or_copy_cx_oracle.yml
+    - el10-ready.yml
+    - install_with_unique_patch_id.yml
+    - manage_wallets_certificates.yml
+    - non_staged_cxoracle.yml
+    - nr-hugepages-overhead.yml
+    - ol10-epel.yml
+    - ol9-requires-fontconfig.yml
+    - opatch-options.yml
+    - oraords-bin.yml
+    - pip-cert-support.yml
+    - pr-extra-packages.yml
+    - pre-commit.yml
+    - proxy-support.yml
+    - remove-one-off-patches.yml
+    - seha-support-for-datapatch.yml
+    - setup-udev-sh.yml
+    - sshd-no.yml
+    - supplogging.yml
+    - tempdir-issues.yml
+    - toggle-conflict-check.yml
+    - typo-pkg-el9.yml
+    - wrong-intersect.yml
+    release_date: '2026-10-21'
+  4.16.0:
+    changes:
+      bugfixes:
+      - 'oracle_db.py: manage started state for the host RAC instance (oravirt#634)'
+      - 'oracle_grants.py: container aware object privs (oravirt#641)'
+      - 'oradb_manage_db: /etc/oratab gets a 2nd entry for a SID when the ORACLE_HOME
+        of the database was changed (oravirt#636)'
+      - 'oradb_manage_db: stop a listener running from an already removed ORACLE_HOME
+        (lsnrctl not available) by terminating the tnslsnr process (oravirt#636)'
+      - 'orasw_meta: assert for listener_installed, sqlnet_installed and tnsnames_installed
+        checks that home is in db_homes_installed (oravirt#635)'
+      - 'orasw_meta: assert for oracle_db_type in db_homes_installed fails for ORACLE_HOME
+        without database (oravirt#635)'
+      - 'orasw_meta: assert for tnsnames_installed fails for entries with use_gi_home:
+        true (oravirt#635)'
+      - 'oraswdb_install: installation of ORACLE_HOME without database fails with
+        ''list object has no element 0'' (oravirt#635)'
+      minor_changes:
+      - 'autoupgrade: PDBs with status UNPLUGGED in the source CDB (keep_source_pdb)
+        are ignored by the state check of the PDBs (oravirt#638)'
+      - 'autoupgrade: additional Java options for AutoUpgrade (autoupgrade_java_options),
+        e.g. a truststore for a proxy with TLS inspection (oravirt#639)'
+      - 'autoupgrade: autoupgrade_download_gold_image_rename renames downloaded Gold
+        Images to autoupgrade_download_gold_image_prefix + release (e.g. db_home_19.32.zip)
+        and creates a symlink with the original filename (oravirt#639)'
+      - 'autoupgrade: autoupgrade_download_latest downloads the latest autoupgrade.jar
+        on the Ansible controller, or on the target host when oracle_sw_copy is false
+        (oravirt#639)'
+      - 'autoupgrade: autoupgrade_run_local executes AutoUpgrade on the Ansible controller
+        (default true) or on the target host (false) for all task files (oravirt#639)'
+      - 'autoupgrade: autoupgrade_upgrade_restoration (default false) and autoupgrade.restoration
+        in oracle_pdbs control the Guaranteed Restore Point (upg1.restoration) (oravirt#638)'
+      - 'autoupgrade: global_log_dir per AutoUpgrade job (recovery data per job) (oravirt#638)'
+      - 'autoupgrade: install.yml checks the Python module pexpect on the host executing
+        AutoUpgrade (pexpect is not installed by the role) (oravirt#639)'
+      - 'autoupgrade: install.yml creates oracle_base on the target host - AutoUpgrade
+        can be used before the installation of the Oracle software (oravirt#639)'
+      - 'autoupgrade: keystore.yml checks the connection (proxy_check.yml), when the
+        keystore console reports a connection failure - a problem of the network/proxy
+        never changes the keystore and is not reported as invalid credentials anymore
+        (oravirt#639)'
+      - 'autoupgrade: proxy support with authentication for the download of autoupgrade.jar
+        and AutoUpgrade (autoupgrade_proxy_username, autoupgrade_proxy_password) (oravirt#639)'
+      - 'autoupgrade: proxy_check.yml - check of the connection to Oracle with the
+        proxy settings before the keystore/download of patches and before autoupgrade_download_latest,
+        with a hint for the cause of an error (e.g. 407 of the proxy) (oravirt#639)'
+      - 'autoupgrade: recovery data of AutoUpgrade - an unfinished deploy is resumed
+        by the deploy phase, recovery data of a finished deploy is cleared before
+        a new upgrade, autoupgrade_upgrade_clear_recovery_data discards it (oravirt#638)'
+      - 'autoupgrade: the analyze phase shows the logfiles and preupgrade reports
+        of the AutoUpgrade job (oravirt#638)'
+      - 'autoupgrade: upgrade_analyze.yml - analyze phase for the Unplug/Plug upgrade
+        of PDBs with AutoUpgrade analyze, configured with attribute autoupgrade in
+        oracle_pdbs (oracle_pdbs defines the end state in the target CDB) (oravirt#638)'
+      - 'autoupgrade: upgrade_deploy.yml - Unplug/Plug upgrade of PDBs with AutoUpgrade
+        deploy, the analyze phase is always executed first (oravirt#638)'
+      - 'autoupgrade: upgrade_fixups.yml - fixups phase (AutoUpgrade fixups) between
+        analyze and deploy phase (oravirt#638)'
+      - 'dev-environment: Update pip requirements (oravirt#642)'
+      - 'doc: new guide doc/guides/autoupgrade_upgrade.adoc (oravirt#638)'
+      - 'doc: new guide doc/guides/out_of_place_patching.adoc (oravirt#636)'
+      - 'examples: requirements.yml use ansible-oracle 4.15.0 (oravirt#642)'
+      - 'molecule: new scenario upgrade for the upgrade from 19c to 26ai (oravirt#638)'
+      - 'molecule: scenario download runs behind a Squid proxy with Basic authentication
+        and without route to the internet, side_effect.yml tests a wrong proxy password
+        (oravirt#639)'
+      - 'oradb_manage_db: Out-of-Place Patching - restart listener from new ORACLE_HOME
+        when home in listener_installed was changed (oravirt#636)'
+      - 'oradb_manage_db: Out-of-Place Patching - switch ORACLE_HOME of an existing
+        database by changing home in oracle_databases (Single Instance without Grid
+        Infrastructure/Oracle Restart only) (oravirt#636)'
+      - 'oradb_manage_db: switch_home.yml fails, when the release of the new ORACLE_HOME
+        differs (upgrade with role autoupgrade needed) (oravirt#638)'
+      - 'oraords: Adjust role to support multiple pools and oraords_sec (oravirt#643)'
+      - 'oraswdb_install: allow startup service after another service (oravirt#633)'
+      - 'playbooks: new autoupgrade_upgrade_analyze.yml, autoupgrade_upgrade_fixups.yml
+        and autoupgrade_upgrade.yml (oravirt#638)'
+      - 'release: new script tools/release/galaxy_version.sh to check and set the
+        collection version from galaxy.yml in requirements.yml (task example:check,
+        example:fix) (oravirt#642)'
+      - 'renovate: check github actions and pinned pip modules in github workflows
+        (oravirt#642)'
+      - 'renovate: configuration for pip modules and container images with local checks
+        (task renovate:check, renovate:pip, renovate:docker) (oravirt#642)'
+      - 'renovate: run against a fork on GitHub with branches pr/renovate/* and changelog
+        fragments (task renovate:fork) (oravirt#642)'
+      - 'renovate: update ansible-lint from 25.2.1 to 26.10.1 (oravirt#642)'
+      - 'renovate: update antsibull-changelog from 0.29.0 to 0.36.0 (oravirt#642)'
+      - 'renovate: update container image python in docker/Dockerfile from 3.10-slim-buster
+        to 3.11-slim-buster (oravirt#642)'
+      - 'renovate: update flake8 from 6.1.0 to 7.4.1 (oravirt#642)'
+      - 'renovate: update github actions: actions/checkout to v7, actions/setup-python
+        to v7, actions/stale to v11, tj-actions/changed-files to v47, artis3n/ansible_galaxy_collection
+        to v3 (oravirt#642)'
+      - 'renovate: update python-version in github workflows changelog-lint and python-lint
+        to 3.15 (oravirt#642)'
+      - 'renovate: update xmltodict from 0.13.0 to 0.15.1 (oravirt#642)'
+    fragments:
+    - ansible-dev.yml
+    - assert-db-homes-without-db.yml
+    - assert-net-homes-installed.yml
+    - autoupgrade-proxy-check.yml
+    - autoupgrade-update.yml
+    - autoupgrade-upgrade.yml
+    - container_objprivs.yml
+    - listener-deleted-home.yml
+    - ords_apex.yml
+    - out-of-place-patching.yml
+    - rac_started_state.yaml
+    - renovate-ansible-lint.yml
+    - renovate-antsibull-changelog.yml
+    - renovate-flake8.yml
+    - renovate-github-actions.yml
+    - renovate-python-image.yml
+    - renovate-xmltodict.yml
+    - renovate.yml
+    - service_dependency.yml
+    release_date: '2026-10-28'
+  4.17.0:
+    changes:
+      bugfixes:
+      - Add orahost_meta_tmpdir and orahost_meta_java_options to dbhome's opatchauto
+        call to enable non-default tmp dir, e.g. on hardened systems (oravirt#604)
+      - Ensure glibc-langpack-en is installed and LANG is forced to en_US.UTF-8 in
+        oracle_db and oracle_datapatch modeules (oravirt#648)
+      - Ensure stage tmp is available on all cluster nodes because opatchauto runs
+        remote checks from there (oravirt#604)
+      - fixed typos in docs (oravirt#646)
+      - 'oradb_manage_db: add missing tag for creating the listener auto-startup profile
+        (oravirt#647)'
+      - 'orahost_ssh: file group of user''s keyfile forced to {{ oracle_group }} (oravirt#561)'
+      - 'orahost_ssh: if only a subset of cluster nodes are in the play, key exchange
+        failed (oravirt#561)'
+      minor_changes:
+      - 'doc: development guide describes nix-shell as recommended development environment
+        and the local Ansible-Controller as separate option (oravirt#645)'
+      - 'orahost, orahost_meta, orahost_ssh: ssh_key_type, ssh_key_bits, ssh_key_file
+        of user''s ssh key can now be configured (oravirt#561)'
+      - 'orahost_meta, orahost_ssh: host key types can now be configured (oravirt#561)'
+      - 'release: new tasks release:pr, release:draft and release:galaxy, task changelog-release
+        removed (oravirt#645)'
+      - 'release: tools/release/build_release.sh with mode galaxy - sync master of
+        the fork with upstream and start the workflow Deploy Collection, when the
+        latest release points to the last commit and the version is not on Ansible
+        Galaxy (oravirt#645)'
+      - 'release: tools/release/build_release.sh with mode pr - set version from branch
+        pr/<version>, commit the version, create the release pull request, add PR
+        references to fragments, create the changelog and write the release notes
+        into the pull request (oravirt#645)'
+      - 'release: tools/release/build_release.sh with mode release - create tag v<version>
+        and a draft release with the description of the release pull request (oravirt#645)'
+    fragments:
+    - db-opatchauto.yml
+    - docs1.yml
+    - dotprofile_tag.yml
+    - force-en_US-lang.yml
+    - release-build-script.yml
+    - ssh-user-equivalence.yml
+    release_date: '2026-10-29'
   4.2.0:
     changes:
       breaking_changes:

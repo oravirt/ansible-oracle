@@ -1,0 +1,12 @@
+---
+- name: Upgrade PDBs (Unplug/Plug) with Oracle AutoUpgrade
+  hosts: "{{ hostgroup | mandatory }}"
+  any_errors_fatal: true
+  vars:
+    # the upgrade is always executed on the database server
+    autoupgrade_run_local: false
+  tasks:
+    - name: Upgrade PDBs
+      ansible.builtin.import_role:
+        name: opitzconsulting.ansible_oracle.autoupgrade
+        tasks_from: upgrade_deploy.yml

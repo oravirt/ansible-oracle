@@ -1,0 +1,77 @@
+---
+# Unplug/Plug upgrade of ORCLPDB1 from DB2 (19c) into DB1 (26ai)
+#
+# oracle_pdbs is set to the end state: ORCLPDB1 in DB1/db26-si-ee
+# with attribute autoupgrade (source_cdb: DB2).
+# The end state is defined here and not in host_vars/dbfs-upg.yml:
+# converge (manage_db) must never see it.
+#
+# Switch: environment variable AUTOUPGRADE_PHASE, comma separated list of phases
+#   all (default) analyze, fixups, deploy
+#   analyze       analyze phase - the databases are not changed
+#   fixups        fixups phase - fixups are applied in the source CDB/PDB
+#   deploy        deploy phase (upgrade_deploy.yml executes the analyze checks internally)
+#
+#   AUTOUPGRADE_PHASE=analyze task side-effect S=upgrade
+#   AUTOUPGRADE_PHASE=analyze,fixups task side-effect S=upgrade
+#
+# Never import manage_db here: with oracle_pdbs in the end state it would create
+# an empty ORCLPDB1 in DB1 instead of migrating it (see doc/guides/autoupgrade_upgrade.adoc).
+- name: Side-Effect - Check AUTOUPGRADE_PHASE
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Assert AUTOUPGRADE_PHASE
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _upgrade_phases | difference(['all', 'analyze', 'fixups', 'deploy']) | length == 0
+        fail_msg: >-
+          AUTOUPGRADE_PHASE must be all or a comma separated list of analyze, fixups, deploy -
+          not '{{ lookup('ansible.builtin.env', 'AUTOUPGRADE_PHASE') }}'
+      vars:
+        _upgrade_phases: >-
+          {{ lookup('ansible.builtin.env', 'AUTOUPGRADE_PHASE') | default('all', true)
+             | split(',') | map('trim') | list }}
+
+# The plays are switched off with an empty host list ('none' matches no host):
+# 'when' on import_playbook would be inherited by each task only.
+- name: Side-Effect - Analyze phase
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.autoupgrade_upgrade_analyze
+  vars:
+    hostgroup: >-
+      {{ (lookup('ansible.builtin.env', 'AUTOUPGRADE_PHASE') | default('all', true)
+          | split(',') | map('trim') | intersect(['all', 'analyze']) | length > 0)
+         | ternary('all', 'none') }}
+    oracle_pdbs: &oracle_pdbs_end_state
+      - cdb: DB1
+        home: "{{ oracle_db1_home }}"
+        pdb_name: ORCLPDB1
+        listener_port: 1521
+        state: present
+        datafile_dest: /u01/app/oracle/oradata
+        autoupgrade:
+          source_cdb: DB2
+          copy_option: file_name_convert=NONE
+          # archivelog: false => no Guaranteed Restore Point (default of autoupgrade_upgrade_restoration)
+          restoration: false
+          parameters:
+            timezone_upg: "yes"
+
+- name: Side-Effect - Fixups phase
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.autoupgrade_upgrade_fixups
+  vars:
+    hostgroup: >-
+      {{ (lookup('ansible.builtin.env', 'AUTOUPGRADE_PHASE') | default('all', true)
+          | split(',') | map('trim') | intersect(['all', 'fixups']) | length > 0)
+         | ternary('all', 'none') }}
+    oracle_pdbs: *oracle_pdbs_end_state
+
+- name: Side-Effect - Deploy phase
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.autoupgrade_upgrade
+  vars:
+    hostgroup: >-
+      {{ (lookup('ansible.builtin.env', 'AUTOUPGRADE_PHASE') | default('all', true)
+          | split(',') | map('trim') | intersect(['all', 'deploy']) | length > 0)
+         | ternary('all', 'none') }}
+    oracle_pdbs: *oracle_pdbs_end_state

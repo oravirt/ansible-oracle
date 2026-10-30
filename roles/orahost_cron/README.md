@@ -2,7 +2,7 @@
 
 Configure cronjobs for ansible-oracle
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)

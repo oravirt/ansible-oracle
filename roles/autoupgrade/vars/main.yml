@@ -1,0 +1,444 @@
+---
+# Execution on the Ansible controller (delegate_to localhost, run_once, no become)
+_autoupgrade_run_local: "{{ autoupgrade_run_local | bool }}"
+
+_autoupgrade_home: >-
+  {{ _autoupgrade_run_local | bool | ternary(autoupgrade_local_home, autoupgrade_home) }}
+
+_autoupgrade_jar_path: "{{ _autoupgrade_home }}/{{ autoupgrade_jar }}"
+
+# autoupgrade.jar in software repository on the Ansible controller
+_autoupgrade_jar_source_local: >-
+  {{ autoupgrade_jar_filesource | default(oracle_sw_source_local + '/' + autoupgrade_jar, true) }}
+
+# autoupgrade.jar in software repository on the target host (oracle_sw_copy: false)
+_autoupgrade_jar_source_remote: >-
+  {{ autoupgrade_jar_filesource | default(oracle_stage_remote + '/' + autoupgrade_jar, true) }}
+
+_autoupgrade_cfg_dir: "{{ _autoupgrade_home }}/cfg"
+
+# SHA256 of mos_password, when autoupgrade_keystore_password is empty
+_autoupgrade_keystore_password: >-
+  {{ autoupgrade_keystore_password | default('', true)
+     or (mos_password | default('') | hash('sha256')) }}
+
+_autoupgrade_keystore_cfg: "{{ _autoupgrade_cfg_dir }}/keystore.cfg"
+
+# output from 'list' in the keystore console:
+# valid MOS credentials: 'Credentials Loaded' without 'Connection Fail...'
+_autoupgrade_keystore_loaded_regex: "\\(MOS\\) - Credentials Loaded"
+_autoupgrade_keystore_failed_regex: "\\(MOS\\) - Credentials Loaded - Connection Fail"
+
+# _autoupgrade_upgrade_java_home: set by upgrade_analyze.yml (JDK of the target ORACLE_HOME),
+# used when autoupgrade_java_home is empty
+_autoupgrade_java_home: >-
+  {{ _autoupgrade_run_local | bool
+     | ternary(autoupgrade_local_java_home,
+               autoupgrade_java_home | default('', true) or _autoupgrade_upgrade_java_home | default('')) }}
+
+# Proxy for get_url and AutoUpgrade (AutoUpgrade reads lowercase https_proxy):
+# proxy_env from orasw_meta + optional credentials autoupgrade_proxy_username/password
+# => [scheme://]user:password@host:port (URL encoded), only when no credentials are in the URL
+_autoupgrade_proxy_env: >-
+  {%- set ns = namespace(env=proxy_env | default({})) -%}
+  {%- if autoupgrade_proxy_username | length > 0 -%}
+  {%-   set cred = (autoupgrade_proxy_username | urlencode | replace('/', '%2F'))
+                   ~ ':' ~ (autoupgrade_proxy_password | urlencode | replace('/', '%2F')) -%}
+  {%-   for key in ['http_proxy', 'https_proxy'] -%}
+  {%-     set url = ns.env[key] | default('') | string -%}
+  {%-     if url | length > 0 and '@' not in url -%}
+  {%-       set scheme = url | regex_search('^[A-Za-z0-9]+://') or 'http://' -%}
+  {%-       set rest = url | regex_replace('^[A-Za-z0-9]+://', '') -%}
+  {%-       set ns.env = ns.env | combine({key: scheme ~ cred ~ '@' ~ rest}) -%}
+  {%-     endif -%}
+  {%-   endfor -%}
+  {%- endif -%}
+  {{ ns.env }}
+
+# Java options for AutoUpgrade (leading blank or empty).
+# Proxy with credentials: Java disables Basic authentication for HTTPS tunneling by default
+# => enable it with jdk.http.auth.tunneling.disabledSchemes=
+_autoupgrade_java_opts: >-
+  {%- set opts = autoupgrade_java_options | default([]) | list -%}
+  {%- if '@' in (_autoupgrade_proxy_env.https_proxy | default('') | string)
+        or '@' in (_autoupgrade_proxy_env.http_proxy | default('') | string) -%}
+  {%-   set opts = opts + ['-Djdk.http.auth.tunneling.disabledSchemes='] -%}
+  {%- endif -%}
+  {{ (' ' ~ (opts | join(' '))) if opts | length > 0 else '' }}
+
+_autoupgrade_java: >-
+  {{ (_autoupgrade_java_home | length > 0)
+     | ternary(_autoupgrade_java_home + '/bin/java', 'java') }}
+
+# local execution: delegate to controller, run once, no become
+_autoupgrade_delegate_to: >-
+  {{ _autoupgrade_run_local | bool | ternary('localhost', inventory_hostname) }}
+
+_autoupgrade_become: "{{ not (_autoupgrade_run_local | bool) }}"
+
+# oracle_sw_patches usable for AutoUpgrade: database patches for the platform
+# (e.g. p36582781_190000_Linux-x86-64.zip) with a supported release in 'version'.
+# APEX (Generic), cvupack etc. are not usable.
+_autoupgrade_download_sw_patches: >-
+  {{ oracle_sw_patches | default([])
+     | selectattr('version', 'defined')
+     | selectattr('filename', 'defined')
+     | selectattr('filename', 'match', autoupgrade_download_filename_regex)
+     | selectattr('version', 'match', '(' + (autoupgrade_download_supported_releases | map('string') | join('|')) + ')\.')
+     | list }}
+
+# oracle_sw_patches entries not usable for AutoUpgrade
+_autoupgrade_download_skipped: >-
+  {{ oracle_sw_patches | default([])
+     | rejectattr('filename', 'in', _autoupgrade_download_sw_patches | map(attribute='filename') | list)
+     | list }}
+
+# Releases from oracle_sw_patches, db_homes_installed and GI (same sources as orasw_download_patches)
+_autoupgrade_download_all_versions: >-
+  {%- set ns = namespace(v=[]) -%}
+  {%- for p in _autoupgrade_download_sw_patches -%}
+  {%-   set ns.v = ns.v + [p.version | string] -%}
+  {%- endfor -%}
+  {%- for h in db_homes_installed | default([]) -%}
+  {%-   if db_homes_config[h.home]['version'] is defined -%}
+  {%-     set ns.v = ns.v + [db_homes_config[h.home]['version'] | string] -%}
+  {%-   endif -%}
+  {%- endfor -%}
+  {%- if oracle_install_option_gi | default('') in ('CRS_CONFIG', 'HA_CONFIG')
+        and oracle_install_version_gi is defined -%}
+  {%-   set ns.v = ns.v + [oracle_install_version_gi | string] -%}
+  {%- endif -%}
+  {{ ns.v | unique }}
+
+_autoupgrade_download_releases: >-
+  {{ _autoupgrade_download_all_versions
+     | map('split', '.') | map('first') | map('int')
+     | select('in', autoupgrade_download_supported_releases | map('int') | list)
+     | unique | sort }}
+
+# AutoUpgrade does not accept RU/OJVM by patch number => keywords are used:
+#   autoupgrade_patch attribute in oracle_sw_patches (explicit, e.g. 'RU:19.24', 'DPBP')
+#   ru_version (e.g. 19.24.0.0.240716) => RU:19.24
+#   description with 'OJVM'            => OJVM
+#   others                             => patchid (one-off)
+_autoupgrade_download_derived: >-
+  {%- set ns = namespace(res=[]) -%}
+  {%- for r in _autoupgrade_download_releases -%}
+  {%-   set ns.tok = ['OPATCH'] -%}
+  {%-   for p in _autoupgrade_download_sw_patches | selectattr('version', 'match', r | string + '\.') -%}
+  {%-     set desc = p.description | default('') | string -%}
+  {%-     if p.autoupgrade_patch is defined -%}
+  {%-       set t = p.autoupgrade_patch | string -%}
+  {%-     elif p.ru_version is defined -%}
+  {%-       set t = 'RU:' + (p.ru_version | string).split('.')[0:2] | join('.') -%}
+  {%-     elif desc is search('OJVM', ignorecase=true) -%}
+  {%-       set t = 'OJVM' -%}
+  {%-     else -%}
+  {%-       set t = p.patchid | string -%}
+  {%-     endif -%}
+  {%-     set ns.tok = ns.tok + [t] -%}
+  {%-   endfor -%}
+  {%-   set ns.res = ns.res + [{'target_version': r, 'patch': ns.tok | unique | join(',')}] -%}
+  {%- endfor -%}
+  {{ ns.res }}
+
+# effective list for the AutoUpgrade config file
+_autoupgrade_download_list: >-
+  {{ autoupgrade_download_patches
+     + (autoupgrade_download_use_oracle_sw_patches | bool | ternary(_autoupgrade_download_derived, [])) }}
+
+# expected files from oracle_sw_patches after download
+_autoupgrade_download_expected: >-
+  {{ _autoupgrade_download_sw_patches | map(attribute='filename') | unique | list }}
+
+# Gold Images from patches_info.json (autoupgrade_download_gold_image_rename)
+# src:  filename created by AutoUpgrade, e.g. db_goldimage_19_32_20261021112350.zip
+# dest: autoupgrade_download_gold_image_prefix + release + .zip
+#       19.32.0.0.0 => 19.32, 23.26.3.0.0 => 26.03 (23ai with RU >= 23.26)
+_autoupgrade_gold_images: >-
+  {%- set ns = namespace(res=[]) -%}
+  {%- set info = (_autoupgrade_patches_info.content | default('') | b64decode or '{}') | from_json -%}
+  {%- for p in info.patches | default([]) -%}
+  {%-   if p.description | default('') is search('Gold Image') and p.releaseUpdate is defined -%}
+  {%-     set v = (p.releaseUpdate | string).split('.') -%}
+  {%-     if v[0] | int == 23 and v[1] | default(0) | int >= 26 -%}
+  {%-       set rel = v[1] ~ '.' ~ ('%02d' | format(v[2] | default(0) | int)) -%}
+  {%-     else -%}
+  {%-       set rel = v[0] ~ '.' ~ v[1] | default('0') -%}
+  {%-     endif -%}
+  {%-     for f in p.files | default([]) -%}
+  {%-       set ns.res = ns.res + [{'src': f.name, 'dest': autoupgrade_download_gold_image_prefix ~ rel ~ '.zip'}] -%}
+  {%-     endfor -%}
+  {%-   endif -%}
+  {%- endfor -%}
+  {{ ns.res }}
+
+# Upgrade of PDBs with Unplug/Plug (upgrade_analyze.yml / upgrade_deploy.yml)
+#
+# oracle_pdbs defines the end state (cdb/home = target CDB/ORACLE_HOME),
+# the attribute autoupgrade defines the source CDB.
+# PDBs with attribute autoupgrade, optional limited by autoupgrade_upgrade_pdbs
+_autoupgrade_upgrade_pdb_list: >-
+  {{ oracle_pdbs | default([])
+     | selectattr('autoupgrade', 'defined')
+     | selectattr('state', 'defined') | selectattr('state', 'equalto', 'present')
+     | selectattr('pdb_name', 'in',
+                  autoupgrade_upgrade_pdbs | default([], true)
+                  or (oracle_pdbs | default([]) | map(attribute='pdb_name') | list))
+     | list }}
+
+# One AutoUpgrade job for all PDBs with the same source and target CDB:
+#   name, source_cdb, target_cdb, source_sid, target_sid,
+#   source_home_key, target_home_key, target_cdb_home_key, target_cdb_defined,
+#   pdbs: [{source_name, target_name, copy_option, restoration, parameters}]
+_autoupgrade_upgrade_jobs: >-
+  {%- set ns = namespace(jobs={}) -%}
+  {%- for p in _autoupgrade_upgrade_pdb_list -%}
+  {%-   set au = p.autoupgrade if p.autoupgrade is mapping else {} -%}
+  {%-   set src_cdb = au.source_cdb | default('') -%}
+  {%-   set src_db = oracle_databases | default([]) | selectattr('oracle_db_name', 'equalto', src_cdb) | first | default({}) -%}
+  {%-   set tgt_db = oracle_databases | default([]) | selectattr('oracle_db_name', 'equalto', p.cdb) | first | default({}) -%}
+  {%-   set src_sid = au.source_sid | default(src_db.oracle_db_instance_name
+                      | default(src_db.oracle_db_unique_name | default(src_cdb))) -%}
+  {%-   set tgt_sid = tgt_db.oracle_db_instance_name | default(tgt_db.oracle_db_unique_name | default(p.cdb)) -%}
+  {%-   set key = src_sid ~ '_' ~ tgt_sid -%}
+  {%-   set job = ns.jobs[key] | default({
+          'name': key,
+          'source_cdb': src_cdb,
+          'target_cdb': p.cdb,
+          'source_sid': src_sid,
+          'target_sid': tgt_sid,
+          'source_home_key': au.source_home | default(src_db.home | default('')),
+          'target_home_key': p.home | default(tgt_db.home | default('')),
+          'target_cdb_home_key': tgt_db.home | default(''),
+          'target_cdb_defined': tgt_db | length > 0,
+          'pdbs': []}) -%}
+  {%-   set pdb = {
+          'source_name': au.source_pdb_name | default(p.pdb_name),
+          'target_name': p.pdb_name,
+          'copy_option': au.copy_option | default(''),
+          'restoration': au.restoration | default(autoupgrade_upgrade_restoration) | bool,
+          'parameters': autoupgrade_upgrade_parameters | default({}, true)
+                        | combine(au.parameters | default({}, true))} -%}
+  {%-   set ns.jobs = ns.jobs | combine({key: job | combine({'pdbs': job.pdbs + [pdb]})}) -%}
+  {%- endfor -%}
+  {{ ns.jobs.values() | list }}
+
+# parameters managed by the role
+_autoupgrade_upgrade_reserved_parameters: [sid, source_home, target_home, target_cdb, pdbs, log_dir, restoration]
+
+# per AutoUpgrade job: requires loop_var aupjob
+_autoupgrade_upgrade_source_home: >-
+  {{ (db_homes_config[aupjob.source_home_key]['oracle_home']
+      | default(oracle_base + '/' + db_homes_config[aupjob.source_home_key]['version'] | string
+                + '/' + aupjob.source_home_key))
+     | regex_replace('/$', '') }}
+
+_autoupgrade_upgrade_target_home: >-
+  {{ (db_homes_config[aupjob.target_home_key]['oracle_home']
+      | default(oracle_base + '/' + db_homes_config[aupjob.target_home_key]['version'] | string
+                + '/' + aupjob.target_home_key))
+     | regex_replace('/$', '') }}
+
+_autoupgrade_upgrade_log_dir: "{{ autoupgrade_log_dir }}/{{ aupjob.name }}"
+
+_autoupgrade_upgrade_cfg: "{{ _autoupgrade_cfg_dir }}/upgrade_{{ aupjob.name }}.cfg"
+
+# Recovery data of AutoUpgrade (global.global_log_dir is the job directory => recovery data per job)
+# config_files/upgradeJobs.bin exists after a deploy - finished or not.
+_autoupgrade_upgrade_recovery_dir: "{{ _autoupgrade_upgrade_log_dir }}/cfgtoollogs/upgrade/auto"
+
+# [Status] of all jobs in state.txt, e.g. FINISHED
+_autoupgrade_upgrade_recovery_statuses: >-
+  {{ (_autoupgrade_upgrade_recovery_state.content | default('') | b64decode)
+     | regex_findall('\[Status\]\s+(\S+)') }}
+
+# none:       no recovery data
+# finished:   recovery data of a finished deploy
+# unfinished: recovery data of an interrupted/failed deploy => resume with deploy
+_autoupgrade_upgrade_recovery: >-
+  {%- if not (_autoupgrade_upgrade_recovery_jobs.stat.exists | default(false)) -%}none
+  {%- elif _autoupgrade_upgrade_recovery_statuses | length > 0
+           and _autoupgrade_upgrade_recovery_statuses | reject('equalto', 'FINISHED') | list | length == 0 -%}finished
+  {%- else -%}unfinished
+  {%- endif -%}
+
+# restoration and parameters are identical for all PDBs of a job (checked by upgrade_analyze.yml)
+_autoupgrade_upgrade_parameters: "{{ (aupjob.pdbs | first).parameters }}"
+
+# upg1.restoration (Guaranteed Restore Point), default: no
+_autoupgrade_upgrade_restoration: "{{ (aupjob.pdbs | first).restoration | ternary('yes', 'no') }}"
+
+# State of source and target CDB from upgrade_query_cdb.sh output:
+#   HOME=<ORACLE_HOME of running instance>
+#   PDB=<name>:<open_mode>
+_autoupgrade_upgrade_source_out: "{{ _autoupgrade_upgrade_query.results[0].stdout_lines | default([]) }}"
+_autoupgrade_upgrade_target_out: "{{ _autoupgrade_upgrade_query.results[1].stdout_lines | default([]) }}"
+
+_autoupgrade_upgrade_source_running_home: >-
+  {{ _autoupgrade_upgrade_source_out | select('match', '^HOME=') | map('regex_replace', '^HOME=', '')
+     | first | default('') | regex_replace('/$', '') }}
+_autoupgrade_upgrade_target_running_home: >-
+  {{ _autoupgrade_upgrade_target_out | select('match', '^HOME=') | map('regex_replace', '^HOME=', '')
+     | first | default('') | regex_replace('/$', '') }}
+
+_autoupgrade_upgrade_source_pdbs: >-
+  {{ _autoupgrade_upgrade_source_out | select('match', '^PDB=')
+     | map('regex_replace', '^PDB=([^:]*):.*$', '\1') | list }}
+_autoupgrade_upgrade_target_pdbs: >-
+  {{ _autoupgrade_upgrade_target_out | select('match', '^PDB=')
+     | map('regex_replace', '^PDB=([^:]*):.*$', '\1') | list }}
+_autoupgrade_upgrade_target_open_modes: >-
+  {%- set ns = namespace(res={}) -%}
+  {%- for l in _autoupgrade_upgrade_target_out | select('match', '^PDB=') -%}
+  {%-   set v = (l | regex_replace('^PDB=', '')).split(':') -%}
+  {%-   set ns.res = ns.res | combine({v[0] | upper: v[1] | default('')}) -%}
+  {%- endfor -%}
+  {{ ns.res }}
+
+# state per PDB:
+#   pending:  in source CDB, not in target CDB => upgrade
+#   upgraded: in target CDB, not in source CDB => nothing to do
+#   conflict: in source and target CDB (e.g. created in target CDB by manage_db)
+#   missing:  neither in source nor in target CDB
+_autoupgrade_upgrade_pdb_states: >-
+  {%- set ns = namespace(res=[]) -%}
+  {%- for p in aupjob.pdbs -%}
+  {%-   set in_src = p.source_name | upper in _autoupgrade_upgrade_source_pdbs | map('upper') | list -%}
+  {%-   set in_tgt = p.target_name | upper in _autoupgrade_upgrade_target_pdbs | map('upper') | list -%}
+  {%-   if in_src and not in_tgt -%}{%- set st = 'pending' -%}
+  {%-   elif in_tgt and not in_src -%}{%- set st = 'upgraded' -%}
+  {%-   elif in_src and in_tgt -%}{%- set st = 'conflict' -%}
+  {%-   else -%}{%- set st = 'missing' -%}{%- endif -%}
+  {%-   set ns.res = ns.res + [p | combine({'state': st})] -%}
+  {%- endfor -%}
+  {{ ns.res }}
+
+_autoupgrade_upgrade_pending_pdbs: "{{ _autoupgrade_upgrade_pdb_states | selectattr('state', 'equalto', 'pending') | list }}"
+
+# all checks from the checklist JSON files of the current AutoUpgrade job (prechecks/*_checklist.json)
+# The structure of the file is not documented by Oracle
+# => collect all objects with an attribute 'severity' at any level.
+_autoupgrade_upgrade_checks: >-
+  {%- macro walk(o) -%}
+  {%-   if o is mapping -%}
+  {%-     if 'severity' in o -%}{{ o | to_json }}{{ '\n' }}{%- endif -%}
+  {%-     for v in o.values() -%}{{ walk(v) }}{%- endfor -%}
+  {%-   elif o is iterable and o is not string -%}
+  {%-     for v in o -%}{{ walk(v) }}{%- endfor -%}
+  {%-   endif -%}
+  {%- endmacro -%}
+  {%- set ns = namespace(out='') -%}
+  {%- for f in _autoupgrade_upgrade_checklist.results | default([]) -%}
+  {%-   set ns.out = ns.out ~ walk((f.content | default('') | b64decode or '{}') | from_json) -%}
+  {%- endfor -%}
+  {{ ns.out.split('\n') | reject('equalto', '') | map('from_json') | list }}
+
+# severity ERROR without fixup from AutoUpgrade => blocks the upgrade
+_autoupgrade_upgrade_blocking_checks: >-
+  {%- set ns = namespace(res=[]) -%}
+  {%- for c in _autoupgrade_upgrade_checks -%}
+  {%-   if (c.severity | string | upper) == 'ERROR'
+          and ((c.fixup_available | default('NO') | string | upper) not in ['YES', 'TRUE']
+               or (c.runfix | default('YES') | string | upper) == 'NO') -%}
+  {%-     set ns.res = ns.res + [c] -%}
+  {%-   endif -%}
+  {%- endfor -%}
+  {{ ns.res }}
+
+# files of the current AutoUpgrade job: <log_dir>/<sid>/<job number>/...
+# The newest checklist belongs to the current job.
+_autoupgrade_upgrade_job_dir: >-
+  {{ (_autoupgrade_upgrade_job_files.files | default([])
+      | selectattr('path', 'search', '/prechecks/[^/]*_checklist\.json$')
+      | sort(attribute='mtime') | map(attribute='path') | last | default(''))
+     | regex_replace('/prechecks/[^/]*$', '') }}
+
+_autoupgrade_upgrade_job_file_list: >-
+  {{ _autoupgrade_upgrade_job_files.files | default([])
+     | selectattr('path', 'match', (_autoupgrade_upgrade_job_dir | regex_escape) ~ '/')
+     | map(attribute='path') | list
+     if _autoupgrade_upgrade_job_dir | length > 0 else [] }}
+
+# User friendly error message for a failed execution of AutoUpgrade
+# requires: _autoupgrade_upgrade_result (registered result), _autoupgrade_upgrade_result_mode, aupjob
+_autoupgrade_upgrade_error_msg: >-
+  {%- set r = _autoupgrade_upgrade_result | default({}) -%}
+  {%- set out = (r.stdout_lines | default([]) + r.stderr_lines | default([]))
+                | map('replace', '\t', '  ') | map('trim') | reject('equalto', '') | list -%}
+  {%- set text = out | join(' ') -%}
+  {%- if 'unfinished execution of a deploy mode' in text -%}
+  {%-   set hint = ['AutoUpgrade found recovery data of a former deploy for this config file.',
+                    'Resume the deploy with playbook autoupgrade_upgrade.yml (deploy phase).',
+                    'Only when the PDBs were restored manually and the upgrade must start from the beginning:',
+                    'discard the recovery data with -e autoupgrade_upgrade_clear_recovery_data=true.'] -%}
+  {%- elif r.msg | default('') is search('did not complete within the requested time') -%}
+  {%-   set hint = ['The deploy did not finish within autoupgrade_upgrade_timeout (' ~ autoupgrade_upgrade_timeout ~ ' seconds).',
+                    'AutoUpgrade may still be running on ' ~ inventory_hostname ~ '. Check the logfiles.'] -%}
+  {%- elif _autoupgrade_upgrade_result_mode == 'deploy' -%}
+  {%-   set hint = ['Fix the problem and execute the deploy phase again - AutoUpgrade resumes the job.'] -%}
+  {%- else -%}
+  {%-   set hint = ['Check the logfiles of AutoUpgrade.'] -%}
+  {%- endif -%}
+  {{ ['AutoUpgrade failed',
+      'Job:          ' ~ aupjob.name ~ ' (' ~ aupjob.source_cdb ~ ' => ' ~ aupjob.target_cdb ~ ')',
+      'Mode:         ' ~ _autoupgrade_upgrade_result_mode,
+      'Return code:  ' ~ (r.rc | default('-') | string),
+      'Config file:  ' ~ _autoupgrade_upgrade_cfg,
+      'Logfiles:     ' ~ _autoupgrade_upgrade_log_dir,
+      '              ' ~ _autoupgrade_upgrade_recovery_dir ~ '/autoupgrade.log']
+     + ((r.msg | default('') | length > 0 and r.msg != 'non-zero return code') | ternary(['Ansible:      ' ~ r.msg], []))
+     + ['--- Output of AutoUpgrade ---'] + (out or ['(no output)'])
+     + ['--- What to do ---'] + hint }}
+
+# Check of the connection to Oracle (proxy_check.yml)
+# proxy URL without password for messages
+_autoupgrade_proxy_display: >-
+  {{ (_autoupgrade_proxy_env.https_proxy | default('') | string
+      | regex_replace('(://[^:/@]*):[^@]*@', '\1:***@'))
+     or 'none (direct connection)' }}
+
+# failed URLs with a hint for the cause: requires _autoupgrade_proxy_check_res (registered loop of uri)
+_autoupgrade_proxy_check_failures: >-
+  {%- set ns = namespace(res=[]) -%}
+  {%- set proxy = _autoupgrade_proxy_env.https_proxy | default('') | string -%}
+  {%- for r in _autoupgrade_proxy_check_res.results | default([]) -%}
+  {%-   if (r.status | default(-1) | int) <= 0 -%}
+  {%-     set m = r.msg | default('') | string -%}
+  {%-     if m is search('407') -%}
+  {%-       set hint = 'Proxy authentication failed (407): check autoupgrade_proxy_username / autoupgrade_proxy_password or the credentials in https_proxy.' -%}
+  {%-     elif m is search('Tunnel connection failed: 403') -%}
+  {%-       set hint = 'The proxy denies the connection (403): the target is not allowed by the proxy. Ask the proxy administrator.' -%}
+  {%-     elif m is search('Tunnel connection failed') -%}
+  {%-       set hint = 'The proxy refused the connection: ' ~ (m | regex_search('Tunnel connection failed: [^>]*') | default('')) -%}
+  {%-     elif m is search('Name or service not known|Temporary failure in name resolution|nodename nor servname|No address associated') -%}
+  {%-       set hint = (proxy | length > 0) | ternary('Name resolution failed: check the hostname of the proxy in https_proxy.',
+                                                     'Name resolution failed and no proxy is configured: set https_proxy, when the internet is reachable through a proxy only.') -%}
+  {%-     elif m is search('Connection refused') -%}
+  {%-       set hint = (proxy | length > 0) | ternary('Connection refused: check the port in https_proxy and that the proxy is running.',
+                                                     'Connection refused without proxy: set https_proxy, when the internet is reachable through a proxy only.') -%}
+  {%-     elif m is search('timed out|Network is unreachable|No route to host') -%}
+  {%-       set hint = (proxy | length > 0) | ternary('No connection to the proxy (timeout/no route): check https_proxy and the firewall to the proxy.',
+                                                     'No route to the internet and no proxy configured: set https_proxy.') -%}
+  {%-     elif m is search('CERTIFICATE_VERIFY_FAILED|certificate verify failed') -%}
+  {%-       set hint = 'TLS certificate not trusted: the proxy probably inspects TLS. Add the CA of the proxy to the trust store of the host and of Java.' -%}
+  {%-     else -%}
+  {%-       set hint = 'Connection failed. Check https_proxy, no_proxy and the firewall.' -%}
+  {%-     endif -%}
+  {%-     set ns.res = ns.res + [{'url': r.aupu | default(r.url | default('')), 'error': m | regex_replace('^Status code was -1 and not \[[^]]*\]: ', ''), 'hint': hint}] -%}
+  {%-   endif -%}
+  {%- endfor -%}
+  {{ ns.res }}
+
+# lines for the debug output of a failed check of the connection
+_autoupgrade_proxy_check_details: >-
+  {%- set ns = namespace(lines=[
+        'No connection to Oracle',
+        'Executed on: ' ~ ((_autoupgrade_proxy_check_controller | default(false) | bool)
+                           | ternary('Ansible controller', _autoupgrade_delegate_to)),
+        'Proxy:       ' ~ _autoupgrade_proxy_display,
+        'no_proxy:    ' ~ (_autoupgrade_proxy_env.no_proxy | default('') or '-')]) -%}
+  {%- for f in _autoupgrade_proxy_check_failures -%}
+  {%-   set ns.lines = ns.lines + ['--- ' ~ f.url ~ ' ---', 'Error: ' ~ f.error, 'Hint:  ' ~ f.hint] -%}
+  {%- endfor -%}
+  {{ ns.lines }}

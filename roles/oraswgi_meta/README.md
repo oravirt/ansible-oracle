@@ -11,7 +11,7 @@ This role has a dependency to `orahost_meta`.
 
 There are a lot of variables who are used by `orasw_meta`
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -44,8 +44,7 @@ Do not change it!
 #### Default value
 
 ```YAML
-_grid_install_user: '{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user
-  }}{% endif %}'
+_grid_install_user: '{% if role_separation %}{{ grid_user }}{% else %}{{ oracle_user }}{% endif %}'
 ```
 
 ### _oraswgi_meta_configure_cluster

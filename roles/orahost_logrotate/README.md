@@ -2,7 +2,7 @@
 
 Configure logrotate for ansible-oracle
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -52,8 +52,7 @@ logrotate_config:
       - dateext
       - compress
   - name: oracle_rman
-    file: "{{ rman_cron_logdir | default('/var/log/oracle/rman/log') }}/*.log {{ oracle_base
-      }}/admin/*/rman/*.log {{ oracle_base }}/admin/*/rman/log/*.log"
+    file: "{{ rman_cron_logdir | default('/var/log/oracle/rman/log') }}/*.log {{ oracle_base }}/admin/*/rman/*.log {{ oracle_base }}/admin/*/rman/log/*.log"
     options:
       - missingok
       - notifempty
@@ -78,8 +77,7 @@ oracle_cleanup_days: 14
 #### Default value
 
 ```YAML
-oracle_home_gi: '{% if _oraswgi_meta_configure_cluster %}{{ oracle_home_gi_cl }}{%
-  else %}{{ oracle_home_gi_so }}{% endif %}'
+oracle_home_gi: '{% if _oraswgi_meta_configure_cluster %}{{ oracle_home_gi_cl }}{% else %}{{ oracle_home_gi_so }}{% endif %}'
 ```
 
 ### oracle_home_gi_cl

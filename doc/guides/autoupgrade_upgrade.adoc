@@ -1,0 +1,681 @@
+:toc:
+:toc-placement!:
+:toclevels: 4
+toc::[]
+
+:sectnums:
+:sectnumlevels: 4
+
+== Upgrade of PDBs with AutoUpgrade (Unplug/Plug)
+
+IMPORTANT: The upgrade of PDBs is _experimental_. +
+Supported is the Unplug/Plug upgrade of PDBs from a CDB of the old release (e.g. 19c)
+into an existing CDB of the new release (e.g. 26ai) on the same host.
+
+The role `autoupgrade` upgrades PDBs with Oracle AutoUpgrade (`autoupgrade.jar`).
+AutoUpgrade unplugs the PDBs from the source CDB, plugs them into the target CDB and upgrades them there.
+The installation of AutoUpgrade and the general settings are described in link:autoupgrade.adoc[autoupgrade.adoc].
+
+The upgrade is split into 3 phases. The names are the AutoUpgrade modes:
+
+.Phases of the upgrade
+[options="header,footer"]
+|=======================
+|Phase |Task file |Playbook |AutoUpgrade |Downtime |Database changed
+|Analyze | `upgrade_analyze.yml` | `autoupgrade_upgrade_analyze.yml` | `-mode analyze` | no | no
+|Fixups | `upgrade_fixups.yml` | `autoupgrade_upgrade_fixups.yml` | `-mode fixups` | no | yes, the source CDB/PDBs (e.g. statistics, recyclebin)
+|Deploy | `upgrade_deploy.yml` | `autoupgrade_upgrade.yml` | analyze phase, then `-mode deploy` | yes, for the PDBs | yes
+|=======================
+
+IMPORTANT: The analyze phase is always the first step. +
+`upgrade_deploy.yml` executes `upgrade_analyze.yml` first and starts the upgrade only, when the analyze phase was successful. +
+The fixups phase is optional. It applies the fixups some time before the deploy and shortens the downtime.
+Without it, AutoUpgrade applies the fixups during the deploy.
+
+=== End state in oracle_pdbs
+
+`oracle_pdbs` always defines the _end state_ of a PDB.
+For the upgrade this is the PDB in the target CDB of the new release:
+
+- `cdb`: the target CDB
+- `home`: the target `ORACLE_HOME`
+
+The source of the PDB is defined with the attribute `autoupgrade` of the PDB.
+It is used by the role `autoupgrade` only.
+
+[WARNING]
+====
+*Do not execute playbook `manage_db` between the change of `oracle_pdbs` and the upgrade!*
+
+As soon as a PDB in `oracle_pdbs` points to the target CDB, `oradb_manage_pdb` (playbook `manage_db`)
+tries to reach this end state. It does not know AutoUpgrade and *creates a new, empty PDB* in the target CDB
+instead of migrating the existing PDB.
+
+- The analyze phase detects this situation (PDB exists in source _and_ target CDB, state `conflict`) and fails.
+  The empty PDB must be dropped manually before the upgrade.
+- Execute `manage_db` again only after a successful upgrade (`autoupgrade_upgrade.yml`).
+- Prepare everything, which needs `manage_db` (e.g. the target CDB), _before_ `oracle_pdbs` is changed.
+====
+
+=== Upgrade vs. Out-of-Place Patching
+
+Both procedures move a database into a new `ORACLE_HOME`. They must not be mixed up.
+
+.Upgrade vs. Out-of-Place Patching
+[options="header,footer"]
+|=======================
+|Topic |Upgrade (this guide) |link:out_of_place_patching.adoc[Out-of-Place Patching]
+|Release of the new `ORACLE_HOME` | new release, e.g. 19c => 26ai | same release, new Release Update, e.g. 19.32 => 19.33
+|Object | PDB, moved into another CDB | CDB with all PDBs
+|Executed by | role `autoupgrade` (`upgrade_deploy.yml`) | role `oradb_manage_db` (`switch_home.yml`)
+|Inventory | `cdb`/`home` in `oracle_pdbs` (end state) + attribute `autoupgrade` (source) | change of `home` in `oracle_databases`
+|Playbook | `autoupgrade_upgrade.yml` - _not_ `manage_db` | `manage_db`
+|Dictionary | upgraded by AutoUpgrade | `datapatch`
+|=======================
+
+`oradb_manage_db` refuses the switch of the `ORACLE_HOME` of a CDB, when the release of the old and the new
+`ORACLE_HOME` differs (`oraversion -majorVersion`).
+
+=== Requirements
+
+- Source and target `ORACLE_HOME` are installed (`db_homes_config`, `db_homes_installed`, playbook `swdb`)
+- The source CDB is running from the source `ORACLE_HOME`
+- The target CDB exists and is running from the target `ORACLE_HOME`.
+  It is created with playbook `manage_db` _before_ the PDBs are changed in `oracle_pdbs`.
+  26ai supports Container Databases only.
+- AutoUpgrade (`autoupgrade.jar`) in the software repository. It is installed on the database server by the task files.
+- Java: the JDK of the target `ORACLE_HOME` is used, when `autoupgrade_java_home` is empty
+- AutoUpgrade is executed on the database server as `oracle_user`.
+  The playbooks set `autoupgrade_run_local: false`.
+  The task files fail with `autoupgrade_run_local: true`.
+- The Python module `pexpect` is _not_ needed for the upgrade
+- Upgrade paths, minimum Release Updates, character sets, components etc. follow the rules of Oracle for AutoUpgrade
+
+=== Configuration
+
+==== Attribute autoupgrade in oracle_pdbs
+
+Only PDBs with the attribute `autoupgrade` and `state: present` are processed.
+
+.Attributes of `autoupgrade` in `oracle_pdbs`
+[options="header,footer"]
+|=======================
+|Attribute |Mandatory |Description
+|`source_cdb` | yes | `oracle_db_name` of the source CDB. Must differ from `cdb`.
+|`source_home` | no | Key in `db_homes_config` of the source `ORACLE_HOME`. Default: `home` of `source_cdb` in `oracle_databases`. Mandatory, when the source CDB is not in `oracle_databases`.
+|`source_sid` | no | SID of the source CDB. Default: `oracle_db_instance_name`, `oracle_db_unique_name` or `oracle_db_name` of `source_cdb` in `oracle_databases`, otherwise `source_cdb`.
+|`source_pdb_name` | no | Name of the PDB in the source CDB. Default: `pdb_name`. A different name renames the PDB (`upg1.target_pdb_name.<pdb>`).
+|`copy_option` | no | `upg1.target_pdb_copy_option.<pdb>`, e.g. `file_name_convert=NONE`. Default: NOCOPY - the datafiles are reused, no fallback with the source CDB. See <<Datafiles: NOCOPY or copy>>.
+|`restoration` | no | `true`: Guaranteed Restore Point before the upgrade. Default: `autoupgrade_upgrade_restoration` (`false`)
+|`parameters` | no | Dict with AutoUpgrade parameters (`upg1.<key>=<value>`). Overrides `autoupgrade_upgrade_parameters`.
+|=======================
+
+The target is taken from the PDB itself (end state):
+
+- `cdb`: target CDB. It must be defined in `oracle_databases`.
+- `home`: target `ORACLE_HOME`. It must be the same as `home` of the target CDB in `oracle_databases`.
+
+.Example: move ORCLPDB1 from DB2 (19c) into DB26 (26ai)
+----
+db_homes_config:
+  db1932-si-ee:
+    version: 19.3.0.0
+    oracle_home: /u01/app/oracle/product/19/db_19.32
+    edition: EE
+    readonly_home: true
+    oracle_home_name: db1932siee
+  db26-si-ee:
+    version: 26.1.0.0
+    oracle_home: /u01/app/oracle/product/26/db_26.1
+    edition: EE
+    readonly_home: true
+    oracle_home_name: db261siee
+
+oracle_databases:
+  - oracle_db_name: DB2          # source CDB in 19c
+    home: db1932-si-ee
+    state: present
+    # ...
+  - oracle_db_name: DB26         # target CDB in 26ai - created before the upgrade
+    home: db26-si-ee
+    is_container: true
+    state: present
+    # ...
+
+oracle_pdbs:
+  - cdb: DB26                    # end state: target CDB
+    home: db26-si-ee             # end state: target ORACLE_HOME
+    pdb_name: ORCLPDB1
+    state: present
+    autoupgrade:
+      source_cdb: DB2            # source CDB
+      parameters:
+        timezone_upg: "yes"
+----
+
+==== AutoUpgrade jobs
+
+All PDBs with the same source CDB and the same target CDB are upgraded in one AutoUpgrade job.
+
+- Config file: `autoupgrade_home`/cfg/`upgrade_<source SID>_<target SID>.cfg`
+- Log directory: `autoupgrade_log_dir`/`<source SID>_<target SID>`
+- `restoration` and `parameters` must be identical for all PDBs of a job
+- Only PDBs, which are still in the source CDB, are written into `upg1.pdbs`.
+  An interrupted upgrade continues with the remaining PDBs.
+
+.Parameters set by the role
+[options="header,footer"]
+|=======================
+|AutoUpgrade |Value
+|`upg1.sid` | SID of the source CDB
+|`upg1.source_home` | `oracle_home` of the source `ORACLE_HOME` in `db_homes_config`
+|`upg1.target_home` | `oracle_home` of `home` of the PDB in `db_homes_config`
+|`upg1.target_cdb` | SID of `cdb` of the PDB
+|`upg1.pdbs` | PDBs in the source CDB (`source_pdb_name`)
+|`upg1.target_pdb_name.<pdb>` | `pdb_name`, when it differs from `source_pdb_name`
+|`upg1.target_pdb_copy_option.<pdb>` | `copy_option`
+|`upg1.log_dir` | `autoupgrade_log_dir`/<job>
+|`upg1.restoration` | `restoration` or `autoupgrade_upgrade_restoration` => `yes`/`no`
+|`global.global_log_dir` | `autoupgrade_log_dir`/<job> - recovery data of AutoUpgrade per job
+|=======================
+
+`sid`, `source_home`, `target_home`, `target_cdb`, `pdbs`, `log_dir` and `restoration`
+must not be used in `parameters`.
+
+.Resulting config file upgrade_DB2_DB26.cfg
+----
+global.global_log_dir=/u01/app/oracle/cfgtoollogs/autoupgrade
+
+upg1.sid=DB2
+upg1.source_home=/u01/app/oracle/product/19/db_19.32
+upg1.target_home=/u01/app/oracle/product/26/db_26.1
+upg1.target_cdb=DB26
+upg1.pdbs=ORCLPDB1
+upg1.log_dir=/u01/app/oracle/cfgtoollogs/autoupgrade/DB2_DB26
+upg1.restoration=no
+upg1.timezone_upg=yes
+----
+
+==== Further parameters
+
+All other AutoUpgrade parameters are passed unchanged.
+Booleans are converted into `yes`/`no`.
+
+.Parameters for the upgrade
+[options="header,footer"]
+|=======================
+|Variable |Scope |Result
+|`autoupgrade_upgrade_parameters` | all jobs | `upg1.<key>=<value>`
+|`autoupgrade.parameters` in `oracle_pdbs` | one job, overrides `autoupgrade_upgrade_parameters` | `upg1.<key>=<value>`
+|`autoupgrade_upgrade_global_parameters` | config file | `global.<key>=<value>`
+|=======================
+
+.Frequently used AutoUpgrade parameters (see Oracle documentation)
+[options="header,footer"]
+|=======================
+|Parameter |Description
+|`timezone_upg` | `yes`: upgrade the time zone file of the PDB during the upgrade
+|`drop_grp_after_upgrade` | `yes`: drop the guaranteed restore point after a successful upgrade
+|`run_utlrp` | Recompile invalid objects after the upgrade
+|`before_action` / `after_action` | Scripts before/after the upgrade
+|=======================
+
+==== Variables of the role
+
+.Variables for the upgrade
+[options="header,footer"]
+|=======================
+|Variable |Default |Description
+|`autoupgrade_upgrade_pdbs` | `[]` | Limit to these PDBs (`pdb_name`). Empty: all PDBs with attribute `autoupgrade`.
+|`autoupgrade_upgrade_restoration` | `false` | Guaranteed Restore Point before the upgrade (`upg1.restoration`)
+|`autoupgrade_upgrade_parameters` | `{}` | AutoUpgrade parameters for all jobs
+|`autoupgrade_upgrade_global_parameters` | `{}` | Additional `global.*` parameters
+|`autoupgrade_upgrade_fail_on_precheck_errors` | `true` | Fail the analyze/fixups phase on errors without automatic fixup
+|`autoupgrade_upgrade_clear_recovery_data` | `false` | Discard the recovery data of AutoUpgrade before the analyze phase. See <<Recovery data of AutoUpgrade>>.
+|`autoupgrade_upgrade_timeout` | `21600` | Maximum runtime in seconds of the deploy per job
+|`autoupgrade_upgrade_poll` | `60` | Poll interval in seconds during the deploy
+|`autoupgrade_java_home` | `''` | JAVA_HOME. Empty: `<target ORACLE_HOME>/jdk`
+|=======================
+
+NOTE: The attribute `autoupgrade` in `oracle_databases` is not supported.
+The analyze phase fails, when it is found.
+
+=== Datafiles: NOCOPY or copy
+
+During the Unplug/Plug upgrade AutoUpgrade unplugs the PDB from the source CDB into an XML file
+and creates the PDB in the target CDB with `create pluggable database ... using '<xml file>'`.
+The attribute `copy_option` in `oracle_pdbs` (AutoUpgrade parameter `target_pdb_copy_option.<pdb>`)
+defines, what happens with the datafiles.
+
+.Options for the datafiles
+[options="header,footer"]
+|=======================
+|`copy_option` |Datafiles |Disk space |Duration |Fallback into the source CDB
+|not set (default) | `NOCOPY`: the target CDB uses the existing datafiles. They stay in their directory, e.g. `oradata/DB2/<GUID>/datafile`. | none | short, independent of the size | *no* - the datafiles are upgraded to the new release
+|`file_name_convert=NONE` | copied as Oracle Managed Files into `db_create_file_dest` of the target CDB | size of the PDB | copy of all datafiles | yes - the source datafiles stay unchanged
+|`file_name_convert=('<old>', '<new>')` | copied, `<old>` in the path is replaced by `<new>` | size of the PDB | copy of all datafiles | yes - the source datafiles stay unchanged
+|=======================
+
+==== NOCOPY (default)
+
+[source,yaml]
+----
+oracle_pdbs:
+  - cdb: DB1
+    home: db26-si-ee
+    pdb_name: ORCLPDB1
+    state: present
+    autoupgrade:
+      source_cdb: DB2
+      # no copy_option => NOCOPY
+----
+
+- Fastest way. Recommended for big PDBs, when a backup of the PDB exists.
+- After the upgrade the datafiles of the PDB in the target CDB are still in the directory of the source CDB,
+  e.g. `/u01/app/oracle/oradata/DB2/<GUID of the PDB>/datafile/`.
+  They can be moved later online with `alter database move datafile` in the target CDB.
+- There is no way back. Oracle: _"Backups are the only fallback strategy."_
+  Flashback Database (`restoration`) does not work across the Unplug/Plug.
+
+[WARNING]
+====
+With NOCOPY the target CDB uses datafiles in the directories of the source CDB. +
+Do not remove these directories (e.g. `rm -rf /u01/app/oracle/oradata/DB2`), when the source CDB is dropped later.
+Check the datafiles of the target CDB first:
+
+----
+select name from v$datafile where con_id = (select con_id from v$pdbs where name = 'ORCLPDB1');
+----
+====
+
+==== Copy as Oracle Managed Files
+
+[source,yaml]
+----
+oracle_pdbs:
+  - cdb: DB1
+    home: db26-si-ee
+    pdb_name: ORCLPDB1
+    state: present
+    autoupgrade:
+      source_cdb: DB2
+      copy_option: file_name_convert=NONE
+----
+
+- Recommended for OMF and ASM (AutoUpgrade: _"For ASM/OMF, use: file_name_convert=none"_).
+- The target CDB needs `db_create_file_dest` (or `pdb_file_name_convert`).
+  Otherwise the analyze phase reports _"The target database ... requires the PDB_FILE_NAME_CONVERT or DB_CREATE_FILE_DEST
+  system parameter defined when the target_pdb_copy_option config parameter is set to file_name_convert=NONE"_.
+  Set it with `init_parameters` of the target CDB in `oracle_databases`.
+- The datafiles are created in the directory of the target CDB, e.g. `oradata/DB1/<GUID>/datafile`.
+- Needs disk space and time for a complete copy of the PDB. The downtime of the PDB includes the copy.
+
+==== Copy with path conversion
+
+[source,yaml]
+----
+oracle_pdbs:
+  - cdb: DB1
+    home: db26-si-ee
+    pdb_name: ORCLPDB1
+    state: present
+    autoupgrade:
+      source_cdb: DB2
+      copy_option: "file_name_convert=('/u01/app/oracle/oradata/DB2/', '/u01/app/oracle/oradata/DB1/')"
+----
+
+- For datafiles with fixed paths (no OMF). Each occurrence of `<old>` in the path of a datafile is replaced by `<new>`.
+- More than one pair is possible: `file_name_convert=('/a/', '/x/', '/b/', '/y/')`.
+- The target directories must exist and must be writable for `oracle_user`.
+- Quote the value in YAML because of the brackets and quotes.
+
+==== Fallback after a copy
+
+With a copy the datafiles of the source PDB stay unchanged in the release of the source CDB.
+AutoUpgrade has unplugged the PDB into an XML file in the job directory:
+
+----
+<autoupgrade_log_dir>/<job>/<source SID>/<job number>/drain/<source SID>-<PDB>.xml
+----
+
+`keep_source_pdb` (AutoUpgrade parameter, set with `parameters`) controls the source CDB:
+
+.keep_source_pdb
+[options="header,footer"]
+|=======================
+|Value |Source CDB after the upgrade
+|`no` (default) | The PDB is dropped from the source CDB (`drop pluggable database ... keep datafiles`). The datafiles are kept.
+|`yes` | The PDB is kept in the source CDB in a closed state (AutoUpgrade: _"kept in a closed state instead of being removed from the source CDB"_).
+|=======================
+
+[source,yaml]
+----
+    autoupgrade:
+      source_cdb: DB2
+      copy_option: file_name_convert=NONE
+      parameters:
+        keep_source_pdb: "yes"
+----
+
+The role ignores PDBs with status `UNPLUGGED` in the source CDB. A kept source PDB is not reported as `conflict`.
+
+The fallback itself is a manual task and is not implemented in the role:
+
+. Drop the upgraded PDB from the target CDB, if needed (`drop pluggable database ORCLPDB1 including datafiles` -
+  only with a copy, never with NOCOPY!)
+. Plug the PDB into the source CDB again, e.g. with the XML file and the unchanged datafiles:
+  `create pluggable database ORCLPDB1 using '<xml file>' nocopy;` and open it
+. Change `oracle_pdbs` back to the source state
+
+NOTE: The fallback with `keep_source_pdb` and the copy options is not tested with molecule yet.
+Test the procedure before you use it in production.
+
+==== Recommendation
+
+.Which option to use
+[options="header,footer"]
+|=======================
+|Situation |Option
+|Big PDB, short downtime, backup available | NOCOPY (default)
+|Fallback into the source CDB needed, enough disk space | `file_name_convert=NONE` + `keep_source_pdb: "yes"`
+|OMF/ASM | `file_name_convert=NONE`
+|Fixed paths without OMF, new directory for the target CDB | `file_name_convert=('<old>', '<new>')`
+|=======================
+
+IMPORTANT: Take a backup of the PDB before the deploy phase - independent of the option.
+
+=== Process overview
+
+. Preparation with `manage_db` (no downtime) - `oracle_pdbs` still points to the source CDB
+.. Install the target `ORACLE_HOME` with playbook `swdb` (`db_homes_installed`)
+.. Add the target CDB to `oracle_databases` and create it with playbook `manage_db`
+. Change the inventory to the end state
+.. `cdb` and `home` of the PDBs in `oracle_pdbs`: target CDB and target `ORACLE_HOME`
+.. Add the attribute `autoupgrade` with `source_cdb` to the PDBs
+.. *From now on: no `manage_db` until the upgrade is done!*
+. Analyze phase (no downtime): `autoupgrade_upgrade_analyze.yml`
+.. Install `autoupgrade.jar` on the database server
+.. Read the PDBs of the source and the target CDB (`v$pdbs`)
+.. AutoUpgrade `analyze` for the PDBs in the source CDB
+.. Evaluate the prechecks. Fail on errors without automatic fixup.
+. Fix the reported problems and repeat the analyze phase until it is successful
+. Fixups phase (no downtime, optional): `autoupgrade_upgrade_fixups.yml`
+.. AutoUpgrade `fixups` for the PDBs in the source CDB, e.g. some days before the deploy
+.. Evaluate the prechecks like the analyze phase
+. Deploy phase (downtime of the PDBs): `autoupgrade_upgrade.yml`
+.. Analyze phase (again)
+.. AutoUpgrade `deploy`: prechecks, fixups, unplug, plug, upgrade, postupgrade
+.. Check that the PDBs are open `READ WRITE` in the target CDB
+. Post tasks
+.. Execute playbook `manage_db` - the PDBs are in their end state now
+.. Remove the attribute `autoupgrade` from `oracle_pdbs` (optional - upgraded PDBs are skipped)
+.. Remove the source CDB, when it is not needed anymore (`state: absent` in `oracle_databases`)
+
+=== Analyze phase
+
+[source,bash]
+----
+ansible-playbook -i inventory/ -e hostgroup=dbservers playbooks/autoupgrade_upgrade_analyze.yml
+----
+
+The role reads the PDBs of the source and the target CDB from `v$pdbs`.
+The `ORACLE_HOME` of a CDB is taken from the running instance (`/proc/<pid of pmon>/exe`).
+
+.State of a PDB in the analyze phase
+[options="header,footer"]
+|=======================
+|Source CDB |Target CDB |State |Action
+|PDB exists | PDB missing | `pending` | AutoUpgrade `analyze` (fixups phase: `fixups`), upgrade in the deploy phase
+|PDB missing | PDB exists | `upgraded` | nothing - the PDB is skipped
+|PDB exists | PDB exists | `conflict` | fail. Usually `manage_db` was executed after the change of `oracle_pdbs` and created an empty PDB in the target CDB.
+|PDB missing | PDB missing | `missing` | fail
+|=======================
+
+Further checks:
+
+- The target CDB must be running from the target `ORACLE_HOME`.
+- The source CDB must be running from the source `ORACLE_HOME`, when PDBs are `pending`.
+  It is not needed anymore, when all PDBs are `upgraded`.
+
+==== Evaluation of the prechecks
+
+AutoUpgrade writes the results of the prechecks into the job directory:
+
+----
+<autoupgrade_log_dir>/<job>/<source SID>/<job number>/
+  autoupgrade_<date>.log
+  autoupgrade_<date>_user.log
+  prechecks/
+    *_checklist.json
+    *_preupgrade.html
+----
+
+The role reads all `*_checklist.json` of the newest job and evaluates each check with the attribute `severity`:
+
+.Evaluation of the prechecks
+[options="header,footer"]
+|=======================
+|`severity` |`fixup_available` |`runfix` |Result
+|`ERROR` | not `YES` | - | blocking
+|`ERROR` | `YES` | `NO` | blocking
+|`ERROR` | `YES` | `YES` or missing | fixed by AutoUpgrade in the deploy
+|`WARNING`, `RECOMMEND`, `INFO` | - | - | reported only
+|=======================
+
+The analyze phase fails, when at least one check is blocking (`autoupgrade_upgrade_fail_on_precheck_errors: true`)
+or when no `*_checklist.json` was found.
+
+NOTE: Oracle does not document the structure of `*_checklist.json`.
+The role collects all objects with an attribute `severity` at any level of the files.
+
+At the end of the analyze phase the role shows for each job:
+
+- `Logfile`: detailed logfile of the AutoUpgrade job (`<job number>/autoupgrade_<date>.log`)
+- `User log`: summary of the AutoUpgrade job (`<job number>/autoupgrade_<date>_user.log`)
+- `Reports`: HTML reports of the prechecks (`*_preupgrade.html`)
+
+The paths are shown before the evaluation fails, so they are available in case of blocking checks, too.
+
+.Result of the analyze phase
+----
+"_autoupgrade_upgrade_state": {
+    "DB2_DB26": {
+        "blocking": [],
+        "checks": 51,
+        "errors": 0,
+        "warnings": 12,
+        "log_dir": "/u01/app/oracle/cfgtoollogs/autoupgrade/DB2_DB26",
+        "logfile": "/u01/app/oracle/cfgtoollogs/autoupgrade/DB2_DB26/DB2/100/autoupgrade_20261025.log",
+        "user_logfile": "/u01/app/oracle/cfgtoollogs/autoupgrade/DB2_DB26/DB2/100/autoupgrade_20261025_user.log",
+        "mode": "analyze",
+        "pdbs": ["ORCLPDB1"],
+        "upgraded_pdbs": [],
+        "reports": ["..."],
+        "state": "analyzed"
+    }
+}
+----
+
+=== Fixups phase
+
+[source,bash]
+----
+ansible-playbook -i inventory/ -e hostgroup=dbservers playbooks/autoupgrade_upgrade_fixups.yml
+----
+
+The fixups phase is the analyze phase with AutoUpgrade in mode `fixups` (`upgrade_fixups.yml` includes `upgrade_analyze.yml`):
+
+- Same checks of the source and the target CDB and the same states of the PDBs
+- AutoUpgrade executes the prechecks and applies the fixups (e.g. dictionary statistics, purge recyclebin)
+  in the source CDB/PDBs. The PDBs _are_ changed, but stay in the source CDB.
+- Same evaluation of the prechecks, logfiles and reports as the analyze phase.
+  It fails on errors without automatic fixup.
+
+The fixups phase is optional. Execute it some time before the deploy to shorten the downtime.
+Without it, AutoUpgrade applies the fixups during the deploy.
+
+=== Deploy phase
+
+[source,bash]
+----
+ansible-playbook -i inventory/ -e hostgroup=dbservers playbooks/autoupgrade_upgrade.yml
+
+# one PDB only
+ansible-playbook -i inventory/ -e hostgroup=dbservers -e '{"autoupgrade_upgrade_pdbs": ["ORCLPDB1"]}' \
+  playbooks/autoupgrade_upgrade.yml
+----
+
+`upgrade_deploy.yml`:
+
+. executes the analyze phase (`upgrade_analyze.yml`)
+. executes `autoupgrade.jar -config upgrade_<job>.cfg -mode deploy -noconsole` for each job in state `analyzed`
+  (`async`: `autoupgrade_upgrade_timeout`, `poll`: `autoupgrade_upgrade_poll`)
+. checks that all PDBs of the job are open `READ WRITE` in the target CDB and are gone from the source CDB
+
+The jobs are executed one after the other.
+
+.Follow the progress on the database server
+[source,bash]
+----
+tail -f /u01/app/oracle/cfgtoollogs/autoupgrade/DB2_DB1/cfgtoollogs/upgrade/auto/autoupgrade.log
+----
+
+==== Repeated execution
+
+- PDBs in the target CDB are skipped (state `upgraded`). The playbook can be executed again without changes.
+- An interrupted or failed deploy is resumed by the next execution of `autoupgrade_upgrade.yml`,
+  see <<Recovery data of AutoUpgrade>>.
+
+==== Recovery data of AutoUpgrade
+
+AutoUpgrade keeps recovery data after each deploy in
+`autoupgrade_log_dir/<job>/cfgtoollogs/upgrade/auto` (`config_files/upgradeJobs.bin`, `state.txt`) -
+for a finished deploy as well as for an interrupted or failed one.
+As long as the recovery data exists, AutoUpgrade refuses `analyze`, `fixups` and a new `deploy` with the same config file:
+
+----
+There is an unfinished execution of a deploy mode. Run the AutoUpgrade in deploy mode to resume from failure point
+----
+
+The role reads `[Status]` of the jobs from `state.txt` before the PDBs are checked:
+
+.Handling of the recovery data
+[options="header,footer"]
+|=======================
+|Recovery data |Analyze/fixups phase |Deploy phase
+|none | normal | normal
+|finished deploy (`FINISHED`), PDBs `pending` | cleared automatically (`-clear_recovery_data`), then normal | cleared automatically, then normal
+|finished deploy (`FINISHED`), all PDBs `upgraded` | kept - needed for `-restore` | kept
+|unfinished deploy (other status or no `state.txt`) | fails with a hint to resume with the deploy phase | state `resume`: no checks of the PDBs, AutoUpgrade `deploy` resumes the job with the existing config file
+|=======================
+
+The checks of the PDBs are skipped for `resume`, because the PDB can be in any intermediate state during a deploy
+(e.g. unplugged from the source CDB, but not plugged into the target CDB yet).
+After the resumed deploy the PDBs are checked like after a normal deploy.
+
+`autoupgrade_upgrade_clear_recovery_data: true` discards the recovery data in any case.
+Use it only, when the PDBs were restored manually and the upgrade must start from the beginning.
+An unfinished deploy cannot be resumed anymore afterwards.
+
+[source,bash]
+----
+ansible-playbook -i inventory/ -e hostgroup=dbservers -e autoupgrade_upgrade_clear_recovery_data=true \
+  playbooks/autoupgrade_upgrade_analyze.yml
+----
+
+==== Fallback
+
+- See <<Datafiles: NOCOPY or copy>>: a fallback into the source CDB is possible with a copy of the datafiles only.
+- `restoration: true` / `autoupgrade_upgrade_restoration: true`: AutoUpgrade creates a Guaranteed Restore Point
+  (`upg1.restoration=yes`). Requires a Fast Recovery Area and Enterprise Edition.
+  Check the Oracle documentation, how the restore point is used for an Unplug/Plug upgrade.
+
+The fallback is not implemented in the role.
+
+IMPORTANT: Take a backup before the upgrade.
+
+=== After the upgrade
+
+`oracle_pdbs` describes the end state already. Nothing has to be changed for the PDBs.
+
+- Execute playbook `manage_db`. It manages the PDBs in the target CDB now (tablespaces, users, services, ...).
+- The attribute `autoupgrade` can be removed from `oracle_pdbs`. Upgraded PDBs are skipped anyway.
+- Services, `tnsnames.ora` entries and wallets, which point to the source CDB, must be changed to the target CDB.
+- Remove the source CDB, when it is not needed anymore (`state: absent` in `oracle_databases`),
+  and the source `ORACLE_HOME` (`db_homes_installed`).
+
+=== Molecule scenario upgrade
+
+The scenario `extensions/molecule/upgrade` tests the Unplug/Plug upgrade of `ORCLPDB1`
+from `DB2` (19c, `db1932-si-ee`) into `DB1` (26ai, `db26-si-ee`).
+The inventory is in `extensions/molecule/shared_config/inventory/host_vars/dbfs-upg.yml`.
+
+.Steps in scenario upgrade
+[options="header,footer"]
+|=======================
+|Step |Playbooks |Result
+|`converge` | `os`, `swdb`, `sql_zauberkasten`, `manage_db` | 19c and 26ai installed, `DB2` with `ORCLPDB1` in 19c, empty target CDB `DB1` in 26ai, listener from 26ai. `oracle_pdbs` points to `DB2` (source state).
+|`side_effect` | `autoupgrade_upgrade_analyze`, `autoupgrade_upgrade_fixups`, `autoupgrade_upgrade` | `oracle_pdbs` is set to the end state in `side_effect.yml` (never in the inventory used by converge). Analyze, fixups and deploy phase for `ORCLPDB1`, controlled by `AUTOUPGRADE_PHASE`.
+|`verify` | | `ORCLPDB1` is open `READ WRITE` in `DB1` (26ai). Only valid after the deploy phase.
+|=======================
+
+The listener runs from the 26ai `ORACLE_HOME`: a listener can serve databases of the same or an older release only.
+
+Installation media in `MOLECULE_SW_DIR`:
+
+- `db_home_19.32.zip` (Golden Image 19.32, e.g. from scenario `download` with `autoupgrade_download_gold_image_rename: true`)
+- `LINUX.X64_2326100_db_home.zip` (26ai)
+- `autoupgrade.jar`
+
+.Execute scenario upgrade
+[source,bash]
+----
+cd extensions
+task converge S=upgrade
+task side-effect S=upgrade
+----
+
+The phases in `side_effect.yml` are controlled with the environment variable `AUTOUPGRADE_PHASE`.
+It is a comma separated list of phases. The phases are always executed in the order analyze, fixups, deploy.
+
+.AUTOUPGRADE_PHASE for side_effect.yml
+[options="header,footer"]
+|=======================
+|Value |Executed |Use case
+|`all` (default, not set) | analyze, fixups, deploy | complete test
+|`analyze` | analyze phase only. The databases are not changed. | analyze changes before the deploy, repeat as often as needed
+|`fixups` | fixups phase only. The source CDB/PDB is changed, the PDB stays in the source CDB. | test the fixups
+|`deploy` | deploy phase only (`upgrade_deploy.yml` executes the analyze checks internally) | test the deploy without the separate analyze/fixups plays
+|`analyze,fixups` | analyze and fixups phase | everything before the deploy
+|=======================
+
+[source,bash]
+----
+cd extensions
+AUTOUPGRADE_PHASE=analyze task side-effect S=upgrade
+AUTOUPGRADE_PHASE=fixups task side-effect S=upgrade
+AUTOUPGRADE_PHASE=analyze,fixups task side-effect S=upgrade
+AUTOUPGRADE_PHASE=deploy task side-effect S=upgrade
+task side-effect S=upgrade        # analyze + fixups + deploy
+----
+
+The deploy phase moves `ORCLPDB1` into `DB1`. A new test of the deploy needs a new environment
+(`task destroy S=upgrade` and `task converge S=upgrade`).
+
+WARNING: Do not execute `task converge S=upgrade` during or after the deploy phase without `task destroy S=upgrade`.
+The inventory of converge contains the source state (`ORCLPDB1` in `DB2`).
+`manage_db` creates a new, empty `ORCLPDB1` in `DB2` after AutoUpgrade has unplugged it.
+The deploy phase reports this as `conflict`.
+
+IMPORTANT: `side_effect.yml` must never import playbook `manage_db`.
+With `oracle_pdbs` in the end state it would create an empty `ORCLPDB1` in `DB1` (see warning above).
+
+=== Known limitations
+
+- Unplug/Plug upgrade of PDBs into an existing CDB on the same host only.
+  Upgrade of a whole CDB, non-CDB to PDB conversion, RAC, Oracle Restart and Data Guard are not supported.
+- The jobs are executed one after the other. AutoUpgrade can execute jobs in parallel - not used by the role.
+- The fallback is not implemented in the role.
+- `manage_db` must not be executed between the change of `oracle_pdbs` and the upgrade (see warning above).
+- The evaluation of the prechecks depends on `*_checklist.json`, which is not documented by Oracle.
+- Patching of databases with AutoUpgrade (`-patch`) is not implemented.

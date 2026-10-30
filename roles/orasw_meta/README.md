@@ -11,7 +11,7 @@ This role has a dependency to `orahost_meta`.
 
 There are a lot of variables who are used by `orasw_meta`
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -69,6 +69,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [oracle_sw_source_www](#oracle_sw_source_www)
   - [orasw_meta_assert_oracle_databases](#orasw_meta_assert_oracle_databases)
   - [orasw_meta_cluster_hostgroup](#orasw_meta_cluster_hostgroup)
+  - [orasw_meta_forced_lang](#orasw_meta_forced_lang)
   - [proxy_env](#proxy_env)
   - [set_oracle_all_editions_options_state](#set_oracle_all_editions_options_state)
   - [shell_aliases](#shell_aliases)
@@ -261,10 +262,8 @@ Set the default password for all DB-Users not defined in `dbpasswords`.
 
 ```YAML
 default_dbpass: >-
-  {% if item is defined and item.oracle_db_passwd is defined %}{{ item.oracle_db_passwd
-  -}}
-  {%- elif dbh is defined and dbh.oracle_db_passwd is defined %}{{ dbh.oracle_db_passwd
-  -}}
+  {% if item is defined and item.oracle_db_passwd is defined %}{{ item.oracle_db_passwd -}}
+  {%- elif dbh is defined and dbh.oracle_db_passwd is defined %}{{ dbh.oracle_db_passwd -}}
   {%- endif %}
 ```
 
@@ -1020,6 +1019,17 @@ Ansible Inventory hostgroup for RAC-Cluster.
 orasw_meta_cluster_hostgroup: ''
 ```
 
+### orasw_meta_forced_lang
+
+Certain modules (e.g. oracle_db and oracle_opatch) rely on English language outputs. This causes trouble if system
+has different locale settings. That's why we force the language in script environments.
+
+#### Default value
+
+```YAML
+orasw_meta_forced_lang: en_US.UTF-8
+```
+
 ### proxy_env
 
 This is an internal variable for downloading patches.
@@ -1056,16 +1066,13 @@ shell_aliases:
   - sqlsyso='. oraenv ;rlwrap sqlplus "/ as sysdba"'
   - dgmgrl='rlwrap dgmgrl'
   - rman='rlwrap rman'
-  - sid='export ORACLE_SID=$(ps -ef | grep "ora_pmon_$ORACLE_DBNAME" |grep -v grep
-    | sed 's/^.*pmon_//g')'
+  - sid='export ORACLE_SID=$(ps -ef | grep "ora_pmon_$ORACLE_DBNAME" |grep -v grep | sed 's/^.*pmon_//g')'
   - sqlp='rlwrap sqlplus'
   - sqlsys='rlwrap sqlplus "/ as sysdba"'
   - dbh='cd $ORACLE_HOME'
   - dbb='cd $ORACLE_BASE'
-  - talert='tail -500f 
-    $ORACLE_BASE/diag/rdbms/$ORA_DB_UNQ_NAME/$ORACLE_SID/trace/alert_$ORACLE_SID.log'
-  - lalert='less 
-    $ORACLE_BASE/diag/rdbms/$ORA_DB_UNQ_NAME/$ORACLE_SID/trace/alert_$ORACLE_SID.log'
+  - talert='tail -500f $ORACLE_BASE/diag/rdbms/$ORA_DB_UNQ_NAME/$ORACLE_SID/trace/alert_$ORACLE_SID.log'
+  - lalert='less $ORACLE_BASE/diag/rdbms/$ORA_DB_UNQ_NAME/$ORACLE_SID/trace/alert_$ORACLE_SID.log'
   - lsnrstart='lsnrctl start $LSNRNAME'
   - lsnrstop='lsnrctl stop $LSNRNAME'
   - lsnrstatus='lsnrctl status $LSNRNAME'

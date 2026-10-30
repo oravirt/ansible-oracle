@@ -1,0 +1,157 @@
+# Taskfile.yml for molecule in ansible-oracle
+#
+# Usage:
+#   task --list
+#   task converge S=dbfs-ol9
+#   task login S=default H=ol9
+#   task exec H=dbfs-ol9 U=oracle
+#
+# MOLECULE_SW_DIR (local directory mounted as /vagrant) is read from the
+# environment or from .env.yml in this directory.
+version: '3'
+
+vars:
+  S: '{{.S | default "default"}}'
+  SW_SCENARIOS: dbfs dbfs-ol9 dbfs-ol10 download golden
+  IMAGES: >-
+    quay.io/rendanic/docker-ol8-ansible:latest
+    quay.io/rendanic/docker-ol9-ansible:latest
+    quay.io/rendanic/docker-ol10-ansible:latest
+    geerlingguy/docker-opensuseleap15-ansible:latest
+
+env:
+  ANSIBLE_FORCE_COLOR: 'true'
+  PY_COLORS: '1'
+
+tasks:
+  default:
+    cmds:
+      - task --list
+    silent: true
+
+  list:
+    desc: Show status of all scenarios
+    dir: "{{.TASKFILE_DIR}}"
+    cmds:
+      - molecule list
+
+  pull:
+    desc: Pull container images (molecule has a 15s timeout for pulling)
+    cmds:
+      - for: {var: IMAGES, split: ' '}
+        cmd: docker pull {{.ITEM}}
+
+  collection:
+    desc: Reinstall the collection from this repository (needed after role changes without version change)
+    dir: "{{.TASKFILE_DIR}}"
+    cmds:
+      - ansible-galaxy collection install --force ..
+
+  _check-sw-dir:
+    internal: true
+    dir: "{{.TASKFILE_DIR}}"
+    preconditions:
+      - sh: >-
+          [ -n "${MOLECULE_SW_DIR:-}" ]
+          || grep -q '^MOLECULE_SW_DIR:' .env.yml 2>/dev/null
+        msg: "MOLECULE_SW_DIR is not set. Export it or add it to extensions/.env.yml"
+
+  _molecule:
+    internal: true
+    dir: "{{.TASKFILE_DIR}}"
+    deps:
+      - task: '{{if has .S (splitList " " .SW_SCENARIOS)}}_check-sw-dir{{else}}_noop{{end}}'
+    cmds:
+      - molecule {{.CMD}} -s {{.S}} {{.CLI_ARGS}}
+
+  _noop:
+    internal: true
+    cmds: []
+
+  create:
+    desc: "Create instances (S=<scenario>)"
+    cmds:
+      - task: _molecule
+        vars: {CMD: create, S: '{{.S}}'}
+
+  converge:
+    desc: "Run converge.yml (S=<scenario>)"
+    cmds:
+      - task: _molecule
+        vars: {CMD: converge, S: '{{.S}}'}
+
+  side-effect:
+    desc: "Run side_effect.yml (S=<scenario>)"
+    cmds:
+      - task: _molecule
+        vars: {CMD: side-effect, S: '{{.S}}'}
+
+  idempotence:
+    desc: "Run converge again and check for changes (S=<scenario>)"
+    cmds:
+      - task: _molecule
+        vars: {CMD: idempotence, S: '{{.S}}'}
+
+  verify:
+    desc: "Run verify.yml (S=<scenario>)"
+    cmds:
+      - task: _molecule
+        vars: {CMD: verify, S: '{{.S}}'}
+
+  test:
+    desc: "Full test: create, converge, idempotence, side-effect, verify, destroy (S=<scenario>)"
+    cmds:
+      - task: _molecule
+        vars: {CMD: test, S: '{{.S}}'}
+
+  destroy:
+    desc: "Destroy instances of one scenario (S=<scenario>)"
+    cmds:
+      - task: _molecule
+        vars: {CMD: destroy, S: '{{.S}}'}
+
+  destroy-all:
+    desc: Destroy instances of all scenarios
+    dir: "{{.TASKFILE_DIR}}"
+    cmds:
+      - molecule destroy --all
+
+  login:
+    desc: "Open a shell in an instance (S=<scenario>, H=<host> for scenarios with more than one instance)"
+    dir: "{{.TASKFILE_DIR}}"
+    interactive: true
+    cmds:
+      - molecule login -s {{.S}} {{if .H}}-h {{.H}}{{end}}
+
+  exec:
+    desc: "docker exec bash in a molecule container (H=<container>, U=<user>, e.g. U=oracle)"
+    interactive: true
+    silent: true
+    cmds:
+      - |
+        H="{{.H}}"
+        if [ -z "$H" ]; then
+          L=$(docker ps --filter label=owner=molecule --format '{{"{{"}}.Names{{"}}"}}')
+          if [ "$(echo "$L" | grep -c .)" -eq 1 ]; then
+            H=$L
+          else
+            echo "No or more than one molecule container running. Set H=<container>:"
+            echo "$L" | sed 's/^/  /'
+            exit 1
+          fi
+        fi
+        docker ps --filter label=owner=molecule --filter "name=^${H}$" --format '{{"{{"}}.Names{{"}}"}}' | grep -qx "$H" \
+          || { echo "'$H' is not a running molecule container"; exit 1; }
+        exec docker exec -it {{if .U}}-u {{.U}}{{end}} "$H" bash -l
+
+  download:
+    desc: Download patches from support.oracle.com into MOLECULE_SW_DIR
+    dir: "{{.TASKFILE_DIR}}"
+    preconditions:
+      - sh: >-
+          { [ -n "${MOS_LOGIN:-}" ] || grep -q '^MOS_LOGIN:' .env.yml 2>/dev/null; }
+          && { [ -n "${MOS_PASSWORD:-}" ] || grep -q '^MOS_PASSWORD:' .env.yml 2>/dev/null; }
+        msg: "Set MOS_LOGIN and MOS_PASSWORD in the environment or in extensions/.env.yml"
+    cmds:
+      - task: _molecule
+        vars: {CMD: test, S: download}

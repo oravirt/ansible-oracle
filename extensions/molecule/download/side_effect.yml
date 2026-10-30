@@ -1,0 +1,199 @@
+---
+# 1. check of the connection with the correct proxy password must succeed
+# 2. negative test: wrong password for the proxy
+# 3. negative test: wrong password for the proxy and autoupgrade_proxy_check: false
+#    => the keystore reports 'Connection Failure', keystore.yml checks the connection
+#       and must fail with the hint of the proxy - the keystore must stay unchanged
+#
+# The check of the connection (proxy_check.yml) must fail before the keystore is used,
+# Squid must log TCP_DENIED/407 and the keystore must stay unchanged.
+# The error message of the role is shown for review.
+- name: Side-Effect - Check of the connection with correct proxy password
+  hosts: dbservers
+  # facts are needed by the role dependencies (orasw_meta)
+  gather_facts: true
+  vars_files:
+    - proxy_vars.yml
+  vars:
+    http_proxy: "{{ download_proxy_url }}"
+    https_proxy: "{{ download_proxy_url }}"
+    no_proxy: localhost,127.0.0.1
+    autoupgrade_proxy_username: "{{ download_proxy_username }}"
+    autoupgrade_proxy_password: "{{ download_proxy_password }}"
+  tasks:
+    - name: Check connection to Oracle
+      ansible.builtin.include_role:
+        name: opitzconsulting.ansible_oracle.autoupgrade
+        tasks_from: proxy_check.yml
+
+- name: Side-Effect - Download with wrong proxy password
+  hosts: dbservers
+  gather_facts: true
+  vars_files:
+    - proxy_vars.yml
+  vars:
+    # same settings as converge.yml, but wrong password
+    oracle_sw_copy: false
+    autoupgrade_java_rpm: java-21-openjdk
+    autoupgrade_download_dir: /u01/stage
+    http_proxy: "{{ download_proxy_url }}"
+    https_proxy: "{{ download_proxy_url }}"
+    no_proxy: localhost,127.0.0.1
+    autoupgrade_proxy_username: "{{ download_proxy_username }}"
+    autoupgrade_proxy_password: "wrong-{{ download_proxy_password }}"
+    _side_effect_access_log: /var/log/squid/access.log
+  tasks:
+    - name: Count TCP_DENIED/407 in access.log of Squid before the test
+      ansible.builtin.shell: grep -c 'TCP_DENIED/407' {{ _side_effect_access_log }} || true
+      delegate_to: download-squid
+      register: _side_effect_407_before
+      changed_when: false
+
+    - name: Keystore before the test
+      ansible.builtin.stat:
+        path: /u01/app/oracle/product/autoupgrade/keystore/cwallet.sso
+        get_checksum: true
+      register: _side_effect_keystore_before
+
+    - name: Download with wrong proxy password
+      block:
+        - name: Download patches
+          ansible.builtin.include_role:
+            name: opitzconsulting.ansible_oracle.autoupgrade
+            tasks_from: download_patches.yml
+
+        - name: Download did not fail
+          ansible.builtin.set_fact:
+            _side_effect_failed: false
+
+      rescue:
+        - name: Download failed as expected
+          ansible.builtin.set_fact:
+            _side_effect_failed: true
+            _side_effect_failed_task: "{{ ansible_failed_task.name | default('') }}"
+            _side_effect_failed_msg: "{{ ansible_failed_result.msg | default(ansible_failed_result) }}"
+
+    - name: Error message of the role (for review)
+      ansible.builtin.debug:
+        msg:
+          - "Failed task: {{ _side_effect_failed_task | default('-') }}"
+          - "Message:     {{ _side_effect_failed_msg | default('-') }}"
+
+    - name: Read TCP_DENIED/407 in access.log of Squid after the test
+      ansible.builtin.shell: grep 'TCP_DENIED/407' {{ _side_effect_access_log }} || true
+      delegate_to: download-squid
+      register: _side_effect_407_after
+      changed_when: false
+
+    - name: Show new TCP_DENIED/407 of Squid
+      ansible.builtin.debug:
+        msg: "{{ _side_effect_407_after.stdout_lines[_side_effect_407_before.stdout | int:] }}"
+
+    - name: Keystore after the test
+      ansible.builtin.stat:
+        path: /u01/app/oracle/product/autoupgrade/keystore/cwallet.sso
+        get_checksum: true
+      register: _side_effect_keystore_after
+
+    - name: Assert download failed in the check of the connection with 407 of the proxy
+      ansible.builtin.assert:
+        that:
+          - _side_effect_failed | bool
+          - _side_effect_failed_task is search('proxy_check')
+          - _side_effect_failed_msg is search('407')
+          - _side_effect_407_after.stdout_lines | length > _side_effect_407_before.stdout | int
+          - _side_effect_keystore_after.stat.checksum | default('') == _side_effect_keystore_before.stat.checksum | default('')
+        fail_msg: >-
+          Expected: the check of the connection fails with 407, Squid logs TCP_DENIED/407,
+          the keystore is unchanged.
+          failed: {{ _side_effect_failed }}, task: {{ _side_effect_failed_task | default('-') }},
+          new 407: {{ _side_effect_407_after.stdout_lines | length - _side_effect_407_before.stdout | int }},
+          keystore unchanged: {{ _side_effect_keystore_after.stat.checksum | default('') == _side_effect_keystore_before.stat.checksum | default('') }}
+
+- name: Side-Effect - Keystore with wrong proxy password and disabled proxy check
+  hosts: dbservers
+  gather_facts: true
+  vars_files:
+    - proxy_vars.yml
+  vars:
+    # same settings as converge.yml, but wrong password
+    oracle_sw_copy: false
+    autoupgrade_java_rpm: java-21-openjdk
+    autoupgrade_download_dir: /u01/stage
+    http_proxy: "{{ download_proxy_url }}"
+    https_proxy: "{{ download_proxy_url }}"
+    no_proxy: localhost,127.0.0.1
+    autoupgrade_proxy_username: "{{ download_proxy_username }}"
+    autoupgrade_proxy_password: "wrong-{{ download_proxy_password }}"
+    # no check before the keystore => the keystore console reports 'Connection Failure'
+    autoupgrade_proxy_check: false
+    _side_effect3_access_log: /var/log/squid/access.log
+  tasks:
+    - name: Count TCP_DENIED/407 in access.log of Squid before the test
+      ansible.builtin.shell: grep -c 'TCP_DENIED/407' {{ _side_effect3_access_log }} || true
+      delegate_to: download-squid
+      register: _side_effect3_407_before
+      changed_when: false
+
+    - name: Keystore before the test
+      ansible.builtin.stat:
+        path: /u01/app/oracle/product/autoupgrade/keystore/cwallet.sso
+        get_checksum: true
+      register: _side_effect3_keystore_before
+
+    - name: Download with wrong proxy password
+      block:
+        - name: Download patches
+          ansible.builtin.include_role:
+            name: opitzconsulting.ansible_oracle.autoupgrade
+            tasks_from: download_patches.yml
+
+        - name: Download did not fail
+          ansible.builtin.set_fact:
+            _side_effect3_failed: false
+
+      rescue:
+        - name: Download failed as expected
+          ansible.builtin.set_fact:
+            _side_effect3_failed: true
+            _side_effect3_failed_task: "{{ ansible_failed_task.name | default('') }}"
+            _side_effect3_failed_msg: "{{ ansible_failed_result.msg | default(ansible_failed_result) }}"
+
+    - name: Error message of the role (for review)
+      ansible.builtin.debug:
+        msg:
+          - "Failed task: {{ _side_effect3_failed_task | default('-') }}"
+          - "Message:     {{ _side_effect3_failed_msg | default('-') }}"
+
+    - name: Read TCP_DENIED/407 in access.log of Squid after the test
+      ansible.builtin.shell: grep 'TCP_DENIED/407' {{ _side_effect3_access_log }} || true
+      delegate_to: download-squid
+      register: _side_effect3_407_after
+      changed_when: false
+
+    - name: Show new TCP_DENIED/407 of Squid
+      ansible.builtin.debug:
+        msg: "{{ _side_effect3_407_after.stdout_lines[_side_effect3_407_before.stdout | int:] }}"
+
+    - name: Keystore after the test
+      ansible.builtin.stat:
+        path: /u01/app/oracle/product/autoupgrade/keystore/cwallet.sso
+        get_checksum: true
+      register: _side_effect3_keystore_after
+
+    - name: Assert download failed in the check of the connection with 407 of the proxy
+      ansible.builtin.assert:
+        that:
+          - _side_effect3_failed | bool
+          - _side_effect3_failed_task is search('proxy_check')
+          # the keystore console was executed before the check
+          - _side_effect3_failed_task is not search('Assert credentials in keystore')
+          - _side_effect3_failed_msg is search('407')
+          - _side_effect3_407_after.stdout_lines | length > _side_effect3_407_before.stdout | int
+          - _side_effect3_keystore_after.stat.checksum | default('') == _side_effect3_keystore_before.stat.checksum | default('')
+        fail_msg: >-
+          Expected: the check of the connection fails with 407, Squid logs TCP_DENIED/407,
+          the keystore is unchanged.
+          failed: {{ _side_effect3_failed }}, task: {{ _side_effect3_failed_task | default('-') }},
+          new 407: {{ _side_effect3_407_after.stdout_lines | length - _side_effect3_407_before.stdout | int }},
+          keystore unchanged: {{ _side_effect3_keystore_after.stat.checksum | default('') == _side_effect3_keystore_before.stat.checksum | default('') }}

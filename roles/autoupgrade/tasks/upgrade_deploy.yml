@@ -1,0 +1,21 @@
+---
+# Deploy phase for the Unplug/Plug upgrade of PDBs with AutoUpgrade.
+#
+# The analyze phase is always executed first.
+# The upgrade is started only, when the analyze phase was successful.
+# Jobs with all PDBs in the target CDB already are skipped.
+# An unfinished deploy (recovery data of AutoUpgrade) is resumed without analyze.
+# _autoupgrade_upgrade_in_deploy: an unfinished deploy is resumed (state 'resume')
+- name: upgrade_deploy | Analyze phase
+  ansible.builtin.include_tasks: upgrade_analyze.yml
+  vars:
+    _autoupgrade_upgrade_in_deploy: true
+
+- name: upgrade_deploy | Upgrade PDBs
+  ansible.builtin.include_tasks: upgrade_deploy_job.yml
+  loop: "{{ _autoupgrade_upgrade_jobs }}"
+  loop_control:
+    loop_var: aupjob
+    label: "{{ aupjob.name }}"
+  when:
+    - _autoupgrade_upgrade_state[aupjob.name]['state'] | default('') in ['analyzed', 'resume']

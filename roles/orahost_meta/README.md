@@ -2,7 +2,7 @@
 
 Meta role used by other roles to share variable defaults.
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -30,6 +30,9 @@ Meta role used by other roles to share variable defaults.
   - [orahost_meta_java_options](#orahost_meta_java_options)
   - [orahost_meta_tmpdir](#orahost_meta_tmpdir)
   - [orahost_min_swap_mb](#orahost_min_swap_mb)
+  - [orahost_ssh_hostkeytypes](#orahost_ssh_hostkeytypes)
+  - [orahost_ssh_key_size](#orahost_ssh_key_size)
+  - [orahost_ssh_key_type](#orahost_ssh_key_type)
   - [role_separation](#role_separation)
   - [scripts_folder](#scripts_folder)
   - [sysctl_kernel_sem_force](#sysctl_kernel_sem_force)
@@ -281,10 +284,8 @@ oracle_seclimits:
   - {name: hard nofile, value: 65536}
   - {name: soft stack, value: 10240}
   - {name: hard stack, value: 32768}
-  - {name: soft memlock, value: '{{ ((0.91 * ansible_memtotal_mb) * 1024) | round
-      | int }}'}
-  - {name: hard memlock, value: '{{ ((0.91 * ansible_memtotal_mb) * 1024) | round
-      | int }}'}
+  - {name: soft memlock, value: '{{ ((0.91 * ansible_memtotal_mb) * 1024) | round | int }}'}
+  - {name: hard memlock, value: '{{ ((0.91 * ansible_memtotal_mb) * 1024) | round | int }}'}
 ```
 
 ### oracle_stage
@@ -383,7 +384,8 @@ orahost_meta_java_options: >-
 #### Default value
 
 ```YAML
-orahost_meta_tmpdir: '{{ oracle_tmp_stage }}'
+orahost_meta_tmpdir: >-
+  {% if ansible_fips | default(false) %}{{ oracle_stage }}{%- endif %}/tmp
 ```
 
 ### orahost_min_swap_mb
@@ -398,6 +400,40 @@ swap (e.g. 16383 instead of 16384 for 16GB)
 
 ```YAML
 orahost_min_swap_mb: 16383
+```
+
+### orahost_ssh_hostkeytypes
+
+SSH host key types to collect/deploy among hosts
+Please note, ed25519 is not supported on FIPS enabled systems and though better not collected
+
+#### Default value
+
+```YAML
+orahost_ssh_hostkeytypes:
+  - dsa
+  - rsa
+  - ecdsa
+```
+
+### orahost_ssh_key_size
+
+SSH key size of {{ orahost_ssh_key_type }} key
+
+#### Default value
+
+```YAML
+orahost_ssh_key_size: 4096
+```
+
+### orahost_ssh_key_type
+
+SSH key type for oracle and grid users' SSH Keys
+
+#### Default value
+
+```YAML
+orahost_ssh_key_type: rsa
 ```
 
 ### role_separation

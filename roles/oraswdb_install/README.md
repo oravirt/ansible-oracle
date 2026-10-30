@@ -2,11 +2,12 @@
 
 Install Oracle Database Software
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [autostartup_service](#autostartup_service)
+  - [autostartup_service_dependency](#autostartup_service_dependency)
   - [configure_oracle_profile](#configure_oracle_profile)
   - [glogin_default_cdb](#glogin_default_cdb)
   - [glogin_default_nocdb](#glogin_default_nocdb)
@@ -46,6 +47,18 @@ switches between on/off for an option.
 autostartup_service: false
 ```
 
+### autostartup_service_dependency
+
+Configure autostartup service to require and be started after this service.
+
+Only used when autostartup_service is true.
+
+#### Default value
+
+```YAML
+autostartup_service_dependency: network.target
+```
+
 ### configure_oracle_profile
 
 Create .profile_-environment scripts for databases
@@ -73,8 +86,7 @@ glogin_default_cdb:
   - set heading off
   - set termout off
   - col global_name noprint
-  - select upper(sys_context ('userenv', 'instance_name') || ':' || sys_context('userenv',
-    'con_name')) global_name from dual;
+  - select upper(sys_context ('userenv', 'instance_name') || ':' || sys_context('userenv', 'con_name')) global_name from dual;
   - set sqlprompt '_user @ &gname:>'
   - set heading on
   - set termout on
@@ -132,8 +144,7 @@ hostinitdaemon: '{{ ansible_service_mgr }}'
 #### Default value
 
 ```YAML
-oracle_ee_options: "{{ _oracle_ee_opiton_dict[db_homes_config[dbh.home]['version']]
-  }}"
+oracle_ee_options: "{{ _oracle_ee_opiton_dict[db_homes_config[dbh.home]['version']] }}"
 ```
 
 ### oracle_sw_image_db
@@ -162,8 +173,7 @@ oracle_sw_image_db:
   - {filename: p10404530_112030_Linux-x86-64_1of7.zip, version: 11.2.0.3, creates: database/readme.html}
   - filename: p10404530_112030_Linux-x86-64_2of7.zip
     version: 11.2.0.3
-    creates: 
-      database/stage/Components/oracle.sysman.console.db/11.2.0.3.0/1/DataFiles/filegroup2.jar
+    creates: database/stage/Components/oracle.sysman.console.db/11.2.0.3.0/1/DataFiles/filegroup2.jar
 ```
 
 #### Example usage

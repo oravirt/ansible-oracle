@@ -2,7 +2,7 @@
 
 Manage pluggable databases in Oracle
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -29,8 +29,7 @@ Password for pdb_admin user.
 
 ```YAML
 pdbadmin_password: >-
-  {{ dbpasswords[odb.1.cdb][odb.1.pdb_name][pdbadmin_user] | default(default_dbpass)
-  }}
+  {{ dbpasswords[odb.1.cdb][odb.1.pdb_name][pdbadmin_user] | default(default_dbpass) }}
 ```
 
 ### pdbadmin_user

@@ -2,7 +2,7 @@
 
 Manage redolog groups in Oracle
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Discovered Tags](#discovered-tags)
@@ -37,5 +37,4 @@ license (MIT)
 ## Author
 
 - Mikael Sandström
-
 - Thorsten Bruhns

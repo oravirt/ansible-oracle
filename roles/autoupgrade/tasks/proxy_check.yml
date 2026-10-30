@@ -1,0 +1,56 @@
+---
+# Check of the connection to Oracle with the proxy settings of the role.
+#
+# Executed on the host and as the user of the later download:
+#   _autoupgrade_proxy_check_controller: true  => Ansible controller (get_url of autoupgrade_download_latest)
+#   otherwise                                  => host executing AutoUpgrade (autoupgrade_run_local)
+#
+# _autoupgrade_proxy_check_url_list: URLs to check, default autoupgrade_proxy_check_urls
+#
+# Any HTTP response of the target counts as success (status > 0).
+# status -1 => no connection: the cause is explained by _autoupgrade_proxy_check_failures.
+- name: proxy_check | Check connection to Oracle
+  ansible.builtin.uri:
+    url: "{{ aupu }}"
+    method: HEAD
+    follow_redirects: none
+    timeout: "{{ autoupgrade_proxy_check_timeout }}"
+    use_proxy: true
+  environment: "{{ _autoupgrade_proxy_env }}"
+  become: "{{ (_autoupgrade_proxy_check_controller | default(false) | bool) | ternary(false, _autoupgrade_become) }}"
+  become_user: "{{ oracle_user }}"
+  delegate_to: "{{ (_autoupgrade_proxy_check_controller | default(false) | bool) | ternary('localhost', _autoupgrade_delegate_to) }}"
+  run_once: "{{ _autoupgrade_proxy_check_controller | default(false) | bool or _autoupgrade_run_local | bool }}"
+  loop: "{{ _autoupgrade_proxy_check_url_list | default(autoupgrade_proxy_check_urls) }}"
+  loop_control:
+    loop_var: aupu
+  register: _autoupgrade_proxy_check_res
+  failed_when: false
+  changed_when: false
+
+- name: proxy_check | Result
+  ansible.builtin.debug:
+    msg: >-
+      {{ _autoupgrade_proxy_check_res.results
+         | map(attribute='aupu')
+         | zip(_autoupgrade_proxy_check_res.results | map(attribute='status', default=-1))
+         | map('join', ' => HTTP ') | list
+         + ['Proxy: ' ~ _autoupgrade_proxy_display] }}
+  run_once: "{{ _autoupgrade_proxy_check_controller | default(false) | bool or _autoupgrade_run_local | bool }}"
+
+- name: proxy_check | Connection to Oracle failed
+  when:
+    - _autoupgrade_proxy_check_failures | length > 0
+  run_once: "{{ _autoupgrade_proxy_check_controller | default(false) | bool or _autoupgrade_run_local | bool }}"
+  block:
+    # debug prints a list line by line - fail would print it as one line of JSON
+    - name: proxy_check | Details
+      ansible.builtin.debug:
+        msg: "{{ _autoupgrade_proxy_check_details }}"
+
+    - name: proxy_check | Connection failed
+      ansible.builtin.fail:
+        msg: >-
+          No connection to Oracle through proxy {{ _autoupgrade_proxy_display }}:
+          {{ _autoupgrade_proxy_check_failures | map(attribute='hint') | unique | join(' ') }}
+          See details above. Disable the check with autoupgrade_proxy_check: false.

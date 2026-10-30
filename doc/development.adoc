@@ -11,14 +11,6 @@ toc::[]
 IMPORTANT: This is an example how most of the development in `ansible-oracle` is done. +
 A Pull-Request is only accepted, when `github-Actions` are valid.
 
-=== Prepare a development environment
-
-IMPORTANT: This chapter shows, how the development envionment could look like. +
-You need an Ansible-Controller with an Editor or IDE of your own choice. +
-The examples assume Bash as your CLI.
-
-
-
 === Create Fork on github and contribute to the project
 
 link:https://docs.github.com/en/get-started/quickstart/contributing-to-projects[github] has some great documentation with details about creating a fork and branch to contribute to `ansible-oracle`.
@@ -26,39 +18,167 @@ link:https://docs.github.com/en/get-started/quickstart/contributing-to-projects[
 IMPORTANT: The `github-Actions` will automatically start, when the branchname starts with `pr` or in each Pull-Request. +
 Please use a branch with 'pr'--prefix, when `ansible-lint` should be checked for each commit.
 
-=== pre-commit
+=== Development environment
 
-IMPORTANT: link:https://pre-commit.com/[pre-commit] is a nice tool for git. +
-Each commit is locally checked against multiple rules, to prevent failures in github-Actions after pushing commits to github. +
-This tool is recommended but not mandatory for contributing to `ansible-oracle`.
+You need an editor or IDE of your own choice and Bash as CLI.
+The tools for development (`ansible-lint`, `ansible-navigator`, `ansible-doctor`, `pre-commit`, ...) can be provided in two ways:
 
-.Installation (cd into repository before)
+[cols="1,2,2"]
+|===
+| |Option 1: nix-shell |Option 2: local Ansible-Controller
+
+|Setup
+|Install Nix once, then `nix-shell` in the repository
+|Create and maintain venvs and tools manually
+
+|Tools
+|All tools and venvs are provided automatically
+|Each tool is installed by yourself
+
+|Recommended for
+|All developers
+|Developers with an existing Ansible-Controller or experience with Docker
+|===
+
+TIP: `nix-shell` is the recommended way for developing in `ansible-oracle`. +
+Choose one option, the chapter <<working-with-tools>> is the same for both.
+
+[[nix-shell]]
+==== Option 1: nix-shell (recommended)
+
+One command in the repository provides all tools, which are needed for development, tests and releases.
+
+===== What is nix-shell?
+
+link:https://nixos.org/[Nix] is a package manager for Linux and macOS, which works independent of the package manager of the OS (`dnf`, `apt`, ...).
+All packages are installed in `/nix/store`, each version in its own directory.
+Different versions of a tool can be installed in parallel without conflicts, the OS installation is not changed.
+
+`nix-shell` starts a new shell with the packages from `shell.nix` in the repository.
+The tools are only available inside this shell, `exit` returns to the normal shell without any change in the OS.
+Packages are downloaded once and reused in all later sessions.
+
+The `shell.nix` of `ansible-oracle` provides:
+
+* Tools from Nix: `python313`, `shellcheck`, `go-task` (`task`), `jq`, `yq`, `gh` (GitHub CLI), `renovate`, `tig`, `ncdu` and `wslu` for WSL2.
++
+NOTE: `gh` is only needed for creating releases (`task release:*`) and for running renovate against a fork.
+This is only relevant for a few maintainers.
+For normal development and Pull-Requests `gh` is not needed and no login with `gh auth login` is required.
+* Python venvs in `.venv/` of the repository, which are created automatically from `tools/dev/requirements_*.txt` at the first start:
++
+[cols="1,2"]
+|===
+|venv |Usage
+
+|`.venv/ansible-oracle`
+|`ansible-lint`, `ansible-navigator`, `molecule`, `pre-commit` - activated in the shell
+
+|`.venv/ansible-doctor`
+|`ansible-doctor` (has conflicts with `ansible-lint` in the same venv)
+
+|`.venv/antsibull`
+|`antsibull-changelog` for changelog fragments and releases
+
+|`.venv/ansible-2.16`
+|tests with `ansible-core` 2.16
+
+|`.venv/ansible-2.19`
+|tests with `ansible-core` 2.19
+|===
+
+===== Why nix-shell instead of containers?
+
+Containers (see `docker/`) are an alternative, but they need much more effort in daily work:
+
+* *No image build, no container runtime:* There is no Dockerfile to maintain and no daemon to start.
+  `nix-shell` works on every Linux, WSL2 and macOS with Nix installed.
+* *Work directly in your repository:* Editor, IDE and git work on the files as usual.
+  There are no volume mounts and no problems with file owners or UIDs between container and host.
+* *Your credentials are available:* SSH agent and keys and the git configuration of your user are used directly, for maintainers also the login of `gh`.
+  A container needs extra mounts for all of them.
+* *pre-commit works as on GitHub:* The hooks of `pre-commit` use the Python and tools from `nix-shell`.
+  E.g. the `ansible-lint` hook fails outside of `nix-shell` with the Python of an older OS.
+* *Same tools for all developers:* Everybody uses the same tools and pip requirements from the repository.
+  No manual installation of `shellcheck`, `gh`, `jq`, `task` or the venvs is needed.
+* *All tasks work out of the box:* `task` for molecule, renovate and releases (`task release:pr`, ...) needs exactly the tools from `nix-shell`.
+* *Nothing is left in your OS:* The tools are removed from `PATH` when the shell is left.
+  The venvs are inside the repository in `.venv/` and are not part of git.
+
+===== Install Nix
+
+Nix is installed once per machine, see link:https://nixos.org/download/[nixos.org/download].
+The multi-user installation is recommended (needs `sudo` only for the installation):
+
 ----
-pip install --user pre-commit
-pre-commit install
+sh <(curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install) --daemon
 ----
 
-.run outside git
+NOTE: For WSL2 the multi-user installation needs `systemd` in WSL2 (`/etc/wsl.conf`: `[boot]` `systemd=true`).
+
+===== Using nix-shell
+
 ----
-pre-commit run
+cd ansible-oracle
+nix-shell
 ----
 
-=== Ansible Navigator
+The first start takes some minutes, because packages are downloaded and the venvs are created.
+Afterwards `nix-shell` starts in seconds and `.venv/ansible-oracle` is activated.
 
-IMPORTANT: python3 should point to Python >=3.9, otherwise `ansible-navigator` and `ansible-lint` could not be used. +
+----
+# check the tools
+task --list
+ansible-lint --version
+
+# leave nix-shell
+exit
+----
+
+A single command can be executed without an interactive shell:
+
+----
+nix-shell --run 'task release:pr'
+----
+
+TIP: With link:https://direnv.net/[direnv] and link:https://github.com/nix-community/nix-direnv[nix-direnv] the environment is loaded automatically, when you change into the repository.
+The repository contains a `.envrc` for this, which must be allowed once with `direnv allow`.
+
+===== Update the venvs
+
+The venvs are only created, when the directory in `.venv/` does not exist.
+After a change of `tools/dev/requirements_*.txt` (e.g. by renovate) the venv must be updated manually.
+Errors like `ModuleNotFoundError: No module named 'yaml'` show an incomplete venv.
+
+----
+# update a venv in place
+.venv/antsibull/bin/pip --require-virtualenv install -r tools/dev/requirements_antsibull.txt
+
+# or recreate it with the next start of nix-shell
+rm -rf .venv/antsibull
+nix-shell
+----
+
+NOTE: `shell.nix` uses the `nixpkgs` channel of your system, the versions of the Nix tools can differ between developers.
+The versions of the Python tools are pinned in `tools/dev/requirements_*.txt`.
+
+==== Option 2: local Ansible-Controller
+
+NOTE: This option is only for developers, who want to use an existing Ansible-Controller or a container and have experience with venvs and Docker. +
+All tools must be installed and updated manually.
+`nix-shell` does all of this automatically, see <<nix-shell>>.
+
+The examples use venvs in `~/venv`.
+Make sure to use a current Python 3, the pinned versions in `tools/dev/requirements_*.txt` need a recent Python.
 The `activate` script is used to change the Python environment in current shell.
+
+===== venv for ansible-oracle
+
+The venv contains `ansible-lint`, `ansible-navigator`, `molecule` and `pre-commit`.
 
 .configure venv for ansible-oracle
 ----
-python3.10 -V
-
-Python 3.10.6
-
-python3.10 -m venv ~/venv/ansible-oracle
-----
-
-.install Python modules
-----
+python3 -m venv ~/venv/ansible-oracle
 . ~/venv/ansible-oracle/bin/activate
 pip --require-virtualenv -v install -r tools/dev/requirements_dev.txt
 ----
@@ -67,22 +187,16 @@ pip --require-virtualenv -v install -r tools/dev/requirements_dev.txt
 ----
 . ~/venv/ansible-oracle/bin/activate
 ansible-navigator --version
-
-ansible-navigator 3.3.0
 ----
 
-=== Using ansible-doctor
+===== venv for ansible-doctor
 
-IMPORTANT: `ansible-doctor` has module dpendencies with conflicts between `ansible-lint`.
-We have to use a dedicated venv for `ansible-doctor'
+IMPORTANT: `ansible-doctor` has module dependencies with conflicts between `ansible-lint`.
+We have to use a dedicated venv for `ansible-doctor`.
 
-.configure venv for ansible-oracle
+.configure venv for ansible-doctor
 ----
 python3 -m venv ~/venv/ansible-doctor
-----
-
-.install Python modules
-----
 . ~/venv/ansible-doctor/bin/activate
 pip --require-virtualenv -v install -r tools/dev/requirements_doctor.txt
 ----
@@ -90,14 +204,45 @@ pip --require-virtualenv -v install -r tools/dev/requirements_doctor.txt
 .Start ansible-doctor
 ----
 ~/venv/ansible-doctor/bin/ansible-doctor --version
+----
 
-ansible-doctor 2.0.4
+===== Ansible-Container
+
+Instead of local venvs, the container from `docker/` can be used as Ansible-Controller.
+
+----
+cd ansible-oracle/docker
+docker-compose run --rm -w /git/ansible-oracle/example/beginner/ansible ansible bash
+----
+
+NOTE: Some `pre-commit` hooks (e.g. `ansible-lint`) need a recent Python and can fail with the Python of an older OS.
+
+[[working-with-tools]]
+=== Working with the tools
+
+The following chapters are the same for both options.
+With `nix-shell` the tools are in `PATH`, with a local Ansible-Controller the venv must be activated before.
+
+==== pre-commit
+
+IMPORTANT: link:https://pre-commit.com/[pre-commit] is a nice tool for git. +
+Each commit is locally checked against multiple rules, to prevent failures in github-Actions after pushing commits to github. +
+This tool is recommended but not mandatory for contributing to `ansible-oracle`.
+
+.Install the git hook once (cd into repository before)
+----
+pre-commit install
 ----
 
 IMPORTANT: Do not forget to place change files in stage area of git before starting `pre-commit`. +
-`pre-commit` works only on the data of the stage area! +
-`pre-commit` could be executed without an active venv.
+`pre-commit` works only on the data of the stage area!
 
+.run outside git
+----
+pre-commit run
+----
+
+==== ansible-doctor
 
 .Start ansible-doctor with pre-commit
 ----
@@ -107,12 +252,15 @@ pre-commit run ansible-doctor
 .Start ansible-doctor to create new README.md file
 ----
 cd ansible-oracle
+
+# nix-shell
+.venv/ansible-doctor/bin/ansible-doctor -f -r roles
+
+# local Ansible-Controller
 ~/venv/ansible-doctor/bin/ansible-doctor -f -r roles
 ----
 
-=== Start Ansible-Container
-
-=== Start Playbook
+==== Start Playbook
 
 IMPORTANT: Don't forget to set the working branch in `requirements.yml`. +
 Remove/Disable `devsec.hardening` for faster installation of Ansible collection, when devsec should not be tested.
@@ -164,16 +312,291 @@ pip3 install antsibull-changelog
 
 Changelogs for Collections: https://github.com/ansible-community/antsibull-changelog/blob/main/docs/changelogs.rst#releasing-a-new-version-of-a-collection
 
+=== Add PR references to fragments
+
+Each entry in a fragment should end with a reference to its Pull-Request, e.g. `(oravirt#599)`.
+`tools/release/fix_fragments.py` adds missing references to all fragments in `changelogs/fragments`.
+
+The Pull-Request is determined from the commits of the fragment file via the GitHub API, newest commit first.
+A merged Pull-Request of any of these commits wins over an open one.
+The open Release-Pull-Request is only used for fragments, which are not part of a merged Pull-Request.
+The reference is appended to every entry that does not end with it, even if the entry already references an issue.
+
+----
+# show what would be changed
+tools/release/fix_fragments.py --dry-run
+
+# update the fragments
+tools/release/fix_fragments.py
+----
+
+Single fragments can be checked with `-f` / `--fragment`, e.g. by a developer after the Pull-Request for a new fragment has been created.
+The parameter accepts a path or a filename from `changelogs/fragments` and can be repeated.
+With `--dry-run` the script returns exit code 1 if the fragment needs to be updated.
+
+----
+# check a single fragment
+tools/release/fix_fragments.py --dry-run -f blanks-in-gi-responsefile.yml
+
+# update a single fragment
+tools/release/fix_fragments.py -f changelogs/fragments/blanks-in-gi-responsefile.yml
+----
+
+NOTE: The Pull-Request must exist on GitHub, otherwise the fragment is reported as `no pull request found`.
+
+Fragments without a Pull-Request and entries that cannot be updated automatically (e.g. broken quoting) are reported and must be fixed manually.
+The script returns exit code 1 in this case.
+
+Without `--fragment` all fragments in `changelogs/fragments` are processed.
+
+NOTE: Without a token the GitHub API allows only 60 requests per hour.
+The token is taken from `GITHUB_TOKEN` or `GH_TOKEN`.
+Without these variables the token stored by `gh` is used, when all fragments are processed (`gh auth token` or `~/.config/gh/hosts.yml` of the active account).
+An invalid token is ignored with a warning.
+
+This must be done before `antsibull-changelog release`, because the release removes the fragments.
+
+=== Collection version in requirements.yml
+
+The examples in `example/*/ansible/requirements.yml` must reference the collection version from `galaxy.yml`.
+The same is needed for the template `tools/release/requirements.yml`.
+`tools/release/galaxy_version.sh` checks or sets the version in all these files.
+
+----
+# check the versions
+tools/release/galaxy_version.sh check
+
+# set the version from galaxy.yml
+tools/release/galaxy_version.sh fix
+----
+
+`check` returns exit code 1 if a file does not use the version from `galaxy.yml`.
+`fix` changes only the version of the collection entry, comments in the files are kept.
+
+The script is also available as `task example:check` and `task example:fix` from the repository root.
+
 === Creating new releases
 
-`antsibull-changelog release` reads `galaxy.yml` to get the release version automatically.
-The execution is aborted, when a release with the version is existing in `CHANGELOG.rst`.
+`tools/release/build_release.sh` executes the whole release process in two steps:
+
+`-m pr`:: Create the Release-Pull-Request with changelog.
+`-m release`:: Create the tag and a draft release for the Release-Pull-Request.
+`-m galaxy`:: Sync `master` of your fork with `master` of the upstream repository.
+`-m docs`:: Update the website, without creating a release.
 
 NOTE: The whole release process should be done with a dedicated Pull-Request.
 
+Requirements:
+
+* The release branch is named `pr/<major>.<minor>.<patch>`, e.g. `pr/4.16.0`.
+* `origin` is your fork on GitHub.
+* `gh` is logged in (`gh auth status`), `jq` and `curl` are installed and `.venv/antsibull` exists. `gh`, `jq` and the venv are provided by `nix-shell`.
+* The script is executed in `nix-shell`, because the pre-commit hooks of the version commit need it.
+
 ----
-antsibull-changelog release
+nix-shell
+git switch -c pr/4.16.0
+tools/release/build_release.sh -m pr
 ----
+
+==== Release-Pull-Request (`-m pr`)
+
+The script executes the following steps:
+
+. Read the version from the branch name (`pr/4.16.0` -> `4.16.0`) and set it in `galaxy.yml`.
+. Set the version in all `requirements.yml` with `tools/release/galaxy_version.sh fix`.
+. Commit `galaxy.yml` and all `requirements.yml` as `Release <version>`.
+  This is the initial commit for the Pull-Request, GitHub refuses a Pull-Request without commits.
+  Other changes in the working tree and the index are not part of this commit.
+  The step is skipped, when the version is already committed.
+. Push the branch to `origin`.
+. Create the Pull-Request `Release <version>` in `oravirt/ansible-oracle`. An existing open Pull-Request of the branch is used.
+. Add the PR references to the fragments with `tools/release/fix_fragments.py`.
+  The script is aborted, when fragments cannot be updated.
+. Create the changelog with `.venv/antsibull/bin/antsibull-changelog release`.
+  `antsibull-changelog` reads the version from `galaxy.yml` and aborts, when the release already exists in `CHANGELOG.rst`.
+  The fragments are removed.
+. Replace the description of the Pull-Request with the release notes of the new version (Markdown, `antsibull-changelog generate --only-latest`).
+
+The changes of fragments and changelog are not committed by the script.
+Review them, then commit and push them to the release branch.
+
+==== Draft release (`-m release`)
+
+----
+tools/release/build_release.sh -m release
+----
+
+The script executes the following steps:
+
+. Search the Pull-Request of the release branch from your fork, open or merged.
+. Create the tag `v<version>` (e.g. `v4.16.0`) like the existing release tags.
+  The tag points to the merge commit of the Pull-Request.
+  When the Pull-Request is still open, the last commit of the Pull-Request is used.
+. Push the tag to the git remote of the GitHub repository (e.g. `upstream` for `oravirt/ansible-oracle`).
+  An existing tag is used, when it points to the same commit, otherwise the script is aborted.
+. Create the draft release `Release <version>` with the description of the Pull-Request as text.
+  The text of an existing draft release is updated, an already published release aborts the script.
+. Update the website with `tools/release/build_website.sh -m push`, see link:website.adoc[website.adoc].
+  The website is built from the local checkout of the release branch and published at once.
+  This step is skipped for tests against a fork (`-r` other than `oravirt/ansible-oracle`).
+
+The draft release must be published manually on GitHub.
+
+NOTE: The website step needs `docker`, `rsync` and `task` and committed sources in `website/`, `doc/`, `roles/` and `docker/hugo/`.
+When it fails, fix the problem and run `-m release` again: the existing tag and draft release are reused.
+
+==== Update the website (`-m docs`)
+
+----
+tools/release/build_release.sh -m docs
+----
+
+Builds and publishes the website with `tools/release/build_website.sh -m push`, like the last step of `-m release`.
+Use it to update the website without a release, e.g. after changes in `doc/` or `website/`, or to repeat a failed website step of `-m release`.
+No release branch is needed, the website is built from the current local checkout.
+The step is skipped with `-r` other than `oravirt/ansible-oracle`.
+
+For more options (commit only, Pull-Request in the website repository) use `tools/release/build_website.sh` directly, see link:website.adoc[website.adoc].
+
+==== Sync fork (`-m galaxy`)
+
+----
+tools/release/build_release.sh -m galaxy
+----
+
+GitHub syncs the fork in the background.
+`-m galaxy` forces the sync of `master` in your fork with `master` of the upstream repository (`gh repo sync`), to take over a release merged in upstream at once.
+The fork is `<gh user>/ansible-oracle`, the user is taken from the login of `gh`.
+Afterwards the last commit of `master` in the fork is shown.
+
+When the last commit of `master` in the fork is a release commit (`Release <version>`), the latest published release of the upstream repository is checked.
+Draft releases are ignored, so the release must be published before.
+
+If the release points to this commit, the workflow `Deploy Collection` is started in the fork, which uploads the collection to Ansible Galaxy.
+The script waits for the workflow and shows the progress of the steps (`gh run watch`).
+When the workflow fails, the log of the failed steps is shown and the script returns exit code 1.
+The workflow is not started, when the version is already on Ansible Galaxy, so `-m galaxy` can be repeated safely.
+
+The mode works only on GitHub with `gh` (and the API of Ansible Galaxy), nothing is changed locally and no release branch is needed.
+The sync is refused, when `master` of the fork contains own commits - no hard reset is done.
+
+==== Tasks
+
+The modes are also available as tasks from the repository root.
+Options are passed after `--`.
+
+----
+task release:pr        # -m pr
+task release:draft     # -m release (incl. website)
+task release:docs      # -m docs
+task release:galaxy    # -m galaxy
+----
+
+The creation of the Release-Pull-Request can be tested against your fork:
+
+----
+task release:pr -- -i -r <github user>/ansible-oracle
+----
+
+The Pull-Request is then created in your fork instead of `oravirt/ansible-oracle`.
+
+WARNING: `fix_fragments.py` searches the Pull-Requests of the fragments in your fork and not in upstream.
+The fragments are part of Pull-Requests in `oravirt/ansible-oracle`, so the results are wrong:
+fragments get the reference of the test Pull-Request in your fork (e.g. `Rendanic#93`) or are skipped with `no pull request found`.
+`-i` is needed, otherwise the script stops at the skipped fragments.
+Changelog and description of the test Pull-Request contain these wrong references, never use them for a real release.
+Revert all changes in the working tree after the test.
+
+==== Options
+
+`-m pr|release|galaxy|docs`:: Mode of the script, see above.
+`-r <owner/repo>`:: GitHub repository for the Pull-Request, the release, the lookup of the fragment Pull-Requests and source of the fork sync (default: `oravirt/ansible-oracle`).
+`-i`:: Continue, when fragments cannot be updated by `fix_fragments.py` (only `-m pr`).
+
+A test against your fork is possible with `-i -r <your account>/ansible-oracle`, or `-m release -r <your account>/ansible-oracle`.
+The fragments get the reference of the Release-Pull-Request in the fork or are skipped, because the Pull-Requests of the fragments are in `oravirt/ansible-oracle`.
+Revert all changes in the working tree after such a test and remove the test tag and draft release (`git tag -d v<version>`, the tag and the release in your fork).
+
+== Check dependencies with renovate
+
+IMPORTANT: This is optional and not needed for the normal development in `ansible-oracle`. +
+It is used by maintainers to find updates for pip modules and container images.
+
+`renovate` is part of `shell.nix`.
+The configuration is in `renovate.json`, the tasks are in `tools/renovate/Taskfile.yml`.
+
+=== Local checks
+
+The local checks read the working tree and do not change anything.
+No GitHub setup is needed.
+`renovate.json` is read from the working tree, but it must be tracked by git.
+
+----
+task renovate:check     # pip modules and container images
+task renovate:pip       # pip modules and pre-commit hooks
+task renovate:docker    # container images only
+task renovate:report    # show the result of the last run again
+task renovate:validate  # validate renovate.json
+----
+
+Dependencies which are pinned intentionally (e.g. `ansible-core` or the molecule base images) are disabled with `packageRules` in `renovate.json`.
+They are shown as `disabled` in the report.
+
+Tools which are used in requirements, in `.pre-commit-config.yaml` and in the github workflows (`ansible-doctor`, `ansible-lint`, `antsibull-changelog`) are grouped with `groupName`.
+An update changes all files in one branch, so the versions are always the same.
+The github workflow for `ansible-doctor` installs `tools/dev/requirements_doctor.txt`.
+The versions of github actions (e.g. `ansible/ansible-lint`) and of `pip install <module>==<version>` in the workflows are checked as well (only with `task renovate:check`).
+
+The pre-commit hooks are looked up with GitHub tags, which needs a token.
+The local checks use the token from `gh auth token`, if `gh` is logged in.
+
+=== Setup gh for renovate
+
+IMPORTANT: The GitHub CLI `gh` is only needed for running renovate against your fork on GitHub (`task renovate:fork`). +
+The local checks work without it.
+
+`gh` is part of `shell.nix`. Login once with your GitHub account:
+
+----
+gh auth login     # GitHub.com, HTTPS, login with a web browser
+gh auth status
+----
+
+The token of `gh` needs the scope `repo` for pushing branches into your fork.
+This is part of the default scopes of `gh auth login`.
+
+renovate reads the token from `RENOVATE_TOKEN`:
+
+----
+export RENOVATE_TOKEN=$(gh auth token)
+----
+
+=== Run renovate against your fork
+
+renovate clones your fork from GitHub, creates a branch for each update and pushes it together with a Pull-Request into your fork.
+The configuration is taken from `renovate.json` in `FORK_BASE` of the fork, not from your working tree.
+`renovate.json` and `tools/renovate/changelog_fragment.sh` must be pushed into `FORK_BASE` before the first run.
+Without `renovate.json` renovate skips the fork (`disabled-no-config`).
+
+`FORK_REPO` is the fork on GitHub, `FORK_BASE` the branch for the updates (default: `master`).
+
+----
+# show what would be done
+task renovate:fork:dry-run FORK_REPO=<github user>/ansible-oracle
+
+# create branches and Pull-Requests in the fork
+task renovate:fork FORK_REPO=<github user>/ansible-oracle
+----
+
+The branches can be tested locally after `git fetch origin`.
+
+The branches are named `pr/renovate/<update>`, so the `github-Actions` are started for each push.
+Each update adds a changelog fragment `changelogs/fragments/renovate-<dependency>.yml` in section `minor_changes`, created by `tools/renovate/changelog_fragment.sh`.
+The PR reference is added later with `tools/release/fix_fragments.py`.
+
+NOTE: renovate keeps the clones and its cache in `~/.cache/renovate`.
+The clone is reset by each run, do not use it as working copy.
 
 == Update Vagrantbox on vagrantcloud for examples
 
@@ -191,7 +614,7 @@ cd packer_templates/oraclelinux/
 
 === Upload new Version
 
-IMPORTANT: Change the boxname to an account with write priviledges.
+IMPORTANT: Change the boxname to an account with write privileges.
 
 .Upload new version after build:
 ----
@@ -207,9 +630,9 @@ vagrant cloud publish --release ${boxname} "$vagrantversion" virtualbox
 == ansible molecule
 
 WARNING: The timeout for pulling docker Container in `molecule` is 15s at the moment. +
-There is no parameter to increase the timeout. Pull container manually before starting the szenario. The image url is defined in `molecule.yml`.
+There is no parameter to increase the timeout. Pull container manually before starting the scenario. The image url is defined in `molecule.yml`.
 
-The following szenarios are existing in the `ansible-oracle profect.
+The following scenarios are existing in the `ansible-oracle profect.
 
 [options="header" cols="1,4" valign="top"]
 |=======================
@@ -221,14 +644,46 @@ The following szenarios are existing in the `ansible-oracle profect.
 | golden | Create Golden-Image for installation from dbfs.
 |=======================
 
+=== Directory for installation media and patches
+
+The scenarios `dbfs`, `dbfs-ol9`, `download` and `golden` mount a local directory as `/vagrant` into the container.
+The local directory must be defined by `MOLECULE_SW_DIR`, there is no default. The path inside the container is always `/vagrant`.
+
+.Set the directory as environment variable
+----
+export MOLECULE_SW_DIR=/mnt/d/ORACLE/sw/linux64
+----
+
+.or permanently in `extensions/.env.yml` (ignored by git)
+----
+MOLECULE_SW_DIR: /mnt/d/ORACLE/sw/linux64
+----
+
+=== Taskfile
+
+`extensions/Taskfile.yml` wraps the molecule commands. The scenario is selected with `S=` (default: `default`).
+
+----
+cd extensions
+task --list
+task pull                      # pull container images before the 1st run
+task converge S=dbfs-ol9
+task converge S=dbfs-ol9 -- -vv  # arguments after -- are passed to molecule
+task login S=default H=ol9
+task destroy S=dbfs-ol9
+task collection                # reinstall collection after role changes
+----
+
+The tasks are also available from the repository root as `task molecule:<task>`.
+
 === Test OS roles
 
-IMPORTANT: This szenario is used, when changes at OS roles should be tested against different OS Distribuitions. +
-Most of the tests are included in the `dbfs` szenario!
+IMPORTANT: This scenario is used, when changes at OS roles should be tested against different OS Distribuitions. +
+Most of the tests are included in the `dbfs` scenario!
 
 The execution time is ~10m for a full test.
 
-The `default` szenario requires no parameter `-s`!
+The `default` scenario requires no parameter `-s`!
 
 .Start download
 ----
@@ -246,18 +701,28 @@ export MOS_LOGIN=Username
 export MOS_PASSWORD=verySecret
 ----
 
+.or store them in `extensions/.env.yml` (ignored by git)
+----
+MOS_LOGIN: Username
+MOS_PASSWORD: 'verySecret'
+----
+
+Environment variables have precedence over `extensions/.env.yml`.
+Quote the password with `'` when it contains special characters like `:`, `#` or `"`.
+Restrict the access to the file with `chmod 600 extensions/.env.yml`.
+
 .Start download
 ----
 cd extensions
 molecule test -s download
 ----
 
-`molecule test` does the full test of the szenario.
+`molecule test` does the full test of the scenario.
 
-=== Test Single Instance in Filesystem with szenario `dbfs`
+=== Test Single Instance in Filesystem with scenario `dbfs`
 
 IMPORTANT: Make sure that the installation media and patches are placed in `/vagrant` before starting `molecule`. +
-Use the szenario `download` for downloading the Patches from support.oracle.com.
+Use the scenario `download` for downloading the Patches from support.oracle.com.
 
 
 The execution time is ~2h for a full test.

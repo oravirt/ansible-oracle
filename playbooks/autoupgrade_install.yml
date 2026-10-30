@@ -1,0 +1,9 @@
+---
+- name: Install Oracle AutoUpgrade
+  hosts: "{{ hostgroup | mandatory }}"
+  any_errors_fatal: true
+  tasks:
+    - name: Install autoupgrade.jar
+      ansible.builtin.import_role:
+        name: opitzconsulting.ansible_oracle.autoupgrade
+        tasks_from: install.yml

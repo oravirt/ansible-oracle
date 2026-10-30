@@ -1,4 +1,9 @@
 ---
+# oracle_sw_copy is true in this scenario
+# => installation media and patches are copied from the Ansible controller
+# => /vagrant only exists inside the container
+oracle_sw_source_local: "{{ lookup('ansible.builtin.env', 'MOLECULE_SW_DIR') }}"
+
 oraords_db_pools:
   - db_pool: default
     pdb_name: ORCLPDB1

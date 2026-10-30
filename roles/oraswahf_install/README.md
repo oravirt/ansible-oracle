@@ -2,7 +2,7 @@
 
 Install Oracle Autonomous Health Framework
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Dependencies](#dependencies)

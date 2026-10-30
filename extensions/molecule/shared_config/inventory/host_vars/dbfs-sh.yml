@@ -1,0 +1,86 @@
+---
+# oracle_sw_copy is true in this scenario
+# => installation media and patches are copied from the Ansible controller
+# => /vagrant only exists inside the container
+oracle_sw_source_local: "{{ lookup('ansible.builtin.env', 'MOLECULE_SW_DIR') }}"
+
+oracle_db2_home: db1932-si-ee
+
+db_homes_installed:
+  - home: db1932-si-ee
+    state: present
+    apply_patches: false
+  - home: db1933-si-ee
+    state: present
+    apply_patches: false
+
+listener_installed:
+  - home: db1932-si-ee
+    listener_name: LISTENER
+    state: present
+  - home: db1933-si-ee
+    listener_name: LISTENER1522
+    state: present
+
+tnsnames_installed:
+  - tnsname: "{{ oracle_pdbs[0]['pdb_name'] }}"
+    home: db1933-si-ee
+    state: present
+
+sqlnet_installed:
+  - home: db1933-si-ee
+    sqlnet: sqlnetalias1
+    state: present
+
+oracle_databases:
+  - home: "{{ oracle_db2_home }}"
+    oradb_facts_ignore_unreachable: true
+    oracle_db_name: &oracle_db_name2 DB2
+    oracle_db_type: SI
+    is_container: true
+    storage_type: FS
+    oracle_database_type: MULTIPURPOSE
+    redolog_size: 50M
+    redolog_groups: 3
+    datafile_dest: /u01/app/oracle/oradata
+    recoveryfile_dest: /u01/app/oracle//fra
+    listener_name: LISTENER
+    listener_port: 1521
+    archivelog: false
+    flashback: false
+    force_logging: false
+    state: present
+    tablespaces:
+      - name: TEST
+        size: 10M
+        autoextend: true
+        next: 50M
+        maxsize: 4G
+        content: permanent
+        state: present
+    init_parameters:
+      - {name: db_create_file_dest, value: '/u01/app/oracle/oradata', scope: both, state: present}
+      - {name: db_create_online_log_dest_1, value: '/u01/app/oracle/oradata', scope: both, state: present}
+      - {name: recyclebin, value: 'off', scope: spfile, state: present}
+      - {name: pga_aggregate_target, value: '128M', scope: both, state: present}
+      - {name: sga_target, value: '1808M', scope: spfile, state: present}
+
+oracle_pdbs:
+  - cdb: DB2
+    home: "{{ oracle_db2_home }}"
+    pdb_name: ORCLPDB1
+    listener_port: 1521
+    state: present
+    datafile_dest: /u01/app/oracle/oradata
+  - cdb: DB2
+    home: "{{ oracle_db2_home }}"
+    pdb_name: ORCLPDB2
+    listener_port: 1521
+    state: present
+    datafile_dest: /u01/app/oracle/oradata
+  - cdb: DB2
+    home: "{{ oracle_db2_home }}"
+    pdb_name: ORCLPDB3
+    listener_port: 1521
+    state: present
+    datafile_dest: /u01/app/oracle/oradata

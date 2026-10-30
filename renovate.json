@@ -1,0 +1,98 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "branchPrefix": "pr/renovate/",
+  "postUpgradeTasks": {
+    "commands": [
+      "tools/renovate/changelog_fragment.sh '{{{depNameSanitized}}}' '{{{depName}}}' '{{{currentVersion}}}' '{{{newVersion}}}'"
+    ],
+    "fileFilters": ["changelogs/fragments/renovate-*.yml"]
+  },
+  "ignorePaths": [
+    ".ansible/**",
+    ".venv/**",
+    ".direnv/**",
+    "context/**",
+    "example/*/ansible/context/**"
+  ],
+  "enabledManagers": [
+    "pip_requirements",
+    "pep621",
+    "dockerfile",
+    "docker-compose",
+    "pre-commit",
+    "github-actions",
+    "custom.regex"
+  ],
+  "pre-commit": {
+    "enabled": true
+  },
+  "pip_requirements": {
+    "managerFilePatterns": ["/(^|/)requirements[\\w.-]*\\.txt$/"]
+  },
+  "packageRules": [
+    {
+      "description": "SLES15SP* and OL versions are intentionally pinned",
+      "matchFileNames": [
+        "docker/molecule/Dockerfile-SLES15SP*",
+        "docker/molecule/Dockerfile-ol*"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "ansible-core is intentionally pinned per venv",
+      "matchPackageNames": ["ansible-core"],
+      "enabled": false
+    },
+    {
+      "description": "ansible-doctor: same version in requirements and pre-commit (workflow uses requirements_doctor.txt)",
+      "matchPackageNames": ["ansible-doctor", "thegeeklab/ansible-doctor"],
+      "groupName": "ansible-doctor"
+    },
+    {
+      "description": "ansible-doctor requires Python <3.15",
+      "matchFileNames": [".github/workflows/ansible-doctor.yml"],
+      "matchDepNames": ["python"],
+      "allowedVersions": "<3.15"
+    },
+    {
+      "description": "ansible-lint: same version in requirements, pre-commit and workflow",
+      "matchPackageNames": ["ansible-lint", "ansible-community/ansible-lint", "ansible/ansible-lint"],
+      "groupName": "ansible-lint"
+    },
+    {
+      "description": "antsibull-changelog: same version in requirements, pre-commit and workflow",
+      "matchPackageNames": ["antsibull-changelog", "ansible-community/antsibull-changelog"],
+      "groupName": "antsibull-changelog"
+    }
+  ],
+  "customManagers": [
+    {
+      "description": "Container images in molecule scenarios",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)molecule/[^/]+/molecule\\.ya?ml$/"],
+      "matchStrings": [
+        "(?:^|\\n)\\s*image:\\s*\"?(?:\\$\\{[A-Z_]+:-)?(?<depName>[a-z0-9./_-]+):(?<currentValue>[\\w.-]+)"
+      ],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "description": "Base image of ansible-builder execution environments",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)execution-environment\\.ya?ml$/"],
+      "matchStrings": [
+        "base_image:\\s*\\n\\s*name:\\s*\"?(?<depName>[a-z0-9./_-]+):(?<currentValue>[\\w.-]+)"
+      ],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "description": "pip install with pinned version in github workflows",
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": [
+        "pip install (?<depName>[A-Za-z0-9._-]+)==(?<currentValue>[\\w.-]+)"
+      ],
+      "datasourceTemplate": "pypi"
+    }
+  ]
+}

@@ -6,7 +6,7 @@ Please use only `oradb_rman_` variables from role `oradb_rman`.
 
 All other role variables from `oradb_rman` are deprecated and will be removed in a future release.
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -67,8 +67,7 @@ Defines the contolfile autobackup target directory for the RMAN-Templates from r
 ```YAML
 oradb_rman_controlfile_autobackup_disk_default: >-
   {% set __autobackup_disk_default = "'/u10/rmanbackup/%d/%d_%F'" -%}
-  {{ rman_controlfile_autobackup_disk_default | default(__autobackup_disk_default)
-  -}}
+  {{ rman_controlfile_autobackup_disk_default | default(__autobackup_disk_default) -}}
 ```
 
 ### oradb_rman_cron_logdir
@@ -78,8 +77,7 @@ Lgofiledirectory for output of cronjobs.
 #### Default value
 
 ```YAML
-oradb_rman_cron_logdir: "{{ rman_cron_logdir | default('/var/log/oracle/rman/log')
-  }}"
+oradb_rman_cron_logdir: "{{ rman_cron_logdir | default('/var/log/oracle/rman/log') }}"
 ```
 
 ### oradb_rman_cron_mkjob
@@ -111,8 +109,7 @@ Lgofiledirectory for `rman_wrapper.sh`.
 #### Default value
 
 ```YAML
-oradb_rman_log_dir: "{{ rman_log_dir | default(odb.0.rman_log_dir | default(oracle_base
-  + '/rman/log')) }}"
+oradb_rman_log_dir: "{{ rman_log_dir | default(odb.0.rman_log_dir | default(oracle_base + '/rman/log')) }}"
 ```
 
 ### oradb_rman_retention_policy_default
@@ -122,8 +119,7 @@ Defines the policy for the RMAN-Templates from role.
 #### Default value
 
 ```YAML
-oradb_rman_retention_policy_default: "{{ rman_retention_policy_default | default('RECOVERY
-  WINDOW OF 14 DAYS') }}"
+oradb_rman_retention_policy_default: "{{ rman_retention_policy_default | default('RECOVERY WINDOW OF 14 DAYS') }}"
 ```
 
 ### oradb_rman_script_dir
@@ -133,8 +129,7 @@ Directory for `*.rman`-Files.
 #### Default value
 
 ```YAML
-oradb_rman_script_dir: "{{ rman_script_dir | default(odb.0.rman_script_dir | default(oracle_base
-  + '/rman')) }}"
+oradb_rman_script_dir: "{{ rman_script_dir | default(odb.0.rman_script_dir | default(oracle_base + '/rman')) }}"
 ```
 
 ### oradb_rman_tns_admin
@@ -145,8 +140,7 @@ This is needed for RMAN-Catalogconnections.
 #### Default value
 
 ```YAML
-oradb_rman_tns_admin: "{{ rman_tns_admin | default(oracle_base + '/rman/network/admin')
-  }}"
+oradb_rman_tns_admin: "{{ rman_tns_admin | default(oracle_base + '/rman/network/admin') }}"
 ```
 
 ### oradb_rman_tnsnames_installed
@@ -171,8 +165,7 @@ Directory for Oracle wallet.
 #### Default value
 
 ```YAML
-oradb_rman_wallet_loc: "{{ rman_wallet_loc | default(oracle_base + '/rman/network/wallet')
-  }}"
+oradb_rman_wallet_loc: "{{ rman_wallet_loc | default(oracle_base + '/rman/network/wallet') }}"
 ```
 
 ### oradb_rman_wallet_password

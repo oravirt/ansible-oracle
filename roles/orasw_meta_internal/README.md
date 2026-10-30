@@ -6,7 +6,7 @@ Do not use any of the variables in your inventory!
 
 This will create issues and problems in `ansible-oracle` and is not supported.
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -186,8 +186,7 @@ _odb_loop_helper: _internal_used_
 #### Default value
 
 ```YAML
-_opdb_home: "{{ (oracle_databases | selectattr('oracle_db_name', 'equalto', _opdb_loop_helper['cdb']))[0]['home']
-  }}"
+_opdb_home: "{{ (oracle_databases | selectattr('oracle_db_name', 'equalto', _opdb_loop_helper['cdb']))[0]['home'] }}"
 ```
 
 ### _opdb_loop_helper
@@ -336,10 +335,7 @@ db_password: >-
 #### Default value
 
 ```YAML
-db_service_name: '{% if item is defined -%} {%- if item.oracle_db_unique_name is defined
-  -%}{{ item.oracle_db_unique_name }}{%- elif item.oracle_db_instance_name is defined
-  -%}{{ item.oracle_db_instance_name }}{%- else -%}{{ item.oracle_db_name }}{%- endif
-  -%}{%- endif %}'
+db_service_name: '{% if item is defined -%} {%- if item.oracle_db_unique_name is defined -%}{{ item.oracle_db_unique_name }}{%- elif item.oracle_db_instance_name is defined -%}{{ item.oracle_db_instance_name }}{%- else -%}{{ item.oracle_db_name }}{%- endif -%}{%- endif %}'
 ```
 
 ### db_user
@@ -389,10 +385,7 @@ grid_env:
 #### Default value
 
 ```YAML
-listener_home: "{%- if lsnrinst is defined -%}{%- if db_homes_config[lsnrinst.home]['oracle_home']
-  is defined -%}{{ db_homes_config[lsnrinst.home]['oracle_home'] }}{%- else -%}{{
-  oracle_base }}/{{ db_homes_config[lsnrinst.home]['version'] }}/{{ db_homes_config[lsnrinst.home]['home']
-  }}{%- endif -%}{%- endif -%}"
+listener_home: "{%- if lsnrinst is defined -%}{%- if db_homes_config[lsnrinst.home]['oracle_home'] is defined -%}{{ db_homes_config[lsnrinst.home]['oracle_home'] }}{%- else -%}{{ oracle_base }}/{{ db_homes_config[lsnrinst.home]['version'] }}/{{ db_homes_config[lsnrinst.home]['home'] }}{%- endif -%}{%- endif -%}"
 ```
 
 ### listener_port_template
@@ -402,8 +395,7 @@ listener_home: "{%- if lsnrinst is defined -%}{%- if db_homes_config[lsnrinst.ho
 #### Default value
 
 ```YAML
-listener_port_template: '{% if item.listener_port is defined %}{{ item.listener_port
-  }}{% else %}{{ listener_port }}{% endif %}'
+listener_port_template: '{% if item.listener_port is defined %}{{ item.listener_port }}{% else %}{{ listener_port }}{% endif %}'
 ```
 
 ### listener_protocols
@@ -518,9 +510,7 @@ The default value depends on `_oraswgi_meta_configure_cluster` and `oracle_home_
 #### Default value
 
 ```YAML
-oracle_home_gi: '{% if oracle_install_version_gi is defined -%}{%- if _oraswgi_meta_configure_cluster
-  -%}{{ oracle_home_gi_cl }}{%- else -%}{{ oracle_home_gi_so }}{%- endif -%}{%- endif
-  %}'
+oracle_home_gi: '{% if oracle_install_version_gi is defined -%}{%- if _oraswgi_meta_configure_cluster -%}{{ oracle_home_gi_cl }}{%- else -%}{{ oracle_home_gi_so }}{%- endif -%}{%- endif %}'
 ```
 
 ### oracle_patch_install
@@ -528,8 +518,7 @@ oracle_home_gi: '{% if oracle_install_version_gi is defined -%}{%- if _oraswgi_m
 #### Default value
 
 ```YAML
-oracle_patch_install: '{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_patch_stage_remote
-  }}{% else %}{{ oracle_patch_stage }}{% endif %}'
+oracle_patch_install: '{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_patch_stage_remote }}{% else %}{{ oracle_patch_stage }}{% endif %}'
 ```
 
 ### oracle_patch_stage
@@ -555,8 +544,7 @@ This is an internal variable. Do not set it in Inventory.
 #### Default value
 
 ```YAML
-oracle_stage_install: '{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote
-  }}{% else %}{{ oracle_stage }}{% endif %}'
+oracle_stage_install: '{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}'
 ```
 
 ### oracle_sw_copy
@@ -572,8 +560,7 @@ oracle_sw_copy: '{% if install_from_nfs %}false{% else %}true{% endif %}'
 #### Default value
 
 ```YAML
-oracle_sw_extract_path: "{%- if '18' in db_version -%}{{ oracle_home_db }}{%- else
-  -%}{{ oracle_stage }}/{{ item[0].version }}{%- endif -%}"
+oracle_sw_extract_path: "{%- if '18' in db_version -%}{{ oracle_home_db }}{%- else -%}{{ oracle_stage }}/{{ item[0].version }}{%- endif -%}"
 ```
 
 ### oracle_sw_unpack

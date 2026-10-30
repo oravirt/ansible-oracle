@@ -2,7 +2,7 @@
 
 sets up the host generic stuff
 
-## Table of content
+## Table of contents
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
@@ -17,6 +17,7 @@ sets up the host generic stuff
   - [configure_motd](#configure_motd)
   - [configure_ntp](#configure_ntp)
   - [configure_public_yum_repo](#configure_public_yum_repo)
+  - [epel10_rpm](#epel10_rpm)
   - [epel6_rpm](#epel6_rpm)
   - [epel7_rpm](#epel7_rpm)
   - [epel8_rpm](#epel8_rpm)
@@ -91,7 +92,6 @@ common_packages_el10:
   - bind-utils
   - ethtool
   - expect
-  - facter
   - git
   - grubby
   - initscripts
@@ -100,7 +100,6 @@ common_packages_el10:
   - libstdc++-devel
   - lsof
   - lvm2
-  - mlocate
   - module-init-tools
   - nc
   - net-tools
@@ -117,8 +116,6 @@ common_packages_el10:
   - unzip
   - util-linux-ng
   - xfsprogs
-  - xorg-x11-utils
-  - xorg-x11-xauth
 ```
 
 ### common_packages_el6
@@ -160,9 +157,7 @@ common_packages_el6:
   - twm
   - autofs
   - parted
-  - mlocate
   - ksh
-  - psmisc
 ```
 
 ### common_packages_el7
@@ -381,6 +376,16 @@ configure_ntp: true
 configure_public_yum_repo: true
 ```
 
+### epel10_rpm
+
+URL for epel-release-latest-10.noarch.rpm
+
+#### Default value
+
+```YAML
+epel10_rpm: oracle-epel-release-el10
+```
+
 ### epel6_rpm
 
 Url for epel-release-latest-6.noarch.rpm
@@ -398,8 +403,7 @@ Url for epel-release-latest-7.noarch.rpm
 #### Default value
 
 ```YAML
-epel7_rpm: 
-  https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/e/epel-release-7-14.noarch.rpm
+epel7_rpm: https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/e/epel-release-7-14.noarch.rpm
 ```
 
 ### epel8_rpm
@@ -414,7 +418,7 @@ epel8_rpm: https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rp
 
 ### epel9_rpm
 
-Url for epel-release-latest-8.noarch.rpm
+Url for epel-release-latest-9.noarch.rpm
 
 #### Default value
 
