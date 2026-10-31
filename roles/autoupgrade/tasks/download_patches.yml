@@ -157,6 +157,30 @@
             - _autoupgrade_gold_images_mv.results
               | rejectattr('skip_reason', 'defined') | rejectattr('changed') | list | length > 0
 
+        # All renamed Gold Images in autoupgrade_download_dir, not only from this download
+        # => the download of an older release update does not change the symlink
+        - name: autoupgrade | Find renamed Gold Images
+          ansible.builtin.find:
+            paths: "{{ autoupgrade_download_dir }}"
+            patterns: "^{{ autoupgrade_download_gold_image_prefix | regex_escape }}[0-9]+\\.[0-9]+\\.zip$"
+            use_regex: true
+            file_type: file
+          register: _autoupgrade_gold_image_files
+          when:
+            - autoupgrade_download_gold_image_latest | bool
+
+        - name: autoupgrade | Create symlink to the latest Gold Image
+          ansible.builtin.file:
+            src: "{{ aulg.value.file }}"
+            dest: "{{ autoupgrade_download_dir }}/{{ autoupgrade_download_gold_image_prefix }}{{ aulg.key }}_latest.zip"
+            state: link
+          loop: "{{ _autoupgrade_gold_image_latest | dict2items }}"
+          loop_control:
+            loop_var: aulg
+            label: "{{ autoupgrade_download_gold_image_prefix }}{{ aulg.key }}_latest.zip -> {{ aulg.value.file }}"
+          when:
+            - autoupgrade_download_gold_image_latest | bool
+
     - name: autoupgrade | Warn about unavailable patches
       ansible.builtin.debug:
         msg: >-
