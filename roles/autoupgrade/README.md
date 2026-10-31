@@ -23,6 +23,7 @@ See `doc/guides/autoupgrade_upgrade.adoc` for the upgrade of PDBs.
   - [autoupgrade_download_dir](#autoupgrade_download_dir)
   - [autoupgrade_download_filename_regex](#autoupgrade_download_filename_regex)
   - [autoupgrade_download_gold_image](#autoupgrade_download_gold_image)
+  - [autoupgrade_download_gold_image_latest](#autoupgrade_download_gold_image_latest)
   - [autoupgrade_download_gold_image_prefix](#autoupgrade_download_gold_image_prefix)
   - [autoupgrade_download_gold_image_rename](#autoupgrade_download_gold_image_rename)
   - [autoupgrade_download_latest](#autoupgrade_download_latest)
@@ -115,6 +116,29 @@ autoupgrade_download_gold_image: ''
 
 ```YAML
 autoupgrade_download_gold_image: "NO"
+```
+
+### autoupgrade_download_gold_image_latest
+
+Create a symlink to the latest Gold Image of each release (`autoupgrade_download_gold_image_rename: true`).
+
+The symlink is named `autoupgrade_download_gold_image_prefix` + major release + `_latest.zip`
+and points to the renamed Gold Image with the highest release update in `autoupgrade_download_dir`:
+
+| Renamed Gold Images | Symlink |
+| --- | --- |
+| `db_home_19.31.zip`, `db_home_19.32.zip` | `db_home_19_latest.zip -> db_home_19.32.zip` |
+| `db_home_26.03.zip`, `db_home_26.04.zip` | `db_home_26_latest.zip -> db_home_26.04.zip` |
+
+The symlink is changed only, when a newer Gold Image exists.
+The download of an older release update does not change the symlink.
+
+Use the symlink as `imagename` in `db_homes_config` for an inventory independent of the release update.
+
+#### Default value
+
+```YAML
+autoupgrade_download_gold_image_latest: false
 ```
 
 ### autoupgrade_download_gold_image_prefix
