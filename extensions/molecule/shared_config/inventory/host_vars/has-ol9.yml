@@ -1,0 +1,102 @@
+---
+# Oracle Restart (HA_CONFIG) with ASM inside a container
+#
+# ASM uses plain files in /u01/asmdisks as disks
+# => device_persistence: '' => asm_diskgroups.disk.device is used as ASM disk
+# => the files are created in converge.yml before the installation of GI
+
+oracle_install_option_gi: HA_CONFIG
+oracle_install_version_gi: 19.3.0.0
+oracle_install_image_gi: gi_goldimage_19_33.zip
+oracle_home_gi: /u01/app/oracle/product/19/restart_19.33
+
+apply_patches_gi: false
+patch_before_rootsh: false
+
+# cluvfy does not work inside a container
+gi_ignoreprereq: true
+
+role_separation: false
+default_gipass: Oracle_123
+
+device_persistence: ''
+partition_devices: false
+oracle_asm_disk_string: /u01/asmdisks/*
+oracle_asm_init_dg: data
+
+asm_diskgroups:
+  - diskgroup: data
+    state: present
+    properties:
+      - {redundancy: external, ausize: 4}
+    attributes:
+      - {name: compatible.rdbms, value: 19.0.0.0.0}
+      - {name: compatible.asm, value: 19.0.0.0.0}
+    disk:
+      - {device: /u01/asmdisks/data01, asmlabel: data01, size: 30G}
+  - diskgroup: fra
+    state: present
+    properties:
+      - {redundancy: external, ausize: 4}
+    attributes:
+      - {name: compatible.rdbms, value: 19.0.0.0.0}
+      - {name: compatible.asm, value: 19.0.0.0.0}
+    disk:
+      - {device: /u01/asmdisks/fra01, asmlabel: fra01, size: 15G}
+
+# DB-Home must not be newer than GI
+db_homes_config:
+  db19-gi-ee:
+    version: 19.3.0.0
+    oracle_home: "/u01/app/oracle/product/19/db_19.33"
+    edition: EE
+    opatch_minversion: 12.2.0.1.52
+    imagename: db_home_19.33.zip
+    readonly_home: true
+    oracle_home_name: db1933giee
+    opatch: []
+
+db_homes_installed:
+  - home: db19-gi-ee
+    state: present
+    apply_patches: false
+
+listener_installed:
+  - listener_name: LISTENER
+    use_gi_home: true
+    state: present
+
+# group_vars/all references db19-si-ee
+sqlnet_installed: []
+tnsnames_installed: []
+oracle_wallet_config: []
+
+oracle_databases:
+  - home: db19-gi-ee
+    oracle_db_name: DBHAS
+    oracle_db_type: SI
+    is_container: true
+    storage_type: ASM
+    oracle_database_type: MULTIPURPOSE
+    redolog_size: 50M
+    redolog_groups: 3
+    datafile_dest: +DATA
+    recoveryfile_dest: +FRA
+    listener_port: 1521
+    archivelog: false
+    flashback: false
+    force_logging: false
+    state: present
+    init_parameters:
+      - {name: db_create_file_dest, value: '+DATA', scope: both, state: present}
+      - {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
+      - {name: recyclebin, value: 'off', scope: spfile, state: present}
+      - {name: pga_aggregate_target, value: '128M', scope: both, state: present}
+      - {name: sga_target, value: '1808M', scope: spfile, state: present}
+
+oracle_pdbs:
+  - cdb: DBHAS
+    home: db19-gi-ee
+    pdb_name: ORCLPDB1
+    listener_port: 1521
+    state: present
