@@ -1,0 +1,18 @@
+db_homes_installed:
+  - home: &db_config_home db26_si_ee
+    apply_patches: false
+    state: present
+
+
+oracle_listeners_config:
+  LISTENER:
+    home: *db_config_home
+    address:
+      - host: "{{ ansible_hostname }}"
+        protocol: TCP
+        port: 1521
+
+listener_installed:
+  - home: *db_config_home
+    listener_name: LISTENER
+    state: present
