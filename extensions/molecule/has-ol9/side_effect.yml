@@ -1,0 +1,11 @@
+---
+# This playbook is a special step in molecule.
+# 2nd run of the configuration: nothing should be changed
+- name: Side-Effect - swgi
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swgi
+  vars:
+    oracle_sw_copy: false
+    is_sw_source_local: true
+
+- name: Side-Effect - Manage-DB
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db

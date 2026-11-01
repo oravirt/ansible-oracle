@@ -1,0 +1,186 @@
+---
+- name: Converge
+  hosts: all
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+
+    # install missing cron on rhel9 container
+    - name: Install cron on RHEL/OL9
+      ansible.builtin.package:
+        name: cronie
+      when:
+        - ansible_os_family == 'RedHat'
+        - ansible_distribution_major_version | int == 9
+
+    # the container image is based on an older OL9 release.
+    # Installing packages pulls a newer openssl-libs and the old ssh-keygen
+    # fails with 'OpenSSL version mismatch' => update openssh first
+    - name: Update openssh on RHEL/OL9
+      ansible.builtin.package:
+        name:
+          - openssh
+          - openssh-clients
+        state: latest  # noqa package-latest
+      when:
+        - ansible_os_family == 'RedHat'
+        - ansible_distribution_major_version | int == 9
+
+- name: Converge os
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.os
+
+- name: Prepare container for Oracle Restart
+  hosts: all
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    # init.ohasd refuses to start in Docker with cgroupv2:
+    #   'cgroupv2 not supported for Docker containers' + exit 1
+    # root.sh copies init.ohasd to /etc/init.d and starts oracle-ohasd.service
+    # => remove the exit before each start of the service
+    - name: Create directory for oracle-ohasd.service drop-in
+      ansible.builtin.file:
+        path: /etc/systemd/system/oracle-ohasd.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Patch init.ohasd for Docker with cgroupv2
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/oracle-ohasd.service.d/99-molecule-docker.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Service]
+          ExecStartPre=-/usr/bin/sed -i -e "/cgroupv2 not supported for Docker containers/{n;s/exit 1/CPU_TASKS=\"\"/}" /etc/init.d/init.ohasd
+
+    # There are no block devices for ASM inside the container
+    # => use sparse files as ASM disks
+    - name: Create directory for ASM disks
+      ansible.builtin.file:
+        path: "{{ oracle_asm_disk_string | dirname }}"
+        state: directory
+        owner: oracle
+        group: oinstall
+        mode: "0755"
+
+    - name: Create ASM disks
+      ansible.builtin.command:
+        argv: [truncate, -s, "{{ item.1.size }}", "{{ item.1.device }}"]
+        creates: "{{ item.1.device }}"
+      loop: "{{ asm_diskgroups | subelements('disk') }}"
+      loop_control:
+        label: "{{ item.1.device }}"
+
+    - name: Set ownership of ASM disks
+      ansible.builtin.file:
+        path: "{{ item.1.device }}"
+        owner: oracle
+        group: asmadmin
+        mode: "0660"
+      loop: "{{ asm_diskgroups | subelements('disk') }}"
+      loop_control:
+        label: "{{ item.1.device }}"
+
+# ASM accepts plain files as disks only on NFS
+# => ORA-15059: invalid device type for ASM disk
+# => ASMCA from 'gridSetup.sh -executeConfigTools' cannot be used, because
+#    _asm_allow_only_raw_disks=false is needed for the ASM instance
+# => install GI without ConfigTools and configure ASM with asmca
+# installation media and patches are unpacked directly from /vagrant
+- name: Converge oraswgi_install
+  hosts: all
+  become: true
+  any_errors_fatal: true
+  vars:
+    oracle_sw_copy: false
+    is_sw_source_local: true
+    run_configtoolallcommand: false
+  roles:
+    - opitzconsulting.ansible_oracle.oraswgi_install
+
+- name: Configure ASM with asmca
+  hosts: all
+  gather_facts: false
+  become: true
+  become_user: oracle
+  any_errors_fatal: true
+  vars:
+    _init_dg: "{{ asm_diskgroups | selectattr('diskgroup', 'equalto', oracle_asm_init_dg) | first }}"
+  environment:
+    ORACLE_HOME: "{{ oracle_home_gi }}"
+    ORACLE_BASE: /u01/app/oracle
+  tasks:
+    # NETCA is part of the ConfigTools as well
+    # => add the listener in GI-Home
+    - name: Check for listener in GI-Home
+      ansible.builtin.command:
+        argv: ["{{ oracle_home_gi }}/bin/srvctl", config, listener, -listener, LISTENER]
+      register: _srvctl_listener
+      changed_when: false
+      failed_when: false
+
+    - name: Add listener to GI-Home
+      ansible.builtin.command:
+        argv: ["{{ oracle_home_gi }}/bin/srvctl", add, listener, -listener, LISTENER, -endpoints, "TCP:1521"]
+      when: "'PRCN-2044' in _srvctl_listener.stdout"
+      changed_when: true
+
+    - name: Start listener in GI-Home
+      ansible.builtin.command:
+        argv: ["{{ oracle_home_gi }}/bin/srvctl", start, listener, -listener, LISTENER]
+      register: _srvctl_listener_start
+      # PRCC-1014: LISTENER was already running
+      changed_when: "'PRCC-1014' not in _srvctl_listener_start.stdout"
+      failed_when:
+        - _srvctl_listener_start.rc != 0
+        - "'PRCC-1014' not in _srvctl_listener_start.stdout"
+
+    # rc=0 for missing resources => 'CRS-2613: Could not find resource'
+    - name: Check for resource ora.asm
+      ansible.builtin.command:
+        argv: ["{{ oracle_home_gi }}/bin/crsctl", stat, res, ora.asm]
+      register: _crsctl_asm
+      changed_when: false
+
+    - name: Configure ASM and initial diskgroup
+      ansible.builtin.command:
+        argv:
+          - "{{ oracle_home_gi }}/bin/asmca"
+          - -silent
+          - -configureASM
+          - -sysAsmPassword
+          - "{{ default_gipass }}"
+          - -asmsnmpPassword
+          - "{{ default_gipass }}"
+          - -param
+          - _asm_allow_only_raw_disks=false
+          - -diskString
+          - "{{ oracle_asm_disk_string }}"
+          - -diskGroupName
+          - "{{ _init_dg.diskgroup | upper }}"
+          - -diskList
+          - "{{ _init_dg.disk | map(attribute='device') | join(',') }}"
+          - -redundancy
+          - "{{ _init_dg.properties | map(attribute='redundancy') | first | upper }}"
+          - -au_size
+          - "{{ _init_dg.properties | map(attribute='ausize') | first }}"
+      when: "'CRS-2613' in _crsctl_asm.stdout"
+      changed_when: true
+
+- name: Converge swgi
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swgi
+  vars:
+    oracle_sw_copy: false
+    is_sw_source_local: true
+
+- name: Converge swdb
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swdb
+  vars:
+    oracle_sw_copy: false
+    is_sw_source_local: true
+
+- name: Converge manage_db
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db
