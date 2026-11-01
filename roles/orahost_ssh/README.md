@@ -15,7 +15,7 @@ SSH Setup for Oracle Grid-Infrastructure installations.
 
 ## Requirements
 
-- Minimum Ansible version: `2.14.0`
+- Minimum Ansible version: `2.16.0`
 
 ## Default Variables
 

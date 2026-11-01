@@ -5,7 +5,7 @@
     state: installed
   when:
     - oracle_packages_sles is defined
-    - install_os_packages
+    - install_os_packages | bool
     - ansible_os_family == 'Suse'
   tags: os_packages, oscheck
   notify: Reboot concerning package updates
@@ -20,9 +20,9 @@
     label: "{{ item.name | default('') }}"
   when:
     - not oracle_packages_sles is defined
-    - install_os_packages
+    - install_os_packages | bool
     - ansible_os_family == 'Suse'
-    - item.condition | default(false)
+    - item.condition | default(false) | bool
   tags: os_packages, oscheck
   notify: Reboot concerning package updates
 
@@ -31,7 +31,7 @@
     name: "{{ extra_packages | default('') }}"
     state: installed
   when:
-    - install_os_packages | default(false)
+    - install_os_packages | default(false) | bool
     - ansible_os_family == 'Suse'
     - extra_packages is defined
   tags: os_packages, oscheck
@@ -42,14 +42,14 @@
     name: "{{ oracle_asm_packages_sles }}"
     state: installed
   when:
-    - install_os_packages
+    - install_os_packages | bool
     - device_persistence == 'asmlib'
     - asm_diskgroups is defined
   tags: os_packages, oscheck, asm1
   notify: Reboot concerning package updates
 
 - name: Disable Transparent Hugepages (runtime)
-  when: not transparent_hugepage_disable_by_grub
+  when: not transparent_hugepage_disable_by_grub | bool
   ansible.builtin.shell: |
     [ -f /sys/kernel/mm/transparent_hugepage/enabled ] && echo never > /sys/kernel/mm/transparent_hugepage/enabled && echo changed
     [ -f /sys/kernel/mm/transparent_hugepage/defrag ] && echo never > /sys/kernel/mm/transparent_hugepage/defrag && echo changed
@@ -58,7 +58,7 @@
   tags: tphnuma
 
 - name: Disable Transparent Hugepages by grub cmdline
-  when: transparent_hugepage_disable_by_grub
+  when: transparent_hugepage_disable_by_grub | bool
   block:
 
     - name: Check if transparent_hugepage=never already present in kernel cmdline

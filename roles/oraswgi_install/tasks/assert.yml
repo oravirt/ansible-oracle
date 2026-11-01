@@ -21,9 +21,9 @@
   ansible.builtin.assert:
     quiet: true
     that:
-      - (role_separation and grid_user != oracle_user)
+      - (role_separation | bool and grid_user != oracle_user)
         or
-        not role_separation
+        not role_separation | bool
     fail_msg: >-
       Role separation is enabled.
       Different values for grid_user={{ grid_user }}

@@ -61,7 +61,7 @@
       filename: {{ osp_loop.filename }}
       unique_patchid: {{ osp_loop.unique_patchid | default('') }}
   when:
-    - apply_patches_db
+    - apply_patches_db | bool
     - dhc_opatch.state == 'present'
     - not dbhome_patches.stdout_lines | select('match', osp_loop.patchid | string) | length > 0
     - osp_loop.unique_patchid | default(0) == dhc_opatch.excludeUPI | default(osp_loop.unique_patchid) | default(0)
@@ -88,7 +88,7 @@
     script_env:
       LANG: "{{ orasw_meta_forced_lang }}"
       TMPDIR: "{{ orahost_meta_tmpdir }}"
-      _JAVA_OPTIONS: "{{ orahost_meta_java_options }}"
+      _JAVA_OPTIONS: "{{ orahost_meta_java_options | default('', true) }}"
     apply_options: "{{ dhc_opatch.apply_options | default(omit) }}"
   become: true
   become_user: "{{ __opatchauto_patchtype | ternary('root', oracle_user) }}"

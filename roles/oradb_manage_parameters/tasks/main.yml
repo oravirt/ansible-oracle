@@ -101,12 +101,12 @@
     force_restart: false
   with_nested:
     - "{{ oracle_databases }}"
-    - ""  # dummy to force odb.0 instead of item.
+    - [""]  # dummy to force odb.0 instead of item.
   when:
     - orasw_meta_primary_node | bool
     - odb.0.restart_spparameter_changed | default(true)
     - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
-    - restart_spparameter_changed
+    - restart_spparameter_changed | bool
   loop_control:
     loop_var: odb
     label: >-

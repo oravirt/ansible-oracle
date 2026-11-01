@@ -38,10 +38,10 @@
       ansible.builtin.import_role:
         name: oraswgi_manage_patches
       when:
-        - patch_before_rootsh
+        - patch_before_rootsh | bool
         - oracle_home_gi not in checkgiinstall.stdout
         - oracle_install_version_gi is version(19, '>=')
-        - apply_patches_gi
+        - apply_patches_gi | bool
 
 - name: include 19c/21c | Check for file GridSetup.sh
   ansible.builtin.stat:
@@ -122,7 +122,7 @@
 - name: include 19c/21c | Execute cluvfy
   ansible.builtin.include_tasks: runcluvfy.yml  # noqa name[missing]
   when:
-    - force_runcluvfy | default(false) or oracle_home_gi not in checkgiinstall.stdout
+    - force_runcluvfy | default(false) | bool or oracle_home_gi not in checkgiinstall.stdout
   tags: always
 
 # The state for olr.loc is used to check if root.sh has been executed
@@ -288,7 +288,7 @@
         executable: /usr/bin/bash
       environment: "{{ oracle_script_env }}"
       become: true
-      with_indexed_items: "{{ groups[orasw_meta_cluster_hostgroup] }}"
+      with_indexed_items: "{{ groups[orasw_meta_cluster_hostgroup] | default([]) }}"
       tags:
         - runroot
       when:
@@ -312,6 +312,6 @@
       tags:
         - runconfigtool
       when:
-        - run_configtoolallcommand
+        - run_configtoolallcommand | bool
         - orasw_meta_primary_node | bool
       register: configtool

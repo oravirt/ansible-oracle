@@ -1,0 +1,26 @@
+---
+- name: Install Oracle AutoUpgrade
+  hosts: "{{ hostgroup | default('dbfs') }}"
+  any_errors_fatal: true
+  tasks:
+
+    - name: install openJDK and python-pexpect
+      become: true
+      become_user: root
+      when:
+        - not autoupgrade_run_local | bool
+      ansible.builtin.package:
+        name:
+          - java-1.8.0-openjdk
+          - python-pexpect
+        state: present
+
+    - name: Install autoupgrade.jar
+      ansible.builtin.import_role:
+        name: opitzconsulting.ansible_oracle.autoupgrade
+        tasks_from: install.yml
+
+- name: Import_playbook autoupgrade_download_patches
+  import_playbook: opitzconsulting.ansible_oracle.autoupgrade_download_patches
+  vars:
+    hostgroup: dbfs

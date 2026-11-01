@@ -26,12 +26,13 @@
 3. [Upgrade of PDBs with AutoUpgrade (Unplug/Plug)](doc/guides/autoupgrade_upgrade.adoc)
 4. [How to develop in ansible-oracle](doc/development.adoc)
 5. [List of roles in ansible-oracle](doc/roles.adoc)
+6. [Breaking Changes - Upgrade Guide](doc/guides/breaking_changes.adoc)
 
 
 ## Pre-requisites
 
-* Ansible Version >= 2.14
+* Ansible Version >= 2.16
 
-  Version 2.14 or newer of Ansible is recommended
+  Version 2.16 or newer of Ansible is recommended
 * Oracle Linux (or any RHEL-based Linux System) >= 8
 * Oracle Database/Grid Infrastructure 21.3.0.0, 19.3.0.0

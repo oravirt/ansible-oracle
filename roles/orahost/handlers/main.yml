@@ -7,3 +7,11 @@
 - name: swapon
   ansible.builtin.command: swapon -a
   # noqa no-changed-when
+
+- name: reload firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    state: reloaded
+  when:
+    - firewall.results | default([]) | length > 0
+    - not disable_firewall | bool

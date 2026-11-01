@@ -7,7 +7,7 @@
     enablerepo: "{{ extrarepos_enabled | default(omit, True) }}"
     disablerepo: "{{ extrarepos_disabled | default(omit, True) }}"
   when:
-    - install_os_packages
+    - install_os_packages | bool
     - ansible_distribution_major_version is version('7', '<=')
   tags: os_packages, oscheck
   notify: Reboot concerning package updates
@@ -25,6 +25,135 @@
   tags: os_packages, oscheck
   notify: Reboot concerning package updates
 
+- name: Check if firewall is installed
+  when:
+    - firewall_open_listener_ports | bool or disable_firewall | bool
+  ansible.builtin.yum:  # noqa fqcn[action-core]
+    list: "{{ firewall_service }}"
+    disablerepo: "*"
+  tags: iptables,firewalld
+  register: firewall
+
+# Starting firewalld activates its permanent config. Do not start it, when this
+# would block new SSH connections of Ansible.
+# Limitation: Rich rules and zones bound to sources are not evaluated.
+- name: Check SSH access before starting firewall
+  when:
+    - firewall_open_listener_ports | bool
+    - not disable_firewall | bool
+    - firewall.results | length > 0
+    - firewall_service == 'firewalld'
+  tags: iptables,firewalld
+  block:
+    # SSH_CONNECTION is removed by sudo => become: false
+    - name: Get SSH connection of Ansible
+      ansible.builtin.command: printenv SSH_CONNECTION
+      become: false
+      changed_when: false
+      failed_when: false
+      register: firewall_ssh_connection
+
+    # see files/firewall_check_ssh.sh for details
+    - name: Check SSH in permanent firewall config
+      when:
+        - firewall_ssh_connection.stdout | length > 0
+      ansible.builtin.script: >-
+        firewall_check_ssh.sh
+        {{ (firewall_ssh_connection.stdout.split())[2] }}
+        {{ (firewall_ssh_connection.stdout.split())[3] }}
+      changed_when: false
+      failed_when: false
+      register: firewall_ssh_check
+
+    - name: Assert SSH is allowed in permanent firewall config
+      when:
+        - firewall_ssh_check.rc is defined
+      ansible.builtin.assert:
+        that:
+          - firewall_ssh_check.rc == 0
+        fail_msg: >-
+          Starting {{ firewall_service }} would block new SSH connections of Ansible
+          ({{ firewall_ssh_check.stdout_lines | join(', ') }}).
+          Allow SSH in the permanent firewall config or set disable_firewall: true.
+        quiet: true
+
+# A firewall stopped by disable_firewall in a previous run must be running again
+# before ports can be opened immediately.
+- name: Enable firewall
+  when:
+    - firewall_open_listener_ports | bool
+    - not disable_firewall | bool
+    - firewall.results | length > 0
+  ansible.builtin.service:
+    name: "{{ firewall_service }}"
+    state: started
+    enabled: true
+  tags: iptables,firewalld
+
+- name: Open Listener ports on firewall
+  when:
+    - firewall_open_listener_ports | bool
+    - firewall.results | length > 0
+    - oracle_install_option_gi not in ("CRS_CONFIG") or oracle_install_option_gi == ""
+    # - not disable_firewall  # ATM: Open ports in spite of disable_firewall
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: true
+    state: enabled
+    # firewalld is stopped when disable_firewall is set => only change permanent config
+    immediate: "{{ not disable_firewall | bool }}"
+  # Iterate through all configured listener ports.
+  loop: >-
+    {{
+      (
+        oracle_listeners_config.values()
+        | selectattr('address', 'defined')
+        | map(attribute='address')
+        | flatten
+        | selectattr('host', 'defined')
+        | map(attribute='port', default=listener_port)
+        | list + (oracle_extra_firewall_ports | default([]))
+      ) | unique
+    }}
+  # oracle_listeners_config.values() — gets all listener config dicts
+  # selectattr('address', 'defined') — check presence of address field
+  # map(attribute='address') — extracts the address list from each entry
+  # flatten — merges all address lists into one
+  # selectattr('host', 'defined') — skips IPC-type address entries
+  # map(attribute='port') — extracts the port from each address entry
+  # list — materializes the result
+  # + (oracle_extra_firewall_ports | default([])) — adds the items of oracle_extra_firewall_ports to the list
+  # unique — deduplicates (in case two listeners share a port)
+  tags: iptables,firewalld
+  notify: reload firewalld
+
+- name: Open Listener ports on firewall (CRS)
+  when:
+    - firewall_open_listener_ports | bool
+    - firewall.results | length > 0
+    - oracle_install_option_gi == "CRS_CONFIG"
+    # - not disable_firewall # ATM: Open ports in spite of disable_firewall
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: true
+    state: enabled
+    # firewalld is stopped when disable_firewall is set => only change permanent config
+    immediate: "{{ not disable_firewall | bool }}"
+  # Iterate through all configured listener ports.
+  loop: >-
+    {{
+      (
+        oracle_listeners_config.values()
+        | selectattr('address', 'defined')
+        | map(attribute='address')
+        | flatten
+        | selectattr('host', 'defined')
+        | map(attribute='port', default=listener_port)
+        | list + (oracle_extra_firewall_ports | default([])) + (oracle_scan_port | default([]))
+      ) | unique
+    }}
+  tags: iptables,firewalld
+  notify: reload firewalld
 - name: Install extra packages
   ansible.builtin.yum:  # noqa fqcn[action-core]
     name: "{{ extra_packages | default('') }}"
@@ -32,35 +161,28 @@
     enablerepo: "{{ extrarepos_enabled | default(omit, True) }}"
     disablerepo: "{{ extrarepos_disabled | default(omit, True) }}"
   when:
-    - install_os_packages
+    - install_os_packages | bool
     - extra_packages is defined
   tags: os_packages, oscheck
   notify: Reboot concerning package updates
 
 - name: Disable Firewall
   when:
-    - disable_firewall
+    - disable_firewall | bool
   block:
-    - name: Check if firewall is installed
-      ansible.builtin.yum:  # noqa fqcn[action-core]
-        list: "{{ firewall_service }}"
-        disablerepo: "*"
-      tags: iptables,firewalld
-      register: firewall
-
     - name: Disable firewall
       ansible.builtin.service:
         name: "{{ firewall_service }}"
         state: stopped
         enabled: false
       when:
-        - firewall.results
+        - firewall.results | length > 0
       tags: iptables,firewalld
       register: iptables
 
 - name: Disable selinux
   when:
-    - disable_selinux
+    - disable_selinux | bool
   tags: selinux
   block:
     - name: Disable selinux (permanently)
@@ -81,7 +203,7 @@
     backup: true
     mode: "0644"
   when:
-    - configure_limits
+    - configure_limits | bool
   tags: seclimit
 
 # RHEL/OL6 use a different way to disable transparent hugepages
@@ -98,7 +220,7 @@
     - ansible_distribution_major_version is version('7', '>=')
   block:
     - name: Disable Transparent Hugepages by script
-      when: not transparent_hugepage_disable_by_grub
+      when: not transparent_hugepage_disable_by_grub | bool
       block:
         - name: Disable Transparent Hugepages (runtime)
           ansible.builtin.shell: if test -f {{ item.path }}; then {{ item.disable }} {{ item.path }}; fi;
@@ -125,7 +247,7 @@
           tags: tphnuma
 
     - name: Disable Transparent Hugepages by grub cmdline
-      when: transparent_hugepage_disable_by_grub
+      when: transparent_hugepage_disable_by_grub | bool
       block:
         - name: Check if transparent_hugepage=never already present in kernel cmdline
           ansible.builtin.lineinfile:

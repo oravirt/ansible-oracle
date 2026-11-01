@@ -60,7 +60,7 @@ This will create issues and problems in `ansible-oracle` and is not supported.
 
 ## Requirements
 
-- Minimum Ansible version: `2.14.0`
+- Minimum Ansible version: `2.16.0`
 
 ## Default Variables
 
@@ -303,7 +303,7 @@ _oracle_home_db_pdb: "{{ db_homes_config[_opdb_home]['oracle_home'] }}"
 #### Default value
 
 ```YAML
-cluster_master: '{{ play_hosts[0] }}'
+cluster_master: '{{ ansible_play_batch[0] }}'
 ```
 
 ### db_mode
@@ -518,7 +518,7 @@ oracle_home_gi: '{% if oracle_install_version_gi is defined -%}{%- if _oraswgi_m
 #### Default value
 
 ```YAML
-oracle_patch_install: '{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_patch_stage_remote }}{% else %}{{ oracle_patch_stage }}{% endif %}'
+oracle_patch_install: '{% if not oracle_sw_copy | bool and not oracle_sw_unpack | bool %}{{ oracle_patch_stage_remote }}{% else %}{{ oracle_patch_stage }}{% endif %}'
 ```
 
 ### oracle_patch_stage
@@ -544,7 +544,7 @@ This is an internal variable. Do not set it in Inventory.
 #### Default value
 
 ```YAML
-oracle_stage_install: '{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}'
+oracle_stage_install: '{% if not oracle_sw_copy | bool and not oracle_sw_unpack | bool %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}'
 ```
 
 ### oracle_sw_copy
@@ -552,7 +552,7 @@ oracle_stage_install: '{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ or
 #### Default value
 
 ```YAML
-oracle_sw_copy: '{% if install_from_nfs %}false{% else %}true{% endif %}'
+oracle_sw_copy: '{{ not (install_from_nfs | bool) }}'
 ```
 
 ### oracle_sw_extract_path
@@ -568,7 +568,7 @@ oracle_sw_extract_path: "{%- if '18' in db_version -%}{{ oracle_home_db }}{%- el
 #### Default value
 
 ```YAML
-oracle_sw_unpack: '{% if install_from_nfs %}false{% else %}true{% endif %}'
+oracle_sw_unpack: '{{ not (install_from_nfs | bool) }}'
 ```
 
 ## Dependencies

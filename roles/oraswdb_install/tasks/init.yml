@@ -6,7 +6,7 @@
     owner: root
     mode: "0750"
   become: true
-  when: autostartup_service and hostinitdaemon == "init"
+  when: autostartup_service | bool and hostinitdaemon == "init"
   tags:
     - autostartup_service
     - seclimit  # Update
@@ -15,5 +15,5 @@
   ansible.builtin.command: "chkconfig --add dbora"
   # noqa command-instead-of-module no-changed-when
   become: true
-  when: autostartup_service and hostinitdaemon == "init"
+  when: autostartup_service | bool and hostinitdaemon == "init"
   tags: autostartup_service

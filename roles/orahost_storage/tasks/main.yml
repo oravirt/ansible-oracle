@@ -10,7 +10,7 @@
     - "{{ asm_diskgroups }}"
     - disk
   when:
-    - partition_devices
+    - partition_devices | bool
     - asm_diskgroups is defined
     - orasw_meta_primary_node | bool
   tags:
@@ -21,7 +21,7 @@
   ansible.builtin.include_tasks: dm-multipath-kpartx.yml
   when:
     - multipath == 'dm-multipath'
-    - partition_devices
+    - partition_devices | bool
     - asm_diskgroups is defined
 
 - name: Configure disks for device persistency

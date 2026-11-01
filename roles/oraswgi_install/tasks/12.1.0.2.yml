@@ -11,7 +11,7 @@
   become_user: "{{ _grid_install_user }}"
   tags:
     - oragridswunpack
-  when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and oracle_sw_copy and oracle_sw_unpack
+  when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and oracle_sw_copy | bool and oracle_sw_unpack | bool
 
 - name: install_home_gi | Extract files to stage-area (GI) (from remote location)
   ansible.builtin.unarchive:
@@ -24,7 +24,7 @@
   become_user: "{{ _grid_install_user }}"
   tags:
     - oragridswunpack
-  when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and not oracle_sw_copy and oracle_sw_unpack
+  when: oracle_home_gi not in checkgiinstall.stdout and oracle_install_version_gi == item.version and not oracle_sw_copy | bool and oracle_sw_unpack | bool
 
 - name: install_home_gi | Install cvuqdisk rpm
   ansible.builtin.include_tasks: "install_cvuqdisk.yml"
@@ -66,7 +66,7 @@
 - ansible.builtin.include_role:
     # noqa name[missing]
     name: oraswgi_manage_patches
-  when: patch_before_rootsh and apply_patches_gi
+  when: patch_before_rootsh | bool and apply_patches_gi | bool
 
 - ansible.builtin.stat:  # noqa name[missing]
     path: "{{ oracle_inventory_loc }}/orainstRoot.sh"
@@ -101,7 +101,7 @@
   ansible.builtin.shell: "sleep {{ item.0 * 60 }}; {{ oracle_home_gi }}/root.sh"
   # noqa command-instead-of-shell no-changed-when
   become: true
-  with_indexed_items: "{{ groups[orasw_meta_cluster_hostgroup] }}"
+  with_indexed_items: "{{ groups[orasw_meta_cluster_hostgroup] | default([]) }}"
   tags:
     - runroot
   when: _oraswgi_meta_configure_cluster and inventory_hostname != cluster_master and inventory_hostname == item.1 and oracle_home_gi not in checkgiinstall.stdout
@@ -124,7 +124,7 @@
     - responsefileconfigtool
   when:
     - orasw_meta_primary_node | bool
-    - run_configtoolallcommand
+    - run_configtoolallcommand | bool
     - oracle_home_gi not in checkgiinstall.stdout
 
 - name: install_home_gi | Run configToolAllCommands
@@ -136,7 +136,7 @@
     - runconfigtool
   when:
     - orasw_meta_primary_node | bool
-    - run_configtoolallcommand
+    - run_configtoolallcommand | bool
     - oracle_home_gi not in checkgiinstall.stdout
   ignore_errors: true
   register: configtool

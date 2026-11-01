@@ -42,7 +42,7 @@
     regexp: '\s{{ ansible_fqdn }}\s'
     line: "{{ etc_hosts_ip }} {{ ansible_hostname }} {{ ansible_fqdn }}"
     state: present
-  when: configure_etc_hosts
+  when: configure_etc_hosts | bool
   tags: etchosts
 
 - name: Add manually defined hosts to /etc/hosts
@@ -60,7 +60,7 @@
   loop_control:
     loop_var: __orahost_etc_hosts_entry
   when:
-    - configure_etc_hosts
+    - configure_etc_hosts | bool
     - etc_hosts_entries|type_debug == "list"
   tags: etchosts
 
@@ -109,7 +109,7 @@
     append: true
     state: present
     password: "{{ item.passwd | default(omit) }}"
-  when: role_separation
+  when: role_separation | bool
   with_items: "{{ grid_users }}"
   tags:
     - user
@@ -122,7 +122,7 @@
     mode: 0440
   with_items: "{{ oracle_users }}"
   when:
-    - configure_oracle_sudo
+    - configure_oracle_sudo | bool
   tags:
     - sudoadd
 
@@ -134,8 +134,8 @@
     mode: 0440
   with_items: "{{ grid_users }}"
   when:
-    - role_separation
-    - configure_oracle_sudo
+    - role_separation | bool
+    - configure_oracle_sudo | bool
   tags:
     - sudoadd
 
@@ -143,9 +143,9 @@
   local_action: shell rm -f /tmp/id_rsa*; ssh-keygen -q -N "" -f /tmp/id_rsa ; chmod +r /tmp/id_rsa; cat /tmp/id_rsa.pub > /tmp/authorized_keys  # noqa yaml no-handler deprecated-local-action ignore-errors no-changed-when fqcn[action-core]
   ignore_errors: true
   when:
-    - configure_ssh
-    - _oraswgi_meta_configure_cluster
-    - old_ssh_config
+    - configure_ssh | bool
+    - _oraswgi_meta_configure_cluster | bool
+    - old_ssh_config | bool
     - orasw_meta_primary_node | bool
   become: false
   tags:
@@ -160,9 +160,9 @@
     force: true
     mode: "0600"
   when:
-    - configure_ssh
-    - _oraswgi_meta_configure_cluster
-    - old_ssh_config
+    - configure_ssh | bool
+    - _oraswgi_meta_configure_cluster | bool
+    - old_ssh_config | bool
   with_nested:
     - "{{ oracle_users }}"
     - "{{ ssh_keys }}"
@@ -178,10 +178,10 @@
     force: true
     mode: 0600
   when:
-    - configure_ssh
-    - _oraswgi_meta_configure_cluster
-    - role_separation
-    - old_ssh_config
+    - configure_ssh | bool
+    - _oraswgi_meta_configure_cluster | bool
+    - role_separation | bool
+    - old_ssh_config | bool
   with_nested:
     - "{{ grid_users }}"
     - "{{ ssh_keys }}"
@@ -194,9 +194,9 @@
   ignore_errors: true
   become: false
   when:
-    - configure_ssh
-    - _oraswgi_meta_configure_cluster
-    - old_ssh_config
+    - configure_ssh | bool
+    - _oraswgi_meta_configure_cluster | bool
+    - old_ssh_config | bool
   tags:
     - sshkeys
 
@@ -206,9 +206,9 @@
   ignore_errors: true
   become: false
   when:
-    - configure_ssh
-    - _oraswgi_meta_configure_cluster
-    - old_ssh_config
+    - configure_ssh | bool
+    - _oraswgi_meta_configure_cluster | bool
+    - old_ssh_config | bool
   tags:
     - sshkeys
 
@@ -218,9 +218,9 @@
   ignore_errors: true
   become: false
   when:
-    - configure_ssh
-    - _oraswgi_meta_configure_cluster
-    - old_ssh_config
+    - configure_ssh | bool
+    - _oraswgi_meta_configure_cluster | bool
+    - old_ssh_config | bool
   tags:
     - sshkeys
 
@@ -233,9 +233,9 @@
     mode: "0644"
   with_items: "{{ oracle_users }}"
   when:
-    - configure_ssh
-    - _oraswgi_meta_configure_cluster
-    - old_ssh_config
+    - configure_ssh | bool
+    - _oraswgi_meta_configure_cluster | bool
+    - old_ssh_config | bool
   tags:
     - sshkeys
 
@@ -248,10 +248,10 @@
     mode: "0644"
   with_items: "{{ grid_users }}"
   when:
-    - configure_ssh
-    - _oraswgi_meta_configure_cluster
-    - role_separation
-    - old_ssh_config
+    - configure_ssh | bool
+    - _oraswgi_meta_configure_cluster | bool
+    - role_separation | bool
+    - old_ssh_config | bool
   tags:
     - sshkeys
 
@@ -262,9 +262,9 @@
     - "{{ ssh_keys }}"
     - "{{ keyfile }}"
   when:
-    - configure_ssh
-    - _oraswgi_meta_configure_cluster
-    - old_ssh_config
+    - configure_ssh | bool
+    - _oraswgi_meta_configure_cluster | bool
+    - old_ssh_config | bool
     - orasw_meta_primary_node | bool
   ignore_errors: true
   become: false
@@ -430,7 +430,7 @@
     - name: Flush Buffer Cache  # noqa no-handler
       when:
         - systclcmd is defined
-        - systclcmd.changed
+        - systclcmd.changed | bool
       block:
         - name: Flush Buffer Cache when hugepages have been changed
           ansible.builtin.command: echo 2 > /proc/sys/vm/drop_caches
@@ -452,8 +452,8 @@
     line: "session required pam_limits.so"
   tags: pamconfig
   when:
-    - configure_limits_pam
-    - configure_limits
+    - configure_limits_pam | bool
+    - configure_limits | bool
 
 - name: Network | Configure NOZEROCONF
   ansible.builtin.lineinfile:
@@ -472,8 +472,8 @@
     owner: root
     mode: "0644"
   when:
-    - configure_interconnect
-    - _oraswgi_meta_configure_cluster
+    - configure_interconnect | bool
+    - _oraswgi_meta_configure_cluster | bool
     - ansible_os_family == 'RedHat'
   tags:
     - eth1
@@ -484,9 +484,9 @@
     name: network
     state: restarted
   when:
-    - configure_interconnect
-    - _oraswgi_meta_configure_cluster
-    - ic.changed
+    - configure_interconnect | bool
+    - _oraswgi_meta_configure_cluster | bool
+    - ic.changed  | bool
     - ansible_os_family == 'RedHat'
   tags:
     - eth1

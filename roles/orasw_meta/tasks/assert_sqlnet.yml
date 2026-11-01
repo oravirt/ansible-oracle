@@ -10,10 +10,10 @@
           ansible.builtin.assert:
             quiet: true
             that:
-              - (sqlni.home is defined and not sqlni.use_gi_home | default(false))
+              - (sqlni.home is defined and not sqlni.use_gi_home | default(false) | bool)
                 or
-                (sqlni.home is undefined and sqlni.use_gi_home | default(false))
-              - sqlni.use_gi_home | default(false) or (sqlni.home is defined and db_homes_config[sqlni.home] is defined)
+                (sqlni.home is undefined and sqlni.use_gi_home | default(false) | bool)
+              - sqlni.use_gi_home | default(false) | bool or (sqlni.home is defined and db_homes_config[sqlni.home] is defined)
               # ORACLE_HOME must be installed (e.g. dedicated listener home, Out-of-Place Patching)
               - sqlni.state | default('') == 'absent'
                 or sqlni.use_gi_home | default(false)
@@ -59,10 +59,10 @@
           ansible.builtin.assert:
             quiet: true
             that:
-              - (tnsni.home is defined and not tnsni.use_gi_home | default(false))
+              - (tnsni.home is defined and not tnsni.use_gi_home | default(false) | bool)
                 or
-                (tnsni.home is undefined and tnsni.use_gi_home | default(false))
-              - tnsni.use_gi_home | default(false) or (tnsni.home is defined and db_homes_config[tnsni.home] is defined)
+                (tnsni.home is undefined and tnsni.use_gi_home | default(false) | bool)
+              - tnsni.use_gi_home | default(false) | bool or (tnsni.home is defined and db_homes_config[tnsni.home] is defined)
               # ORACLE_HOME must be installed (e.g. dedicated listener home, Out-of-Place Patching)
               - tnsni.state | default('') == 'absent'
                 or tnsni.use_gi_home | default(false)
@@ -109,10 +109,10 @@
           ansible.builtin.assert:
             quiet: true
             that:
-              - (lsnri.home is defined and not lsnri.use_gi_home | default(false))
+              - (lsnri.home is defined and not lsnri.use_gi_home | default(false) | bool)
                 or
-                (lsnri.home is undefined and lsnri.use_gi_home | default(false))
-              - lsnri.use_gi_home | default(false) or (lsnri.home is defined and db_homes_config[lsnri.home] is defined)
+                (lsnri.home is undefined and lsnri.use_gi_home | default(false) | bool)
+              - lsnri.use_gi_home | default(false) | bool or (lsnri.home is defined and db_homes_config[lsnri.home] is defined)
               # ORACLE_HOME must be installed (e.g. dedicated listener home, Out-of-Place Patching)
               - lsnri.state | default('') == 'absent'
                 or lsnri.use_gi_home | default(false)

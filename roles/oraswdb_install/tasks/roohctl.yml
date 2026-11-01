@@ -6,7 +6,7 @@
     that:
       - db_homes_config[dbh.home]['oracle_home_name'] is defined
   when:
-    - db_homes_config[dbh.home]['readonly_home'] | default(false)
+    - db_homes_config[dbh.home]['readonly_home'] | default(false) | bool
 
 - name: install_home_db | Configure Read Only Oracle Home
   ansible.builtin.command: "{{ oracle_home_db }}/bin/roohctl {% if db_homes_config[dbh.home]['readonly_home'] | default(false) %}-enable{% else %}-disable{% endif %}"

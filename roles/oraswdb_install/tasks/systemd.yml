@@ -18,7 +18,7 @@
       {{ item.home | default('') }}
       state: {{ item.state | default('') }}
   when:
-    - autostartup_service
+    - autostartup_service | bool
     - oracle_install_option_gi | default('') | length == 0
     - db_homes_installed | length > 0
     - hostinitdaemon == "systemd"

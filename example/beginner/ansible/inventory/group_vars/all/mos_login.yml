@@ -1,0 +1,13 @@
+---
+# My Oracle Support credentials for AutoUpgrade from the OS environment:
+#   export MOS_USERNAME=<login>
+#   read -s MOS_PASSWORD && export MOS_PASSWORD
+#
+# Optional: replace the lookups with static values.
+# Encrypt the password with ansible-vault in this case.
+mos_username: "{{ lookup('ansible.builtin.env', 'MOS_USERNAME', default=Undefined) }}"
+mos_password: "{{ lookup('ansible.builtin.env', 'MOS_PASSWORD', default=Undefined) }}"
+
+# Keystore password for AutoUpgrade (16 characters), derived from mos_password:
+# fixed prefix for digit, special, lower and upper case + first 12 characters of sha256(mos_password)
+autoupgrade_keystore_password: "1_aA{{ (mos_password | hash('sha256'))[:12] }}"

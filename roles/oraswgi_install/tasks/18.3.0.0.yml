@@ -16,7 +16,7 @@
     - orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
     - oracle_install_version_gi == item.version
-    - oracle_sw_copy and oracle_sw_unpack
+    - oracle_sw_copy | bool and oracle_sw_unpack | bool
 
 - name: install_home_gi | Extract files to ORACLE_HOME (gi) (from remote location)
   ansible.builtin.unarchive:
@@ -34,7 +34,7 @@
     - orasw_meta_primary_node | bool
     - oracle_home_gi not in checkgiinstall.stdout
     - oracle_install_version_gi == item.version
-    - not oracle_sw_copy
+    - not oracle_sw_copy | bool
 
 # Check for an existing GRID_HOME before reinstallation of OPatch
 - name: install_home_gi | Check for file GridSetup.sh
@@ -129,7 +129,7 @@
 - ansible.builtin.include_role:
     # noqa name[missing]
     name: oraswgi_manage_patches
-  when: patch_before_rootsh and apply_patches_gi
+  when: patch_before_rootsh | bool and apply_patches_gi | bool
 
 - name: install_home_gi | Run oraInstroot script after installation
   ansible.builtin.shell: "{{ oracle_inventory_loc }}/orainstRoot.sh"
@@ -160,7 +160,7 @@
   ansible.builtin.shell: "sleep {{ item.0 * 60 }}; {{ oracle_home_gi }}/root.sh"
   # noqa command-instead-of-shell no-changed-when
   become: true
-  with_indexed_items: "{{ groups[orasw_meta_cluster_hostgroup] }}"
+  with_indexed_items: "{{ groups[orasw_meta_cluster_hostgroup] | default([]) }}"
   tags:
     - runroot
   # when: not master_node and oracle_home_gi not in checkgiinstall.stdout and inventory_hostname == item.1
@@ -182,7 +182,7 @@
     - runconfigtool
   when:
     - orasw_meta_primary_node | bool
-    - run_configtoolallcommand
+    - run_configtoolallcommand | bool
     - oracle_home_gi not in checkgiinstall.stdout
   ignore_errors: true
   register: configtool

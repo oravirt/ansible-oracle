@@ -29,7 +29,7 @@
     owner: "{{ oracle_user }}"
     group: "{{ oracle_group }}"
     mode: 0660
-  when: configure_oracle_profile
+  when: configure_oracle_profile | bool
   tags: create_db,dotprofile_db
 
 - name: install_home_db | Setup response file for install (DB)
@@ -58,13 +58,13 @@
         creates: "{{ oracle_home_db }}/{{ item[0].creates }}"
       with_nested:
         - "{{ _oraswdb_install_oracle_sw_image_db | selectattr('version', 'equalto', db_homes_config[dbh.home]['version']) }}"
-        - ""  # dummy to force item.0 instead of item.
+        - [""]  # dummy to force item.0 instead of item.
       become: true
       become_user: "{{ oracle_user }}"
       when:
         - item[0].version == db_homes_config[dbh.home]['version']
         - dbh.state|lower == 'present'
-        - oracle_sw_copy
+        - oracle_sw_copy | bool
         - oracle_home_db not in existing_dbhome.stdout_lines
       tags:
         - oradbswunpack
@@ -77,13 +77,13 @@
         creates: "{{ oracle_home_db }}/{{ item[0].creates }}"
       with_nested:
         - "{{ _oraswdb_install_oracle_sw_image_db | selectattr('version', 'equalto', db_homes_config[dbh.home]['version']) }}"
-        - ""  # dummy to force item.0 instead of item.
+        - [""]  # dummy to force item.0 instead of item.
       become: true
       become_user: "{{ oracle_user }}"
       when:
         - item[0].version == db_homes_config[dbh.home]['version']
         - dbh.state|lower == 'present'
-        - not oracle_sw_copy
+        - not oracle_sw_copy | bool
         - oracle_home_db not in existing_dbhome.stdout_lines
       tags:
         - oradbswunpack
@@ -146,7 +146,7 @@
           when:
             - db_homes_config[dbh.home]['edition'] == 'EE'
             - oracle_ee_options is defined
-            - disable_ee_options
+            - disable_ee_options | bool
           loop_control:
             label: >-
               {{ oracle_home_db }}

@@ -1,0 +1,355 @@
+:toc:
+:toc-placement!:
+:toclevels: 3
+toc::[]
+
+:sectnums:
+:sectnumlevels: 3
+
+== Breaking Changes - Upgrade Guide
+
+This guide lists all changes in `ansible-oracle` which require an action in your inventory, playbooks or environment when upgrading to a new major version.
+
+How to use this guide:
+
+. Find your current version and the target version.
+. Read the overview table of every major version in between.
+. Check the column _Affected if_ against your inventory. Only the rows that match need an action.
+
+NOTE: The complete list of changes is in link:../../CHANGELOG.rst[CHANGELOG.rst].
+This guide only covers the changes from the section _Breaking Changes / Porting Guide_ and explains the required actions.
+
+=== Version 5.0.0
+
+==== Overview
+
+[cols="3,4,4",options="header"]
+|===
+|Change |Affected if |Action
+
+|<<Minimum ansible-core 2.16>>
+|ansible-core 2.14 or 2.15 is used on the controller or in the execution environment
+|Upgrade to ansible-core 2.16 or newer
+
+|<<Supported operating systems on target hosts>>
+|ansible-core 2.17 or newer *and* target hosts with Oracle Linux / RHEL 8 (Python 3.6)
+|Use ansible-core 2.16 for these hosts
+
+|<<Collection dependencies community.general and community.crypto>>
+|`community.general` < 11.0.0 or >= 12.0.0, or `community.crypto` >= 3.0.0 is installed or pinned in your `requirements.yml`
+|Use `community.general` 11.x and `community.crypto` 2.x
+
+|<<Strict boolean conditionals with ansible-core 2.19>>
+|ansible-core 2.19 or newer is used *and* your own playbooks or roles use variables directly in conditionals
+|Use `\| bool` in your conditionals. `ansible-oracle` itself accepts strings like `"yes"` or `-e var=false`
+
+|<<Templating changes with ansible-core 2.19>>
+|ansible-core 2.19 or newer is used *and* your inventory contains templates (`{% if %}`, `{{ }}`) which create values for `ansible-oracle`
+|Check the result types of your templates
+
+|<<Default of oracle_sw_copy and oracle_sw_unpack with install_from_nfs>>
+|`install_from_nfs: true` *and* `oracle_sw_copy` or `oracle_sw_unpack` are not set in inventory
+|Set `oracle_sw_copy: true` and `oracle_sw_unpack: true` to keep the old behavior or test the installation directly from NFS
+
+|<<Firewall enabled by default on RHEL/OL>>
+|Target hosts with RHEL/OL *and* `firewalld` is installed *and* `disable_firewall` is not set in inventory
+|Check the permanent `firewalld` config before the upgrade, or set `disable_firewall: true` and `firewall_open_listener_ports: false` to keep the old behavior
+|===
+
+==== Minimum ansible-core 2.16
+
+`ansible-oracle` 5.x requires ansible-core 2.16 or newer (4.x: 2.14).
+The minimum version is defined by `requires_ansible` in `meta/runtime.yml` and `min_ansible_version` in `meta/main.yml` of all roles.
+
+Check the version on the controller or in your execution environment:
+
+[source,shell]
+----
+ansible --version
+----
+
+===== Python on controller and target hosts
+
+Each ansible-core version supports a fixed range of Python versions on the controller and on the target hosts:
+
+[cols="1,2,2",options="header"]
+|===
+|ansible-core |Python on controller |Python on target host
+
+|2.16 |3.10 - 3.12 |2.7, 3.6 - 3.12
+|2.17 |3.10 - 3.12 |3.7 - 3.12
+|2.18 |3.11 - 3.13 |3.8 - 3.13
+|2.19 |3.11 - 3.13 |3.8 - 3.13
+|===
+
+The Python on the target host is the system Python or the interpreter from `ansible_python_interpreter`.
+
+===== Supported operating systems on target hosts
+
+[cols="2,1,2,3",options="header"]
+|===
+|OS |System Python |ansible-core 2.16 |ansible-core 2.17 - 2.19
+
+|Oracle Linux / RHEL 8
+|3.6
+|yes
+|*no* - see below
+
+|Oracle Linux / RHEL 9
+|3.9
+|yes
+|yes
+
+|Oracle Linux / RHEL 10
+|3.12
+|yes
+|yes
+
+|SLES / openSUSE Leap 15
+|3.6
+|yes
+|only with `python311` (SLES 15 SP4 or newer) and `ansible_python_interpreter: /usr/bin/python3.11` - not tested with `ansible-oracle`
+|===
+
+IMPORTANT: Use ansible-core 2.16 for Oracle Linux / RHEL 8. +
+The system Python 3.6 is not supported by ansible-core 2.17 or newer, even fact gathering fails.
+A newer Python from AppStream (e.g. `python3.12` with `ansible_python_interpreter: /usr/bin/python3.12`) runs most modules,
+but `ansible.builtin.dnf` and `ansible.builtin.yum` fail, because the dnf Python bindings exist for Python 3.6 only:
+`Could not import the dnf python module using /usr/bin/python3.12`.
+The roles `common`, `orahost`, `oraords` and `oraswgi_install` install packages with these modules.
+Tested with ansible-core 2.19.14 and Oracle Linux 8.10.
+
+The controller can use another OS than the target hosts.
+Oracle Linux 8 and 9 provide Python 3.11 and 3.12 as additional packages (`python3.11`, `python3.12`) for a controller with ansible-core 2.19.
+
+==== Collection dependencies community.general and community.crypto
+
+The dependencies in `galaxy.yml` are limited to versions, which support the minimum ansible-core version and Python 3.6 on the target hosts:
+
+[cols="2,2,2",options="header"]
+|===
+|Collection |4.x |5.0.0
+
+|`community.general`
+|`>=8.6.0`
+|`>=11.0.0,<12.0.0`
+
+|`community.crypto`
+|`>=2.21.1`
+|`>=2.21.1,<3.0.0` (3.x needs ansible-core >= 2.17)
+|===
+
+`ansible-galaxy collection install` fails with a dependency conflict, when your `requirements.yml` pins a version outside of these ranges.
+Remove the pinning or adjust it to the ranges above.
+
+==== Strict boolean conditionals with ansible-core 2.19
+
+ansible-core 2.19 requires a real boolean as result of a conditional (`when`, `failed_when`, `changed_when`, `until`, `assert: that`).
+Older versions converted strings like `"false"` or `"yes"` silently.
+Now the task fails:
+
+----
+Conditional result (True) was derived from value of type 'str' at '...'. Conditionals must have a boolean result.
+----
+
+`ansible-oracle` 5.0.0 evaluates all boolean variables from the inventory with `| bool`.
+Strings like `"true"`, `"yes"`, `"false"` or extra-vars like `-e oracle_sw_copy=false` work as before.
+
+Your own playbooks and roles are affected, when they use variables directly in conditionals:
+
+[source,yaml]
+----
+# fails with ansible-core 2.19, when my_flag is a string ("true", "yes", -e my_flag=true)
+when: my_flag
+
+# works with all versions
+when: my_flag | bool
+----
+
+The `bool` filter accepts `true`/`false`, `yes`/`no`, `on`/`off`, `1`/`0` (case-insensitive).
+Other values (e.g. `"enabled"` or an empty string) result in a deprecation warning and `false`.
+This will be an error in ansible-core 2.23.
+
+TIP: `ANSIBLE_ALLOW_BROKEN_CONDITIONALS=true` restores the old behavior temporarily.
+Use it only to find the affected conditionals, not as permanent solution.
+
+==== Templating changes with ansible-core 2.19
+
+ansible-core 2.19 has a new templating engine.
+The result of a template has a different type in some cases.
+`ansible-oracle` 5.0.0 is adapted, but templates in your inventory are used as they are.
+
+[cols="3,2,2",options="header"]
+|===
+|Template |ansible-core < 2.19 |ansible-core 2.19
+
+|`"{% if x %}True{% else %}False{% endif %}"`
+|bool
+|string `"True"` / `"False"`
+
+|`"{% if x %}{'key': 1}{% endif %}"`, `"{% if x %}[1, 2]{% endif %}"`
+|dict / list
+|string
+
+|`"{% if x %}-flag{% endif %}"` with `x` false (empty result)
+|empty string `""`
+|`None`
+
+|`"{{ 1521 }}"`
+|string `"1521"`
+|int `1521`
+|===
+
+Examples of failing expressions with ansible-core 2.19:
+
+[source,yaml]
+----
+my_flag: "{% if foo %}True{% else %}False{% endif %}"
+my_param: "{% if foo %}-flag{% endif %}"
+my_port: "{{ 1521 }}"
+
+# when: my_flag              -> fails: string instead of boolean
+# when: my_param == ''       -> false, because the value is None
+# "{{ my_param | length }}"  -> fails: None has no length
+# "{{ 'host:' + my_port }}"  -> fails: string + int
+# when: my_port == '1521'    -> false, because the value is an int
+----
+
+Recommendations:
+
+- Write expressions instead of text: `my_flag: "{{ foo | bool }}"` or `my_flag: "{{ foo == 'x' }}"`.
+- Use YAML for lists and dictionaries instead of creating them as text.
+- Use `| default('', true)` when a template can be empty and a string is needed.
+- Use `| int` or `| string` for comparisons.
+
+An empty template in `environment:` sets the environment variable to the text `None`, e.g. `_JAVA_OPTIONS=None` lets Java fail with `Unrecognized option: None`.
+Use `"{{ my_value | default('', true) }}"` for environment variables, which can be empty.
+
+Embedding these values into other strings is not affected: `"gridSetup.sh {{ my_param }}"` renders an empty string for `None` in all versions.
+
+==== Other ansible-core 2.19 changes for own playbooks and inventories
+
+`ansible-oracle` 5.0.0 is checked for these changes.
+They are relevant for your own playbooks, inventories and `ansible.cfg`:
+
+- File modes must be quoted strings in inventories: `mode: '0775'` instead of `mode: 775`.
+  An unquoted `775` is an integer and is passed through templates (for example `mode: "{{ item.mode }}"`) as decimal 775, which is mode `1407`.
+  Before 2.19 the template converted the value to the string `"775"`, which was interpreted as octal.
+- `with_nested` handles strings differently (not mentioned in the porting guide):
+  an empty string `""` is an empty list (the task is skipped completely), a templated string `"{{ var }}"` is split into single characters.
+  Use lists: `- [""]` or `- ["{{ var }}"]`.
+- A loop over an undefined list fails, although `when` is false, when `delegate_to` uses the loop variable (not mentioned in the porting guide).
+  Use `loop: "{{ my_list | default([]) }}"`.
+- Templates inside conditionals fail: `that: swap >= {{ min_swap }}` must be written as `that: swap >= min_swap | int`.
+- The `ssh` connection uses `SSH_ASKPASS` instead of `sshpass` for password authentication.
+  Set `password_mechanism = sshpass` in section `[ssh_connection]` of `ansible.cfg` to keep the old behavior.
+- The `bool` filter warns for values other than `true`/`false`, `yes`/`no`, `on`/`off`, `1`/`0` (and `None`). This will be an error in ansible-core 2.23.
+- A timeout of `become` is an unreachable error. Use `ignore_unreachable` instead of `ignore_errors`.
+- The magic variable `play_hosts` is deprecated, use `ansible_play_batch`.
+
+The complete list is in the https://docs.ansible.com/ansible/latest/porting_guides/porting_guide_core_2.19.html[ansible-core 2.19 Porting Guide].
+
+==== Default of oracle_sw_copy and oracle_sw_unpack with install_from_nfs
+
+The defaults of `oracle_sw_copy` and `oracle_sw_unpack` depend on `install_from_nfs`.
+Until 4.x the defaults were the strings `"true"` or `"false"`.
+The string `"false"` is not empty and was evaluated as `true` in most conditionals.
+The documented behavior for `install_from_nfs: true` (no copy, no unpack) was therefore not active, unless both variables were set explicitly in the inventory.
+
+As of 5.0.0 both defaults are real booleans.
+
+[cols="2,2,2",options="header"]
+|===
+|`install_from_nfs: true` and ... |4.x |5.0.0
+
+|`oracle_sw_copy`/`oracle_sw_unpack` not set
+|installation media are copied and unpacked to `oracle_stage`
+|installation media are used from `oracle_stage_remote` (NFS mount)
+
+|`oracle_sw_copy`/`oracle_sw_unpack` set as boolean
+|no change
+|no change
+|===
+
+Affected variables with changed default value: `oracle_sw_copy`, `oracle_sw_unpack`, `oracle_stage_install`, `oracle_patch_install`.
+
+Keep the behavior of 4.x:
+
+[source,yaml]
+----
+install_from_nfs: true
+oracle_sw_copy: true
+oracle_sw_unpack: true
+----
+
+==== Firewall enabled by default on RHEL/OL
+
+Until 4.x the role `orahost` stopped and disabled `firewalld` on RHEL/OL by default (`disable_firewall: true`).
+As of 5.0.0 `firewalld` stays active and the role opens the ports of the Oracle listeners:
+
+[cols="2,2,3",options="header"]
+|===
+|Variable |4.x |5.0.0
+
+|`disable_firewall`
+|`true`
+|`false`
+
+|`firewall_open_listener_ports`
+|- (not available)
+|`true` (new)
+|===
+
+The change applies only to RHEL/OL target hosts with installed `firewalld`.
+SUSE is not changed.
+
+What `orahost` does with the new defaults:
+
+. Checks, if the permanent `firewalld` config allows the SSH connection of Ansible (service `ssh`, port and target of the zone).
+  The play fails, when starting `firewalld` would block SSH.
+  Rich rules and zones bound to sources are not evaluated by this check.
+. Starts and enables `firewalld`.
+. Opens the following TCP ports in the permanent and the running config:
+** all ports from `address` in `oracle_listeners_config` with a `host` (IPC addresses are ignored, `listener_port` is used for addresses without `port`),
+** all ports from the new variable `oracle_extra_firewall_ports`,
+** `oracle_scan_port` with `oracle_install_option_gi: CRS_CONFIG`.
+
+Other ports are not opened automatically, e.g. EM Express (5500), ORDS/APEX or the Enterprise Manager agent.
+Add them to `oracle_extra_firewall_ports`:
+
+[source,yaml]
+----
+oracle_extra_firewall_ports:
+  - 5500  # EM Express
+----
+
+WARNING: Oracle RAC needs unrestricted network traffic on the private interconnect.
+Allow the interconnect in `firewalld` (for example with a trusted zone for the interconnect interfaces) or set `disable_firewall: true` on the cluster nodes.
+
+Combinations of both variables:
+
+[cols="1,1,4",options="header"]
+|===
+|`disable_firewall` |`firewall_open_listener_ports` |Result
+
+|`false` |`true` |Default in 5.0.0: `firewalld` is started and enabled, ports are opened immediately and permanently
+|`true` |`false` |Behavior of 4.x: `firewalld` is stopped and disabled
+|`true` |`true` |`firewalld` is stopped and disabled, ports are only added to the permanent config (prepared for a later start)
+|`false` |`false` |`firewalld` is not changed by `orahost`
+|===
+
+Keep the behavior of 4.x:
+
+[source,yaml]
+----
+disable_firewall: true
+firewall_open_listener_ports: false
+----
+
+=== Adding new breaking changes
+
+Every changelog fragment with a `breaking_changes` entry needs an entry in this guide:
+
+. Add a row to the overview table of the next major version. Create the version section, if it does not exist.
+. Describe the change in an own subsection: what changed, why, who is affected, before/after and the required action with an example.
+. Reference this guide in the changelog fragment (`see doc/guides/breaking_changes.adoc`).

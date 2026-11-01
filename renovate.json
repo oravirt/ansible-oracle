@@ -22,6 +22,7 @@
     "docker-compose",
     "pre-commit",
     "github-actions",
+    "ansible-galaxy",
     "custom.regex"
   ],
   "pre-commit": {
@@ -42,6 +43,18 @@
     {
       "description": "ansible-core is intentionally pinned per venv",
       "matchPackageNames": ["ansible-core"],
+      "enabled": false
+    },
+    {
+      "description": "version ranges in galaxy.yml are set intentionally (requires_ansible, see tools/renovate/galaxy_requires.py)",
+      "matchManagers": ["ansible-galaxy"],
+      "matchPackageNames": ["community.general", "community.crypto"],
+      "enabled": false
+    },
+    {
+      "description": "version of the own collection in requirements.yml is set by tools/release/galaxy_version.sh",
+      "matchManagers": ["ansible-galaxy"],
+      "matchPackageNames": ["opitzconsulting.ansible_oracle"],
       "enabled": false
     },
     {

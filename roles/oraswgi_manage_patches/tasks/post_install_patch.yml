@@ -13,7 +13,7 @@
 # opatch precheck runs cluvfy on all cluster nodes in {{ oracle_tmp_stage }}, although patching only one
 - name: post_install_patch | Ensure stage temp directory is present at all nodes when patching a cluster
   when:
-    - orasw_meta_cluster_hostgroup is defined
+    - orasw_meta_cluster_hostgroup | default('') | length > 0
     - _oraswgi_manage_patches_crstype == 'crs'
   ansible.builtin.file:
     path: "{{ oracle_tmp_stage }}"
@@ -22,7 +22,7 @@
     group: "{{ oracle_group }}"
     mode: "0775"
   delegate_to: "{{ _oraswgi_manage_patches_cluster_host }}"
-  loop: "{{ groups[orasw_meta_cluster_hostgroup] }}"
+  loop: "{{ groups[orasw_meta_cluster_hostgroup] | default([]) }}"
   loop_control:
     loop_var: _oraswgi_manage_patches_cluster_host
 
