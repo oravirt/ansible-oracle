@@ -31,8 +31,9 @@
 
 ## Pre-requisites
 
-* Ansible Version >= 2.16
+* ansible-core 2.16 - 2.19
 
-  Version 2.16 or newer of Ansible is recommended
+  `ansible-oracle` 4.x supports ansible-core 2.14 - 2.18 only
 * Oracle Linux (or any RHEL-based Linux System) >= 8
-* Oracle Database/Grid Infrastructure 21.3.0.0, 19.3.0.0
+* Oracle Database 26ai, 19c
+* Oracle Grid Infrastructure/Restart 19c
