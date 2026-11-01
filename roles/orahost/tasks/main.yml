@@ -144,9 +144,9 @@
   ignore_errors: true
   when:
     - configure_ssh | bool
-    - _oraswgi_meta_configure_cluster
+    - _oraswgi_meta_configure_cluster | bool
     - old_ssh_config | bool
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
   become: false
   tags:
     - sshkeys
@@ -161,7 +161,7 @@
     mode: "0600"
   when:
     - configure_ssh | bool
-    - _oraswgi_meta_configure_cluster
+    - _oraswgi_meta_configure_cluster | bool
     - old_ssh_config | bool
   with_nested:
     - "{{ oracle_users }}"
@@ -179,7 +179,7 @@
     mode: 0600
   when:
     - configure_ssh | bool
-    - _oraswgi_meta_configure_cluster
+    - _oraswgi_meta_configure_cluster | bool
     - role_separation | bool
     - old_ssh_config | bool
   with_nested:
@@ -195,7 +195,7 @@
   become: false
   when:
     - configure_ssh | bool
-    - _oraswgi_meta_configure_cluster
+    - _oraswgi_meta_configure_cluster | bool
     - old_ssh_config | bool
   tags:
     - sshkeys
@@ -207,7 +207,7 @@
   become: false
   when:
     - configure_ssh | bool
-    - _oraswgi_meta_configure_cluster
+    - _oraswgi_meta_configure_cluster | bool
     - old_ssh_config | bool
   tags:
     - sshkeys
@@ -219,7 +219,7 @@
   become: false
   when:
     - configure_ssh | bool
-    - _oraswgi_meta_configure_cluster
+    - _oraswgi_meta_configure_cluster | bool
     - old_ssh_config | bool
   tags:
     - sshkeys
@@ -234,7 +234,7 @@
   with_items: "{{ oracle_users }}"
   when:
     - configure_ssh | bool
-    - _oraswgi_meta_configure_cluster
+    - _oraswgi_meta_configure_cluster | bool
     - old_ssh_config | bool
   tags:
     - sshkeys
@@ -249,7 +249,7 @@
   with_items: "{{ grid_users }}"
   when:
     - configure_ssh | bool
-    - _oraswgi_meta_configure_cluster
+    - _oraswgi_meta_configure_cluster | bool
     - role_separation | bool
     - old_ssh_config | bool
   tags:
@@ -263,9 +263,9 @@
     - "{{ keyfile }}"
   when:
     - configure_ssh | bool
-    - _oraswgi_meta_configure_cluster
+    - _oraswgi_meta_configure_cluster | bool
     - old_ssh_config | bool
-    - _orasw_meta_primary_node | bool
+    - orasw_meta_primary_node | bool
   ignore_errors: true
   become: false
   tags:
@@ -430,7 +430,7 @@
     - name: Flush Buffer Cache  # noqa no-handler
       when:
         - systclcmd is defined
-        - systclcmd.changed
+        - systclcmd.changed | bool
       block:
         - name: Flush Buffer Cache when hugepages have been changed
           ansible.builtin.command: echo 2 > /proc/sys/vm/drop_caches
@@ -473,7 +473,7 @@
     mode: "0644"
   when:
     - configure_interconnect | bool
-    - _oraswgi_meta_configure_cluster
+    - _oraswgi_meta_configure_cluster | bool
     - ansible_os_family == 'RedHat'
   tags:
     - eth1
@@ -485,8 +485,8 @@
     state: restarted
   when:
     - configure_interconnect | bool
-    - _oraswgi_meta_configure_cluster
-    - ic.changed
+    - _oraswgi_meta_configure_cluster | bool
+    - ic.changed  | bool
     - ansible_os_family == 'RedHat'
   tags:
     - eth1
