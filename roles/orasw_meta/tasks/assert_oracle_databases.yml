@@ -15,10 +15,7 @@
               - dbc.value['version'] is defined
               - dbc.value['version'] in [
                   '26.1.0.0',
-                  '21.3.0.0',
-                  '19.3.0.0', '18.3.0.0', '12.2.0.1',
-                  '12.1.0.2',
-                  '11.2.0.4', '11.2.0.3'
+                  '19.3.0.0'
                   ]
               - dbc.value['edition'] is defined
               - dbc.value['edition'] in ['EE', 'SE', 'SE2']
@@ -36,6 +33,7 @@
             label: "{{ dbc.key | default('') }}"
             loop_var: dbc
           when:
+            - assert_db_homes_config | bool
             - db_homes_config is defined
           register: assertdb_homes_config
 

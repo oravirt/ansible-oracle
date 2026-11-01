@@ -17,6 +17,7 @@ There are a lot of variables who are used by `orasw_meta`
 - [Default Variables](#default-variables)
   - [_www_download_bin](#_www_download_bin)
   - [apply_patches_db](#apply_patches_db)
+  - [assert_db_homes_config](#assert_db_homes_config)
   - [autostartup_service](#autostartup_service)
   - [db_homes_config](#db_homes_config)
   - [db_homes_installed](#db_homes_installed)
@@ -110,6 +111,21 @@ This is a global switch to enable/disable DB-Patching for all ORACLE_HOMEs.
 
 ```YAML
 apply_patches_db: true
+```
+
+### assert_db_homes_config
+
+Switch for enable/disable assert on `db_homes_config`.
+
+The assert allows only the versions `19.3.0.0` and `26.1.0.0`.
+`false` disables all checks of `db_homes_config`, not only the check of the version.
+
+Please change the state only when really needed!
+
+#### Default value
+
+```YAML
+assert_db_homes_config: true
 ```
 
 ### autostartup_service

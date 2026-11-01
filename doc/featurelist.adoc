@@ -4,26 +4,19 @@
 WARNING: Please check the official Compatibility List from Oracle for RDBMS and Restart/Grid-Infrastructure. +
 `ansible-oracle` only supports combinations from Oracle with exceptions from the following table.
 
+IMPORTANT: As of `ansible-oracle` 5.0 only Oracle 19c and 26ai are supported for RDBMS.
+Restart and Grid-Infrastructure are supported for 19c only. +
+Older releases (11.2, 12.1, 12.2, 18c, 21c) are rejected by the assert of `db_homes_config`,
+see link:guides/breaking_changes.adoc[Breaking Changes - Upgrade Guide].
+
 IMPORTANT: All Editions from Oracle are supported.
 See documentation from Oracle for differences between Enterprise and Standard Edition (SE, SE One and SE2)
 
 
-:supportedfrom112: 11.2.0.3 <<table1footnote,[1]>> \
-11.2.0.4 <<table1footnote,[1]>> + \
-12.1.0.2 <<table1footnote,[1]>> + \
-12.2.0.1 <<table1footnote,[1]>> + \
-18c <<table1footnote,[1]>> + \
-19c + \
-21c
+:supportedversions: 19c + \
+26ai
 
-:supportedfrom12: 12.1.0.2 <<table1footnote,[1]>> + \
-12.2.0.1 <<table1footnote,[1]>> + \
-18c <<table1footnote,[1]>> + \
-19c + \
-21c
-
-:supportedfrom19: 19c + \
-21c
+:supportedgi: 19c
 
 .Featurelist
 [options="header" cols="1,2,2" valign="top"]
@@ -51,26 +44,26 @@ Redhat Enterprise Linux
 
 .5+|Software
 |Ansible
-|2.14 or newer <<table1footnote,^[9]^>> +
+|ansible-core 2.16 - 2.19 <<table1footnote,^[9]^>> +
 
 |Oracle RDBMS
-|{supportedfrom112}
+|{supportedversions}
 
 |Oracle Grid-Infrastructure
-|{supportedfrom12}
+|{supportedgi}
 
 |Oracle Restart
-|{supportedfrom12}
+|{supportedgi}
 
 |cxOracle for Python
 |Python 3
 
 .3+|ASM
 |ASM Filter Driver (ASMFD)
-|{supportedfrom19}
+|{supportedgi}
 
 |ASMlib
-|{supportedfrom12}
+|{supportedgi}
 
 |udev
 |<<table1footnote,^[3]^>>
@@ -78,7 +71,7 @@ Redhat Enterprise Linux
 
 .9+|Installation Options
 |DB Options in Binaries
-.4+|{supportedfrom12}
+.4+|{supportedversions}
 
 |Statspack for nonCDB, CDB and PDB
 a|
@@ -95,20 +88,22 @@ a| Golden Image for RDBMS, Restart & GI
 
 * Create from Installation
 * Install from Image
-.2+|{supportedfrom19}
+.2+|{supportedversions}
 |readonly Homes for RDBMS
 
 e|Oracle Data-Guard
 |19c (planned! <<table1footnote,^[5]^>>) +
-21c (planned! <<table1footnote,^[5]^>>)
+26ai (planned! <<table1footnote,^[5]^>>)
 
-e|automatic Database Migrations
-.2+|not supported
+|Database Migrations: Upgrade of PDBs with AutoUpgrade (Unplug/Plug, experimental! <<table1footnote,^[2]^>>) <<table1footnote,^[12]^>>
+|19c => 26ai
+
 e|Prepatch installations <<table1footnote,^[10]^>>
+|not supported
 
 .14+|Database Management
 |Grants
-.13+|{supportedfrom112}
+.13+|{supportedversions}
 
 a|init.ora Parameter <<table1footnote,^[7]^>>)
 
@@ -125,11 +120,11 @@ e|Database Services <<table1footnote,^[3]^>>
 |Define Characterset during DBCA
 |Enable/Disable Archivelogmode & FRA
 |Timezone Upgrades
-|{supportedfrom12}
+|{supportedversions}
 
 .4+|Database Patching
 |Release Updates<<table1footnote,^[11]^>>
-.4+|{supportedfrom12}
+.4+|{supportedversions}
 
 a|OneOff Patches<<table1footnote,^[11]^>>
 
@@ -140,11 +135,22 @@ a|OneOff Patches<<table1footnote,^[11]^>>
 
 |Oracle APEX (experimental!)
 a|Installation of APEX in PDB. Not supported for CDB or nonCDB.
-|{supportedfrom19}
+|{supportedversions}
+
+|Oracle AutoUpgrade (experimental! <<table1footnote,^[2]^>>)
+a|link:guides/autoupgrade.adoc[AutoUpgrade] with role `autoupgrade`
+
+* Installation and update of `autoupgrade.jar` on database server or Ansible controller
+* Keystore for My Oracle Support
+* Download of patches and gold images from My Oracle Support
+* link:guides/autoupgrade_upgrade.adoc[Unplug/Plug upgrade of PDBs] (analyze, fixups, deploy) <<table1footnote,^[12]^>>
+* Patching with AutoUpgrade is not implemented
+a|Download: 19c, 21c, 23ai, 26ai +
+Upgrade: 19c => 26ai
 
 |Environment script
 a|dynamic shell environment link:https://github.com/opitzconsulting/oracle-scripts[`ocenv`] for Oracle
-|{supportedfrom12}
+|{supportedversions}
 
 |=======================
 
@@ -169,8 +175,12 @@ a|dynamic shell environment link:https://github.com/opitzconsulting/oracle-scrip
 [[table1footnote]]^8^::
   only create/drop PDB
 [[table1footnote]]^9^::
-  Ansible 2.14 or newer is mandatory since `ansible-oracle` Version 4.2.
+  `ansible-oracle` 5.x supports ansible-core 2.16 - 2.19. +
+  `ansible-oracle` 4.2 - 4.x supports ansible-core 2.14 - 2.18.
 [[table1footnote]]^10^::
   Use the Golden-Image feature as a workaround.
 [[table1footnote]]^11^::
   Supported for Single-Instance, Oracle Restart and Oracle Grid-Infrastructure.
+[[table1footnote]]^12^::
+  Source CDB (old release) and target CDB (new release) must run on the same host.
+  See link:guides/autoupgrade_upgrade.adoc[Upgrade of PDBs with AutoUpgrade].

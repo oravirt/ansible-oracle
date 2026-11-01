@@ -54,11 +54,25 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<Firewall enabled by default on RHEL/OL>>
 |Target hosts with RHEL/OL *and* `firewalld` is installed *and* `disable_firewall` is not set in inventory
 |Check the permanent `firewalld` config before the upgrade, or set `disable_firewall: true` and `firewall_open_listener_ports: false` to keep the old behavior
+
+|<<Supported versions in db_homes_config>>
+|`db_homes_config` contains an ORACLE_HOME with a `version` other than `19.3.0.0` or `26.1.0.0`
+|Upgrade the databases to 19c or 26ai, then remove the old ORACLE_HOMEs from `db_homes_config`. Emergency switch: `assert_db_homes_config: false`
 |===
 
 ==== Minimum ansible-core 2.16
 
-`ansible-oracle` 5.x requires ansible-core 2.16 or newer (4.x: 2.14).
+`ansible-oracle` 5.x supports ansible-core 2.16 - 2.19.
+`ansible-oracle` 4.x supports ansible-core 2.14 - 2.18, so ansible-core 2.19 requires `ansible-oracle` 5.x.
+
+[cols="1,2",options="header"]
+|===
+|`ansible-oracle` |ansible-core
+
+|4.x |2.14 - 2.18
+|5.x |2.16 - 2.19
+|===
+
 The minimum version is defined by `requires_ansible` in `meta/runtime.yml` and `min_ansible_version` in `meta/main.yml` of all roles.
 
 Check the version on the controller or in your execution environment:
@@ -345,6 +359,40 @@ Keep the behavior of 4.x:
 disable_firewall: true
 firewall_open_listener_ports: false
 ----
+
+==== Supported versions in db_homes_config
+
+The role `orasw_meta` checks `db_homes_config`.
+It is a dependency of nearly all roles, so the check runs in nearly every playbook.
+As of 5.0.0 only Oracle 19c and 26ai are accepted as `version`:
+
+[cols="1,3",options="header"]
+|===
+|Version |Allowed `version` in `db_homes_config`
+
+|4.x
+|`26.1.0.0`, `21.3.0.0`, `19.3.0.0`, `18.3.0.0`, `12.2.0.1`, `12.1.0.2`, `11.2.0.4`, `11.2.0.3`
+
+|5.0.0
+|`26.1.0.0`, `19.3.0.0`
+|===
+
+`version` is the base release of the ORACLE_HOME.
+Release Updates are not part of it, e.g. an ORACLE_HOME with 19.32 uses `version: 19.3.0.0`.
+
+An ORACLE_HOME with another version stops the playbook with a failed assert, even when the ORACLE_HOME is not used by the playbook.
+Upgrade the databases to 19c or 26ai, e.g. with the role `autoupgrade`, and remove the old ORACLE_HOMEs from `db_homes_config` afterwards.
+
+The assert can be disabled in emergency cases:
+
+[source,yaml]
+----
+assert_db_homes_config: false
+----
+
+WARNING: `assert_db_homes_config: false` disables all checks of `db_homes_config`, not only the check of the version.
+Missing `oracle_home`, `edition` or `opatch_minversion` are no longer detected.
+ORACLE_HOMEs with other versions are not tested with `ansible-oracle` 5.x.
 
 === Adding new breaking changes
 
