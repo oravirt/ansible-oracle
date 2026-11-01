@@ -7,7 +7,7 @@
     enablerepo: "{{ extrarepos_enabled | default(omit, True) }}"
     disablerepo: "{{ extrarepos_disabled | default(omit, True) }}"
   when:
-    - install_os_packages
+    - install_os_packages | bool
     - ansible_distribution_major_version is version('7', '<=')
   tags: os_packages, oscheck
   notify: Reboot concerning package updates
@@ -103,25 +103,35 @@
     enablerepo: "{{ extrarepos_enabled | default(omit, True) }}"
     disablerepo: "{{ extrarepos_disabled | default(omit, True) }}"
   when:
-    - install_os_packages
+    - install_os_packages | bool
     - extra_packages is defined
   tags: os_packages, oscheck
   notify: Reboot concerning package updates
 
 - name: Disable Firewall
   when:
-    - disable_firewall
-    - firewall.results
-  ansible.builtin.service:
-    name: "{{ firewall_service }}"
-    state: stopped
-    enabled: false
-  tags: iptables,firewalld
-  register: iptables
+    - disable_firewall | bool
+  block:
+    - name: Check if firewall is installed
+      ansible.builtin.yum:  # noqa fqcn[action-core]
+        list: "{{ firewall_service }}"
+        disablerepo: "*"
+      tags: iptables,firewalld
+      register: firewall
+
+    - name: Disable firewall
+      ansible.builtin.service:
+        name: "{{ firewall_service }}"
+        state: stopped
+        enabled: false
+      when:
+        - firewall.results | length > 0
+      tags: iptables,firewalld
+      register: iptables
 
 - name: Disable selinux
   when:
-    - disable_selinux
+    - disable_selinux | bool
   tags: selinux
   block:
     - name: Disable selinux (permanently)
@@ -142,7 +152,7 @@
     backup: true
     mode: "0644"
   when:
-    - configure_limits
+    - configure_limits | bool
   tags: seclimit
 
 # RHEL/OL6 use a different way to disable transparent hugepages
@@ -159,7 +169,7 @@
     - ansible_distribution_major_version is version('7', '>=')
   block:
     - name: Disable Transparent Hugepages by script
-      when: not transparent_hugepage_disable_by_grub
+      when: not transparent_hugepage_disable_by_grub | bool
       block:
         - name: Disable Transparent Hugepages (runtime)
           ansible.builtin.shell: if test -f {{ item.path }}; then {{ item.disable }} {{ item.path }}; fi;
@@ -186,7 +196,7 @@
           tags: tphnuma
 
     - name: Disable Transparent Hugepages by grub cmdline
-      when: transparent_hugepage_disable_by_grub
+      when: transparent_hugepage_disable_by_grub | bool
       block:
         - name: Check if transparent_hugepage=never already present in kernel cmdline
           ansible.builtin.lineinfile:

@@ -69,7 +69,7 @@
   when:
     - autoupgrade_proxy_check | bool
     - autoupgrade_download_latest | bool
-    - oracle_sw_copy or _autoupgrade_run_local | bool
+    - oracle_sw_copy | bool or _autoupgrade_run_local | bool
 
 - name: autoupgrade | Check connection to Oracle on target host
   ansible.builtin.include_tasks: proxy_check.yml
@@ -79,7 +79,7 @@
   when:
     - autoupgrade_proxy_check | bool
     - autoupgrade_download_latest | bool
-    - not oracle_sw_copy
+    - not oracle_sw_copy | bool
     - not _autoupgrade_run_local | bool
 
 - name: autoupgrade | Download latest version into software repository on Ansible controller
@@ -88,13 +88,13 @@
   run_once: true
   when:
     - autoupgrade_download_latest | bool
-    - oracle_sw_copy or _autoupgrade_run_local | bool
+    - oracle_sw_copy | bool or _autoupgrade_run_local | bool
   block:
     - name: autoupgrade | Assert software repository is local
       ansible.builtin.assert:
         quiet: true
         that:
-          - is_sw_source_local
+          - is_sw_source_local | bool
         fail_msg: >-
           autoupgrade_download_latest requires is_sw_source_local: true
 
@@ -121,7 +121,7 @@
   become_user: "{{ oracle_user }}"
   when:
     - autoupgrade_download_latest | bool
-    - not oracle_sw_copy
+    - not oracle_sw_copy | bool
     - not _autoupgrade_run_local | bool
 
 - name: autoupgrade | Install
@@ -150,8 +150,8 @@
         force: "{{ autoupgrade_force_update }}"
         remote_src: false
       when:
-        - is_sw_source_local
-        - oracle_sw_copy or _autoupgrade_run_local | bool
+        - is_sw_source_local | bool
+        - oracle_sw_copy | bool or _autoupgrade_run_local | bool
 
     - name: autoupgrade | Download from www {{ autoupgrade_jar }}
       ansible.builtin.get_url:
@@ -163,8 +163,8 @@
         client_key: "{{ get_url_ssl_client_key | default(omit) }}"
       environment: "{{ _autoupgrade_proxy_env }}"
       when:
-        - not is_sw_source_local
-        - oracle_sw_copy or _autoupgrade_run_local | bool
+        - not is_sw_source_local | bool
+        - oracle_sw_copy | bool or _autoupgrade_run_local | bool
 
     - name: autoupgrade | Copy from remote stage {{ autoupgrade_jar }}
       ansible.builtin.copy:
@@ -174,7 +174,7 @@
         force: "{{ autoupgrade_force_update }}"
         remote_src: true
       when:
-        - not oracle_sw_copy
+        - not oracle_sw_copy | bool
         - not _autoupgrade_run_local | bool
 
     - name: autoupgrade | Get version

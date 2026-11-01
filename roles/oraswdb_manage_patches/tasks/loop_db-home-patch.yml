@@ -3,7 +3,7 @@
 - name: Output
   ansible.builtin.debug:
     msg: "Managing patches for {{ oracle_home_db }}"
-  when: apply_patches_db
+  when: apply_patches_db | bool
 
 - name: Upgrade OPatch
   ansible.builtin.include_tasks: opatch-upgrade.yml
@@ -18,7 +18,7 @@
     mode: "0644"
     force: true
   when:
-    - apply_patches_db
+    - apply_patches_db | bool
     - current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
   become: true
   become_user: "{{ oracle_user }}"
@@ -28,7 +28,7 @@
 - name: Configure ocm.rsp (2)
   ansible.builtin.command: "{{ oracle_patch_stage }}/{{ db_version }}/ocmrsp.expect"
   when:
-    - apply_patches_db
+    - apply_patches_db | bool
     - current_opatch_version.msg is version_compare('12.2.0.1.5', '<')
   become: true
   become_user: "{{ oracle_user }}"
@@ -90,7 +90,7 @@
   tags:
     - apply_patch_db
   when:
-    - apply_patches_db
+    - apply_patches_db | bool
     - db_homes_config[dbh.home]['opatchauto'] is defined
     - item.1 is defined
     - not olrloc.stat.exists

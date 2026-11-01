@@ -14,11 +14,14 @@ size_in_gb_hugepages: 0
 
 configure_host_disks: true
 
+# Hyper-V VM from packer-hyperv: one disk /dev/sda, the free space of VG "ol" (/dev/sda3)
+# is used for the Oracle filesystems.
 host_fs_layout:
-  - vgname: vgora
+  - vgname: ol
     state: present
     filesystem:
-      - {mntp: /u01, lvname: lvorabase, lvsize: 25G, fstype: xfs}
+      - {mntp: swap, lvname: lvswap, lvsize: 16G, fstype: swap}
+      - {mntp: /u01, lvname: lvorabase, lvsize: 40G, fstype: xfs}
       - {mntp: /u02, lvname: lvoradata, lvsize: 25G, fstype: xfs, fsopts: "-m reflink=1 -m crc=1"}
     disk:
-      - {device: /dev/sdb, pvname: /dev/sdb1}
+      - {device: /dev/sda, pvname: /dev/sda3}

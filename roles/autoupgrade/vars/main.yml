@@ -173,6 +173,20 @@ _autoupgrade_gold_images: >-
   {%- endfor -%}
   {{ ns.res }}
 
+# Latest renamed Gold Image per major release (autoupgrade_download_gold_image_latest)
+# db_home_26.03.zip, db_home_26.04.zip => {'26': {'release': '26.04', 'file': 'db_home_26.04.zip'}}
+_autoupgrade_gold_image_latest: >-
+  {%- set ns = namespace(res={}) -%}
+  {%- set prefix_re = '^' ~ (autoupgrade_download_gold_image_prefix | regex_escape) -%}
+  {%- for f in _autoupgrade_gold_image_files.files | default([]) | map(attribute='path') | map('basename') -%}
+  {%-   set rel = f | regex_replace(prefix_re, '') | regex_replace('\.zip$', '') -%}
+  {%-   set major = rel.split('.')[0] -%}
+  {%-   if major not in ns.res or rel is version(ns.res[major]['release'], '>') -%}
+  {%-     set ns.res = ns.res | combine({major: {'release': rel, 'file': f}}) -%}
+  {%-   endif -%}
+  {%- endfor -%}
+  {{ ns.res }}
+
 # Upgrade of PDBs with Unplug/Plug (upgrade_analyze.yml / upgrade_deploy.yml)
 #
 # oracle_pdbs defines the end state (cdb/home = target CDB/ORACLE_HOME),

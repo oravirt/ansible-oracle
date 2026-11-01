@@ -12,7 +12,7 @@
       ansible.builtin.assert:
         quiet: true
         that:
-          - ansible_memory_mb.swap.total >= {{ orahost_min_swap_mb }}
+          - ansible_memory_mb.swap.total >= orahost_min_swap_mb | int
       tags:
         - assertswap
         - molecule-notest
@@ -87,10 +87,10 @@
         -ignorePrereq
         -silent
         -waitforcompletion
-        {% if (_oraswdb_install_patches_dirlist | length > 1
+        {% if (_oraswdb_install_patches_dirlist | default('', true) | length > 1
         and patch_before_rootsh | bool
         and apply_patches_db | bool) %}{{ __argvruoneoffs }}{% endif %}
-        {% if (_oraswdb_install_opatchauto_dirlist | length > 1
+        {% if (_oraswdb_install_opatchauto_dirlist | default('', true) | length > 1
         and patch_before_rootsh | bool
         and apply_patches_db | bool) %}{{ __argvru }}{% endif %}
         {% if db_homes_config[dbh.home]['oracle_home_name'] is defined %}ORACLE_HOME_NAME={{ db_homes_config[dbh.home]['oracle_home_name'] }}{% endif %}

@@ -40,6 +40,19 @@ tasks:
         vars:
           MANAGERS: '["dockerfile","docker-compose","custom.regex"]'
 
+  galaxy:
+    desc: Check collections in galaxy.yml and requirements.yml for updates (lookup only)
+    cmds:
+      - task: check
+        vars:
+          MANAGERS: '["ansible-galaxy"]'
+      - task: galaxy:requires
+
+  galaxy:requires:
+    desc: Check requires_ansible of the collections in galaxy.yml against meta/runtime.yml
+    cmds:
+      - tools/renovate/galaxy_requires.py
+
   lookup:
     internal: true
     env:

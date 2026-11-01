@@ -25,11 +25,11 @@
 
 - name: db_opatch | Upgrade Opatch block
   when:
-    - apply_patches_db
+    - apply_patches_db | bool
     - db_homes_config[dbh.home]['opatch_minversion'] is defined
     - (current_opatch_version.msg | default('0')) is version_compare(db_homes_config[dbh.home]['opatch_minversion'], '<')
       or
-      oraswdb_manage_patches_force_opatch_upgrade
+      oraswdb_manage_patches_force_opatch_upgrade | bool
   block:
     - name: db_opatch | Copy oracle opatch to server (www)
       ansible.builtin.get_url:
@@ -48,9 +48,9 @@
         label: >-
           filename: {{ oop_loop.filename | default('') }}
       when:
-        - apply_patches_db
-        - oracle_sw_copy
-        - not is_sw_source_local
+        - apply_patches_db | bool
+        - oracle_sw_copy | bool
+        - not is_sw_source_local | bool
       tags:
         - oragridopatchget
 
@@ -68,8 +68,8 @@
         label: >-
           filename: {{ oop_loop.filename | default('') }}
       when:
-        - oracle_sw_copy
-        - is_sw_source_local
+        - oracle_sw_copy | bool
+        - is_sw_source_local | bool
       tags:
         - oragridpatchpush
 
@@ -82,7 +82,7 @@
         group: "{{ oracle_group }}"
       with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', db_version) }}"
       when:
-        - oracle_sw_copy
+        - oracle_sw_copy | bool
       tags:
         - oragridpatchunpack
 
@@ -95,14 +95,14 @@
         group: "{{ oracle_group }}"
       with_items: "{{ oracle_opatch_patch | selectattr('version', 'equalto', db_version) }}"
       when:
-        - not oracle_sw_copy
+        - not oracle_sw_copy | bool
       tags:
         - oragridpatchunpack
 
     - name: db_opatch | Check current opatch version 2
       when:
         - db_homes_config[dbh.home]['opatch_minversion'] is defined
-        - not oraswdb_manage_patches_force_opatch_upgrade
+        - not oraswdb_manage_patches_force_opatch_upgrade | bool
       block:
         - name: db_opatch | Check current opatch version 2
           opitzconsulting.ansible_oracle.oracle_opatch:

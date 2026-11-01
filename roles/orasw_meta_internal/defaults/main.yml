@@ -235,16 +235,16 @@ oracle_all_editions_options:
 
 oracle_patch_stage: "{{ oracle_stage }}/patches"
 oracle_patch_stage_remote: "{{ oracle_stage_remote }}/patches"
-oracle_patch_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_patch_stage_remote }}{% else %}{{ oracle_patch_stage }}{% endif %}"
+oracle_patch_install: "{% if not oracle_sw_copy | bool and not oracle_sw_unpack | bool %}{{ oracle_patch_stage_remote }}{% else %}{{ oracle_patch_stage }}{% endif %}"
 ocm_response_file: "{{ oracle_patch_stage }}/{{ db_version }}/ocm.rsp"
 
 # @var oracle_stage_install:description: >
 # This is an internal variable. Do not set it in Inventory.
 # @end
-oracle_stage_install: "{% if not oracle_sw_copy and not oracle_sw_unpack %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
+oracle_stage_install: "{% if not oracle_sw_copy | bool and not oracle_sw_unpack | bool %}{{ oracle_stage_remote }}{% else %}{{ oracle_stage }}{% endif %}"
 
-oracle_sw_copy: "{% if install_from_nfs %}false{% else %}true{% endif %}"
-oracle_sw_unpack: "{% if install_from_nfs %}false{% else %}true{% endif %}"
+oracle_sw_copy: "{{ not (install_from_nfs | bool) }}"
+oracle_sw_unpack: "{{ not (install_from_nfs | bool) }}"
 oracle_sw_extract_path: "{%- if '18' in db_version -%}\
                             {{ oracle_home_db }}\
                           {%- else -%}\
@@ -411,4 +411,4 @@ oracle_home_gi: "{% if oracle_install_version_gi is defined -%}\
                     {%- endif -%}\
                  {%- endif %}"
 
-cluster_master: "{{ play_hosts[0] }}"
+cluster_master: "{{ ansible_play_batch[0] }}"
