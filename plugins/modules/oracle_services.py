@@ -3,6 +3,10 @@
 
 import os
 from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.oracledb_connect import (  # noqa: E501
+    oracledb,
+    oracledb_connect,
+)
 
 DOCUMENTATION = '''
 ---
@@ -14,7 +18,7 @@ description:
     - If the file C(/etc/oracle/olr.loc) exists, the system is treated as managed by
       Grid Infrastructure (RAC or Oracle Restart) and the service is managed with
       C(srvctl) from O(oracle_home). The database connection options are ignored.
-    - Otherwise the service is managed with C(DBMS_SERVICE) through a cx_Oracle
+    - Otherwise the service is managed with C(DBMS_SERVICE) through a python-oracledb
       connection. In this mode only O(name) is used for the service, O(pdb),
       O(role), O(preferred_instances), O(available_instances), O(clbgoal) and
       O(rlbgoal) are ignored.
@@ -160,9 +164,13 @@ options:
         required: false
         default: 1521
 notes:
-    - cx_Oracle needs to be installed
+    - python-oracledb needs to be installed on systems without Grid Infrastructure,
+      e.g. with the role C(opitzconsulting.ansible_oracle.pyoracledb).
+      With Grid Infrastructure the module uses srvctl only.
+    - python-oracledb is used in thick mode. The Oracle Client libraries must be found,
+      e.g. with ORACLE_HOME and LD_LIBRARY_PATH set in the environment of the task.
     - Check mode is not supported.
-requirements: [ "cx_Oracle" ]
+requirements: [ "python-oracledb" ]
 author:
     - Mikael Sandström (@oravirt)
 '''
@@ -227,13 +235,6 @@ msg:
     type: str
     sample: "Service service1 (db1) successfully created"
 '''
-
-try:
-    import cx_Oracle
-except ImportError:
-    cx_oracle_exists = False
-else:
-    cx_oracle_exists = True
 
 
 # Check if the service exists
@@ -679,13 +680,13 @@ def execute_sql_get(module, msg, cursor, sql):
         cursor.execute(sql)
         result = cursor.fetchone()  # noqa F841
 
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (dberror,) = exc.args
         if dberror.code == 1403:
             # no_data_found
             return False
 
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
             error.message,
@@ -702,7 +703,7 @@ def execute_sql_get(module, msg, cursor, sql):
 def execute_sql(module, msg, cursor, sql):
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Something went wrong while executing sql - %s sql: %s' % (
             error.message,
@@ -795,47 +796,19 @@ def main():
         gimanaged = True
     else:
         gimanaged = False
-        if not cx_oracle_exists:
-            msg = (
-                "System doesn\'t seem to be managed by GI, so the cx_Oracle module is "
-                "required. 'pip install cx_Oracle' should do the trick. If cx_Oracle "
-                "is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
-            )
-            module.fail_json(msg=msg)
+        # Without GI the services are managed with DBMS_SERVICE => database connection.
+        # The module has no option mode => normal connection
+        if not service_name:
+            service_name = database_name
 
-        else:
-            if not service_name:
-                service_name = database_name
+        if pdb and not service_name:
+            service_name = pdb
+            database_name = pdb
 
-            if pdb and not service_name:
-                service_name = pdb
-                database_name = pdb
-
-            wallet_connect = '/@%s' % service_name
-            try:
-                if not user and not password:
-                    # If neither user or password is supplied, the use of an
-                    # oracle wallet is assumed
-                    connect = wallet_connect
-                    conn = cx_Oracle.connect(wallet_connect)
-                elif user and password:
-                    dsn = cx_Oracle.makedsn(
-                        host=hostname, port=port, service_name=service_name
-                    )
-                    connect = dsn
-                    conn = cx_Oracle.connect(user, password, dsn)
-                elif not (user) or not (password):
-                    module.fail_json(msg='Missing username or password for cx_Oracle')
-
-            except cx_Oracle.DatabaseError as exc:
-                (error,) = exc.args
-                msg = 'Could not connect to database - %s, connect descriptor: %s' % (
-                    error.message,
-                    connect,
-                )
-                module.fail_json(msg=msg, changed=False)
-
-            cursor = conn.cursor()
+        conn = oracledb_connect(
+            module, hostname, port, service_name, user, password, 'normal'
+        )
+        cursor = conn.cursor()
 
     if state in ('present', 'started', 'stopped'):
         if not check_service_exists(
