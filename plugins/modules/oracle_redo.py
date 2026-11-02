@@ -2,6 +2,10 @@
 # -*- coding: utf-8 -*-
 
 from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.oracledb_connect import (  # noqa: E501
+    oracledb,
+    oracledb_connect,
+)
 
 ANSIBLE_METADATA = {
     'metadata_version': '1.1',
@@ -90,8 +94,11 @@ options:
         type: int
         required: true
 notes:
-    - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+    - python-oracledb needs to be installed, e.g. with the role
+      C(opitzconsulting.ansible_oracle.pyoracledb).
+    - python-oracledb is used in thick mode. The Oracle Client libraries must be found,
+      e.g. with ORACLE_HOME and LD_LIBRARY_PATH set in the environment of the task.
+requirements: [ "python-oracledb" ]
 author:
     - Mikael Sandström (@oravirt)
 '''
@@ -129,13 +136,6 @@ msg:
         Groups have been adjusted to 3 groups.
 '''
 
-try:
-    import cx_Oracle
-except ImportError:
-    cx_oracle_exists = False
-else:
-    cx_oracle_exists = True
-
 
 # Ansible code
 def main():
@@ -165,53 +165,7 @@ def main():
     groups = module.params["groups"]
     # threads = module.params["threads"]
 
-    # Check for required modules
-    if not cx_oracle_exists:
-        module.fail_json(
-            msg=(
-                "The cx_Oracle module is required. "
-                "'pip install cx_Oracle' should do the trick. "
-                "If cx_Oracle is installed, make sure ORACLE_HOME "
-                "& LD_LIBRARY_PATH is set"
-            )
-        )
-
-    wallet_connect = '/@%s' % service_name
-    try:
-        if not user and not password:
-            # If neither user or password is supplied, the use of an
-            # oracle wallet is assumed
-            if mode == 'sysdba':
-                connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
-            else:
-                connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
-
-        elif user and password:
-            if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(
-                    host=hostname, port=port, service_name=service_name
-                )
-                connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
-            else:
-                dsn = cx_Oracle.makedsn(
-                    host=hostname, port=port, service_name=service_name
-                )
-                connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
-
-        elif not (user) or not (password):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
-
-    except cx_Oracle.DatabaseError as exc:
-        (error,) = exc.args
-        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (
-            error.message,
-            connect,
-        )
-        module.fail_json(msg=msg[0], changed=False)
+    conn = oracledb_connect(module, hostname, port, service_name, user, password, mode)
     #
     # if module.check_mode:
     #     module.exit_json(changed=False)
@@ -415,10 +369,10 @@ def main():
     cur = conn.cursor()
 
     try:
-        v_size_changed = cur.var(cx_Oracle.NUMBER)
-        v_group_changed = cur.var(cx_Oracle.NUMBER)
-        v_size_msg = cur.var(cx_Oracle.STRING)
-        v_group_msg = cur.var(cx_Oracle.STRING)
+        v_size_changed = cur.var(oracledb.NUMBER)
+        v_group_changed = cur.var(oracledb.NUMBER)
+        v_size_msg = cur.var(oracledb.STRING)
+        v_group_msg = cur.var(oracledb.STRING)
         cur.execute(
             redosql,
             {
@@ -430,7 +384,7 @@ def main():
                 'o_group_msg': v_group_msg,
             },
         )
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = '%s' % (error.message)
         module.fail_json(msg=msg, changed=False)
