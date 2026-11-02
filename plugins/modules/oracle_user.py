@@ -11,123 +11,234 @@ DOCUMENTATION = '''
 module: oracle_user
 short_description: Manage users/schemas in an Oracle database
 description:
-    - Manage users/schemas in an Oracle database
-    - Can be run locally on the controlmachine or on a remote host
+    - Creates, changes, locks, unlocks, expires and drops users (schemas) in an
+      Oracle database.
+    - The existence of a user is checked in C(DBA_USERS).
+    - User names, tablespaces and profiles are not quoted in the SQL statements,
+      so they are always stored in uppercase.
+    - Existing users are compared with C(DBA_USERS) (account status, authentication
+      type, default and temporary tablespace, profile). If any of these differs,
+      one C(ALTER USER) statement with all given attributes is executed.
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "1.9.1"
 options:
+    oracle_home:
+        description:
+            - The ORACLE_HOME to use. Sets the environment variable E(ORACLE_HOME)
+              for the module.
+        type: str
+        required: false
+        aliases: ['oh']
     hostname:
-        description: The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
     port:
-        description: The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     service_name:
-        description: The database service name to connect to
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the
+              wallet entry.
+        type: str
         required: true
+        aliases: ['tns']
     user:
-        description: The Oracle user name to connect to the database
+        description:
+            - The Oracle user name to connect to the database.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
         required: false
     password:
-        description: The Oracle user password for 'user'
+        description:
+            - The Oracle user password for O(user).
+        type: str
         required: false
     mode:
-        description: The mode with which to connect to the database
+        description:
+            - The mode with which to connect to the database.
+        type: str
         required: false
         default: normal
-        choices: ['normal','sysdba']
+        choices: ['normal', 'sysdba']
     schema:
-        description: The schema that you want to manage
+        description:
+            - The name of the user/schema to manage.
+            - Required in practice, although not enforced by the argument spec.
+        type: str
         required: false
-        default: None
+        aliases: ['name']
     schema_password:
-        description: The password for the new schema. i.e '..identified by password'
+        description:
+            - The password of the user (C(IDENTIFIED BY "<password>")).
+            - O(schema_password) or O(schema_password_hash) is required when a user
+              with O(authentication_type=password) is created.
+            - For an existing user, the password is checked against the C(S:) hash in
+              C(SYS.USER$.SPARE4). If no C(S:) hash exists, the password is reset on
+              every run.
+        type: str
         required: false
-        default: null
     schema_password_hash:
-        description: >
-            The password hash for the new schema.
-            i.e '..identified by values 'XXXXXXX'
+        description:
+            - The password hash of the user (C(IDENTIFIED BY VALUES '<hash>')).
+            - For an existing user, it is compared with the complete content of
+              C(SYS.USER$.SPARE4).
+        type: str
         required: false
-        default: None
     default_tablespace:
-        description: >
-            The default tablespace for the new schema. The tablespace must exist
+        description:
+            - The default tablespace of the user. The tablespace must exist.
+            - The user always gets C(QUOTA UNLIMITED) on this tablespace.
+        type: str
         required: false
-        default: None
     default_temp_tablespace:
-        description: >
-            The default tablespace for the new schema. The tablespace must exist
+        description:
+            - The temporary tablespace of the user. The tablespace must exist.
+        type: str
         required: false
-        default: None
     update_password:
-        description: >
-            always will update passwords if they differ. on_create will only set the
-            password for newly created users.
+        description:
+            - V(always) - the password (or the authentication type for
+              O(authentication_type=external) or O(authentication_type=global))
+              of an existing user is changed if it differs.
+            - V(on_create) - the password and authentication type are only set when
+              the user is created.
+        type: str
         required: false
         default: always
-        choices: ['always','on_create']
+        choices: ['always', 'on_create']
     authentication_type:
-        description: The type of authentication for the user.
+        description:
+            - The type of authentication for the user.
+            - V(password) - C(IDENTIFIED BY), see O(schema_password) and
+              O(schema_password_hash).
+            - V(external) - C(IDENTIFIED EXTERNALLY).
+            - V(global) - C(IDENTIFIED GLOBALLY).
+        type: str
         required: false
         default: password
-        choices: ['password','external','global']
+        choices: ['password', 'external', 'global']
     profile:
-        description: The profile for the user
+        description:
+            - The profile of the user. The profile must exist.
+        type: str
         required: false
-        default: None
+    container:
+        description:
+            - Adds C(CONTAINER=<container>) to the C(CREATE USER) statement,
+              e.g. V(all) for a common user in a CDB.
+            - Used only when the user is created.
+        type: str
+        required: false
+    container_data:
+        description:
+            - If set, C(ALTER USER <schema> SET CONTAINER_DATA=<container>
+              CONTAINER=CURRENT) is executed after the user has been created.
+            - Note that the value of O(container) is used in the statement, not the
+              value of this option.
+            - Used only when the user is created.
+        type: str
+        required: false
     grants:
-        description: The privileges granted to the new schema
+        description:
+            - Not implemented. The option is accepted but ignored by the module.
+            - Use M(opitzconsulting.ansible_oracle.oracle_grants) to manage
+              privileges.
+        type: list
+        elements: str
         required: false
-        default: None
     state:
-        description: >
-            Whether the user should exist. Absent removes the user, locked/unlocked
-            locks or unlocks the user
-        required: False
+        description:
+            - V(present) - the user is created if missing. An existing user is
+              unlocked (C(ACCOUNT UNLOCK)).
+            - V(unlocked) - same as V(present).
+            - V(locked) - the user is created or changed with C(ACCOUNT LOCK).
+            - V(expired) - the user is created or changed with C(PASSWORD EXPIRE).
+            - V(expired & locked) - the user is created or changed with
+              C(ACCOUNT LOCK PASSWORD EXPIRE).
+            - V(absent) - the user is dropped with C(DROP USER ... CASCADE). The users
+              C(SYS), C(SYSTEM) and C(DBSNMP) are never dropped.
+        type: str
+        required: false
         default: present
-        choices: ['present','absent','locked','unlocked']
+        choices: ['present', 'absent', 'locked', 'unlocked', 'expired',
+                  'expired & locked']
 notes:
     - cx_Oracle needs to be installed
+    - The connecting user needs C(SELECT) on C(SYS.USER$) to compare passwords of
+      existing users.
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+    - Mikael Sandström (@oravirt)
 '''
 
 EXAMPLES = '''
-# Create a new schema on a remote db by running the module on the controlmachine
-# (i.e: delegate_to: localhost)
-oracle_user:
+- name: Create a schema on a remote database
+  opitzconsulting.ansible_oracle.oracle_user:
     hostname: remote-db-server
-    service_name: orcl
+    service_name: orclpdb
     user: system
-    password: manager
+    password: "{{ system_password }}"
     schema: myschema
-    schema_password: mypass
-    default_tablespace: test
+    schema_password: "{{ myschema_password }}"
+    default_tablespace: users
+    default_temp_tablespace: temp
+    profile: default
     state: present
-    grants: "'create session', create any table'"
 
-# Create a new schema on a remote db
-oracle_user:
-    hostname: localhost
-    service_name: orcl
+- name: Create a schema with a password hash, keep the password of existing users
+  opitzconsulting.ansible_oracle.oracle_user:
+    service_name: orclpdb
     user: system
-    password: manager
+    password: "{{ system_password }}"
     schema: myschema
-    schema_password: mypass
-    default_tablespace: test
-    state: present
-    grants: dba
+    schema_password_hash: "S:0123456789ABCDEF...;T:0123456789ABCDEF..."
+    update_password: on_create
 
-# Drop a schema on a remote db
-oracle_user:
-    hostname: localhost
+- name: Create a common user in the CDB (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_user:
     service_name: orcl
+    mode: sysdba
+    schema: c##monitor
+    schema_password: "{{ monitor_password }}"
+    container: all
+
+- name: Lock a schema
+  opitzconsulting.ansible_oracle.oracle_user:
+    service_name: orclpdb
     user: system
-    password: manager
+    password: "{{ system_password }}"
+    schema: myschema
+    state: locked
+
+- name: Drop a schema
+  opitzconsulting.ansible_oracle.oracle_user:
+    hostname: localhost
+    service_name: orclpdb
+    user: system
+    password: "{{ system_password }}"
     schema: myschema
     state: absent
+'''
+
+RETURN = '''
+msg:
+    description:
+        - Message describing the action that was executed.
+        - When an existing user has been altered, the message contains the executed
+          C(ALTER USER) statement.
+    returned: always
+    type: str
+    sample: "The schema myschema has been created successfully"
 '''
 
 

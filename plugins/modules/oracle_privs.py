@@ -7,183 +7,224 @@ from ansible.module_utils.basic import AnsibleModule
 DOCUMENTATION = '''
 ---
 module: oracle_privs
-short_description: Manage object and system privileges in Oracle database
+short_description: Manage object and system privileges in an Oracle database
 description:
-    - Manage users/schemas in an Oracle database
-    - Can be run locally on the controlmachine or on a remote host
+    - Grants and revokes system privileges, roles and object privileges to and from
+      users and roles in an Oracle database.
+    - Everything is done in one PL/SQL block. Privileges of the same grantee (and
+      object) are combined in one C(GRANT) or C(REVOKE) statement.
+    - Without O(objs), O(privs) are system privileges or roles. They are compared
+      with C(DBA_SYS_PRIVS) and C(DBA_ROLE_PRIVS).
+    - With O(objs), O(privs) are object privileges. The objects are resolved in
+      C(DBA_OBJECTS) at runtime, filtered by O(objtypes), and compared with
+      C(DBA_TAB_PRIVS). Objects created later are not covered.
+    - Only privileges that are missing are granted (O(state=present)) and only
+      privileges that are granted directly are revoked (O(state=absent)), so
+      C(changed=true) is only returned if a statement was executed.
+    - Grantees in O(roles) that do not exist, or that are Oracle maintained
+      (C(ORACLE_MAINTAINED=Y), 12c and later), are silently ignored. C(SYS) and
+      C(SYSTEM) are rejected.
+    - In check mode the module only connects to the database and returns
+      C(changed=false) without checking the privileges.
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
+    - Can be run locally on the control machine or on a remote host.
 version_added: "2.2.1"
 options:
     hostname:
-        description: The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
     port:
-        description: The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     service_name:
-        description: The database service name to connect to
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the
+              wallet entry.
+        type: str
         required: true
     user:
-        description: >
-            The Oracle user name to connect to the database, must have DBA privilege
-        required: False
+        description:
+            - The Oracle user name to connect to the database.
+            - The user needs the privileges to read the C(DBA_*) views and to grant
+              and revoke the privileges, for example C(DBA).
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
+        required: false
     password:
-        description: The Oracle user password for 'user'
-        required: False
+        description:
+            - The Oracle user password for O(user).
+        type: str
+        required: false
     mode:
-        description: The mode with which to connect to the database
-        required: true
+        description:
+            - The mode with which to connect to the database.
+        type: str
+        required: false
         default: normal
-        choices: ['normal','sysdba']
+        choices: ['normal', 'sysdba']
     state:
-        description: >
-            If present, then privileges are granted,
-            if absent then privileges are revoked
-        required: true
-        choices: ['present','absent']
+        description:
+            - V(present) - missing privileges are granted.
+            - V(absent) - granted privileges are revoked.
+        type: str
+        required: false
+        default: present
+        choices: ['present', 'absent']
     privs:
-        description: >
-            Privileges to grant or revoke
-            Can be either system privileges (then objs parameter must not be specified)
-            or object privileges (objs parameter must also be set)
-        required: true
+        description:
+            - Privileges to grant or revoke. Always converted to uppercase.
+            - Without O(objs), system privileges or roles, for example
+              V(CREATE SESSION) or V(SELECT_CATALOG_ROLE).
+            - With O(objs), object privileges, for example V(SELECT) or V(UPDATE).
+              Use single privileges as listed in C(DBA_TAB_PRIVS); V(ALL) is not
+              idempotent.
         type: list
-        aliases: priv
+        elements: str
+        required: true
+        aliases: ['priv']
     objs:
-        description: >
-            When setting object privileges, list the objects the privileges are set for.
-            Use format: SCHEMA_NAME.OBJECT_NAME
-            Wildcard (%) can be used in OBJECT_NAME part, for example HR.% to set
-            privileges for all objects (with type objecttype) in schema HR.
-            Object names are CASE SENSITIVE, so by default use UPPER CASE.
-        required: false
+        description:
+            - When setting object privileges, list the objects the privileges are
+              set for.
+            - Use the format C(SCHEMA_NAME.OBJECT_NAME). The wildcard C(%) can be
+              used in the object name part, for example V(HR.%) to set privileges
+              for all objects (of the types in O(objtypes)) in schema C(HR).
+              C(_) is matched literally.
+            - Object names are case-sensitive, see O(convert_to_upper).
         type: list
-        aliases: obj
+        elements: str
+        required: false
+        aliases: ['obj']
     objtypes:
-        description: >
-            When using object privileges, list also the object types (from OBJECT_TYPE
-            column from DBA_OBJECTS).
+        description:
+            - When using object privileges, the object types (C(OBJECT_TYPE) column
+              of C(DBA_OBJECTS)) of the objects in O(objs).
+            - Always converted to uppercase.
+        type: list
+        elements: str
         required: false
-        default: ['TABLE','VIEW']
-        type: list
+        default: ['TABLE', 'VIEW']
     roles:
-        description: >
-            List of user names and role names to set permissions to.
-            Names are CASE SENSITIVE! So by default use UPPER CASE.
-        required: true
+        description:
+            - List of user names and role names (grantees) to grant the privileges
+              to or revoke them from.
+            - Names are case-sensitive, see O(convert_to_upper).
         type: list
-        aliases: role
+        elements: str
+        required: true
+        aliases: ['role']
     convert_to_upper:
-        description: >
-            Converts all entries for role and objs parameters silently to upper case to
-            simulate case insensitivity
-        required: False
-        default: True
+        description:
+            - Converts all entries of O(roles) and O(objs) to uppercase to simulate
+              case insensitivity.
         type: bool
+        required: false
+        default: true
     quiet:
-        description: >
-            If set to False, all executed commands are returned as Ansible
-            output message
-        required: False
-        default: True
+        description:
+            - If set to V(false), all executed statements are returned in RV(msg).
         type: bool
-
+        required: false
+        default: true
 notes:
     - cx_Oracle needs to be installed
     - Oracle RDBMS 11gR2 or later required
 requirements: [ "cx_Oracle", "re" ]
-author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
+author:
+    - Ilmar Kerm (@ilmarkerm)
 '''
 
 EXAMPLES = '''
----
-- hosts: localhost
-  vars:
-    oraclehost: 192.168.56.101
-    oracleport: 1521
-    oracleservice: orcl
-    oracleuser: system
-    oraclepassword: oracle
-    oracle_env:
-      ORACLE_HOME: /usr/lib/oracle/12.1/client64
-      LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
-  tasks:
-    - name: grant oracle system privileges
-      oracle_privs:
-        hostname: "{{ oraclehost }}"
-        port: "{{ oracleport }}"
-        service_name: "{{ oracleservice }}"
-        user: "{{ oracleuser }}"
-        password: "{{ oraclepassword }}"
-        state: present
-        privs:
-          - CREATE TABLE
-          - CREATE VIEW
-          - CREATE TYPE
-          - CREATE PROCEDURE
-          - CREATE SESSION
-        roles:
-          - ILMAR
-          - HR
-          - READER_ROLE
-      environment: "{{ oracle_env }}"
+- name: Grant system privileges
+  opitzconsulting.ansible_oracle.oracle_privs:
+    hostname: dbhost
+    port: 1521
+    service_name: orclpdb
+    user: system
+    password: "{{ system_password }}"
+    state: present
+    privs:
+      - CREATE TABLE
+      - CREATE VIEW
+      - CREATE TYPE
+      - CREATE PROCEDURE
+      - CREATE SESSION
+    roles:
+      - ILMAR
+      - HR
+      - READER_ROLE
+  environment:
+    ORACLE_HOME: /usr/lib/oracle/19/client64
+    LD_LIBRARY_PATH: /usr/lib/oracle/19/client64/lib
 
-    - name: revoke oracle system privileges
-      oracle_privs:
-        hostname: "{{ oraclehost }}"
-        port: "{{ oracleport }}"
-        service_name: "{{ oracleservice }}"
-        user: "{{ oracleuser }}"
-        password: "{{ oraclepassword }}"
-        state: absent
-        privs:
-          - CREATE ANY TABLE TABLE
-          - SELECT ANY TABLE
-        roles:
-          - ILMAR
-          - READER_ROLE
-      environment: "{{ oracle_env }}"
+- name: Revoke system privileges
+  opitzconsulting.ansible_oracle.oracle_privs:
+    hostname: dbhost
+    service_name: orclpdb
+    user: system
+    password: "{{ system_password }}"
+    state: absent
+    privs:
+      - CREATE ANY TABLE
+      - SELECT ANY TABLE
+    roles:
+      - ILMAR
+      - READER_ROLE
 
-    - name: grant oracle object privileges
-      oracle_privs:
-        hostname: "{{ oraclehost }}"
-        port: "{{ oracleport }}"
-        service_name: "{{ oracleservice }}"
-        user: "{{ oracleuser }}"
-        password: "{{ oraclepassword }}"
-        state: present
-        privs:
-          - SELECT
-          - FLASHBACK
-        objs:
-          - HR.%
-          - FINANCE.%
-        roles:
-          - ILMAR
-          - READER_ROLE
-      environment: "{{ oracle_env }}"
+- name: Grant object privileges on all tables and views of HR and FINANCE
+  opitzconsulting.ansible_oracle.oracle_privs:
+    hostname: dbhost
+    service_name: orclpdb
+    user: system
+    password: "{{ system_password }}"
+    state: present
+    privs:
+      - SELECT
+      - FLASHBACK
+    objs:
+      - HR.%
+      - FINANCE.%
+    roles:
+      - ILMAR
+      - READER_ROLE
 
-    - name: revoke oracle object privileges
-      oracle_privs:
-        hostname: "{{ oraclehost }}"
-        port: "{{ oracleport }}"
-        service_name: "{{ oracleservice }}"
-        user: "{{ oracleuser }}"
-        password: "{{ oraclepassword }}"
-        state: absent
-        privs:
-          - INSERT
-          - UPDATE
-          - DELETE
-        objs:
-          - HR.%
-        objtypes:
-          - TABLE
-        roles:
-          - READER_ROLE
-        quiet: False
-      environment: "{{ oracle_env }}"
+- name: Revoke object privileges on tables of HR (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_privs:
+    service_name: orclpdb
+    state: absent
+    privs:
+      - INSERT
+      - UPDATE
+      - DELETE
+    objs:
+      - HR.%
+    objtypes:
+      - TABLE
+    roles:
+      - READER_ROLE
+    quiet: false
+'''
+
+RETURN = '''
+msg:
+    description:
+        - The executed statements, each prefixed with C(-), if O(quiet=false).
+        - V(null) if O(quiet=true) or if no statement was executed.
+    returned: success, not in check mode
+    type: str
+    sample: >-
+        -GRANT CREATE SESSION,CREATE TABLE TO "ILMAR"-GRANT CREATE SESSION
+        TO "READER_ROLE"
 '''
 
 
@@ -197,7 +238,7 @@ else:
 
 # Ansible code
 def main():
-    global lconn, conn, lparam, module
+    global conn, module
     msg = ['']
     module = AnsibleModule(
         argument_spec=dict(

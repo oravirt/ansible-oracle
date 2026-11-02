@@ -7,109 +7,166 @@ from ansible.module_utils.basic import AnsibleModule
 DOCUMENTATION = '''
 ---
 module: oracle_jobwindow
-short_description: Manage DBMS_SCHEDULER job windows in Oracle database
+short_description: Manage DBMS_SCHEDULER job windows in an Oracle database
 description:
-    - Manage DBMS_SCHEDULER job windows in Oracle database
-    - Can be run locally on the controlmachine or on a remote host
+    - Creates, changes, enables, disables and drops DBMS_SCHEDULER windows in an
+      Oracle database.
+    - Windows are always owned by C(SYS). The existence is checked in
+      C(ALL_SCHEDULER_WINDOWS), so the connecting user must be able to see the
+      windows of C(SYS) (e.g. DBA privilege).
+    - The window name is converted to uppercase.
+    - For an existing window, O(comments), O(repeat_interval), O(resource_plan),
+      O(window_priority) and the duration are compared with the database. If one of
+      them differs, all attributes are set again with C(DBMS_SCHEDULER.SET_ATTRIBUTE)
+      and the window is enabled or disabled according to O(state). Otherwise only
+      the enabled/disabled state is changed if needed.
+    - O(repeat_interval) is compared as an exact string with the stored value.
+    - Either O(duration_min) or O(duration_hour) must be given, also for
+      O(state=absent).
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "2.2.1"
 options:
     hostname:
-        description: The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
     port:
-        description: >
-            The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     service_name:
-        description: >
-            The database service name to connect to
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the wallet
+              entry.
+        type: str
         required: true
     user:
-        description: >
-            The Oracle user name to connect to the database, must have DBA privilege
-        required: False
+        description:
+            - The Oracle user name to connect to the database, must have DBA privilege.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
+        required: false
     password:
-        description: The Oracle user password for 'user'
-        required: False
+        description:
+            - The Oracle user password for O(user).
+        type: str
+        required: false
     mode:
-        description: >
-            The mode with which to connect to the database
-        required: true
+        description:
+            - The mode with which to connect to the database.
+        type: str
+        required: false
         default: normal
-        choices: ['normal','sysdba']
+        choices: ['normal', 'sysdba']
     state:
-        description: >
-            If absent then window is dropped,
-            if enabled or disabled then window is created at the requested state
-        required: true
-        choices: ['enabled','disabled','absent']
+        description:
+            - V(enabled) - the window is created or changed and enabled.
+            - V(disabled) - the window is created or changed and disabled.
+            - V(absent) - the window is dropped.
+        type: str
+        required: false
+        default: enabled
+        choices: ['enabled', 'disabled', 'absent']
     name:
-        description: Scheduler window name
-        required: True
+        description:
+            - The name of the scheduler window (without the C(SYS.) prefix).
+        type: str
+        required: true
+        aliases: ['window_name']
     repeat_interval:
-        description: >
-            Window repeat interval using DBMS_SCHEDULER calendaring syntax
-        required: True
-        aliases:
-            - interval
+        description:
+            - The window repeat interval using DBMS_SCHEDULER calendaring syntax.
+            - Required also for O(state=absent).
+        type: str
+        required: true
+        aliases: ['interval']
     comments:
-        description: Comment about the window
-        required: False
+        description:
+            - A comment about the window.
+            - If omitted, an existing comment is removed.
+        type: str
+        required: false
     resource_plan:
-        description: Comment about the window
-        required: False
+        description:
+            - The resource manager plan that is activated when the window opens.
+            - If omitted, a change of the resource plan in the database is not
+              detected, but the resource plan is removed when other attributes are
+              changed.
+        type: str
+        required: false
     window_priority:
-        description: Window priority
+        description:
+            - The priority of the window.
+        type: str
+        required: false
         default: low
-        choices:
-            - low
-            - high
-        aliases:
-            - priority
+        choices: ['low', 'high']
+        aliases: ['priority']
     duration_min:
-        description: Total window duration in minutes
-        required: False
+        description:
+            - The total window duration in minutes.
+            - Mutually exclusive with O(duration_hour). One of both is required.
         type: int
+        required: false
     duration_hour:
-        description: Total window duration in hours
-        required: False
+        description:
+            - The total window duration in hours.
+            - Mutually exclusive with O(duration_min). One of both is required.
         type: int
-
+        required: false
 notes:
     - cx_Oracle needs to be installed
     - Oracle RDBMS 10gR2 or later required
+    - In check mode, the module exits with C(changed=false) without checking
+      the database.
 requirements: [ "cx_Oracle", "datetime" ]
-author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
+author:
+    - Ilmar Kerm (@ilmarkerm)
 '''
 
 EXAMPLES = '''
-- hosts: localhost
-  vars:
-    oraclehost: 192.168.56.101
-    oracleport: 1521
-    oracleservice: orcl
-    oracleuser: system
-    oraclepassword: oracle
-    oracle_env:
-      ORACLE_HOME: /usr/lib/oracle/12.1/client64
-      LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
-  tasks:
-    - name: job window
-      oracle_jobwindow:
-        hostname: "{{ oraclehost }}"
-        port: "{{ oracleport }}"
-        service_name: "{{ oracleservice }}"
-        user: "{{ oracleuser }}"
-        password: "{{ oraclepassword }}"
-        state: enabled
-        name: SUNDAY_WINDOW
-        interval: freq=daily;byday=SUN;byhour=6;byminute=0; bysecond=0
-        comments: Sunday window for maintenance tasks
-        duration_hour: 12
-        resource_plan: DEFAULT_MAINTENANCE_PLAN
-      environment: "{{ oracle_env }}"
+- name: Create and enable the window SUNDAY_WINDOW
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    hostname: dbhost
+    port: 1521
+    service_name: orcl
+    user: system
+    password: "{{ system_password }}"
+    state: enabled
+    name: SUNDAY_WINDOW
+    interval: freq=daily;byday=SUN;byhour=6;byminute=0;bysecond=0
+    comments: Sunday window for maintenance tasks
+    duration_hour: 12
+    resource_plan: DEFAULT_MAINTENANCE_PLAN
+  environment:
+    ORACLE_HOME: /usr/lib/oracle/12.1/client64
+    LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
+
+- name: Drop the window SUNDAY_WINDOW (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    service_name: orcl
+    state: absent
+    name: SUNDAY_WINDOW
+    interval: freq=daily;byday=SUN;byhour=6;byminute=0;bysecond=0
+    duration_hour: 12
+'''
+
+RETURN = '''
+msg:
+    description:
+        - Message of the module. Currently always an empty string.
+        - Not returned in check mode.
+    returned: success
+    type: str
+    sample: ""
 '''
 
 
@@ -147,7 +204,7 @@ def query_existing(name):
 
 # Ansible code
 def main():
-    global lconn, conn, msg, module
+    global conn, msg, module
     msg = ['']
     module = AnsibleModule(
         argument_spec=dict(

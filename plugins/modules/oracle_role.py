@@ -6,87 +6,135 @@ from ansible.module_utils.basic import AnsibleModule
 DOCUMENTATION = '''
 ---
 module: oracle_role
-short_description: Manage users/roles in an Oracle database
+short_description: Manage roles in an Oracle database
 description:
-    - Manage grants/privileges in an Oracle database
-    - Handles role/sys privileges at the moment.
-    - It is possible to add object privileges as well, but they are not considered when
-      removing privs at the moment.
+    - Creates, changes and drops roles (C(CREATE ROLE)) in an Oracle database.
+    - The module does not manage privileges granted to a role, use
+      M(opitzconsulting.ansible_oracle.oracle_grants) for that.
+    - The existence of a role is checked in C(DBA_ROLES). The role name is not quoted
+      in the SQL statements, so it is always stored in uppercase.
+    - For an existing role, the authentication type (C(DBA_ROLES.AUTHENTICATION_TYPE))
+      is compared with O(auth). The role is only altered when they differ, so a
+      changed password or package in O(auth_conf) is not detected.
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "1.9.1"
 options:
     hostname:
-        description: The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
     port:
-        description: The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     service_name:
-        description: The database service name to connect to
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the wallet
+              entry.
+        type: str
         required: true
     user:
-        description: The Oracle user name to connect to the database
-        required: true
+        description:
+            - The Oracle user name to connect to the database.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
+        required: false
     password:
-        description: The Oracle user password for 'user'
-        required: true
+        description:
+            - The Oracle user password for O(user).
+        type: str
+        required: false
     mode:
-        description: The mode with which to connect to the database
-        required: true
+        description:
+            - The mode with which to connect to the database.
+        type: str
+        required: false
         default: normal
-        choices: ['normal','sysdba']
+        choices: ['normal', 'sysdba']
     role:
-        description: The role that should get grants added/removed
+        description:
+            - The name of the role.
+            - Required in practice, although not enforced by the argument spec.
+        type: str
         required: false
-        default: null
-    grants:
-        description: The privileges granted to the new role. Can be a string or a list
+    auth:
+        description:
+            - The authentication type of the role.
+            - V(none) - C(NOT IDENTIFIED).
+            - V(password) - C(IDENTIFIED BY <auth_conf>).
+            - V(application) - C(IDENTIFIED USING <auth_conf>).
+            - V(external) - C(IDENTIFIED EXTERNALLY).
+            - V(global) - C(IDENTIFIED GLOBALLY).
+            - Used with O(state=present) only.
+        type: str
         required: false
-        default: null
+        default: none
+        choices: ['none', 'password', 'external', 'global', 'application']
+    auth_conf:
+        description:
+            - The password for O(auth=password) or the authentication package
+              (C(schema.package)) for O(auth=application).
+            - Required for O(auth=password) and O(auth=application), ignored otherwise.
+        type: str
+        required: false
     state:
-        description: >
-            The intended state of the priv (present=added to the user,
-            absent=removed from the user).
-            REMOVEALL will remove ALL role/sys privileges
+        description:
+            - V(present) - the role is created, or its authentication type is changed
+              (see O(auth)).
+            - V(absent) - the role is dropped.
+        type: str
+        required: false
         default: present
-        choices: ['present','absent','REMOVEALL']
+        choices: ['present', 'absent']
 notes:
     - cx_Oracle needs to be installed
+    - Check mode is not supported.
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+    - Mikael Sandström (@oravirt)
 '''
 
 EXAMPLES = '''
-# Add grants to the user
-oracle_role:
+- name: Create role MYROLE
+  opitzconsulting.ansible_oracle.oracle_role:
     hostname: remote-db-server
     service_name: orcl
     user: system
-    password: manager
+    password: "{{ system_password }}"
     role: myrole
     state: present
-    grants: 'create session','create any table',connect,resource
 
-# Revoke the 'create any table' grant
-oracle_role:
-    hostname: localhost
+- name: Create password protected role MYPWROLE
+  opitzconsulting.ansible_oracle.oracle_role:
+    hostname: remote-db-server
     service_name: orcl
     user: system
-    password: manager
+    password: "{{ system_password }}"
+    role: mypwrole
+    auth: password
+    auth_conf: "{{ role_password }}"
+
+- name: Drop role MYROLE (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_role:
+    service_name: orcl
     role: myrole
     state: absent
-    grants: 'create any table'
+'''
 
-# Remove all grants from a user
-oracle_role:
-    hostname: localhost
-    service_name: orcl
-    user: system
-    password: manager
-    role: myrole
-    state: REMOVEALL
-    grants:
+RETURN = '''
+msg:
+    description: Message describing the action that was executed.
+    returned: always
+    type: str
+    sample: "The role (myrole) has been created successfully, authentication: none"
 '''
 
 try:

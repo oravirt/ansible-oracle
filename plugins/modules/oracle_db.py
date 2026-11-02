@@ -12,342 +12,435 @@ DOCUMENTATION = '''
 module: oracle_db
 short_description: Manage an Oracle database
 description:
-    - Create/delete a database using dbca
-    - If a responsefile is available, that will be used. If initparams is
-      defined, those will be attached to the createDatabase command
-    - If no responsefile is created, the database will be created based on all
-      other parameters
+    - Creates and deletes an Oracle database with C(dbca), starts or restarts it and
+      manages some database settings (archivelog, force logging, flashback,
+      supplemental logging, default tablespaces, time zone).
+    - Must run on the database server. If C(/etc/oracle/olr.loc) exists, the database
+      is treated as managed by Oracle Grid Infrastructure and C(srvctl) is used to
+      check, start and stop it. Otherwise C(/etc/oratab) and C(sqlplus / as sysdba)
+      are used.
+    - The existence of a database is checked with C(srvctl config database) or in
+      C(/etc/oratab). If the database is registered with a different Oracle home,
+      the module fails.
+    - The module connects as C(SYS) with C(SYSDBA) privilege using O(sys_password)
+      to the service O(db_unique_name) (or O(db_name)), extended by
+      C(.<domain>) when O(domain) is set. If O(sys_password) is not set, a
+      connection with an Oracle wallet (C(/@<service>)) is used.
+    - The Oracle version is determined with C(sqlplus -V) from O(oracle_home). Some
+      C(dbca) arguments are only passed for specific versions.
+    - Check mode is not supported.
 version_added: "2.4.0"
 options:
     oracle_home:
-        description: >
-            The home where the database will be created
+        description:
+            - The Oracle home of the database. Used for C(dbca), C(srvctl) and
+              C(sqlplus).
+            - If not set, the environment variable C(ORACLE_HOME) is used. The module
+              fails if neither is set.
         required: false
         type: str
         aliases: ['oh']
     db_name:
-        description: The name of the database
+        description:
+            - The name of the database (C(-gdbName) for C(dbca)).
         required: true
-        default: None
         type: str
         aliases: ['db', 'database_name', 'name']
     sid:
-        description: The instance name
+        description:
+            - The instance name (C(-sid) for C(dbca)).
+            - Used to find the database in C(/etc/oratab) and as C(ORACLE_SID) for
+              C(sqlplus). Defaults to O(db_name) where needed.
         required: false
         type: str
-        default: None
     db_unique_name:
-        description: The database db_unique_name
+        description:
+            - The C(db_unique_name) of the database.
+            - When set, C(db_name) and C(db_unique_name) are passed to C(dbca) as
+              init parameters. Also used as service name for the connection and as
+              database name for C(srvctl).
         required: false
-        default: None
         type: str
         aliases: ['dbunqn', 'unique_name']
     sys_password:
-        description: Password for the sys user
+        description:
+            - Password for the C(SYS) user.
+            - Used for C(dbca) (create and delete) and for the database connection.
+            - Required in practice for O(state=absent) and, unless an Oracle wallet
+              is used, for all states connecting to the database, although not
+              enforced by the argument spec.
         required: false
-        default: None
         type: str
         aliases: ['syspw', 'sysdbapassword', 'sysdbapw']
     system_password:
-        description: >
-            Password for the system user.
-            If not set, defaults to sys_password
+        description:
+            - Password for the C(SYSTEM) user, used when creating the database.
+            - Defaults to O(sys_password). With O(responsefile), O(sys_password) is
+              only used when the response file contains no C(systemPassword).
         required: false
         type: str
-        default: None
         aliases: ['systempw']
     dbsnmp_password:
-        description: >
-            Password for the dbsnmp user.
-            If not set, defaults to sys_password
+        description:
+            - Password for the C(DBSNMP) user, used when creating the database.
+            - Defaults to O(sys_password).
         required: false
         type: str
-        default: None
         aliases: ['dbsnmppw']
     responsefile:
-        description: The name of responsefile
-        required: true
+        description:
+            - Path to a C(dbca) response file on the database server.
+            - If set, the database is created with C(-responseFile). Only O(db_name),
+              O(sid), O(db_unique_name), O(domain), O(initparams), the passwords,
+              O(nodelist) (with O(dbconfig_type=RAC)) and O(omf) are passed in
+              addition. All other creation options are ignored.
+            - The module fails if the file does not exist.
+        required: false
         type: str
-        default: None
     template:
-        description: >
-            The template the database will be based off
+        description:
+            - The C(dbca) template the database is created from (C(-templateName)).
+            - Ignored when O(responsefile) is set.
         required: false
         type: str
         default: General_Purpose.dbc
     cdb:
-        description: >
-            Should the database be a container database
+        description:
+            - Whether the database is created as container database
+              (C(-createAsContainerDatabase)).
+            - Only passed for versions newer than 11.2 and without O(responsefile).
         required: false
+        type: bool
         default: false
-        type: str
         aliases: ['container']
-        choices: ['True','False']
-    datafile_dest:
-        description: >
-            Where the database files should be placed \
-            (ASM diskgroup or filesystem path)
+    local_undo:
+        description:
+            - Whether local undo is used for PDBs (C(-useLocalUndoForPDBs)).
+            - Only used with O(cdb=true), for versions newer than 11.2 and without
+              O(responsefile).
         required: false
-        default: false
+        type: bool
+        default: true
+    datafile_dest:
+        description:
+            - Where the database files are placed (ASM disk group or file system
+              path, C(-datafileDestination)).
+            - Ignored when O(responsefile) is set.
+        required: false
         type: str
         aliases: ['dfd']
     recoveryfile_dest:
-        description: >
-            Where the database files should be placed
-            (ASM diskgroup or filesystem path)
+        description:
+            - Where the fast recovery area is placed (ASM disk group or file system
+              path, C(-recoveryAreaDestination)).
+            - Ignored when O(responsefile) is set.
         required: false
-        default: false
+        type: str
         aliases: ['rfd']
     storage_type:
-        description: >
-            Type of underlying storage (Filesystem or ASM)
+        description:
+            - Type of the underlying storage (C(-storageType)), file system or ASM.
+            - Ignored when O(responsefile) is set.
         required: false
-        default: FS
         type: str
+        default: FS
         aliases: ['storage']
         choices: ['FS', 'ASM']
     dbconfig_type:
-        description: >
-            Type of database (SI,RAC,RON)
+        description:
+            - Type of the database - single instance (V(SI)), RAC or RAC One Node.
+            - Passed as C(-databaseConfigType) (12.2) or C(-databaseConfType) (12.1)
+              only. V(SI) is passed as C(SINGLE).
+            - Also controls whether O(nodelist) and O(racone_service) are used.
         required: false
         type: str
         default: SI
         choices: ['SI', 'RAC', 'RACONENODE']
     db_type:
-        description: >
-            Default Type of database (MULTIPURPOSE, OLTP, DATA_WAREHOUSING)
+        description:
+            - Database type for C(dbca) (C(-databaseType)).
+            - Ignored when O(responsefile) is set.
         required: false
         type: str
         default: MULTIPURPOSE
-        choices: ['MULTIPURPOSE', 'OLTP', 'DATA_WAREHOUSING']
+        choices: ['MULTIPURPOSE', 'DATA_WAREHOUSING', 'OLTP']
     racone_service:
-        description: >
-            If dbconfig_type = RACONENODE, a service has to be created along
-            with the DB. This is the name of that service
-            If no name is defined, the service will be called
-            "{{ db_name }}_ronserv"
+        description:
+            - Name of the service that is created with a RAC One Node database
+              (C(-RACOneNodeServiceName)).
+            - Only used with O(dbconfig_type=RACONENODE) and without O(responsefile).
+              Defaults to C(<db_name>_ronserv).
         required: false
         type: str
-        default: None
         aliases: ['ron_service']
     characterset:
-        description: >
-            The database characterset
+        description:
+            - The database character set (C(-characterSet)).
+            - Ignored when O(responsefile) is set.
         required: false
         type: str
         default: AL32UTF8
     memory_percentage:
-        description: >
-            The database total memory in % of available memory
+        description:
+            - The database total memory in percent of the available memory
+              (C(-memoryPercentage)).
+            - Ignored when O(responsefile) is set.
+            - Mutually exclusive with O(memory_totalmb).
         required: false
         type: str
     memory_totalmb:
-        description: >
-            The database total memory in MB. Defaults to 1G
+        description:
+            - The database total memory in MB (C(-totalMemory)).
+            - Ignored when O(responsefile) is set.
+            - Mutually exclusive with O(memory_percentage).
         required: false
         type: str
-        default: ['1024']
+        default: '1024'
     nodelist:
-        description: >
-            The list of nodes a RAC DB should be created on
+        description:
+            - The list of cluster nodes a RAC database is created on (C(-nodelist)).
+            - Only used with O(dbconfig_type=RAC).
         required: false
-        type: str
+        type: list
+        elements: str
     amm:
-        description: >
-            Should Automatic Memory Management be used
-            (memory_target, memory_max_target)
+        description:
+            - Whether Automatic Memory Management (C(memory_target)) is used.
+            - Version 12.2 - C(-memoryMgmtType AUTO) or C(AUTO_SGA).
+              Version 12.1 - C(-automaticMemoryManagement true|false).
+              Version 11.2 - C(-automaticMemoryManagement) if V(true).
+              Not passed for other versions.
+            - Ignored when O(responsefile) is set.
         required: false
-        Default: false
         type: bool
-        choices: ['true', 'false']
-    omf:
-        description: >
-            Should Oracle Managed Files be used
-        required: false
-        Default: false
-        type: bool
-        choices: ['true', 'false']
+        default: false
+        aliases: ['automatic_memory_management']
     initparams:
-        description: >
-            List of dict for init.ora parameter.
+        description:
+            - List of init parameters in the form C(name=value), passed to C(dbca)
+              with C(-initParams).
         required: false
         type: list
-        suboptions:
-            name:
-                description: The init.ora parameter name.
-                type: str
-            value:
-                description: The parameter value.
-                type: str
-            scope:
-                description: The scope of the parameter
-                type: str
-                default: both
-                choices:
-                    - "both"
-                    - "spfile"
+        elements: str
+    force_restart:
+        description:
+            - Only used with O(state=restarted).
+            - If V(true), the database is restarted without further checks.
+            - If V(false), the database is only restarted when an spfile is in use
+              and parameters in the spfile differ from the runtime values
+              (C(V$SPPARAMETER) vs. C(V$PARAMETER2)). Otherwise it is only started
+              if it is not running.
+        required: false
+        type: bool
+        default: true
+        version_added: "3.8.0"
     customscripts:
-        description: >
-            List of scripts to run after database is created
+        description:
+            - List of SQL scripts that C(dbca) runs after the database is created
+              (C(-customScripts)).
+            - Ignored when O(responsefile) is set.
         required: false
         type: list
+        elements: str
     default_tablespace_type:
-        description: >
-            Database default tablespace type (DEFAULT_TBS_TYPE)
+        description:
+            - Default tablespace type of the database (C(DEFAULT_TBS_TYPE)), set with
+              C(ALTER DATABASE SET DEFAULT ... TABLESPACE).
+            - Used with O(state=present).
         required: false
-        default: smallfile
         type: str
+        default: smallfile
         choices: ['smallfile', 'bigfile']
     default_tablespace:
-        description: >
-            Database default tablespace
-        default: smallfile
+        description:
+            - Default permanent tablespace of the database
+              (C(ALTER DATABASE DEFAULT TABLESPACE)).
+            - Used with O(state=present). The current value is compared in lowercase,
+              so the name should be given in lowercase.
         required: false
         type: str
     default_temp_tablespace:
-        description: >
-            Database default temporary tablespace
+        description:
+            - Default temporary tablespace of the database
+              (C(ALTER DATABASE DEFAULT TEMPORARY TABLESPACE)).
+            - Used with O(state=present). The current value is compared in lowercase,
+              so the name should be given in lowercase.
         required: false
         type: str
     archivelog:
-        description: >
-            Puts the database is archivelog mode
+        description:
+            - Whether the database runs in archivelog mode.
+            - Used with O(state=present). Changing the mode restarts the database
+              (shutdown, startup mount, C(ALTER DATABASE [NO]ARCHIVELOG), restart).
         required: false
-        default: false
-        choices: ['true', 'false']
         type: bool
+        default: false
     force_logging:
-        description: >
-            Enables force logging for the Database
-        required: False
-        default: false
-        choices: ['true', 'false']
+        description:
+            - Whether force logging is enabled for the database.
+            - Used with O(state=present).
+        required: false
         type: bool
+        default: false
     supplemental_logging:
-        description: >
-            Enables supplemental (minimal) logging for the Database
-            (basically 'add supplemental log data')
+        description:
+            - Whether minimal supplemental logging is enabled
+              (C(ALTER DATABASE ADD|DROP SUPPLEMENTAL LOG DATA)).
+            - Used with O(state=present) and only for version 19 and newer.
         required: false
-        default: false
-        choices: ['true', 'false']
         type: bool
+        default: false
     flashback:
-        description: >
-            Enables flashback for the database
-        required: False
-        default: false
-        choices: ['True', 'False']
-        type: bool
-    state:
-        description: >
-            The intended state of the database. For 'restarted' the database
-            has to be running.
-        default: present
-        type: str
-        choices: ['present', 'absent','started','restarted']
-    force_restart:
-        description: >
-            Effective only when using state == 'restarted'
-            If true (default), database will be restarted without checking \
-            for spfile vs runtime parameters
-            If false, database will ONLY be restarted if spfile is in use \
-            and spfile parameters do not match runtime parameters
+        description:
+            - Whether flashback database is enabled.
+            - Used with O(state=present).
         required: false
-        default: true
-        choices: ['true', 'false']
         type: bool
-        version_added: "3.8.0"
+        default: false
+    datapatch:
+        description:
+            - Currently not used by the module.
+        required: false
+        type: bool
+        default: true
+    domain:
+        description:
+            - The database domain.
+            - Appended to the service name for the database connection.
+            - With O(responsefile), passed to C(dbca) as init parameter C(db_domain).
+        required: false
+        type: str
+    timezone:
+        description:
+            - The database time zone (C(ALTER DATABASE SET TIME_ZONE)).
+            - Used with O(state=present). The current value is compared in lowercase.
+        required: false
+        type: str
+    output:
+        description:
+            - V(short) - short messages.
+            - V(verbose) - the messages of a create or delete contain the output and
+              the C(dbca) command line.
+        required: false
+        type: str
+        default: short
+        choices: ['short', 'verbose']
+    state:
+        description:
+            - V(present) - the database is created if it does not exist. For new and
+              existing databases the settings O(archivelog), O(force_logging),
+              O(flashback), O(supplemental_logging), O(default_tablespace_type),
+              O(default_tablespace), O(default_temp_tablespace) and O(timezone)
+              are enforced. Creation options are not applied to an existing
+              database.
+            - V(absent) - the database is deleted with C(dbca -deleteDatabase). The
+              database must be running.
+            - V(started) - the database is started if it is not running.
+            - V(restarted) - the database is restarted, see O(force_restart).
+            - V(started) and V(restarted) fail if the database does not exist.
+        required: false
+        type: str
+        default: present
+        choices: ['present', 'absent', 'started', 'restarted']
     hostname:
-        description: >
-            The host of the database if using dbms_service
+        description:
+            - Currently not used. The connection always uses the local host name of
+              the database server.
         required: false
         type: str
         default: localhost
         aliases: ['host']
     port:
-        description: >
-            The listener port to connect to the database if using
-            dbms_service
+        description:
+            - The listener port used to connect to the database.
         required: false
-        type: str
+        type: int
         default: 1521
     script_env:
-        description: >
-            Dictionary of environment settings to be passed to run_command
+        description:
+            - Dictionary of environment variables passed to the C(sqlplus -V),
+              C(srvctl config), C(srvctl status) and C(srvctl start) commands.
         required: false
+        type: dict
         default: {}
-
-
+    omf:
+        description:
+            - Whether Oracle Managed Files are used (C(-useOMF)).
+            - Only passed for version 18.4 and newer.
+        required: false
+        type: bool
+        default: false
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+    - Mikael Sandström (@oravirt)
 '''
 
 EXAMPLES = '''
-# Create a DB (non-cdb)
-oracle_db:
-    oh=/u01/app/oracle/12.2.0.1/db1
-    db_name=orclcdb
-    syspw=Oracle_123
-    state=present
-    storage=ASM
-    dfd=+DATA
-    rfd=+DATA
+- name: Create a non-CDB on ASM
+  opitzconsulting.ansible_oracle.oracle_db:
+    oracle_home: /u01/app/oracle/product/19/db1
+    db_name: orcl
+    sys_password: "{{ sys_password }}"
+    storage_type: ASM
+    datafile_dest: +DATA
+    recoveryfile_dest: +FRA
     default_tablespace_type: bigfile
+    state: present
 
+- name: Create a container database with a response file and archivelog mode
+  opitzconsulting.ansible_oracle.oracle_db:
+    oracle_home: /u01/app/oracle/product/19/db1
+    db_name: orclcdb
+    db_unique_name: orclcdb_site1
+    sid: orclcdb
+    sys_password: "{{ sys_password }}"
+    system_password: "{{ system_password }}"
+    responsefile: /tmp/dbca_orclcdb.rsp
+    initparams:
+      - sga_target=1500M
+      - sga_max_size=1500M
+    archivelog: true
+    force_logging: true
+    state: present
+  environment:
+    ORACLE_HOME: /u01/app/oracle/product/19/db1
+  run_once: true
 
-- hosts: all
-  gather_facts: true
-  vars:
-      oracle_home: /u01/app/oracle/12.2.0.1/db1
-      dbname: orclcdb
-      dbunqname: "{{ dbname}}_unq"
-      container: True
-      dbsid: "{{ dbname }}"
-      hostname: "{{ ansible_hostname }}"
-      oracle_env:
-             ORACLE_HOME: "{{ oracle_home }}"
-             LD_LIBRARY_PATH: "{{ oracle_home }}/lib"
-      myaction: present
-      rspfile: "/tmp/dbca_{{dbname}}.rsp"
-      initparameters:
-                - memory_target=0
-                - memory_max_target=0
-                - sga_target=1500M
-                - sga_max_size=1500M
-      dfd: +DATA
-      rfd: +FRA
-      storage: ASM
-      dbtype: SI
-      #ron_service: my_ron_service
-      #clnodes: racnode-dc1-1,racnode-dc1-2
-  tasks:
-  - name: Manage database
-    oracle_db:
-           service_name={{ dbname }}
-           hostname={{ hostname }}
-           user=sys
-           password=Oracle_123
-           state={{ myaction }}
-           db_name={{ dbname }}
-           sid={{ dbsid | default(omit) }}
-           db_unique_name={{ dbunqname | default(omit) }}
-           sys_password=Oracle_123
-           system_password=Oracle_123
-           responsefile={{ rspfile | default(omit) }}
-           cdb={{ container | default (omit) }}
-           initparams={{ initparameters | default(omit) }}
-           datafile_dest={{ dfd }}
-           recoveryfile_dest={{ rfd }}
-           storage_type={{ storage }}
-           dbconfig_type={{ dbtype }}
-           racone_service={{ ron_service | default(omit) }}
-           amm=False
-           memory_totalmb=1024
-           nodelist={{ clnodes | default(omit) }}
-    environment: "{{ oracle_env }}"
-    run_once: True
+- name: Restart the database only if spfile parameters were changed
+  opitzconsulting.ansible_oracle.oracle_db:
+    oracle_home: /u01/app/oracle/product/19/db1
+    db_name: orcl
+    sys_password: "{{ sys_password }}"
+    force_restart: false
+    state: restarted
+
+- name: Delete a database
+  opitzconsulting.ansible_oracle.oracle_db:
+    oracle_home: /u01/app/oracle/product/19/db1
+    db_name: orcl
+    sys_password: "{{ sys_password }}"
+    state: absent
+'''
+
+RETURN = '''
+msg:
+    description: Message describing the action that was executed.
+    returned: always
+    type: str
+    sample: "Database orcl already exists and is in the intended state -
+      Archivelog: False, Force Logging: False, Flashback: False, Supplemental
+      Logging: False, Timezone: None"
+restart_reason:
+    description:
+        - Reasons for the restart, either V(force_restart option was given) or the
+          spfile parameters that differ from the runtime values
+          (C(name:runtime -> spfile)).
+    returned: when the database was restarted with O(state=restarted)
+    type: list
+    elements: str
+    sample: ["sga_target:1536M -> 2G"]
 '''
 
 
@@ -1249,7 +1342,6 @@ def main():
     global service_name
     global hostname
     global port
-    global israc
     global newdb
     global output
     global verbosemsg

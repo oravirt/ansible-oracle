@@ -9,100 +9,153 @@ DOCUMENTATION = '''
 module: oracle_profile
 short_description: Manage profiles in an Oracle database
 description:
-    - Manage profiles in an Oracle database
+    - Creates, changes and drops profiles (C(CREATE PROFILE)) in an Oracle database.
+    - The existence of a profile is checked in C(DBA_PROFILES). The profile name is
+      not quoted in the SQL statements, so it is always stored in uppercase.
+    - O(attribute_name) and O(attribute_value) are matched by position, i.e. the
+      first name gets the first value and so on.
+    - A new profile is created with all given attributes in one
+      C(CREATE PROFILE ... LIMIT) statement.
+    - For an existing profile, the given attributes are compared with
+      C(DBA_PROFILES.LIMIT) (case-insensitive). If they differ, an
+      C(ALTER PROFILE ... LIMIT) statement is executed for every given attribute.
+      Attributes that are not given are not changed.
+    - Due to a bug in the comparison, the C(ALTER PROFILE) statements are currently
+      executed on every run for an existing profile and C(changed=true) is returned.
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "2.4.1.0"
 options:
     name:
-        description: The name of the profile
+        description:
+            - The name of the profile.
+        type: str
         required: true
-        default: None
         aliases: ['profile']
     state:
-        description: The intended state of the profile.
+        description:
+            - V(present) - the profile is created or its attributes are changed.
+            - V(absent) - the profile is dropped.
+        type: str
+        required: false
         default: present
-        choices: ['present','absent']
+        choices: ['present', 'absent']
     attribute_name:
-        description: >
-            The attribute name (e.g PASSWORD_REUSE_TIME)
-        default: None
+        description:
+            - The list of resource or password parameters of the profile
+              (e.g. V(password_reuse_time)).
+            - Required also for O(state=absent).
+        type: list
+        elements: str
+        required: true
         aliases: ['an']
     attribute_value:
-        description: The attribute value (e.g 10)
-        default: None
+        description:
+            - The list of values for the attributes in O(attribute_name), in the
+              same order (e.g. V(10), V(unlimited) or V(default)).
+            - Required also for O(state=absent).
+        type: list
+        elements: str
+        required: true
         aliases: ['av']
-    username:
-        description: The DB username
+    user:
+        description:
+            - The Oracle user name to connect to the database.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
         required: false
-        default: sys
-        aliases: ['un']
+        aliases: ['un', 'username']
     password:
-        description: The password for the DB user
+        description:
+            - The Oracle user password for O(user).
+        type: str
         required: false
-        default: None
         aliases: ['pw']
+    mode:
+        description:
+            - The mode with which to connect to the database.
+        type: str
+        required: false
+        default: normal
+        choices: ['normal', 'sysdba']
     service_name:
-        description: The profile_name to connect to the database.
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the wallet
+              entry.
+            - Required in practice, although not enforced by the argument spec.
+        type: str
         required: false
         aliases: ['sn']
     hostname:
-        description: The host of the database if using dbms_profile
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
         aliases: ['host']
     port:
-        description: >
-            The listener port to connect to the database if using dbms_profile
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     oracle_home:
-        description: The ORACLE_HOME
+        description:
+            - The ORACLE_HOME. It is set as environment variable C(ORACLE_HOME) after
+              the database connection has been established.
+            - If omitted, the environment variable C(ORACLE_HOME) must be set,
+              otherwise the module fails.
+        type: str
         required: false
-        default: None
         aliases: ['oh']
-
 notes:
     - cx_Oracle needs to be installed
+    - Check mode is not supported.
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+    - Mikael Sandström (@oravirt)
 '''
 
 EXAMPLES = '''
-# Create a profile
-- hosts: dbserver
-  vars:
-      oracle_home: /u01/app/oracle/12.2.0.1/db1
-      hostname: "{{ inventory_hostname }}"
-      service_name: orclpdb
-      user: system
-      password: Oracle_123
-      oracle_env:
-             ORACLE_HOME: "{{ oracle_home }}"
-             LD_LIBRARY_PATH: "{{ oracle_home }}/lib"
-      profiles:
-               - name: profile1
-                 attribute_name:
-                            - password_reuse_max
-                            - password_reuse_time
-                            - sessions_per_user
-                 attribute_value:
-                            - 6
-                            - 20
-                            - 5
-                 state: present
-  tasks:
-  - name: Manage profiles
-    oracle_profile:
-            name={{ item.name }}
-            attribute_name={{ item.attribute_name}}
-            attribute_value={{ item.attribute_value}}
-            state={{ item.state }}
-            hostname={{ hostname }}
-            service_name={{ service_name }}
-            user={{ user }}
-            password={{ password }}
-    environment: "{{oracle_env}}"
-    with_items: "{{ profiles }}"
+- name: Create profile PROFILE1
+  opitzconsulting.ansible_oracle.oracle_profile:
+    hostname: dbhost
+    service_name: orclpdb
+    user: system
+    password: "{{ system_password }}"
+    name: profile1
+    attribute_name:
+      - password_reuse_max
+      - password_reuse_time
+      - sessions_per_user
+    attribute_value:
+      - 6
+      - 20
+      - 5
+    state: present
+  environment:
+    ORACLE_HOME: /u01/app/oracle/12.2.0.1/db1
+    LD_LIBRARY_PATH: /u01/app/oracle/12.2.0.1/db1/lib
 
+- name: Drop profile PROFILE1 (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_profile:
+    service_name: orclpdb
+    oracle_home: /u01/app/oracle/12.2.0.1/db1
+    name: profile1
+    attribute_name: []
+    attribute_value: []
+    state: absent
+'''
+
+RETURN = '''
+msg:
+    description: Message describing the action that was executed.
+    returned: always
+    type: str
+    sample: "Successfully created profile profile1 "
 '''
 
 try:

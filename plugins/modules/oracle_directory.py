@@ -6,52 +6,119 @@ from ansible.module_utils.basic import AnsibleModule
 DOCUMENTATION = '''
 ---
 module: oracle_directory
-short_description: Manage users/schemas in an Oracle database
+short_description: Manage directory objects in an Oracle database
 description:
-    - Manage grants/privileges in an Oracle database
-    - Handles role/sys privileges at the moment.
-    - It is possible to add object privileges as well, but they are not considered
-      when removing privs at the moment.
+    - Creates, changes and drops directory objects (C(CREATE DIRECTORY))
+      in an Oracle database.
+    - The existence of a directory is checked in C(DBA_DIRECTORIES).
+    - The directory name is not quoted in the SQL statements, so it is always
+      stored in uppercase.
+    - The module does not check or create the path on the database server.
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "1.9.1"
 options:
     hostname:
-        description: The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
     port:
-        description: The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     service_name:
-        description: The database service name to connect to
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias
+              of the wallet entry.
+        type: str
         required: true
     user:
-        description: The Oracle user name to connect to the database
-        required: true
-    password:
-        description: The Oracle user password for 'user'
-        required: true
-    mode:
-        description: The mode with which to connect to the database
-        required: true
-        default: normal
-        choices: ['normal','sysdba']
-    directory_name:
-        description: The name of the directory
-        required: True
-        default: null
-    path:
-        description: Where the directory should point
+        description:
+            - The Oracle user name to connect to the database.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
         required: false
-        default: null
-
+    password:
+        description:
+            - The Oracle user password for O(user).
+        type: str
+        required: false
+    mode:
+        description:
+            - The mode with which to connect to the database.
+        type: str
+        required: false
+        default: normal
+        choices: ['normal', 'sysdba']
+    directory_name:
+        description:
+            - The name of the directory object.
+            - Required in practice, although not enforced by the argument spec.
+        type: str
+        required: false
+    directory_path:
+        description:
+            - The path on the database server the directory object points to.
+            - Used with O(state=present) only.
+        type: str
+        required: false
+    directory_mode:
+        description:
+            - How to handle an existing directory with a different path.
+            - V(enforce) - the directory is recreated with
+              C(CREATE OR REPLACE DIRECTORY) to point to O(directory_path).
+            - V(normal) - the path of an existing directory is not changed.
+        type: str
+        required: false
+        default: enforce
+        choices: ['normal', 'enforce']
+    state:
+        description:
+            - V(present) - the directory is created or its path is changed
+              (see O(directory_mode)).
+            - V(absent) - the directory is dropped.
+        type: str
+        required: false
+        default: present
+        choices: ['present', 'absent']
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+    - Mikael Sandström (@oravirt)
 '''
 
 EXAMPLES = '''
+- name: Create directory DATA_PUMP_DIR2
+  opitzconsulting.ansible_oracle.oracle_directory:
+    hostname: dbhost
+    service_name: orclpdb
+    user: system
+    password: "{{ system_password }}"
+    directory_name: data_pump_dir2
+    directory_path: /u01/app/oracle/dpdump2
+    state: present
+
+- name: Drop directory DATA_PUMP_DIR2 (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_directory:
+    service_name: orclpdb
+    directory_name: data_pump_dir2
+    state: absent
+'''
+
+RETURN = '''
+msg:
+    description: Message describing the action that was executed.
+    returned: always
+    type: str
+    sample: "Directory: data_pump_dir2, created with path: /u01/app/oracle/dpdump2"
 '''
 
 try:

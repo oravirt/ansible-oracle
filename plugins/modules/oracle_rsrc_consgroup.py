@@ -8,212 +8,287 @@ DOCUMENTATION = '''
 module: oracle_rsrc_consgroup
 short_description: Manage DBMS_RESOURCE_MANAGER consumer groups
 description:
-    - Manage DBMS_RESOURCE_MANAGER consumer groups
-    - Can be run locally on the controlmachine or on a remote host
+    - Creates, changes and drops Resource Manager consumer groups with
+      C(DBMS_RESOURCE_MANAGER), including their consumer group mappings and the
+      switch privileges (C(DBMS_RESOURCE_MANAGER_PRIVS)).
+    - Can be run locally on the control machine or on a remote host.
     - For more accurate documentation about attributes, please check Oracle DB
-      documentation about DBMS_RESOURCE_MANAGER
+      documentation about DBMS_RESOURCE_MANAGER.
+    - The existence of the consumer group is checked in
+      C(DBA_RSRC_CONSUMER_GROUPS) with the uppercased O(name).
+    - With O(state=present), an existing group is changed if O(comments),
+      O(mgmt_mth), O(category), the switch grants or the mappings differ. Grants
+      and mappings are synchronised completely, entries not listed are removed.
+    - If neither O(user) nor O(password) is given, a connection with an Oracle
+      wallet (C(/@<service_name>)) is used. Otherwise both must be set.
+    - In check mode the module only connects to the database and returns
+      changed=false. No changes are predicted.
 version_added: "2.2.1"
 options:
     hostname:
-        description: The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
     port:
-        description: The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     service_name:
-        description: The database service name to connect to
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the
+              wallet entry.
+        type: str
         required: true
     user:
-        description: >
-            The Oracle user name to connect to the database, must have DBA privilege
-        required: False
+        description:
+            - The Oracle user name to connect to the database, must have DBA
+              privileges.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
+        required: false
     password:
-        description: The Oracle user password for 'user'
-        required: False
+        description:
+            - The Oracle user password for O(user).
+        type: str
+        required: false
     mode:
-        description: The mode with which to connect to the database
-        required: true
+        description:
+            - The mode with which to connect to the database.
+        type: str
+        required: false
         default: normal
-        choices: ['normal','sysdba']
+        choices: ['normal', 'sysdba']
     state:
-        description: >
-            If present, then consumer group is created,
-            if absent, then consumer group is removed
-        required: true
-        choices: ['present','absent']
+        description:
+            - V(present) - the consumer group is created or changed, grants and
+              mappings are synchronised.
+            - V(absent) - the consumer group is dropped
+              (C(DBMS_RESOURCE_MANAGER.DELETE_CONSUMER_GROUP)).
+        type: str
+        required: false
+        default: present
+        choices: ['present', 'absent']
     name:
-        description: Resource consumer group name
-        required: True
+        description:
+            - Resource consumer group name.
+        type: str
+        required: true
     comments:
-        description: Comment about the group
-        required: False
+        description:
+            - Comment for the consumer group.
+        type: str
+        required: false
     mgmt_mth:
-        description: Name of CPU resource allocation method
+        description:
+            - Resource allocation method for distributing CPU among sessions in the
+              consumer group, V(round-robin) or V(run-to-completion).
+            - Compared case-insensitively with the existing value.
+        type: str
+        required: false
         default: round-robin
     category:
-        description: Describes the category of the consumer group
+        description:
+            - The category of the consumer group, e.g. V(other), V(interactive),
+              V(batch) or V(maintenance).
+            - Compared case-insensitively with the existing value.
+        type: str
+        required: false
         default: other
     map_client_id:
-        description: >
-            This procedure adds, deletes, or modifies entries that map sessions to
-            consumer groups, based on the session's login and runtime attributes.
-            Check Oracle documentation on
-            DBMS_RESOURCE_MANAGER.SET_CONSUMER_GROUP_MAPPING on more details.
-        required: False
+        description:
+            - Sessions whose C(CLIENT_ID) matches one of the values are mapped
+              to this consumer group.
+            - C(CLIENT_ID) is the client identifier of the session.
+            - Mappings are set with
+              C(DBMS_RESOURCE_MANAGER.SET_CONSUMER_GROUP_MAPPING). Values are
+              converted to uppercase.
+            - With O(state=present), all existing mappings of this consumer group
+              that are not listed in any C(map_*) option are removed.
         type: list
+        elements: str
+        required: false
     map_client_machine:
-        description: >
-            This procedure adds, deletes, or modifies entries that map sessions to
-            consumer groups, based on the session's login and runtime attributes.
-            Check Oracle documentation on
-            DBMS_RESOURCE_MANAGER.SET_CONSUMER_GROUP_MAPPING on more details.
-        required: False
+        description:
+            - Sessions whose C(CLIENT_MACHINE) matches one of the values are mapped
+              to this consumer group.
+            - C(CLIENT_MACHINE) is the name of the client machine.
+            - See O(map_client_id) for the mapping behaviour.
         type: list
+        elements: str
+        required: false
     map_client_os_user:
-        description: >
-            This procedure adds, deletes, or modifies entries that map sessions to
-            consumer groups, based on the session's login and runtime attributes.
-            Check Oracle documentation on
-            DBMS_RESOURCE_MANAGER.SET_CONSUMER_GROUP_MAPPING on more details.
-        required: False
+        description:
+            - Sessions whose C(CLIENT_OS_USER) matches one of the values are mapped
+              to this consumer group.
+            - C(CLIENT_OS_USER) is the operating system user of the client.
+            - See O(map_client_id) for the mapping behaviour.
         type: list
+        elements: str
+        required: false
     map_client_program:
-        description: >
-            This procedure adds, deletes, or modifies entries that map sessions to
-            consumer groups, based on the session's login and runtime attributes.
-            Check Oracle documentation on
-            DBMS_RESOURCE_MANAGER.SET_CONSUMER_GROUP_MAPPING on more details.
-        required: False
+        description:
+            - Sessions whose C(CLIENT_PROGRAM) matches one of the values are mapped
+              to this consumer group.
+            - C(CLIENT_PROGRAM) is the name of the client program.
+            - See O(map_client_id) for the mapping behaviour.
         type: list
+        elements: str
+        required: false
     map_module_name:
-        description: >
-            This procedure adds, deletes, or modifies entries that map sessions to
-            consumer groups, based on the session's login and runtime attributes.
-            Check Oracle documentation on
-            DBMS_RESOURCE_MANAGER.SET_CONSUMER_GROUP_MAPPING on more details.
-        required: False
+        description:
+            - Sessions whose C(MODULE_NAME) matches one of the values are mapped
+              to this consumer group.
+            - C(MODULE_NAME) is the module name set with C(DBMS_APPLICATION_INFO).
+            - See O(map_client_id) for the mapping behaviour.
         type: list
+        elements: str
+        required: false
     map_module_name_action:
-        description: >
-            This procedure adds, deletes, or modifies entries that map sessions to
-            consumer groups, based on the session's login and runtime attributes.
-            Check Oracle documentation on
-            DBMS_RESOURCE_MANAGER.SET_CONSUMER_GROUP_MAPPING on more details.
-        required: False
+        description:
+            - Sessions whose C(MODULE_NAME_ACTION) matches one of the values are mapped
+              to this consumer group.
+            - C(MODULE_NAME_ACTION) is module name and action, separated by a dot.
+            - See O(map_client_id) for the mapping behaviour.
         type: list
+        elements: str
+        required: false
     map_oracle_function:
-        description: >
-            This procedure adds, deletes, or modifies entries that map sessions to
-            consumer groups, based on the session's login and runtime attributes.
-            Check Oracle documentation on
-            DBMS_RESOURCE_MANAGER.SET_CONSUMER_GROUP_MAPPING on more details.
-        required: False
+        description:
+            - Sessions whose C(ORACLE_FUNCTION) matches one of the values are mapped
+              to this consumer group.
+            - C(ORACLE_FUNCTION) is an Oracle function, e.g. V(BACKUP) or V(COPY).
+            - See O(map_client_id) for the mapping behaviour.
         type: list
+        elements: str
+        required: false
     map_oracle_user:
-        description: >
-            This procedure adds, deletes, or modifies entries that map sessions to
-            consumer groups, based on the session's login and runtime attributes.
-            Check Oracle documentation on
-            DBMS_RESOURCE_MANAGER.SET_CONSUMER_GROUP_MAPPING on more details.
-        required: False
+        description:
+            - Sessions whose C(ORACLE_USER) matches one of the values are mapped
+              to this consumer group.
+            - C(ORACLE_USER) is the database user name.
+            - See O(map_client_id) for the mapping behaviour.
         type: list
+        elements: str
+        required: false
     map_oracle_user_profile:
-        description: >
-            Module appends all users with mentioned profiles to map_oracle_user
-            parameter list
-        required: False
+        description:
+            - List of profiles. All users that have one of these profiles at module
+              runtime are added to O(map_oracle_user).
         type: list
+        elements: str
+        required: false
     map_service_module:
-        description: >
-            This procedure adds, deletes, or modifies entries that map sessions to
-            consumer groups, based on the session's login and runtime attributes.
-            Check Oracle documentation on
-            DBMS_RESOURCE_MANAGER.SET_CONSUMER_GROUP_MAPPING on more details.
-        required: False
+        description:
+            - Sessions whose C(SERVICE_MODULE) matches one of the values are mapped
+              to this consumer group.
+            - C(SERVICE_MODULE) is service name and module name, separated by a dot.
+            - See O(map_client_id) for the mapping behaviour.
         type: list
+        elements: str
+        required: false
     map_service_module_action:
-        description: >
-            This procedure adds, deletes, or modifies entries that map sessions to
-            consumer groups, based on the session's login and runtime attributes.
-            Check Oracle documentation on
-            DBMS_RESOURCE_MANAGER.SET_CONSUMER_GROUP_MAPPING on more details.
-        required: False
+        description:
+            - Sessions whose C(SERVICE_MODULE_ACTION) matches one of the values are
+              mapped to this consumer group.
+            - C(SERVICE_MODULE_ACTION) is service, module and action, separated by dots.
+            - See O(map_client_id) for the mapping behaviour.
         type: list
+        elements: str
+        required: false
     map_service_name:
-        description: >
-            This procedure adds, deletes, or modifies entries that map sessions to
-            consumer groups, based on the session's login and runtime attributes.
-            Check Oracle documentation on
-            DBMS_RESOURCE_MANAGER.SET_CONSUMER_GROUP_MAPPING on more details.
-        required: False
+        description:
+            - Sessions whose C(SERVICE_NAME) matches one of the values are mapped
+              to this consumer group.
+            - C(SERVICE_NAME) is the service name used to connect.
+            - See O(map_client_id) for the mapping behaviour.
         type: list
+        elements: str
+        required: false
     grant_name:
-        description: >
-            List of users and roles that will be granted switch to this consumer group
+        description:
+            - List of users and roles that are granted the privilege to switch to this
+              consumer group (C(GRANT_SWITCH_CONSUMER_GROUP)).
+            - Names are converted to uppercase. Users and roles that do not exist in
+              the database are silently ignored.
+            - With O(state=present), the switch privilege is revoked from all other
+              grantees that are not covered by O(grant_name) or
+              O(grant_user_profile).
         type: list
-        required: False
-        aliases:
-            - grant
-            - grant_user
-            - grant_role
-            - grants
+        elements: str
+        required: false
+        aliases: ['grant', 'grant_user', 'grant_role', 'grants']
     grant_user_profile:
-        description: >
-            All users with these profiles will be granted switch to this consumer group
+        description:
+            - List of profiles. All users that have one of these profiles at module
+              runtime are granted the privilege to switch to this consumer group.
         type: list
-        required: False
-
+        elements: str
+        required: false
 notes:
     - cx_Oracle needs to be installed
     - Oracle RDBMS 11gR2 or later required
 requirements: [ "cx_Oracle" ]
-author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
+author:
+    - Ilmar Kerm (@ilmarkerm)
 '''
 
 EXAMPLES = '''
-- hosts: localhost
-  vars:
-    oraclehost: 192.168.56.101
-    oracleport: 1521
-    oracleservice: orcl
-    oracleuser: system
-    oraclepassword: oracle
-    oracle_env:
-      ORACLE_HOME: /usr/lib/oracle/12.1/client64
-      LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
-  tasks:
-    - name: job class
-      oracle_rsrc_consgroup:
-        hostname: "{{ oraclehost }}"
-        port: "{{ oracleport }}"
-        service_name: "{{ oracleservice }}"
-        user: "{{ oracleuser }}"
-        password: "{{ oraclepassword }}"
-        state: present
-        name: testgroup1
-        comments: hello world
-        grant:
-          - OE
-          - SH
-          - PM
-          - IX
-        grant_user_profile:
-          - HR1
-        map_oracle_user_profile:
-          - HR1
-        map_oracle_user:
-          - OE
-          - SH
-          - PM
-          - IX
-        map_service_name:
-          - app1
-          - app2
-        map_client_machine:
-          - appserver3
-      environment: "{{ oracle_env }}"
+- name: Create consumer group with grants and mappings
+  opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+    hostname: dbhost
+    port: 1521
+    service_name: orcl
+    user: system
+    password: "{{ system_password }}"
+    state: present
+    name: testgroup1
+    comments: hello world
+    grant:
+      - OE
+      - SH
+      - PM
+      - IX
+    grant_user_profile:
+      - HR1
+    map_oracle_user_profile:
+      - HR1
+    map_oracle_user:
+      - OE
+      - SH
+      - PM
+      - IX
+    map_service_name:
+      - app1
+      - app2
+    map_client_machine:
+      - appserver3
+  environment:
+    ORACLE_HOME: /usr/lib/oracle/19/client64
+    LD_LIBRARY_PATH: /usr/lib/oracle/19/client64/lib
+
+- name: Drop consumer group (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+    service_name: orcl
+    name: testgroup1
+    state: absent
+'''
+
+RETURN = '''
+msg:
+    description:
+        - Comma-separated summary of the added and removed grants and mappings.
+        - Empty if nothing was changed. Not returned in check mode.
+    returned: success
+    type: str
+    sample: "Added grants: ['OE'], Removed grants: [], Added mappings:
+      {'ORACLE_USER': {'OE'}}, Removed mappings: {}"
 '''
 
 try:
@@ -332,7 +407,7 @@ def new_mappings_dict():
 
 # Ansible code
 def main():
-    global lconn, conn, msg, module
+    global conn, msg, module
     msg = []
     module = AnsibleModule(
         argument_spec=dict(

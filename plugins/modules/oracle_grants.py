@@ -6,112 +6,219 @@ from ansible.module_utils.basic import AnsibleModule
 DOCUMENTATION = '''
 ---
 module: oracle_grants
-short_description: Manage users/schemas in an Oracle database
+short_description: Manage privileges of users and roles in an Oracle database
 description:
-    - Manage grants/privileges in an Oracle database
-    - Handles role/sys privileges at the moment.
-    - It is possible to add object privileges as well, but they are not considered
-      when removing privs at the moment.
+    - Grants and revokes roles, system privileges, object privileges and directory
+      privileges for a user (O(schema)) or a role (O(role)) in an Oracle database.
+    - Current role and system privileges are read from C(DBA_ROLE_PRIVS) and
+      C(DBA_SYS_PRIVS), object and directory privileges from C(DBA_TAB_PRIVS).
+    - With O(state=present) the wanted privileges are compared with the current ones
+      and only the differences are granted (and revoked with
+      O(grants_mode=enforce)). C(changed=true) is reported if at least one
+      statement was executed.
+    - With O(state=absent) or O(state=REMOVEALL) only roles and system privileges are
+      revoked. Object and directory privileges are not touched.
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "1.9.1"
 options:
     hostname:
-        description: >
-            The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
     port:
-        description: The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     service_name:
-        description: >
-            The database service name to connect to
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the wallet
+              entry.
+        type: str
         required: true
     user:
-        description: >
-            The Oracle user name to connect to the database
-        required: true
+        description:
+            - The Oracle user name to connect to the database.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
+        required: false
     password:
-        description: >
-            The Oracle user password for 'user'
-        required: true
+        description:
+            - The Oracle user password for O(user).
+        type: str
+        required: false
     mode:
-        description: >
-            The mode with which to connect to the database
-        required: true
+        description:
+            - The mode with which to connect to the database.
+        type: str
+        required: false
         default: normal
-        choices: ['normal','sysdba']
+        choices: ['normal', 'sysdba']
     schema:
-        description: >
-            The schema that should get grants added/removed
+        description:
+            - The user (schema) whose privileges are managed.
+            - With O(state=present) the module fails if the user does not exist, with
+              O(state=absent) or O(state=REMOVEALL) it returns C(changed=false).
+            - Mutually exclusive with O(role). One of O(schema) or O(role) is required.
+        type: str
         required: false
-        default: null
+    role:
+        description:
+            - The role whose privileges are managed.
+            - Mutually exclusive with O(schema).
+        type: str
+        required: false
     grants:
-        description: >
-            The privileges granted to the new schema. Can be a string or a list
+        description:
+            - List of roles and system privileges, for example V(connect) or
+              V(create session).
+            - The names are compared case-insensitively with O(state=present).
+              With O(state=absent) they must be given in lowercase to match.
+            - Quotes and square brackets in the elements are removed.
+            - With O(state=present) and O(grants_mode=enforce), all roles and system
+              privileges not in this list are revoked, so omitting O(grants) revokes
+              all of them. If V(dba) is in the list, C(UNLIMITED TABLESPACE) is never
+              revoked.
+            - With O(state=absent) the listed roles and system privileges are revoked.
+            - Must not be empty with O(state=absent) and O(state=REMOVEALL).
+        type: list
+        elements: str
         required: false
-        default: null
     object_privs:
-        description: >
-            The privileges granted to specific objects
-            # - format: 'priv1,priv2,priv3:owner.object_name'
-            #   e.g:
-            #   - select,update,insert,delete:sys.dba_tablespaces
-            #   - select:sys.v_$session
+        description:
+            - List of object privileges in the format
+              C(<priv>[,<priv>...]:<owner>.<object_name>), for example
+              V(select,update:app.orders) or V(select:sys.v_$session).
+            - The object must be given as C(<owner>.<object_name>), otherwise it is
+              not recognized as already granted.
+            - Missing privileges are granted. With O(grants_mode=enforce), privileges
+              not in the list are revoked, and all privileges on objects not in the
+              list are revoked with C(REVOKE ALL), so omitting O(object_privs)
+              revokes all object privileges.
+            - Only used with O(state=present).
+        type: list
+        elements: str
         required: false
-        default: null
+        aliases: ['objprivs']
+    directory_privs:
+        description:
+            - List of directory privileges in the format
+              C(<priv>[,<priv>...]:<directory_object>), for example
+              V(read,write:sys.data_pump_dir).
+            - Current privileges are read as C(<owner>.<directory_name>), and
+              directories are owned by C(SYS). The directory must therefore be given
+              as C(sys.<directory_name>) to be recognized as already granted.
+            - Missing privileges are granted. With O(grants_mode=enforce), privileges
+              not in the list are revoked, and all privileges on directories not in
+              the list are revoked with C(REVOKE ALL), so omitting
+              O(directory_privs) revokes all directory privileges.
+            - Only used with O(state=present).
+        type: list
+        elements: str
+        required: false
+        aliases: ['dirprivs']
     grants_mode:
-        description: >
-            Should the list of grants be enforced, or just appended to.
-            enforce: Whatever is in the list of grants will be enforced,
-            i.e grants/privileges will be removed if they are not in the list
-            append: Grants/privileges are just appended, nothing is removed
+        description:
+            - How to handle existing privileges that are not wanted with
+              O(state=present).
+            - V(enforce) - privileges not listed in O(grants), O(object_privs) and
+              O(directory_privs) are revoked.
+            - V(append) - missing privileges are granted, nothing is revoked.
+        type: str
+        required: false
         default: enforce
-        choices: ['enforce','append']
+        choices: ['enforce', 'append']
+        aliases: ['privs_mode']
+    container:
+        description:
+            - Value for the C(CONTAINER=) clause, for example V(all) or V(current).
+            - Added to the C(GRANT) statement for roles and system privileges and to
+              the C(GRANT) and C(REVOKE) statements for object privileges. Not used for
+              directory privileges and for revoking roles and system privileges.
+        type: str
+        required: false
     state:
-        description: >
-            The intended state of the priv
-            (present=added to the user,
-            absent=removed from the user).
-            REMOVEALL will remove ALL role/sys privileges
+        description:
+            - V(present) - roles and privileges are granted (and revoked, see
+              O(grants_mode)).
+            - V(absent) - the roles and system privileges in O(grants) are revoked.
+            - V(REMOVEALL) - all roles and system privileges are revoked. O(grants)
+              must still be set to a non-empty value.
+        type: str
+        required: false
         default: present
-        choices: ['present','absent','REMOVEALL']
+        choices: ['present', 'absent', 'REMOVEALL']
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+    - Mikael Sandström (@oravirt)
 '''
 
 EXAMPLES = '''
-# Add grants to the user
-oracle_grants:
+- name: Grant roles, system and object privileges to a user
+  opitzconsulting.ansible_oracle.oracle_grants:
     hostname: remote-db-server
     service_name: orcl
     user: system
-    password: manager
-    schema:myschema
-    state: present
-    grants: 'create session','create any table',connect,resource
-
-# Revoke the 'create any table' grant
-oracle_grants:
-    hostname: localhost
-    service_name: orcl
-    user: system
-    password: manager
+    password: "{{ system_password }}"
     schema: myschema
-    state: absent
-    grants: 'create any table'
-
-# Remove all grants from a user
-oracle_grants:
-    hostname: localhost
-    service_name: orcl
-    user: system
-    password: manager
-    schema: myschema
-    state: REMOVEALL
     grants:
+      - create session
+      - create any table
+      - connect
+      - resource
+    object_privs:
+      - select,update,insert,delete:sys.dba_tablespaces
+      - select:sys.v_$session
+    directory_privs:
+      - read,write:sys.data_pump_dir
+    state: present
+
+- name: Add a role to a user without revoking other privileges
+  opitzconsulting.ansible_oracle.oracle_grants:
+    service_name: orcl
+    user: system
+    password: "{{ system_password }}"
+    schema: myschema
+    grants: select_catalog_role
+    grants_mode: append
+    state: present
+
+- name: Revoke the 'create any table' privilege
+  opitzconsulting.ansible_oracle.oracle_grants:
+    service_name: orcl
+    user: system
+    password: "{{ system_password }}"
+    schema: myschema
+    grants: create any table
+    state: absent
+
+- name: Revoke all roles and system privileges (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_grants:
+    service_name: orcl
+    schema: myschema
+    grants: all
+    state: REMOVEALL
+'''
+
+RETURN = '''
+msg:
+    description:
+        - With O(state=present), the list of executed SQL statements if something
+          was changed, otherwise V(Nothing to do).
+        - With O(state=absent) or O(state=REMOVEALL), a message if nothing was
+          changed. If something was revoked, the value is C([""]).
+    returned: always
+    type: raw
+    sample: ["grant connect,resource to myschema"]
 '''
 
 try:

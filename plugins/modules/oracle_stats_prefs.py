@@ -14,78 +14,126 @@ DOCUMENTATION = '''
 module: oracle_stats_prefs
 short_description: Manage DBMS_STATS global preferences
 description:
-    - Manage DBMS_STATS global preferences
-    - Can be run locally on the controlmachine or on a remote host
+    - Sets or resets global optimizer statistics preferences with
+      C(DBMS_STATS.SET_GLOBAL_PREFS).
+    - The current value is read with C(DBMS_STATS.GET_PREFS).
+    - With O(state=present) the preference is only set (C(changed=true)) when the
+      current value differs from O(preference_value). The comparison is case
+      insensitive.
+    - With O(state=absent) the preference is reset to its default by setting it to
+      C(NULL). C(changed=true) is only reported when the value after the reset differs
+      from the value before.
+    - In check mode the module connects to the database and returns C(changed=false)
+      without reading or changing the preference.
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
+    - Can be run locally on the control machine or on a remote host.
 version_added: "2.4"
 options:
     hostname:
-        description: The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
     port:
-        description: The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     service_name:
-        description: The database service name to connect to
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the
+              wallet entry.
+        type: str
         required: true
     user:
-        description: >
-            The Oracle user name to connect to the database, must have DBA privilege
-        required: False
+        description:
+            - The Oracle user name to connect to the database.
+            - The user needs privileges to execute C(DBMS_STATS.SET_GLOBAL_PREFS),
+              for example the DBA role.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
+        required: false
     password:
-        description: The Oracle user password for 'user'
-        required: False
+        description:
+            - The Oracle user password for O(user).
+        type: str
+        required: false
     mode:
-        description: The mode with which to connect to the database
-        required: true
+        description:
+            - The mode with which to connect to the database.
+        type: str
+        required: false
         default: normal
-        choices: ['normal','sysdba']
+        choices: ['normal', 'sysdba']
     preference_name:
-        description: DBMS_STATS preference name
+        description:
+            - Name of the DBMS_STATS preference, for example V(TABLE_CACHED_BLOCKS)
+              or V(STALE_PERCENT).
+        type: str
+        required: true
         aliases:
             - pname
     preference_value:
-        description: Preference value
+        description:
+            - Value of the preference.
+            - Required in practice with O(state=present), although not enforced by
+              the argument spec. Without a value nothing is changed.
+            - Ignored with O(state=absent).
+        type: str
+        required: false
         aliases:
             - pvalue
     state:
-        description: >
-            Either to set the preference (present) or reset it to default (absent)
-        required: true
+        description:
+            - V(present) - the preference is set to O(preference_value).
+            - V(absent) - the preference is reset to its default value.
+        type: str
+        required: false
         default: present
-        choices: ['present','absent']
-
+        choices: ['present', 'absent']
 notes:
     - cx_Oracle needs to be installed
     - Oracle RDBMS 10gR2 or later required
 requirements: [ "cx_Oracle" ]
-author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
+author:
+    - Ilmar Kerm (@ilmarkerm)
 '''
 
 EXAMPLES = '''
----
-- hosts: localhost
-  vars:
-    oraclehost: 192.168.56.102
-    oracleport: 1521
-    oracleservice: orcl
-    oracleuser: system
-    oraclepassword: oracle
-    oracle_env:
-      ORACLE_HOME: /usr/lib/oracle/12.1/client64
-      LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
-  tasks:
-    - name: set dbms_stats settings
-      oracle_stats_prefs:
-        hostname: "{{ oraclehost }}"
-        port: "{{ oracleport }}"
-        service_name: "{{ oracleservice }}"
-        user: "{{ oracleuser }}"
-        password: "{{ oraclepassword }}"
-        pname: TABLE_CACHED_BLOCKS
-        pvalue: 16
-      environment: "{{ oracle_env }}"
+- name: Set global preference TABLE_CACHED_BLOCKS to 16
+  opitzconsulting.ansible_oracle.oracle_stats_prefs:
+    hostname: dbhost
+    port: 1521
+    service_name: orclpdb
+    user: system
+    password: "{{ system_password }}"
+    pname: TABLE_CACHED_BLOCKS
+    pvalue: "16"
+  environment:
+    ORACLE_HOME: /usr/lib/oracle/12.1/client64
+    LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
+
+- name: Reset global preference STALE_PERCENT to default (Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_stats_prefs:
+    service_name: orclpdb
+    preference_name: STALE_PERCENT
+    state: absent
+'''
+
+RETURN = '''
+msg:
+    description:
+        - Result of the PL/SQL block, for example the old and the new value.
+        - V(Not changed) when the preference already had the intended value.
+    returned: when not running in check mode
+    type: str
+    sample: "Old value 1 changed to 16"
 '''
 
 try:
@@ -98,7 +146,7 @@ else:
 
 # Ansible code
 def main():
-    global lconn, conn, msg, module
+    global conn, msg, module
     msg = ['']
     module = AnsibleModule(
         argument_spec=dict(

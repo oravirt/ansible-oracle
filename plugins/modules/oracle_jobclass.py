@@ -6,99 +6,145 @@ from ansible.module_utils.basic import AnsibleModule
 DOCUMENTATION = '''
 ---
 module: oracle_jobclass
-short_description: Manage DBMS_SCHEDULER job classes in Oracle database
+short_description: Manage DBMS_SCHEDULER job classes in an Oracle database
 description:
-    - Manage DBMS_SCHEDULER job classes in Oracle database
-    - Can be run locally on the controlmachine or on a remote host
+    - Creates, changes and drops DBMS_SCHEDULER job classes in an Oracle database.
+    - Job classes are always owned by C(SYS). The existence is checked in
+      C(ALL_SCHEDULER_JOB_CLASSES), so the connecting user must be able to see the
+      job classes of C(SYS) (e.g. DBA privilege).
+    - The job class name is converted to uppercase.
+    - For an existing job class, O(comments), O(resource_group), O(service),
+      O(history) and O(logging) are compared with the database. If one of them
+      differs, all attributes are set again with C(DBMS_SCHEDULER.SET_ATTRIBUTE).
+      Omitted optional attributes are set to NULL.
+    - O(resource_group) and O(service) are compared case-sensitively with the stored
+      (usually uppercase) values.
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "2.2.1"
 options:
     hostname:
-        description: The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
     port:
-        description: The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     service_name:
-        description: >
-            The database service name to connect to
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the wallet
+              entry.
+        type: str
         required: true
     user:
-        description: >
-            - The Oracle user name to connect to the database, must have DBA privilege
-        required: False
+        description:
+            - The Oracle user name to connect to the database, must have DBA privilege.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
+        required: false
     password:
-        description: The Oracle user password for 'user'
-        required: False
+        description:
+            - The Oracle user password for O(user).
+        type: str
+        required: false
     mode:
-        description: >
-            The mode with which to connect to the database
-        required: true
+        description:
+            - The mode with which to connect to the database.
+        type: str
+        required: false
         default: normal
-        choices: ['normal','sysdba']
+        choices: ['normal', 'sysdba']
     state:
-        description: >
-            If present, job class is created if absent then job class is removed
-        required: true
-        choices: ['present','absent']
+        description:
+            - V(present) - the job class is created or its attributes are changed.
+            - V(absent) - the job class is dropped.
+        type: str
+        required: false
+        default: present
+        choices: ['present', 'absent']
     name:
-        description: Job class name
-        required: True
+        description:
+            - The name of the job class (without the C(SYS.) prefix).
+        type: str
+        required: true
     resource_group:
-        description: >
-            Resource manager resource consumer group the class is associated with
-        required: False
+        description:
+            - The resource manager consumer group the job class is associated with.
+        type: str
+        required: false
     service:
-        description: Database service under what jobs run as
-        required: False
+        description:
+            - The database service the jobs of this class run under.
+        type: str
+        required: false
     logging:
-        description: How much information is logged
+        description:
+            - How much information is logged for jobs of this class.
+        type: str
+        required: false
         default: failed runs
-        choices: ["off","runs","failed runs","full"]
+        choices: ['off', 'runs', 'failed runs', 'full']
     history:
         description:
-            - Number of days the logs for this job class are retained
-            - If set to 0, no logs will be kept
-        required: False
+            - The number of days the logs for this job class are retained.
+            - If set to V(0), no logs will be kept.
+            - If omitted, the global C(LOG_HISTORY) scheduler attribute applies.
         type: int
+        required: false
     comments:
         description:
-            - Comment about the class
-        required: False
-
+            - A comment about the job class.
+        type: str
+        required: false
 notes:
     - cx_Oracle needs to be installed
     - Oracle RDBMS 10gR2 or later required
+    - In check mode, the module exits with C(changed=false) without checking
+      the database.
 requirements: [ "cx_Oracle" ]
-author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
+author:
+    - Ilmar Kerm (@ilmarkerm)
 '''
 
 EXAMPLES = '''
----
-- hosts: localhost
-  vars:
-    oraclehost: 192.168.56.101
-    oracleport: 1521
-    oracleservice: orcl
-    oracleuser: system
-    oraclepassword: oracle
-    oracle_env:
-      ORACLE_HOME: /usr/lib/oracle/12.1/client64
-      LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
-  tasks:
-    - name: job class
-      oracle_jobclass:
-        hostname: "{{ oraclehost }}"
-        port: "{{ oracleport }}"
-        service_name: "{{ oracleservice }}"
-        user: "{{ oracleuser }}"
-        password: "{{ oraclepassword }}"
-        state: present
-        name: testclass
-        logging: failed runs
-        history: 14
-      environment: "{{ oracle_env }}"
+- name: Create job class TESTCLASS
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    hostname: dbhost
+    port: 1521
+    service_name: orcl
+    user: system
+    password: "{{ system_password }}"
+    state: present
+    name: testclass
+    logging: failed runs
+    history: 14
+  environment:
+    ORACLE_HOME: /usr/lib/oracle/12.1/client64
+    LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
+
+- name: Drop job class TESTCLASS (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    service_name: orcl
+    state: absent
+    name: testclass
+'''
+
+RETURN = '''
+msg:
+    description:
+        - Message of the module. Currently always an empty string.
+        - Not returned in check mode.
+    returned: success
+    type: str
+    sample: ""
 '''
 
 try:
@@ -133,7 +179,7 @@ def query_existing(job_class_name):
 
 # Ansible code
 def main():
-    global lconn, conn, msg, module
+    global conn, msg, module
     msg = ['']
     module = AnsibleModule(
         argument_spec=dict(

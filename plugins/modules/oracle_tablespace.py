@@ -8,159 +8,250 @@ DOCUMENTATION = '''
 module: oracle_tablespace
 short_description: Manage tablespaces in an Oracle database
 description:
-    - Manage tablespaces in an Oracle database (create, drop, put in
-      read only/read write, offline/online)
-    - Can be run locally on the controlmachine or on a remote host
+    - Creates and drops tablespaces (permanent, temporary or undo), adds data or temp
+      files and changes the status (read only, read write, offline, online) of a
+      tablespace in an Oracle database.
+    - The existence and status of a tablespace are checked in C(DBA_TABLESPACES).
+      The tablespace name is not quoted in the SQL statements, so it is always
+      stored in uppercase.
+    - With any O(state) except V(absent), a missing tablespace is created first and
+      then the wanted status is set.
+    - Oracle Managed Files (OMF) are used if the parameter C(db_create_file_dest)
+      is set. Otherwise O(datafile) is required for every O(state) except
+      V(absent), also for an existing tablespace.
+    - Files are only added, never removed or resized.
+    - The autoextend settings (O(autoextend), O(nextsize), O(maxsize)) are enforced
+      on all existing files of the tablespace on every run.
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
+    - Can be run locally on the control machine or on a remote host.
 version_added: "1.9.1"
 options:
     hostname:
-        description: The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
     port:
-        description: The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     service_name:
-        description: The database service name to connect to
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the wallet
+              entry.
+        type: str
         required: true
     user:
-        description: The Oracle user name to connect to the database
-        required: true
-    mode:
-        description: The mode with which to connect to the database (normal/sysdba)
+        description:
+            - The Oracle user name to connect to the database.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
         required: false
-        choices: ['normal','sysdba']
-        default: normal
     password:
-        description: The Oracle user password for 'user'
-        required: true
-    tablespace:
-        description: The tablespace that should be managed
-        required: True
-    state:
-        description: The intended state of the tablespace
-        default: present
-        choices: ['present','absent','online','offline','read_only','read_write']
-    bigfile:
-        description: Should the tablespace be created as a bigfile tablespace
-        default: false
-        choices: ['true','false']
-    datafile:
-        description: >
-            Where to put the datafile. Can be an ASM diskgroup or a filesystem datafile
-            (i.e '+DATA', '/u01/oradata/testdb/test01.dbf')
-            mutually_exclusive with numfiles
+        description:
+            - The Oracle user password for O(user).
+        type: str
         required: false
-        aliases: ['df','path']
+    mode:
+        description:
+            - The mode with which to connect to the database.
+        type: str
+        required: false
+        default: normal
+        choices: ['normal', 'sysdba']
+    tablespace:
+        description:
+            - The name of the tablespace.
+        type: str
+        required: true
+        aliases: ['name', 'ts']
+    state:
+        description:
+            - V(present) - the tablespace is created if missing. An existing read only
+              tablespace is set to read write, an offline tablespace is set online.
+            - V(absent) - the tablespace is dropped with
+              C(INCLUDING CONTENTS AND DATAFILES).
+            - V(read_only) - the tablespace is set to read only.
+            - V(read_write) - a read only tablespace is set to read write, an offline
+              tablespace is set online.
+            - V(offline) - the tablespace is set offline.
+            - V(online) - the tablespace is set online.
+            - Missing files (see O(datafile) and O(numfiles)) are added with all states
+              except V(absent).
+        type: str
+        required: false
+        default: present
+        choices: ['present', 'absent', 'read_only', 'read_write', 'offline',
+                  'online']
+    bigfile:
+        description:
+            - Create the tablespace as bigfile tablespace.
+            - The module fails if more than one file is given in O(datafile).
+            - With OMF, the bigfile tablespace is created with O(size) only, the
+              autoextend settings are applied afterwards.
+            - No files are added to an existing bigfile tablespace.
+        type: bool
+        required: false
+        default: false
+    datafile:
+        description:
+            - List of data files (temp files for O(content=temp)) of the tablespace.
+              An element can be a file name or an ASM disk group
+              (for example V(/u01/oradata/orcl/test01.dbf) or V(+DATA)).
+            - On creation all files are created with O(size).
+            - For an existing tablespace, files whose names are not found in
+              C(DBA_DATA_FILES) are added, but only if the tablespace has fewer
+              files than the list has elements.
+            - Required if C(db_create_file_dest) is not set.
+            - Mutually exclusive with O(numfiles).
+        type: list
+        elements: str
+        required: false
+        aliases: ['datafile', 'df']
     numfiles:
-        description: >
-            If OMF (db_create_file_dest) is set, you can just specify the number of
-            datafiles you want attached to the tablespace
-            mutually_exclusive with datafile
+        description:
+            - The number of data files (temp files for O(content=temp)) of the
+              tablespace when OMF (C(db_create_file_dest)) is used.
+            - On creation this number of files is created. For an existing
+              tablespace with fewer files, the missing files are added.
+            - Defaults to one file on creation.
+            - Mutually exclusive with O(datafile).
+        type: int
         required: false
     size:
         description:
-            - The size of the datafile (10M, 10G, 150G etc)
+            - The initial size of each new file, for example V(10M), V(10G) or
+              V(150G).
+            - Only used for new files, existing files are not resized.
+            - If O(size), O(autoextend) and O(maxsize) are all omitted, O(size=100M),
+              O(autoextend=true), O(nextsize=1M) and O(maxsize=unlimited) are used.
+        type: str
         required: false
     content:
         description:
-            - The type of tablespace (permanent, temporary or undo)
+            - The type of the tablespace.
+            - Used to create the tablespace and to decide whether data or temp files
+              are counted and added. Must match the type of an existing tablespace.
+        type: str
+        required: false
         default: permanent
-        choices: ['permanent','temp','undo']
+        choices: ['permanent', 'temp', 'undo']
     autoextend:
         description:
-            - Should the datafile be autoextended
+            - Enable autoextend for the files of the tablespace.
+            - The setting is enforced on all existing files, so V(false) switches off
+              autoextend on files where it is enabled.
+            - Requires O(nextsize) if V(true).
+        type: bool
+        required: false
         default: false
-        choices: ['true','false']
     nextsize:
         description:
-            - If autoextend, the size of the next extent allocated (1M, 50M, 1G etc)
+            - The autoextend increment of the files, for example V(1M), V(50M) or
+              V(1G).
+            - Used if O(autoextend=true). Changes on existing files are only detected
+              for values with suffix V(M), V(G) or V(T).
+        type: str
+        required: false
         aliases: ['next']
     maxsize:
-        description: >
-            If autoextend, the maximum size of the datafile (1M, 50M, 1G etc).
-            If empty, defaults to database limits
+        description:
+            - The maximum size of each file with autoextend, for example V(1M),
+              V(50M), V(1G) or V(unlimited).
+            - Used if O(autoextend=true). If omitted, the database default is used.
+              Changes on existing files are only detected for values with suffix
+              V(M), V(G) or V(T).
+        type: str
+        required: false
         aliases: ['max']
-
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+    - Mikael Sandström (@oravirt)
 '''
 
 EXAMPLES = '''
-# Create a new normal tablespace
-oracle_tablespace:
+- name: Create a tablespace in ASM disk group +DATA
+  opitzconsulting.ansible_oracle.oracle_tablespace:
     hostname: db-server-scan
     service_name: orcl
     user: system
-    password: manager
+    password: "{{ system_password }}"
     tablespace: test
     datafile: '+DATA'
     size: 100M
     state: present
 
-# Create a new bigfile temporary tablespace with autoextend on and maxsize set
-oracle_tablespace:
+- name: Create a bigfile temporary tablespace with autoextend
+  opitzconsulting.ansible_oracle.oracle_tablespace:
     hostname: db-server
     service_name: orcl
     user: system
-    password: manager
-    tablespace: test
+    password: "{{ system_password }}"
+    tablespace: test_temp
     datafile: '+DATA'
     content: temp
     size: 100M
-    state: present
     bigfile: true
     autoextend: true
     next: 100M
     maxsize: 20G
+    state: present
 
-# Drop a tablespace
-oracle_tablespace:
-    hostname: localhost
+- name: Create a tablespace with 4 OMF data files (db_create_file_dest is set)
+  opitzconsulting.ansible_oracle.oracle_tablespace:
     service_name: orcl
     user: system
-    password: manager
-    tablespace: test
-    state: absent
+    password: "{{ system_password }}"
+    tablespace: app_data
+    numfiles: 4
+    size: 1G
+    autoextend: true
+    nextsize: 100M
+    maxsize: unlimited
+    state: present
 
-# Make a tablespace read only
-oracle_tablespace:
-    hostname: localhost
+- name: Make a tablespace read only (connection with Oracle wallet, OMF)
+  opitzconsulting.ansible_oracle.oracle_tablespace:
     service_name: orcl
-    user: system
-    password: manager
     tablespace: test
     state: read_only
 
-# Make a tablespace read write
-oracle_tablespace:
-    hostname: localhost
+- name: Make a tablespace read write
+  opitzconsulting.ansible_oracle.oracle_tablespace:
     service_name: orcl
     user: system
-    password: manager
+    password: "{{ system_password }}"
     tablespace: test
+    datafile: '+DATA'
     state: read_write
 
-# Make a tablespace offline
-oracle_tablespace:
-    hostname: localhost
+- name: Drop a tablespace including contents and data files
+  opitzconsulting.ansible_oracle.oracle_tablespace:
     service_name: orcl
     user: system
-    password: manager
+    password: "{{ system_password }}"
     tablespace: test
-    state: offline
+    state: absent
+'''
 
-# Make a tablespace online
-oracle_tablespace:
-    hostname: localhost
-    service_name: orcl
-    user: system
-    password: manager
-    tablespace: test
-    state: online
+RETURN = '''
+msg:
+    description: Message describing the action that was executed and the used
+        settings.
+    returned: always
+    type: str
+    sample: "Tablespace TEST successfully created - initial size: 100M, bigfile: False,
+        autoextend: False, nextsize: None, maxsize/file: None, numfiles: 1,
+        status: ONLINE"
 '''
 
 try:
@@ -441,7 +532,6 @@ def ensure_tablespace_state(
     nextsize,
     maxsize,
 ):
-    global newtbs
     alter_tbs_list = []
     wanted_list_dbf = []
 
@@ -970,7 +1060,6 @@ def execute_sql(module, msg, cursor, sql):
 
 
 def main():
-    global crfiles
     global newtbs
     global msg
     msg = ['']
