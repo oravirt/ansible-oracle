@@ -2,6 +2,10 @@
 # -*- coding: utf-8 -*-
 
 from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.oracledb_connect import (  # noqa: E501
+    oracledb,
+    oracledb_connect,
+)
 
 DOCUMENTATION = '''
 ---
@@ -63,9 +67,12 @@ options:
             - normal
             - sysdba
 notes:
-    - cx_Oracle needs to be installed
+    - python-oracledb needs to be installed, e.g. with the role
+      C(opitzconsulting.ansible_oracle.pyoracledb).
+    - python-oracledb is used in thick mode. The Oracle Client libraries must be found,
+      e.g. with ORACLE_HOME and LD_LIBRARY_PATH set in the environment of the task.
     - Oracle RDBMS 10gR2 or later required
-requirements: [ "cx_Oracle" ]
+requirements: [ "python-oracledb" ]
 author:
     - Ilmar Kerm (@ilmarkerm)
 '''
@@ -176,14 +183,6 @@ ansible_facts:
 '''
 
 
-try:
-    import cx_Oracle
-except ImportError:
-    cx_oracle_exists = False
-else:
-    cx_oracle_exists = True
-
-
 def rows_to_dict_list(cursor):
     columns = [i[0] for i in cursor.description]
     return [dict(zip(columns, row)) for row in cursor]
@@ -216,16 +215,6 @@ def main():
         ),
         supports_check_mode=True,
     )
-    # Check for required modules
-    if not cx_oracle_exists:
-        module.fail_json(
-            msg=(
-                "The cx_Oracle module is required. "
-                "'pip install cx_Oracle' should do "
-                "the trick. If cx_Oracle is installed, "
-                "make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
-            )
-        )
     # Connect to database
     hostname = module.params["hostname"]
     port = module.params["port"]
@@ -233,42 +222,7 @@ def main():
     user = module.params["user"]
     password = module.params["password"]
     mode = module.params["mode"]
-    wallet_connect = '/@%s' % service_name
-    try:
-        if not user and not password:
-            # If neither user or password is supplied, the use of an
-            # oracle wallet is assumed
-            if mode == 'sysdba':
-                connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
-            else:
-                connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
-
-        elif user and password:
-            if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(
-                    host=hostname, port=port, service_name=service_name
-                )
-                connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
-            else:
-                dsn = cx_Oracle.makedsn(
-                    host=hostname, port=port, service_name=service_name
-                )
-                connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
-
-        elif not (user) or not (password):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
-
-    except cx_Oracle.DatabaseError as exc:
-        (error,) = exc.args
-        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (
-            error.message,
-            connect,
-        )
-        module.fail_json(msg=msg[0], changed=False)
+    conn = oracledb_connect(module, hostname, port, service_name, user, password, mode)
     if conn.version < "10.2":
         module.fail_json(msg="Database version must be 10gR2 or greater", changed=False)
     #
@@ -289,7 +243,7 @@ def main():
             "ORDER BY inst_id"
         )
 
-    except cx_Oracle.Error:
+    except oracledb.Error:
         rac = []
 
     try:
@@ -302,7 +256,7 @@ def main():
         else:
             pdb = []
 
-    except cx_Oracle.Error:
+    except oracledb.Error:
         pdb = []
 
     if conn.version >= '12.1':
