@@ -1,0 +1,7 @@
+---
+minor_changes:
+  - "pyoracledb: new role to install python-oracledb with pip, the counterpart of the role cxoracle for the migration from cx_Oracle to python-oracledb"
+deprecated_features:
+  - "cxoracle: the role will be removed, when all modules are migrated from cx_Oracle to python-oracledb. Use the role pyoracledb and its variables pyoracledb_* (see doc/guides/breaking_changes.adoc)"
+breaking_changes:
+  - "os.yml: the playbook installs python-oracledb with the new role pyoracledb in addition to cx_Oracle. The default source is the Python package index. Target hosts without access to the package index or with a proxy need the new variables pyoracledb_source, pyoracledb_use_proxy and pyoracledb_http_proxy (see doc/guides/breaking_changes.adoc)"

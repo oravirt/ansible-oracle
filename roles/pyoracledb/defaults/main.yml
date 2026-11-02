@@ -1,0 +1,42 @@
+---
+# @var pyoracledb_install:description: Install python-oracledb?
+pyoracledb_install: true
+
+# @var pyoracledb_source:description: >
+# Source for `pip3 install`. Default is the package `oracledb` from the package index.
+#
+# Supported values:
+#
+# - package name with optional version specifier, e.g. `oracledb==3.4.0`
+# - local file on the Ansible controller (`/path` or `file:///path`),
+#   copied to the managed node when `is_sw_source_local: true` and `oracle_sw_copy: true`.
+#   With `oracle_sw_copy: false` the path must exist on the managed node.
+# - URL (`http://`, `https://`, `ftp://`), downloaded on the managed node
+#   when `is_sw_source_local: false` and `oracle_sw_copy: true`
+# @end
+# @var pyoracledb_source:example: pyoracledb_source: "oracledb==3.4.0"
+pyoracledb_source: oracledb
+
+# @var pyoracledb_umask:description: Define umask for pip installation of python-oracledb
+
+# @var pyoracledb_use_proxy:description: Use a http_proxy for the pip installation
+pyoracledb_use_proxy: false
+
+# @var pyoracledb_http_proxy:description: >
+# Define the http_proxy for the pip installation.
+#
+# Needed when `pyoracledb_use_proxy: true`.
+# @end
+# @var pyoracledb_http_proxy:example: pyoracledb_http_proxy: proxy.example:3128
+
+# @var pyoracledb_extra_args:description: >
+# Define optional arguments for extra_args during pip installation.
+# The variable is used by `pyoracledb_use_proxy` and `pyoracledb_http_proxy` and
+# supports client certificates known from orasw_meta.
+# @end
+# @var pyoracledb_extra_args: $ ""
+pyoracledb_extra_args: "
+  {% if pyoracledb_use_proxy | bool -%}--proxy={{ pyoracledb_http_proxy }}{% endif %}
+  {% if get_url_ssl_client_cert is defined -%}--client-cert={{ get_url_ssl_client_cert }}{% endif %}
+  {% if get_url_ssl_client_key is defined -%}--cert={{ get_url_ssl_client_key }}{% endif %}
+  "
