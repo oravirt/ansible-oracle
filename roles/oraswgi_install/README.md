@@ -222,6 +222,7 @@ unless a `filesource` dict element provides a full path / complete URL to the im
 
 ```YAML
 oracle_sw_image_gi:
+  - {filename: LINUX.X64_2326100_grid_home.zip, version: 26.1.0.0, creates: install/.img.bin}
   - {filename: LINUX.X64_213000_grid_home.zip, version: 21.3.0.0, creates: install/.img.bin}
   - {filename: LINUX.X64_193000_grid_home.zip, version: 19.3.0.0, creates: install/.img.bin}
   - {filename: LINUX.X64_180000_grid_home.zip, version: 18.3.0.0, creates: install/.img.bin}
@@ -318,6 +319,9 @@ run_configtoolallcommand: true
 
 - (bug): ConfigTools should not depend on olr.loc...
 - (bug): ConfigTools should not depend on olr.loc...
+- (bug): ConfigTools should not depend on olr.loc...
+- (information): add selectattr to asm_diskgroups
+- (information): Check if path for patches is ok with patch_id/patch_id
 - (information): add selectattr to asm_diskgroups
 - (information): Check if path for patches is ok with patch_id/patch_id
 - (information): add selectattr to asm_diskgroups
