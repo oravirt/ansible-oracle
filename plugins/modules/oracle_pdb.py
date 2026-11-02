@@ -9,136 +9,265 @@ DOCUMENTATION = '''
 module: oracle_pdb
 short_description: Manage pluggable databases in Oracle
 description:
-    - Manage pluggable databases in Oracle.
+    - Creates, plugs in, opens, closes, unplugs and drops pluggable databases (PDB)
+      in an Oracle container database (CDB).
+    - The module must connect to the root container of the CDB.
+    - The existence of a PDB is checked in C(DBA_PDBS), its open mode in C(V$PDBS).
+    - The PDB name is not quoted in the SQL statements, so it is always stored in
+      uppercase.
+    - A new PDB is created with C(CREATE PLUGGABLE DATABASE), opened on all
+      instances (C(OPEN INSTANCES=ALL)) and, with O(save_state=true), its state is
+      saved (C(SAVE STATE INSTANCES=ALL)). Afterwards O(state) is enforced.
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "2.1.0.0"
 options:
     name:
-        description: The name of the pdb
-        required: True
-        default: None
+        description:
+            - The name of the PDB.
+        type: str
+        required: true
+        aliases: ['pdb', 'pdb_name']
     oracle_home:
-        description: The ORACLE_HOME to use
-        required: False
-        default: None
+        description:
+            - The ORACLE_HOME to use. Sets the environment variable E(ORACLE_HOME)
+              for the module.
+            - The module fails if neither O(oracle_home) nor the environment variable
+              E(ORACLE_HOME) is set.
+        type: str
+        required: false
+        aliases: ['oh']
     sourcedb:
-        description: >
-            The container database which will house the pdb
-        required: True
-        default: None
-        aliases: ['db']
+        description:
+            - The name of the container database that houses the PDB.
+            - Only used as default for O(service_name).
+        type: str
+        required: true
+        aliases: ['db', 'container', 'cdb']
     state:
-        description: >
-            The intended state of the pdb.
-            'status' will just show the status of the pdb
+        description:
+            - The intended state of the PDB. The PDB is created if it does not exist
+              for all states except V(absent), V(unplugged) and V(status).
+            - V(present), V(open), V(read_write) - the PDB is opened read write
+              (C(OPEN FORCE)).
+            - V(closed) - the PDB is closed (C(CLOSE IMMEDIATE)).
+            - V(read_only) - the PDB is opened read only (C(OPEN READ ONLY FORCE)).
+            - V(restricted) - the PDB is opened in restricted mode
+              (C(OPEN RESTRICTED FORCE)).
+            - For an existing PDB, the open mode and restricted flag in C(V$PDBS) are
+              compared with the intended state. The C(ALTER PLUGGABLE DATABASE)
+              statement is only executed on a difference and affects the current
+              instance only.
+            - V(absent) - the PDB is closed on all instances and dropped
+              C(INCLUDING DATAFILES).
+            - V(unplugged) - the PDB is closed on all instances, unplugged into the
+              XML file O(unplug_dest) and dropped C(KEEP DATAFILES).
+            - V(status) - nothing is changed. The PDB status is queried.
+        type: str
+        required: false
         default: present
-        choices: ['present','absent', 'status']
+        choices: ['present', 'absent', 'open', 'closed', 'read_write', 'read_only',
+                  'restricted', 'status', 'unplugged']
+    save_state:
+        description:
+            - Save the open state of a newly created PDB with
+              C(ALTER PLUGGABLE DATABASE ... SAVE STATE INSTANCES=ALL).
+            - Only used when the PDB is created.
+        type: bool
+        required: false
+        default: true
     pdb_admin_username:
-        description: >
-            The username for the pdb admin user
+        description:
+            - The name of the PDB admin user (C(ADMIN USER)) of a new PDB.
+            - Not used when the PDB is plugged in with O(unplug_dest).
+        type: str
         required: false
         default: pdb_admin
-        aliases: ['un']
+        aliases: ['pdbadmun']
     pdb_admin_password:
-        description: The password for the pdb admin user
+        description:
+            - The password of the PDB admin user O(pdb_admin_username).
+        type: str
         required: false
         default: pdb_admin
-        aliases: ['pw']
+        aliases: ['pdbadmpw']
     datafile_dest:
-        description: The path where the datafiles will be placed
+        description:
+            - The directory or ASM disk group for the datafiles of a new PDB
+              (C(CREATE_FILE_DEST)).
+        type: str
         required: false
-        default: None
-        aliases: ['dfd']
+        aliases: ['dfd', 'create_file_dest']
     unplug_dest:
-        description: >
-            The path where the 'unplug' xml-file will be placed.
-            Also used when plugging in a pdb
+        description:
+            - The path of the XML file the PDB is unplugged into with
+              O(state=unplugged).
+            - When set while a PDB is created, the PDB is plugged in from this XML
+              file (C(USING '<unplug_dest>' TEMPFILE REUSE)) instead of being created
+              from the seed.
+            - Required in practice for O(state=unplugged), although not enforced by
+              the argument spec.
+        type: str
         required: false
-        default: None
-        aliases: ['plug_dest','upd','pd']
-    username:
-        description: The database username to connect to the database
+        aliases: ['plug_dest', 'upd', 'pd']
+    file_name_convert:
+        description:
+            - Comma separated list of file name pairs for C(FILE_NAME_CONVERT)
+              when a PDB is created, e.g. V(/u02/oradata/pdbseed/,/u02/oradata/pdb1/).
+            - Together with O(unplug_dest), the datafiles are copied (C(COPY)).
+        type: str
         required: false
-        default: None
-        aliases: ['un']
+        aliases: ['fnc']
+    service_name_convert:
+        description:
+            - Not implemented. The option is accepted but ignored by the module.
+        type: str
+        required: false
+        aliases: ['snc']
+    default_tablespace_type:
+        description:
+            - Not implemented. The option is accepted but ignored by the module.
+        type: str
+        required: false
+        default: smallfile
+        choices: ['smallfile', 'bigfile']
+    default_tablespace:
+        description:
+            - Not implemented. The option is accepted but ignored by the module.
+        type: str
+        required: false
+    default_temp_tablespace:
+        description:
+            - Not implemented. The option is accepted but ignored by the module.
+        type: str
+        required: false
+    timezone:
+        description:
+            - Not implemented. The option is accepted but ignored by the module.
+        type: str
+        required: false
+    user:
+        description:
+            - The Oracle user name to connect to the database.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
+        required: false
+        aliases: ['un', 'username']
     password:
-        description: The password to connect to the database
+        description:
+            - The Oracle user password for O(user).
+        type: str
         required: false
-        default: None
         aliases: ['pw']
-    service_name:
-        description: The service_name to connect to the database
+    mode:
+        description:
+            - The mode with which to connect to the database.
+        type: str
         required: false
-        default: database_name
+        default: normal
+        choices: ['normal', 'sysdba']
+    service_name:
+        description:
+            - The database service name to connect to. Defaults to O(sourcedb).
+            - When connecting with an Oracle wallet, this is the TNS alias of the
+              wallet entry.
+        type: str
+        required: false
         aliases: ['sn']
     hostname:
-        description: The host of the database
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
         aliases: ['host']
     port:
-        description: The listener port to connect to the database
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
-
 notes:
     - cx_Oracle needs to be installed
+    - O(datafile_dest) and O(file_name_convert) are mutually exclusive.
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+    - Mikael Sandström (@oravirt)
 '''
 
 EXAMPLES = '''
-# Creates a pdb on a different filesystem
-oracle_pdb:
+- name: Create a PDB with its datafiles in a different location
+  opitzconsulting.ansible_oracle.oracle_pdb:
     name: pdb1
     sourcedb: cdb1
-    dfd: /u02/oradata/pdb1
+    datafile_dest: /u02/oradata/pdb1
+    pdb_admin_password: "{{ pdb_admin_password }}"
     state: present
-    un: system
-    pw: Oracle123
-    oracle_home=/u01/app/oracle/12.2.0.1/db
+    user: sys
+    password: "{{ sys_password }}"
+    mode: sysdba
+    oracle_home: /u01/app/oracle/product/19/db
 
-# Remove a pdb
-oracle_pdb:
+- name: Close a PDB
+  opitzconsulting.ansible_oracle.oracle_pdb:
     name: pdb1
     sourcedb: cdb1
-    state: absent
-    un: system
-    pw: Oracle123
-    oracle_home: /u01/app/oracle/12.2.0.1/db
+    state: closed
+    user: sys
+    password: "{{ sys_password }}"
+    mode: sysdba
+    oracle_home: /u01/app/oracle/product/19/db
 
-# Check the status for a pdb
-oracle_pdb:
+- name: Check the status of a PDB (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_pdb:
     name: pdb1
     sourcedb: cdb1
     state: status
-    un: system
-    pw: Oracle123
-    oracle_home: /u01/app/oracle/12.2.0.1/db
+    mode: sysdba
+    oracle_home: /u01/app/oracle/product/19/db
 
-
-# Unplug a pdb
-oracle_pdb:
+- name: Unplug a PDB
+  opitzconsulting.ansible_oracle.oracle_pdb:
     name: pdb1
     sourcedb: cdb1
     unplug_dest: /tmp/unplugged-pdb.xml
     state: unplugged
-    un: sys
-    pw: Oracle123
+    user: sys
+    password: "{{ sys_password }}"
     mode: sysdba
-    sn: cdb1
-    oracle_home: /u01/app/oracle/12.2.0.1/db1
+    oracle_home: /u01/app/oracle/product/19/db
 
-# plug in a pdb
-oracle_pdb:
+- name: Plug in a PDB into another CDB
+  opitzconsulting.ansible_oracle.oracle_pdb:
     name: plug1
     sourcedb: cdb2
-    plug_dest: /tmp/unplugged-pdb.xml
+    unplug_dest: /tmp/unplugged-pdb.xml
     state: present
-    un: sys
-    pw: Oracle123
+    user: sys
+    password: "{{ sys_password }}"
     mode: sysdba
-    sn: cdb1
-    oracle_home: /u01/app/oracle/12.2.0.1/db2
+    oracle_home: /u01/app/oracle/product/19/db
+
+- name: Remove a PDB
+  opitzconsulting.ansible_oracle.oracle_pdb:
+    name: pdb1
+    sourcedb: cdb1
+    state: absent
+    user: sys
+    password: "{{ sys_password }}"
+    mode: sysdba
+    oracle_home: /u01/app/oracle/product/19/db
+'''
+
+RETURN = '''
+msg:
+    description:
+        - Message describing the action that was executed.
+    returned: always
+    type: str
+    sample: "Pluggable database pdb1 already in the intended state"
 '''
 
 try:
@@ -168,10 +297,10 @@ def check_pdb_exists(cursor, module, msg, name):
 
 
 def quote_string(item):
-    if len(value) > 0:
-        return "'%s'" % (value)
+    if len(item) > 0:
+        return "'%s'" % (item)
     else:
-        return value
+        return item
 
 
 def create_pdb(
@@ -403,7 +532,6 @@ def execute_sql(module, msg, cursor, sql):
 
 def main():
     global msg
-    global value
     msg = ['']
 
     module = AnsibleModule(

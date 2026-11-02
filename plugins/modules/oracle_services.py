@@ -9,126 +9,223 @@ DOCUMENTATION = '''
 module: oracle_services
 short_description: Manage services in an Oracle database
 description:
-    - Manage services in an Oracle database
+    - Creates, removes, starts, stops and restarts database services and shows their
+      status.
+    - If the file C(/etc/oracle/olr.loc) exists, the system is treated as managed by
+      Grid Infrastructure (RAC or Oracle Restart) and the service is managed with
+      C(srvctl) from O(oracle_home). The database connection options are ignored.
+    - Otherwise the service is managed with C(DBMS_SERVICE) through a cx_Oracle
+      connection. In this mode only O(name) is used for the service, O(pdb),
+      O(role), O(preferred_instances), O(available_instances), O(clbgoal) and
+      O(rlbgoal) are ignored.
+    - If neither O(user) nor O(password) is given, a connection with an Oracle
+      wallet (C(/@<service_name>)) is used. Otherwise both must be set.
+    - With Grid Infrastructure, the configuration of an existing service is compared
+      with O(preferred_instances), O(available_instances), O(clbgoal) and O(rlbgoal)
+      and changed with C(srvctl modify service) if it differs.
 version_added: "2.1.0.0"
 options:
     name:
-        description: The name of the service
+        description:
+            - The name of the service.
+        type: str
         required: true
-        default: None
+        aliases: ['service']
     oracle_home:
-        description: The name of the service
-        required: true
-        default: None
+        description:
+            - The Oracle home of the database. C(srvctl) is called from
+              C(<oracle_home>/bin).
+            - If not set, the environment variable C(ORACLE_HOME) is used. The module
+              fails if neither is set.
+        type: str
+        required: false
         aliases: ['oh']
     database_name:
-        description: The database in which the service will run
-        required: True
-        default: None
+        description:
+            - The unique name of the database in which the service runs (C(srvctl -d)).
+            - Without Grid Infrastructure it is the default for O(service_name).
+        type: str
+        required: true
         aliases: ['db']
     state:
-        description: >
-            The intended state of the service.
-            'status' will just show the status of the service
-        default: present
-        choices: ['present','absent','started','stopped', 'status']
-    preferred_instances:
-        description: >
-            The RAC instances on which the service will actively run.
-            Comma-separated list
+        description:
+            - V(present) - the service is created if it does not exist. With Grid
+              Infrastructure the configuration of an existing service is adjusted.
+              The service is not started.
+            - V(started) - like V(present), then the service is started.
+            - V(stopped) - like V(present), then the service is stopped.
+            - V(restarted) - the service is stopped and started again.
+            - V(absent) - the service is stopped and removed.
+            - V(status) - reports whether the service is running, nothing is changed.
+              With Grid Infrastructure, the output of C(srvctl status service) is
+              returned.
+        type: str
         required: false
-        default: None
+        default: present
+        choices: ['present', 'absent', 'started', 'stopped', 'status', 'restarted']
+    preferred_instances:
+        description:
+            - Comma-separated list of the RAC instances on which the service actively
+              runs (C(srvctl -r) / C(-preferred)).
+            - Grid Infrastructure only.
+        type: str
+        required: false
         aliases: ['pi']
     available_instances:
-        description: >
-            The RAC instances on which the service can run in case of failure
-            of preferred_instances. Comma-separated list
+        description:
+            - Comma-separated list of the RAC instances on which the service can run
+              when the O(preferred_instances) fail (C(srvctl -a) / C(-available)).
+            - Grid Infrastructure only.
+        type: str
         required: false
-        default: None
         aliases: ['ai']
     pdb:
-        description: The pdb which the service is attached to
+        description:
+            - The pluggable database the service is attached to (C(srvctl -pdb)).
+            - Only used when the service is created with Grid Infrastructure.
+        type: str
         required: false
-        default: None
     role:
-        description: >
-            Role of the service (primary, physical_standby, logical_standby,
-            snapshot_standby)
+        description:
+            - The database role in which the service is started automatically
+              (C(srvctl -l)).
+            - Only used when the service is created with Grid Infrastructure.
+        type: str
         required: false
-        default: None
-        choices: ['primary','physical_standby','logical_standby','snapshot_standby']
+        choices: ['primary', 'physical_standby', 'logical_standby', 'snapshot_standby']
+    clbgoal:
+        description:
+            - The connection load balancing goal, e.g. V(SHORT) or V(LONG)
+              (C(srvctl -clbgoal)).
+            - Grid Infrastructure only. For an existing service, V(LONG) is assumed
+              when not set, so the goal of the service is reset to V(LONG).
+        type: str
+        required: false
+        aliases: ['clb']
+    rlbgoal:
+        description:
+            - The runtime load balancing goal, e.g. V(NONE), V(SERVICE_TIME) or
+              V(THROUGHPUT) (C(srvctl -rlbgoal)).
+            - Grid Infrastructure only. For an existing service, V(NONE) is assumed
+              when not set, so the goal of the service is reset to V(NONE).
+        type: str
+        required: false
+        aliases: ['rlb']
     force:
-        description: Adds the 'force' flag to the srvctl command
-        default: False
-        choices: ['true','false']
-    username:
-        description: >
-            The database username to connect to the database if using dbms_service
+        description:
+            - Adds the C(-f) flag to C(srvctl remove service) with O(state=absent).
+            - Grid Infrastructure only.
+        type: bool
         required: false
-        default: None
-        aliases: ['un']
+        default: false
+    user:
+        description:
+            - The Oracle user name to connect to the database.
+            - Only used without Grid Infrastructure.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
+        required: false
+        aliases: ['un', 'username']
     password:
-        description: >
-            The password to connect to the database if using dbms_service
+        description:
+            - The Oracle user password for O(user).
+            - Only used without Grid Infrastructure.
+        type: str
         required: false
-        default: None
         aliases: ['pw']
     service_name:
-        description: >
-            The service_name to connect to the database if using dbms_service.
+        description:
+            - The database service name to connect to.
+            - Only used without Grid Infrastructure. Defaults to O(database_name).
+            - When connecting with an Oracle wallet, this is the TNS alias of the
+              wallet entry.
+        type: str
         required: false
-        default: database_name. Will be set to the pdb-name if pdb is set
         aliases: ['sn']
     hostname:
-        description: The host of the database if using dbms_service
+        description:
+            - The Oracle database host.
+            - Only used without Grid Infrastructure. Ignored when connecting with an
+              Oracle wallet.
+        type: str
         required: false
         default: localhost
         aliases: ['host']
     port:
-        description: The listener port to connect to the database if using dbms_service
+        description:
+            - The listener port number on the host.
+            - Only used without Grid Infrastructure. Ignored when connecting with an
+              Oracle wallet.
+        type: int
         required: false
         default: 1521
-
 notes:
     - cx_Oracle needs to be installed
+    - Check mode is not supported.
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+    - Mikael Sandström (@oravirt)
 '''
 
 EXAMPLES = '''
-# Create a service
-oracle_services:
+- name: Create a service
+  opitzconsulting.ansible_oracle.oracle_services:
     name: service1
     database_name: db1
+    oracle_home: /u01/app/oracle/product/19/db1
     state: present
 
-# Start a service
-oracle_services:
+- name: Create and start a service
+  opitzconsulting.ansible_oracle.oracle_services:
     name: service1
     database_name: db1
+    oracle_home: /u01/app/oracle/product/19/db1
     state: started
 
-# Stop a service
-oracle_services:
+- name: Stop a service
+  opitzconsulting.ansible_oracle.oracle_services:
     name: service1
     database_name: db1
+    oracle_home: /u01/app/oracle/product/19/db1
     state: stopped
 
-# Remove a service
-oracle_services:
+- name: Remove a service
+  opitzconsulting.ansible_oracle.oracle_services:
     name: service1
     database_name: db1
+    oracle_home: /u01/app/oracle/product/19/db1
     state: absent
 
-# Create a service in a RAC pdb and run it on a subset of nodes/instances
-oracle_services:
+- name: Create a service in a RAC PDB and run it on a subset of instances
+  opitzconsulting.ansible_oracle.oracle_services:
     name: service1
     database_name: raccdb
-    oh: /u01/app/oracle/12.1.0.2/db1
+    oracle_home: /u01/app/oracle/product/19/db1
     pdb: mypdb
-    pi: raccdb1
-    ai: raccdb2,raccdb3
-    state: present
+    preferred_instances: raccdb1
+    available_instances: raccdb2,raccdb3
+    clbgoal: SHORT
+    rlbgoal: SERVICE_TIME
+    state: started
+
+- name: Show the status of a service
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: service1
+    database_name: db1
+    oracle_home: /u01/app/oracle/product/19/db1
+    state: status
+  register: service_status
+'''
+
+RETURN = '''
+msg:
+    description:
+        - Message describing the action that was executed.
+        - With O(state=status) and Grid Infrastructure, the output of
+          C(srvctl status service).
+    returned: always
+    type: str
+    sample: "Service service1 (db1) successfully created"
 '''
 
 try:

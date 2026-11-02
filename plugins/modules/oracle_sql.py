@@ -8,68 +8,138 @@ from ansible.module_utils.basic import AnsibleModule
 DOCUMENTATION = '''
 ---
 module: oracle_sql
-short_description: Execute arbitrary sql
+short_description: Execute SQL statements or SQL scripts in an Oracle database
 description:
-    - Execute arbitrary sql against an Oracle database
+    - Executes a single SQL statement or PL/SQL block (O(sql)) or all statements of a
+      SQL script file (O(script)) in an Oracle database.
+    - The module is not idempotent. Every run executes the SQL and reports
+      C(changed=true), except for a single C(SELECT) statement in O(sql).
+    - Every executed statement is followed by a C(COMMIT).
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "2.1.0.0"
 options:
-    username:
-        description: The database username to connect to the database
+    user:
+        description:
+            - The Oracle user name to connect to the database.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
         required: false
-        default: None
-        aliases: ['un']
+        aliases: ['un', 'username']
     password:
-        description: The password to connect to the database
+        description:
+            - The Oracle user password for O(user).
+        type: str
         required: false
-        default: None
         aliases: ['pw']
-    service_name:
-        description: The service_name to connect to the database
+    mode:
+        description:
+            - The mode with which to connect to the database.
+        type: str
         required: false
-        default: database_name
+        default: normal
+        choices: ['normal', 'sysdba', 'sysasm']
+    service_name:
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the wallet
+              entry.
+            - Required in practice, although not enforced by the argument spec.
+        type: str
+        required: false
         aliases: ['sn']
     hostname:
-        description: The host of the database
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
         aliases: ['host']
     port:
-        description: The listener port to connect to the database
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     sql:
-        description: The sql you want to execute
+        description:
+            - A single SQL statement or PL/SQL block to execute.
+            - A statement starting with C(begin ) (case-insensitive) is executed as
+              PL/SQL block unchanged.
+            - For all other statements trailing C(;) characters are removed.
+            - A statement starting with C(select ) (case-insensitive) is executed as
+              query, the result rows are returned in RV(msg) and C(changed=false) is
+              reported.
+            - Any other statement is executed and C(changed=true) is reported.
+            - Mutually exclusive with O(script). One of O(sql) or O(script) is required
+              in practice, although not enforced by the argument spec.
+        type: str
         required: false
     script:
-        description: The script you want to execute. Doesn't handle selects
+        description:
+            - Path to a SQL script file on the managed node whose statements are
+              executed one after another.
+            - Empty lines and leading/trailing whitespace are removed from the script.
+            - The statement delimiter is C(/) if the script ends with C(/) or contains
+              C(create or replace) anywhere (case-insensitive), otherwise C(;).
+              Delimiters inside single or double quotes are ignored.
+            - Results of C(SELECT) statements in the script are not returned.
+            - The module fails if the file is empty.
+            - Mutually exclusive with O(sql).
+        type: str
         required: false
 notes:
     - cx_Oracle needs to be installed
     - Oracle client libraries need to be installed along with ORACLE_HOME and
       LD_LIBRARY_PATH settings.
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+    - Mikael Sandström (@oravirt)
 '''
 
 EXAMPLES = '''
-# Execute arbitrary sql
-- oracle_sql:
-    username: "{{ user }}"
-    password: "{{ password }}"
-    service_name: one.world
-    sql: 'select username from dba_users'
-# Execute arbitrary script1
-- oracle_sql:
-    username: "{{ user }}"
-    password: "{{ password }}"
-    service_name: one.world
-    script: /u01/scripts/create-all-the-procedures.sql
-# Execute arbitrary script2
-- oracle_sql:
-    username: "{{ user }}"
-    password: "{{ password }}"
-    service_name: one.world
+- name: Query the database users
+  opitzconsulting.ansible_oracle.oracle_sql:
+    user: system
+    password: "{{ system_password }}"
+    hostname: dbhost
+    service_name: orclpdb
+    sql: select username from dba_users
+  register: users
+
+- name: Execute a PL/SQL block as SYSDBA
+  opitzconsulting.ansible_oracle.oracle_sql:
+    user: sys
+    password: "{{ sys_password }}"
+    mode: sysdba
+    service_name: orclpdb
+    sql: "begin dbms_stats.gather_schema_stats('APP'); end;"
+
+- name: Execute a SQL script (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_sql:
+    service_name: orclpdb
     script: /u01/scripts/create-tables-and-insert-default-values.sql
+
+- name: Execute a script with PL/SQL objects delimited by /
+  opitzconsulting.ansible_oracle.oracle_sql:
+    user: app
+    password: "{{ app_password }}"
+    service_name: orclpdb
+    script: /u01/scripts/create-all-the-procedures.sql
+'''
+
+RETURN = '''
+msg:
+    description:
+        - For a C(SELECT) statement in O(sql), the list of result rows (each row
+          is a list of column values).
+        - Otherwise a message with the executed statement or the script name and
+          the cleaned script contents.
+    returned: always
+    type: raw
+    sample: [["SYS"], ["SYSTEM"]]
 '''
 
 try:

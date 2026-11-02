@@ -7,90 +7,174 @@ from ansible.module_utils.basic import AnsibleModule
 DOCUMENTATION = '''
 ---
 module: oracle_parameter
-short_description: Manage parameters in an Oracle database
+short_description: Manage initialization parameters in an Oracle database
 description:
-    - Manage init parameters in an Oracle database
-
+    - Sets or resets initialization parameters with C(ALTER SYSTEM SET) and
+      C(ALTER SYSTEM RESET).
+    - The parameter must exist (C(V$PARAMETER), or C(SYS.X$KSPPI) for underscore
+      parameters), otherwise the module fails.
+    - Underscore (hidden) parameters can only be handled with O(mode=sysdba).
+    - With O(state=present), the current value is read and compared (case-insensitive)
+      with O(value). The parameter is only changed when the values differ.
+    - With O(scope=spfile), the current value is read from C(V$SPPARAMETER), otherwise
+      from C(V$PARAMETER). With O(mode=sysdba), the C(X$) tables are used instead.
+      O(sid) is not considered when reading the current value.
+    - With O(state=reset) or O(state=absent), C(ALTER SYSTEM RESET) is executed. If the
+      parameter is not set (ORA-32010), the module returns C(changed=false).
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "1.9.1"
 options:
     hostname:
-        description: The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
     port:
-        description: The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     service_name:
-        description: The database service name to connect to
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the wallet
+              entry.
+        type: str
         required: true
     user:
-        description: The Oracle user name to connect to the database
-        required: true
+        description:
+            - The Oracle user name to connect to the database.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
+        required: false
     password:
-        description: The Oracle user password for 'user'
-        required: true
+        description:
+            - The Oracle user password for O(user).
+        type: str
+        required: false
     mode:
-        description: >
-            The mode with which to connect to the database
-        required: true
+        description:
+            - The mode with which to connect to the database.
+            - V(sysdba) is required for underscore parameters.
+        type: str
+        required: false
         default: normal
-        choices: ['normal','sysdba']
+        choices: ['normal', 'sysdba']
     name:
-        description: The parameter that is being changed
+        description:
+            - The name of the parameter.
+            - Required in practice, although not enforced by the argument spec.
+            - Names starting with V(_), V(+), V(/) or a double quote are enclosed in
+              double quotes in the SQL statement.
+        type: str
         required: false
-        default: null
+        aliases: ['parameter']
     value:
-        description: The value of the parameter
+        description:
+            - The new value of the parameter.
+            - Required in practice for O(state=present).
+            - A value containing whitespace or one of the characters
+              C(?*$%#()!,._/=+-) is enclosed in single quotes, so lists of values
+              (like V('a','b')) are not supported.
+            - Use V('') (quoted) to set an empty value.
+            - Ignored for O(state=reset) and O(state=absent).
+        type: str
         required: false
-        default: null
+    comment:
+        description:
+            - A comment added to the C(ALTER SYSTEM SET) statement.
+            - Used with O(state=present) only.
+        type: str
+        required: false
+    scope:
+        description:
+            - The C(SCOPE) clause of the C(ALTER SYSTEM) statement.
+            - Also determines where the current value is read from (see description).
+        type: str
+        required: false
+        default: both
+        choices: ['both', 'spfile', 'memory']
+    sid:
+        description:
+            - The C(SID) clause of the C(ALTER SYSTEM) statement.
+            - V(*) means all instances.
+        type: str
+        required: false
+        default: '*'
     state:
-        description: >
-            The intended state of the parameter (present means set to value,
-            absent/reset means the value is reset to its default value).
+        description:
+            - V(present) - the parameter is set to O(value).
+            - V(reset) or V(absent) - the parameter is reset to its default value.
+        type: str
+        required: false
         default: present
-        choices: ['present','absent','reset']
+        choices: ['present', 'absent', 'reset']
 notes:
     - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle","re" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+    - Check mode is supported. With O(state=reset) or O(state=absent), check mode
+      always reports C(changed=true).
+requirements: [ "cx_Oracle", "re" ]
+author:
+    - Mikael Sandström (@oravirt)
 '''
 
 EXAMPLES = '''
-# Set the value of db_recovery_file_dest
-oracle_parameter:
+- name: Set db_recovery_file_dest
+  opitzconsulting.ansible_oracle.oracle_parameter:
     hostname: remote-db-server
     service_name: orcl
     user: system
-    password: manager
+    password: "{{ system_password }}"
     name: db_recovery_file_dest
     value: '+FRA'
     state: present
     scope: both
     sid: '*'
 
-# Set the value of db_recovery_file_dest_size
-oracle_parameter:
+- name: Set db_recovery_file_dest_size in the spfile only
+  opitzconsulting.ansible_oracle.oracle_parameter:
     hostname: remote-db-server
     service_name: orcl
     user: system
-    password: manager
+    password: "{{ system_password }}"
     name: db_recovery_file_dest_size
     value: 100G
-    state: present
-    scope: both
+    comment: Changed by Ansible
+    scope: spfile
 
-# Reset the value of open_cursors
-oracle_parameter:
+- name: Reset open_cursors to its default value
+  opitzconsulting.ansible_oracle.oracle_parameter:
     hostname: remote-db-server
     service_name: orcl
     user: system
-    password: manager
-    name: db_recovery_file_dest_size
+    password: "{{ system_password }}"
+    name: open_cursors
     state: reset
     scope: spfile
 
+- name: Set an underscore parameter (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    service_name: orcl
+    mode: sysdba
+    name: _optimizer_adaptive_cursor_sharing
+    value: 'false'
+    scope: spfile
+'''
 
+RETURN = '''
+msg:
+    description:
+        - Message describing the action that was executed.
+        - Not returned for O(state=reset) in check mode. After a successful reset, the
+          value is a list with an empty string.
+    returned: success
+    type: str
+    sample: "The parameter (open_cursors) is already set to 300"
 '''
 
 try:

@@ -12,85 +12,121 @@ ANSIBLE_METADATA = {
 DOCUMENTATION = '''
 ---
 module: oracle_redo
-short_description: Manage Oracle redo related things
+short_description: Manage the size and number of Oracle online redo log groups
 description:
-    - Manage redogroups
-    - Can be run locally on the controlmachine or on a remote host
+    - Ensures that all online redo log groups have the size O(size) and that every
+      enabled redo thread has O(groups) redo log groups.
+    - Everything is done in one PL/SQL block in the database.
+    - Redo log groups with a different size are replaced. For each such group a new
+      group with O(size) is added to the same thread
+      (C(ALTER DATABASE ADD LOGFILE THREAD <n> SIZE <size>)) and the old group is
+      dropped. If the old group is C(CURRENT) or C(ACTIVE), a log switch and a
+      checkpoint are done first (C(SWITCH ALL LOGFILE) and C(CHECKPOINT GLOBAL) in
+      RAC), followed by a wait of 5 seconds.
+    - New groups are created without file names or member count, so the database
+      defaults (for example C(DB_CREATE_ONLINE_LOG_DEST_n)) are used.
+    - If a thread has fewer groups than O(groups), groups are added with the next
+      free group number. If it has more, the groups with the highest group number
+      that are not C(CURRENT) or C(ACTIVE) are dropped. Files of dropped groups are
+      not deleted by the module.
+    - C(changed=true) is returned if any group was replaced, added or dropped.
+    - The connected user needs the privileges to read C(V$LOG), C(V$THREAD) and
+      C(V$INSTANCE), C(ALTER DATABASE), C(ALTER SYSTEM) and C(EXECUTE) on
+      C(DBMS_LOCK).
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
+    - Can be run locally on the control machine or on a remote host.
 version_added: "2.4"
 options:
     hostname:
-        description: The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
     port:
-        description: >
-            The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     service_name:
-        description: >
-            The database service name to connect to
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the
+              wallet entry.
+        type: str
         required: true
     user:
-        description: >
-            The Oracle user name to connect to the database, must have DBA privilege
-        required: False
-    password:
-        description: The Oracle user password for 'user'
-        required: False
-    mode:
-        description: >
-            The mode with which to connect to the database
-        required: true
-        default: normal
-        choices: ['normal','sysdba']
-    size:
-        description: size of redologs
-        required: true
-        default: 50MB
-    groups:
-        description: The number of redolog groups
+        description:
+            - The Oracle user name to connect to the database.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
         required: false
-        type: int
-    members:
-        description: >
-            Either to set the preference (present)
-            or reset it to default (absent)
+    password:
+        description:
+            - The Oracle user password for O(user).
+        type: str
+        required: false
+    mode:
+        description:
+            - The mode with which to connect to the database.
+        type: str
+        required: false
+        default: normal
+        choices: ['normal', 'sysdba']
+    size:
+        description:
+            - The wanted size of every redo log group.
+            - Must end with an uppercase V(M), V(G) or V(T), for example V(512M) or
+              V(1G).
+        type: str
         required: true
-        default: 1
-
-
+    groups:
+        description:
+            - The wanted number of redo log groups per enabled redo thread.
+        type: int
+        required: true
 notes:
     - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+    - Mikael Sandström (@oravirt)
 '''
 
 EXAMPLES = '''
-- hosts: all
-  gather_facts: true
-  vars:
-      oracle_home: /u01/app/oracle/12.2.0.1/db1
-      hostname: "{{ ansible_hostname }}"
-      service_name: orclcdb
-      user: system
-      password: Oracle_123
-      oracle_env:
-             ORACLE_HOME: "{{ oracle_home }}"
-             LD_LIBRARY_PATH: "{{ oracle_home }}/lib"
-      redosize: 15M
-      numgroups: 3
-  tasks:
-  - name: Manage redologs
-    oracle_redo:
-        service_name={{ service_name }}
-        hostname={{ hostname}}
-        user={{ user }}
-        password={{ password }}
-        groups={{ numgroups |default(omit) }}
-        size={{ redosize |default(omit)}}
-    environment: "{{ oracle_env }}"
-    run_once: True
+- name: Ensure 3 redo log groups of 1G per thread
+  opitzconsulting.ansible_oracle.oracle_redo:
+    hostname: "{{ ansible_hostname }}"
+    service_name: orclcdb
+    user: system
+    password: "{{ system_password }}"
+    size: 1G
+    groups: 3
+  environment:
+    ORACLE_HOME: /u01/app/oracle/product/19.0.0/dbhome_1
+    LD_LIBRARY_PATH: /u01/app/oracle/product/19.0.0/dbhome_1/lib
+  run_once: true
+
+- name: Ensure 4 redo log groups of 512M per thread (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_redo:
+    service_name: orclcdb
+    mode: sysdba
+    size: 512M
+    groups: 4
+'''
+
+RETURN = '''
+msg:
+    description:
+        - Message describing the size changes and the group changes.
+    returned: success
+    type: str
+    sample: >-
+        All redologs have been changed to 1G.
+        Groups have been adjusted to 3 groups.
 '''
 
 try:
@@ -103,7 +139,7 @@ else:
 
 # Ansible code
 def main():
-    global lconn, conn, msg, module
+    global conn, msg, module
     msg = ['']
     module = AnsibleModule(
         argument_spec=dict(

@@ -9,89 +9,130 @@ DOCUMENTATION = '''
 module: oracle_jobschedule
 short_description: Manage DBMS_SCHEDULER job schedules in Oracle database
 description:
-    - Manage DBMS_SCHEDULER job schedules in Oracle database
-    - Can be run locally on the controlmachine or on a remote host
+    - Creates, changes and drops C(DBMS_SCHEDULER) schedules in an Oracle database.
+    - The existence and attributes of a schedule are read from
+      C(ALL_SCHEDULER_SCHEDULES).
+    - An existing schedule is changed with C(DBMS_SCHEDULER.SET_ATTRIBUTE) if
+      O(repeat_interval) or O(comments) differ. The values are compared as strings.
+    - In check mode, the module only connects to the database. It does not check
+      the schedule and always returns C(changed=false).
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "2.2.1"
 options:
     hostname:
-        description: The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
     port:
-        description: The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     service_name:
-        description: The database service name to connect to
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the
+              wallet entry.
+        type: str
         required: true
     user:
-        description: >
-            The Oracle user name to connect to the database, must have DBA privilege
-        required: False
-    password:
-        description: >
-            The Oracle user password for 'user'
-        required: False
-    mode:
-        description: >
-            The mode with which to connect to the database
-        required: true
-        default: normal
-        choices: ['normal','sysdba']
-    state:
-        description: >
-            If present, job schedule is created, if absent then schedule is dropped
-        required: true
-        choices: ['present','absent']
-    name:
-        description: Job schedule name
-        required: True
-    repeat_interval:
-        description: Schedule repeat interval using DBMS_SCHEDULER calendaring syntax
-        required: True
-        aliases:
-            - interval
-    comments:
-        description: Comment about the class
-        required: False
-    convert_to_upper:
-        description: Schedule name automatically converted to upper case
+        description:
+            - The Oracle user name to connect to the database.
+            - The user needs privileges to manage schedules in the schema of the
+              schedule, e.g. C(CREATE ANY JOB).
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
         required: false
-        default: True
+    password:
+        description:
+            - The Oracle user password for O(user).
+        type: str
+        required: false
+    mode:
+        description:
+            - The mode with which to connect to the database.
+        type: str
+        required: false
+        default: normal
+        choices: ['normal', 'sysdba']
+    state:
+        description:
+            - V(present) - the schedule is created or changed.
+            - V(absent) - the schedule is dropped.
+        type: str
+        required: false
+        default: present
+        choices: ['present', 'absent']
+    name:
+        description:
+            - The name of the schedule, including the owner schema in the form
+              V(OWNER.SCHEDULE_NAME).
+            - Allowed characters are letters, digits, V(_), V($) and V(#).
+        type: str
+        required: true
+    repeat_interval:
+        description:
+            - The repeat interval of the schedule in C(DBMS_SCHEDULER) calendaring
+              syntax, e.g. V(FREQ=HOURLY;INTERVAL=1).
+            - Also required with O(state=absent), although it is not used there.
+        type: str
+        required: true
+        aliases: ['interval']
+    comments:
+        description:
+            - Comments for the schedule.
+            - If not set, existing comments are removed.
+        type: str
+        required: false
+    convert_to_upper:
+        description:
+            - Whether O(name) is converted to uppercase.
+            - With V(false), the schedule name is used case sensitive (quoted).
         type: bool
-
+        required: false
+        default: true
 notes:
     - cx_Oracle needs to be installed
     - Oracle RDBMS 10gR2 or later required
 requirements: [ "cx_Oracle", "re" ]
-author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
+author:
+    - Ilmar Kerm (@ilmarkerm)
 '''
 
 EXAMPLES = '''
----
-- hosts: localhost
-  vars:
-    oraclehost: 192.168.56.101
-    oracleport: 1521
-    oracleservice: orcl
-    oracleuser: system
-    oraclepassword: oracle
-    oracle_env:
-      ORACLE_HOME: /usr/lib/oracle/12.1/client64
-      LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
-  tasks:
-    - name: job schedule
-      oracle_jobschedule:
-        hostname: "{{ oraclehost }}"
-        port: "{{ oracleport }}"
-        service_name: "{{ oracleservice }}"
-        user: "{{ oracleuser }}"
-        password: "{{ oraclepassword }}"
-        state: present
-        name: hr.hourly_schedule
-        interval: FREQ=HOURLY; INTERVAL=1
-        comments: Just for testing
-      environment: "{{ oracle_env }}"
+- name: Create hourly job schedule
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    hostname: dbhost
+    port: 1521
+    service_name: orclpdb
+    user: system
+    password: "{{ system_password }}"
+    state: present
+    name: hr.hourly_schedule
+    repeat_interval: FREQ=HOURLY; INTERVAL=1
+    comments: Just for testing
+
+- name: Drop job schedule (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    service_name: orclpdb
+    state: absent
+    name: hr.hourly_schedule
+    repeat_interval: FREQ=HOURLY; INTERVAL=1
+'''
+
+RETURN = '''
+msg:
+    description:
+        - Always an empty string, the module sets no message.
+    returned: success, when not in check mode
+    type: str
+    sample: ""
 '''
 
 try:
@@ -119,7 +160,7 @@ def query_existing(owner, name):
 
 # Ansible code
 def main():
-    global lconn, conn, msg, module
+    global conn, msg, module
     msg = ['']
     module = AnsibleModule(
         argument_spec=dict(

@@ -9,179 +9,247 @@ DOCUMENTATION = '''
 module: oracle_job
 short_description: Manage DBMS_SCHEDULER jobs in Oracle database
 description:
-    - Manage DBMS_SCHEDULER jobs in an Oracle database
-    - Can be run locally on the controlmachine or on a remote host
+    - Creates, changes and drops C(DBMS_SCHEDULER) jobs in an Oracle database.
+    - The existence and attributes of a job are read from C(ALL_SCHEDULER_JOBS) and
+      C(ALL_SCHEDULER_JOB_ARGS).
+    - A new job is created with C(DBMS_SCHEDULER.CREATE_JOB). Afterwards
+      O(restartable), O(logging_level) and O(job_arguments) are set, and the job is
+      enabled if O(enabled=true).
+    - An existing job is compared with all options. If any attribute differs, the
+      job is dropped and created again.
+    - In check mode, the module only connects to the database. It does not check
+      the job and always returns C(changed=false).
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "2.2.1"
 options:
     hostname:
-        description: The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
     port:
-        description: The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
     service_name:
-        description: The database service name to connect to
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the
+              wallet entry.
+        type: str
         required: true
     user:
-        description: >
-            The Oracle user name to connect to the database, must have DBA privilege
-        required: False
+        description:
+            - The Oracle user name to connect to the database.
+            - The user needs privileges to create and drop jobs in the schema of the
+              job, e.g. C(CREATE ANY JOB).
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
+        required: false
     password:
-        description: The Oracle user password for 'user'
-        required: False
+        description:
+            - The Oracle user password for O(user).
+        type: str
+        required: false
     mode:
-        description: >
-            The mode with which to connect to the database
+        description:
+            - The mode with which to connect to the database.
+        type: str
         required: false
         default: normal
-        choices:
-            - normal
-            - sysdba
+        choices: ['normal', 'sysdba']
     state:
-        description: >
-            If present, then job is created, if absent then job is dropped
-        required: true
-        choices:
-            - present
-            - absent
+        description:
+            - V(present) - the job is created, or dropped and created again if any
+              attribute differs.
+            - V(absent) - the job is dropped.
+        type: str
+        required: false
+        default: present
+        choices: ['present', 'absent']
     enabled:
-        description: Is job enabled
+        description:
+            - Whether the job is enabled.
+        type: bool
         required: false
         default: true
-        type: bool
     job_name:
-        description: >
-            Job name, can be specified with owner schema name
-        required: True
-        aliases:
-            - name
+        description:
+            - The name of the job, including the owner schema in the form
+              V(OWNER.JOB_NAME).
+            - Allowed characters are letters, digits, V(_), V($) and V(#).
+        type: str
+        required: true
+        aliases: ['name']
     job_class:
-        description: Job class
+        description:
+            - The job class of the job.
+            - Must be given in uppercase, as it is compared case sensitive with
+              C(ALL_SCHEDULER_JOBS).
+        type: str
         required: false
         default: DEFAULT_JOB_CLASS
-        aliases:
-            - class
+        aliases: ['class']
     job_type:
-        description: Job type
+        description:
+            - The type of the job action.
+            - Not used when the job is created with O(program_name).
+        type: str
         required: false
         default: plsql_block
-        choices:
-            - plsql_block
-            - stored_procedure
-            - executable
-            - external_script
-            - sql_script
-            - backup_script
-        aliases:
-            - type
+        choices: ['plsql_block', 'stored_procedure', 'executable', 'external_script',
+                  'sql_script', 'backup_script']
+        aliases: ['type']
     job_action:
-        description: Job action (what is executed)
+        description:
+            - The action executed by the job, e.g. a PL/SQL block or the name of a
+              stored procedure, depending on O(job_type).
+            - O(job_action) or O(program_name) is required with O(state=present).
+        type: str
         required: false
-        aliases:
-            - action
+        aliases: ['action']
     job_arguments:
-        description: >
-            List of arguments passed to job, only positional arguments supported
-        required: false
+        description:
+            - List of argument values passed to the job. Only positional arguments
+              are supported.
+            - The number of arguments of the job is set to the number of list
+              elements.
         type: list
-        aliases:
-            - arguments
-    lightweight:
-        description: Is it lightweight job
+        elements: str
         required: false
-        default: False
+        aliases: ['arguments']
+    lightweight:
+        description:
+            - Whether the job is created as lightweight job (C(job_style=LIGHTWEIGHT)).
+            - Lightweight jobs require O(program_name) and cannot be restartable.
         type: bool
+        required: false
+        default: false
     credential:
-        description: Credential name
+        description:
+            - The name of the credential used by the job.
+            - If no owner schema is given, the owner of the job is assumed.
+        type: str
         required: false
     destination:
-        description: Destination name
+        description:
+            - The name of the destination of the job.
+            - If no owner schema is given, the owner of the job is assumed.
+        type: str
         required: false
     restartable:
-        description: Is job restartable
-        required: false
-        default: False
+        description:
+            - Whether the job is restartable.
         type: bool
+        required: false
+        default: false
     repeat_interval:
-        description: Job repeat interval
+        description:
+            - The repeat interval of the job in C(DBMS_SCHEDULER) calendaring syntax,
+              e.g. V(FREQ=HOURLY;INTERVAL=3).
+            - Mutually exclusive with O(schedule_name).
+        type: str
         required: false
     logging_level:
-        description: Job logging level
+        description:
+            - The logging level of the job.
+            - If not set, the default logging level of the job class is used.
+        type: str
         required: false
-        choices:
-            - off
-            - runs
-            - failed runs
-            - full
+        choices: ['off', 'runs', 'failed runs', 'full']
     program_name:
-        description: Associated DBMS_SCHEDULER program name
+        description:
+            - The C(DBMS_SCHEDULER) program executed by the job, in the form
+              V(OWNER.PROGRAM_NAME).
+            - Mutually exclusive with O(job_action).
+        type: str
         required: false
     schedule_name:
-        description: Associated DBMS_SCHEDULER schedule name
+        description:
+            - The C(DBMS_SCHEDULER) schedule used by the job, in the form
+              V(OWNER.SCHEDULE_NAME).
+            - Mutually exclusive with O(repeat_interval).
+        type: str
         required: false
     comments:
-        description: Job comments
+        description:
+            - Comments for the job.
+        type: str
         required: false
     auto_drop:
-        description: >
-            Is job automatically dropped after execution
-        required: false
-        default: False
+        description:
+            - Whether the job is automatically dropped after its last execution.
         type: bool
+        required: false
+        default: false
     convert_to_upper:
-        description: >
-            Job name automatically converted to upper case
-        required: false
-        default: True
+        description:
+            - Whether O(job_name) is converted to uppercase.
+            - With V(false), the job name is used case sensitive (quoted).
         type: bool
+        required: false
+        default: true
 notes:
     - cx_Oracle needs to be installed
     - Oracle RDBMS 10gR2 or later required
 requirements: [ "cx_Oracle", "re" ]
-author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
+author:
+    - Ilmar Kerm (@ilmarkerm)
 '''
 
 EXAMPLES = '''
-- hosts: localhost
-  vars:
-    oraclehost: 192.168.56.101
-    oracleport: 1521
-    oracleservice: orcl
-    oracleuser: system
-    oraclepassword: oracle
-    oracle_env:
-      ORACLE_HOME: /usr/lib/oracle/12.1/client64
-      LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
-  tasks:
-    - name: drop job
-      oracle_job:
-        hostname: "{{ oraclehost }}"
-        port: "{{ oracleport }}"
-        service_name: "{{ oracleservice }}"
-        user: "{{ oracleuser }}"
-        password: "{{ oraclepassword }}"
-        state: absent
-        name: hr.j1
-      environment: "{{ oracle_env }}"
-    - name: create job
-      oracle_job:
-        hostname: "{{ oraclehost }}"
-        port: "{{ oracleport }}"
-        service_name: "{{ oracleservice }}"
-        user: "{{ oracleuser }}"
-        password: "{{ oraclepassword }}"
-        state: present
-        name: hr.j1
-        action: begin null; null; end;
-        logging_level: runs
-        comments: This job is just for testing something
-        repeat_interval: FREQ=HOURLY;interval=3
-        enabled: False
-        lightweight: False
-        restartable: True
-      environment: "{{ oracle_env }}"
+- name: Drop job
+  opitzconsulting.ansible_oracle.oracle_job:
+    hostname: dbhost
+    port: 1521
+    service_name: orclpdb
+    user: system
+    password: "{{ system_password }}"
+    state: absent
+    job_name: hr.j1
+
+- name: Create job
+  opitzconsulting.ansible_oracle.oracle_job:
+    hostname: dbhost
+    port: 1521
+    service_name: orclpdb
+    user: system
+    password: "{{ system_password }}"
+    state: present
+    job_name: hr.j1
+    job_action: begin null; null; end;
+    logging_level: runs
+    comments: This job is just for testing something
+    repeat_interval: FREQ=HOURLY;INTERVAL=3
+    enabled: false
+    lightweight: false
+    restartable: true
+
+- name: Create job calling a stored procedure with a schedule (Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_job:
+    service_name: orclpdb
+    job_name: hr.purge_log
+    job_type: stored_procedure
+    job_action: hr.log_pkg.purge
+    job_arguments:
+      - "30"
+    schedule_name: hr.daily_schedule
+    logging_level: failed runs
+'''
+
+RETURN = '''
+msg:
+    description:
+        - Always an empty string, the module sets no message.
+    returned: success, when not in check mode
+    type: str
+    sample: ""
 '''
 
 try:
@@ -379,7 +447,7 @@ def compare_with_owner(value1, value2, owner):
 
 # Ansible code
 def main():
-    global lconn, conn, lparam, module, job_fullname
+    global conn, module, job_fullname
     msg = ['']
     module = AnsibleModule(
         argument_spec=dict(

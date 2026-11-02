@@ -7,128 +7,198 @@ from ansible.module_utils.basic import AnsibleModule
 DOCUMENTATION = '''
 ---
 module: oracle_asmdg
-short_description: Manage diskgroups in an Oracle database
+short_description: Manage ASM disk groups
 description:
-  - Manage diskgroups in an Oracle database
+    - Creates, changes and drops ASM disk groups and shows their disks.
+    - The module connects to the ASM instance with C(SYSASM) privileges.
+    - The existence of a disk group is checked in C(GV$ASM_DISKGROUP)
+      (case-insensitive).
+    - A new disk group is created with C(CREATE DISKGROUP <name> <redundancy>
+      REDUNDANCY DISK ... [ATTRIBUTE ...]).
+    - For an existing disk group with O(state=present), the disks and attributes
+      are compared with the wanted state. Missing disks are added and disks not
+      listed in O(disks) are dropped with C(ALTER DISKGROUP ... ADD DISK ... DROP
+      DISK ...), differing attributes are set with C(ALTER DISKGROUP ... SET
+      ATTRIBUTE). Read-only attributes are ignored. O(redundancy) is not changed.
+    - In a RAC environment (C(V$INSTANCE.PARALLEL=YES)), a new disk group is
+      started on all nodes with C(srvctl start diskgroup), and before dropping a
+      disk group it is stopped with C(srvctl stop diskgroup) and mounted locally.
+      This needs O(oracle_home) or the environment variable E(ORACLE_HOME).
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "2.1.0"
 options:
-  name:
-    description: The name of the diskgroup
-    required: true
-    default: None
-    type: str
-    aliases: ['diskgroup', 'dg']
-  state:
-    description: >
-        The intended state of the diskgroup. 'status' will just show the
-        status of the diskgroup
-    default: present
-    type: str
-    choices: ['present', 'absent', 'status']
-  disks:
-    description: >
-        A list of disks that should be part of the diskgroup. Only the listed
-        disks will be part of the DG, meaning if the disk is removed from the
-        list it will also be removed from the DG
-    default: None
-    type: str
-  redundancy:
-    description: >
-        The redundancy configuration for the diskgroup, It does not yet
-        support putting disks in specific failure groups
-    default: external
-    type: str
-    choices: ['external', 'normal', 'high']
-  attribute_name:
-    description: >
-        The attribute name (e.g compatible.rdbms)
-    default: None
-    type: str
-    aliases: ['an']
-  attribute_value:
-    description: >
-      The attribute value (e.g 12.1.0.2)
-    default: None
-    type: str
-    aliases: ['av']
-  username:
-    description: The ASM username
-    required: false
-    type: str
-    default: sys
-    aliases: ['un']
-  password:
-    description: The password for the ASM user
-    required: false
-    default: None
-    type: str
-    aliases: ['pw']
-  service_name:
-    description: >
-      The diskgroup_name to connect to the database if using dbms_diskgroup.
-    required: false
-    default: +ASM
-    type: str
-    aliases: ['sn']
-  hostname:
-    description: >
-      The host of the database if using dbms_diskgroup
-    required: false
-    default: localhost
-    type: str
-    aliases: ['host']
-  port:
-    description: >
-      The listener port to connect to the database if using dbms_diskgroup
-    required: false
-    default: 1521
-    type: str
-  oracle_home:
-    description: The GI ORACLE_HOME
-    required: false
-    default: None
-    type: str
-    aliases: ['oh']
-
+    name:
+        description:
+            - The name of the disk group.
+        type: str
+        required: true
+        aliases: ['diskgroup', 'dg']
+    disks:
+        description:
+            - The list of disks (paths) that should be part of the disk group.
+            - Only the listed disks will be part of the disk group. Disks of an
+              existing disk group that are not in the list are dropped.
+            - Disk names containing C(:) (ASMLib, for example V(ORCL:DISK1)) are
+              converted to uppercase, other paths are compared case-sensitive with
+              C(V$ASM_DISK.PATH).
+            - Required with O(state=present), although not enforced by the
+              argument spec.
+        type: list
+        elements: str
+        required: false
+    redundancy:
+        description:
+            - The redundancy of the disk group.
+            - Used only when the disk group is created. Disks cannot be placed in
+              specific failure groups.
+        type: str
+        required: false
+        default: external
+        choices: ['external', 'normal', 'high', 'flex']
+    attribute_name:
+        description:
+            - List of disk group attribute names, for example V(compatible.asm).
+            - Each entry corresponds to the entry at the same position in
+              O(attribute_value).
+            - Names and values are converted to lowercase.
+        type: list
+        elements: str
+        required: false
+        aliases: ['an']
+    attribute_value:
+        description:
+            - List of disk group attribute values, for example V(19.0.0.0).
+            - Must have the same number of entries as O(attribute_name).
+            - Attributes are only compared for an existing disk group when both
+              O(attribute_name) and O(attribute_value) are set. If any attribute
+              differs, all listed attributes are set again.
+        type: list
+        elements: str
+        required: false
+        aliases: ['av']
+    state:
+        description:
+            - V(present) - the disk group is created, or its disks and attributes
+              are changed to the wanted state.
+            - V(absent) - the disk group is dropped (C(DROP DISKGROUP) without
+              C(INCLUDING CONTENTS)).
+            - V(status) - returns the disks of the disk group in RV(msg). Nothing
+              is changed.
+        type: str
+        required: false
+        default: present
+        choices: ['present', 'absent', 'status']
+    user:
+        description:
+            - The user name to connect to the ASM instance (as C(SYSASM)).
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
+        required: false
+        aliases: ['un', 'username']
+    password:
+        description:
+            - The password for O(user).
+        type: str
+        required: false
+        aliases: ['pw']
+    hostname:
+        description:
+            - The host of the ASM instance.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
+        required: false
+        default: localhost
+        aliases: ['host']
+    port:
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
+        required: false
+        default: 1521
+    service_name:
+        description:
+            - The service name of the ASM instance.
+            - When connecting with an Oracle wallet, this is the TNS alias of the
+              wallet entry.
+        type: str
+        required: false
+        default: '+ASM'
+        aliases: ['sn']
+    oracle_home:
+        description:
+            - The Grid Infrastructure C(ORACLE_HOME).
+            - Only used in a RAC environment to call C(srvctl). If not set, the
+              environment variable E(ORACLE_HOME) is used.
+        type: str
+        required: false
+        aliases: ['oh']
 notes:
-  - cx_Oracle needs to be installed
+    - cx_Oracle needs to be installed
 requirements: [ "cx_Oracle" ]
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+author:
+    - Mikael Sandström (@oravirt)
 '''
 
 EXAMPLES = '''
-# Create a diskgroup
-oracle_asmdg:
+- name: Create disk group MYDG1 with ASMLib disks
+  opitzconsulting.ansible_oracle.oracle_asmdg:
     name: MYDG1
     disks:
-       - ORCL:MYDG1
-       - ORCL:MYDG2
+      - ORCL:MYDG1
+      - ORCL:MYDG2
     attribute_name: compatible.asm
     attribute_value: 12.1.0.2
     redundancy: external
     state: present
-    un: sys
-    pw: oracle123
-    sn: '+ASM'
-    host: localhost
-    oh: /u01/app/oracle/12.1.2.0/grid
+    user: sys
+    password: "{{ asm_password }}"
+    service_name: '+ASM'
+    hostname: localhost
+    oracle_home: /u01/app/oracle/12.1.0.2/grid
 
-oracle_asmdg:
+- name: Create disk group DATA with several attributes
+  opitzconsulting.ansible_oracle.oracle_asmdg:
     name: DATA
     disks:
-       - /dev/oracle/data1
-       - /dev/oracle/data2
-    attributes:
-      - {name: compatible.asm, value: 12.2.0.1.0 }
-      - {name: compatible.rdbms, value: 12.2.0.1.0 }
+      - /dev/oracle/data1
+      - /dev/oracle/data2
+    attribute_name:
+      - compatible.asm
+      - compatible.rdbms
+    attribute_value:
+      - 19.0.0.0
+      - 19.0.0.0
     redundancy: external
     state: present
-    un: sys
-    pw: oracle123
-    sn: '+ASM'
-    host: localhost
-    oh: /u01/app/oracle/12.2.0.1/grid
+    user: sys
+    password: "{{ asm_password }}"
+    oracle_home: /u01/app/19.0.0/grid
 
+- name: Show the disks of disk group DATA (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_asmdg:
+    name: DATA
+    state: status
+
+- name: Drop disk group MYDG1
+  opitzconsulting.ansible_oracle.oracle_asmdg:
+    name: MYDG1
+    state: absent
+    user: sys
+    password: "{{ asm_password }}"
+'''
+
+RETURN = '''
+msg:
+    description:
+        - Message describing the action that was executed.
+        - With O(state=status) and an existing disk group, a list of
+          C([path, name]) entries of the disks (from C(V$ASM_DISK)) is returned
+          instead of a string.
+    returned: always
+    type: raw
+    sample: "Diskgroup DATA has been put in the intended state"
 '''
 
 try:

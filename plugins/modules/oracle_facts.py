@@ -6,43 +6,59 @@ from ansible.module_utils.basic import AnsibleModule
 DOCUMENTATION = '''
 ---
 module: oracle_facts
-short_description: Returns some facts about Oracle DB
+short_description: Gather facts about an Oracle database
 description:
-    - Returns some facts about Oracle DB
+    - Connects to an Oracle database and returns information about database,
+      instances, PDBs, tablespaces, redo logs, options, init parameters and the
+      session environment as Ansible facts.
+    - The facts are stored as top level keys in C(ansible_facts), for example
+      C(ansible_facts.database) or C(ansible_facts.parameter).
+    - The module never changes anything (C(changed=false)).
+    - In check mode the module only connects to the database and returns no facts.
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "2.2.1"
 options:
     hostname:
-        description: The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
-        type: str
     port:
-        description: >
-            The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
-        type: str
     service_name:
-        description: >
-            The database service name to connect to
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the
+              wallet entry.
+        type: str
         required: true
-        type: str
     user:
-        description: >
-            The Oracle user name to connect to the database, must have DBA privilege
-        required: False
+        description:
+            - The Oracle user name to connect to the database.
+            - The user needs read access to the queried C(V$) and C(GV$) views,
+              for example the DBA role.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
         type: str
+        required: false
     password:
-        description: >
-            The Oracle user password for 'user'
-        required: False
+        description:
+            - The Oracle user password for O(user).
         type: str
+        required: false
     mode:
-        description: >
-            The mode with which to connect to the database
+        description:
+            - The mode with which to connect to the database.
+        type: str
         required: false
         default: normal
-        type: str
         choices:
             - normal
             - sysdba
@@ -50,31 +66,113 @@ notes:
     - cx_Oracle needs to be installed
     - Oracle RDBMS 10gR2 or later required
 requirements: [ "cx_Oracle" ]
-author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
+author:
+    - Ilmar Kerm (@ilmarkerm)
 '''
 
 EXAMPLES = '''
-- hosts: localhost
-  vars:
-    oraclehost: 192.168.56.101
-    oracleport: 1521
-    oracleservice: orcl
-    oracleuser: system
-    oraclepassword: oracle
-    oracle_env:
-      ORACLE_HOME: /usr/lib/oracle/12.1/client64
-      LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
-  tasks:
-    - name: gather database facts
-      oracle_facts:
-        hostname: "{{ oraclehost }}"
-        port: "{{ oracleport }}"
-        service_name: "{{ oracleservice }}"
-        user: "{{ oracleuser }}"
-        password: "{{ oraclepassword }}"
-      register: dbfacts
-    - debug:
-        var: dbfacts
+- name: Gather database facts
+  opitzconsulting.ansible_oracle.oracle_facts:
+    hostname: dbhost
+    port: 1521
+    service_name: orcl
+    user: system
+    password: "{{ system_password }}"
+  environment:
+    ORACLE_HOME: /usr/lib/oracle/12.1/client64
+    LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
+  register: dbfacts
+
+- name: Show database role and open PDBs
+  ansible.builtin.debug:
+    msg:
+      - "{{ ansible_facts.userenv.DATABASE_ROLE }}"
+      - "{{ ansible_facts.pdb | map(attribute='NAME') | list }}"
+
+- name: Gather database facts as SYSDBA (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_facts:
+    service_name: orcl
+    mode: sysdba
+'''
+
+RETURN = '''
+msg:
+    description: Message of the module. Always an empty string.
+    returned: when not running in check mode
+    type: str
+    sample: ""
+ansible_facts:
+    description:
+        - Facts about the database.
+        - Column names are returned in uppercase as reported by the database.
+    returned: when not running in check mode
+    type: dict
+    contains:
+        version:
+            description: Version of the database server (C(connection.version)).
+            type: str
+            sample: "19.21.0.0.0"
+        database:
+            description:
+                - All columns of C(V$DATABASE).
+                - C(CDB) is set to V(NO) for databases without this column.
+            type: dict
+            sample: {"NAME": "ORCL", "CDB": "YES", "LOG_MODE": "ARCHIVELOG"}
+        instance:
+            description: All columns of C(V$INSTANCE).
+            type: dict
+            sample: {"INSTANCE_NAME": "orcl", "STATUS": "OPEN"}
+        rac:
+            description:
+                - C(INST_ID), C(INSTANCE_NAME), C(HOST_NAME) and C(STARTUP_TIME) of
+                  all instances from C(GV$INSTANCE).
+                - Empty list if the query fails.
+            type: list
+            elements: dict
+        pdb:
+            description:
+                - C(CON_ID), C(GUID_HEX), C(NAME) and C(OPEN_MODE) of all PDBs from
+                  C(V$PDBS).
+                - Empty list for non-CDBs or if the query fails.
+            type: list
+            elements: dict
+        tablespace:
+            description:
+                - Permanent tablespaces with C(CON_ID), C(NAME), C(BIGFILE),
+                  C(SIZE_MB) and number of datafiles (C(DATAFILES#)).
+                - C(CON_ID) is V(0) for databases before 12.1.
+            type: list
+            elements: dict
+        temp_tablespace:
+            description:
+                - Temporary tablespaces with C(CON_ID), C(NAME), C(BIGFILE),
+                  C(SIZE_MB) and number of tempfiles (C(TEMPFILES#)).
+            type: list
+            elements: dict
+        redolog:
+            description:
+                - Online redo log groups from C(V$LOG) with C(GROUP#), C(THREAD#),
+                  C(SEQUENCE#), C(MB), C(BLOCKSIZE), C(ARCHIVED) and C(STATUS).
+            type: list
+            elements: dict
+        option:
+            description: All rows of C(V$OPTION).
+            type: list
+            elements: dict
+        parameter:
+            description:
+                - All init parameters from C(V$PARAMETER), keyed by parameter name.
+                - Each entry contains C(value) and C(isdefault).
+            type: dict
+            sample: {"db_name": {"value": "orcl", "isdefault": "FALSE"}}
+        userenv:
+            description:
+                - Session context from C(SYS_CONTEXT('USERENV', ...)) -
+                  C(CURRENT_USER), C(DATABASE_ROLE), C(ISDBA), C(ORACLE_HOME).
+                - From 11.1 also C(CURRENT_EDITION_ID) and C(CURRENT_EDITION_NAME),
+                  from 12.1 also C(CON_ID) and C(CON_NAME).
+            type: dict
+            sample: {"CURRENT_USER": "SYSTEM", "DATABASE_ROLE": "PRIMARY"}
 '''
 
 

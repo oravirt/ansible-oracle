@@ -14,171 +14,254 @@ else:
 
 
 DOCUMENTATION = '''
+---
 module: oracle_ldapuser
-short_description: >
-    Syncronises user accounts from LDAP/Active directory to Oracle database and
-    maps group membership to Oracle roles
+short_description: Synchronise users from LDAP/Active Directory to an Oracle database
 description:
-    - Syncronises user accounts from LDAP/Active directory to Oracle database and maps \
-      group membership to Oracle roles
-    - Can be run locally on the controlmachine or on a remote host
+    - Synchronises user accounts from LDAP/Active Directory to an Oracle database and
+      maps LDAP group membership to Oracle roles.
+    - Can be run locally on the control machine or on a remote host.
+    - The users are searched below O(ldap_user_basedn) with O(ldap_user_filter).
+      The value of O(ldap_username_attribute) is used as the Oracle user name.
+    - All synchronised users are identified by O(user_profile). Missing users are
+      created with O(user_default_tablespace), O(user_temp_tablespace),
+      O(user_profile) and the quota O(user_quota_on_default_tbs_mb) on the default
+      tablespace.
+    - Existing users with differing tablespaces, profile, quota or authentication
+      type, or with a locked account, are changed back with C(ALTER USER ...
+      ACCOUNT UNLOCK).
+    - Each synchronised user gets exactly the privileges and roles from
+      O(user_grants) plus the roles mapped by O(group_role_map). All other system
+      privileges and roles granted directly to the user are revoked.
+    - Users with profile O(user_profile) that are no longer found in LDAP are
+      locked or dropped, see O(deleted_user_mode).
+    - The whole synchronisation runs in one PL/SQL block. The module reports
+      changed=true if at least one DDL statement was executed.
+    - If neither O(user) nor O(password) is given, a connection with an Oracle
+      wallet (C(/@<service_name>)) is used. Otherwise both must be set.
+    - In check mode the module only connects to LDAP and the database and returns
+      changed=false. No changes are predicted.
 version_added: "2.2.0"
 options:
     hostname:
-        description: The Oracle database host
+        description:
+            - The Oracle database host.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
         required: false
         default: localhost
-        type: str
     port:
-        description: >
-            The listener port number on the host
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
         required: false
         default: 1521
-        type: int
     service_name:
-        description: >
-            The database service name to connect to
-        required: true
+        description:
+            - The database service name to connect to.
+            - When connecting with an Oracle wallet, this is the TNS alias of the
+              wallet entry.
         type: str
+        required: true
     user:
-        description: >
-            The Oracle user name to connect to the database, must have DBA privilege
+        description:
+            - The Oracle user name to connect to the database, must have DBA
+              privileges.
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
         required: false
     password:
         description:
-            - The Oracle user password for 'user'
+            - The Oracle user password for O(user).
+        type: str
         required: false
     mode:
         description:
-            - The mode with which to connect to the database
-        required: true
+            - The mode with which to connect to the database.
+        type: str
+        required: false
         default: normal
-        choices: ['normal','sysdba']
+        choices: ['normal', 'sysdba']
     user_default_tablespace:
         description:
-            - Default tablespace for syncronised users
+            - Default tablespace for synchronised users.
+            - Must be an existing permanent tablespace. V(SYSTEM) and V(SYSAUX) are
+              rejected.
+        type: str
         required: false
         default: USERS
     user_quota_on_default_tbs_mb:
         description:
-            - Quota in MB for the default tablespace
-            - Do not specify for unlimited quota
+            - Quota in MB on O(user_default_tablespace).
+            - Do not specify for unlimited quota.
+        type: int
         required: false
     user_temp_tablespace:
         description:
-            - Temporary tablespace for syncronised user
+            - Temporary tablespace for synchronised users.
+            - Must be an existing temporary tablespace.
+        type: str
         required: false
         default: TEMP
     user_profile:
         description:
-            - Profile for syncronised user
-            - Must be dedicated profile for this syncronization process, since this is \
-              the only way to detect which users should be locked/dropped
+            - Profile for synchronised users. The profile must exist.
+            - Must be a dedicated profile for this synchronisation process, since this
+              is the only way to detect which users should be locked or dropped.
+              V(DEFAULT) is rejected.
+        type: str
         required: false
         default: LDAP_USER
     user_default_password:
         description:
-            - Default password for newly created user
-            - Password is expired immediately
-            - Do not specify for EXTERNAL authentication_type
+            - Password for newly created users. The password is expired immediately
+              (C(PASSWORD EXPIRE)).
+            - If not set, users are created and kept C(IDENTIFIED EXTERNALLY).
+              Existing synchronised users with password authentication are then
+              changed to C(IDENTIFIED EXTERNALLY).
+            - The password of existing users is not changed.
+        type: str
         required: false
     user_grants:
         description:
-            - List of all grants all syncronised users will get
-        required: false
+            - List of system privileges and roles all synchronised users get.
+            - Privileges and roles not listed here or in O(group_role_map) are
+              revoked from the users.
         type: list
-        default: create session
+        elements: str
+        required: false
+        default: ['create session']
     ldap_connect:
         description:
-            - LDAP connect string eg ldap://domain.int:389
+            - LDAP connect URI, e.g. V(ldap://domain.int:389).
+        type: str
         required: true
     ldap_binddn:
         description:
-            - LDAP login username eg reader@domain.int
+            - LDAP bind user, e.g. V(reader@domain.int).
+        type: str
         required: true
     ldap_bindpassword:
         description:
-            - LDAP login password
+            - LDAP bind password.
+        type: str
         required: true
     ldap_user_basedn:
         description:
-            - LDAP BASE DN for syncronised users
+            - LDAP base DN for the user search.
+        type: str
         required: true
     ldap_user_subtree:
         description:
-            - Is the entire subtree searched for users (true) or just one level (false)
+            - Whether the entire subtree below O(ldap_user_basedn) is searched for
+              users (V(true)) or just one level (V(false)).
+        type: bool
         required: false
         default: true
     ldap_user_filter:
-        description: >
-            LDAP filter to search for syncronised users
+        description:
+            - LDAP filter to search for synchronised users.
+        type: str
         required: false
         default: (objectClass=user)
     ldap_username_attribute:
-        description: >
-            LDAP attribute that is used for user name in Oracle
-            If value does not "Oracle identifier" compatible, then this user is
-            silently skipped
+        description:
+            - LDAP attribute that is used as user name in Oracle.
+            - The value is converted to uppercase. It must be at most 32 characters
+              long, start with a letter, contain only letters, digits and
+              underscores and must not end with an underscore.
+        type: str
         required: false
         default: sAMAccountName
     deleted_user_mode:
-        description: >
-            What action to take then user is not found in LDAP search anymore
+        description:
+            - What to do with users that have profile O(user_profile), are not
+              locked and are not found in the LDAP search anymore.
+            - V(lock) - the account is locked (C(ALTER USER ... ACCOUNT LOCK)).
+            - V(drop) - the user is dropped (C(DROP USER ... CASCADE)).
+        type: str
         required: false
         default: lock
-        choices: ['lock','drop']
+        choices: ['lock', 'drop']
     group_role_map:
-        description: >
-            Each user can be granted additional roles based on LDAP group membership,
-            this parameter describes the relationship between group LDAP DN and
-            Oracle group name
-            Each list item must be DICT with elements dn and groups
-            Example list item:
-            {dn: "CN=prod_db_reader,OU=Security Groups,DC=domain,DC=int",
-            group: "prod_db_reader"}
+        description:
+            - Maps LDAP group membership to Oracle roles.
+            - Each list item is a dictionary with the keys C(dn) (the DN of the LDAP
+              group) and C(group) (the name of the Oracle role).
+            - A user gets the role if C(dn) is contained in the C(memberOf)
+              attribute of the user. The role must exist in the database.
+        type: list
+        elements: dict
         required: false
-        type: list of dicts
 notes:
     - cx_Oracle needs to be installed
     - ldap python module needs to be installed, but not from PIP!
       yum install python-ldap
+    - The module fails if the LDAP search returns no users.
 requirements: [ "cx_Oracle", "ldap", "re" ]
-author: Ilmar Kerm, ilmar.kerm@gmail.com, @ilmarkerm
+author:
+    - Ilmar Kerm (@ilmarkerm)
 '''
 
 EXAMPLES = '''
-- hosts: localhost
+- name: Synchronise LDAP users into the database
+  opitzconsulting.ansible_oracle.oracle_ldapuser:
+    hostname: dbhost
+    port: 1521
+    service_name: orcl
+    user: system
+    password: "{{ system_password }}"
+    ldap_connect: ldap://domain.int:389
+    ldap_binddn: reader@domain.int
+    ldap_bindpassword: "{{ ldap_password }}"
+    ldap_user_basedn: OU=Users,DC=domain,DC=int
+    # objectClass is person, member of one specific group, not a computer
+    # and the account is not disabled
+    ldap_user_filter: "{{ ldap_filter_parts | join('') }}"
+    ldap_username_attribute: sAMAccountName
+    user_profile: LDAP_USER
+    user_grants:
+      - create session
+      - create table
+    group_role_map:
+      - dn: CN=prod_db_reader,OU=Security Groups,DC=domain,DC=int
+        group: prod_db_reader
+      - dn: CN=prod_db_writer,OU=Security Groups,DC=domain,DC=int
+        group: prod_db_writer
   vars:
-    oracle_env:
-      ORACLE_HOME: /usr/lib/oracle/12.1/client64
-      LD_LIBRARY_PATH: /usr/lib/oracle/12.1/client64/lib
-  tasks:
-    - name: oracle_ldapuser
-      oracle_ldapuser:
-        hostname: testldap
-        port: 1521
-        service_name: orcl
-        user: system
-        password: Oracle123
-        ldap_connect: ldap://domain.int:389
-        ldap_binddn: reader@domain.int
-        ldap_bindpassword: HelloWorld123
-        ldap_user_basedn: OU=Users,DC=domain,DC=int
-        #user_default_password: Oracle123
-        # The following filter means that objectClass is person, member of
-        # one specific group, but not COMPUTER and account is not disabled
-        ldap_user_filter: (&(objectClass=person)(memberOf=CN=prod_db,OU=Security Groups,DC=domain,DC=int)(!(userAccountControl:1.2.840.113556.1.4.803:=2))(!(objectClass=COMPUTER)))
-        #ldap_user_filter: (sAMAccountName=*prod*)
-        ldap_username_attribute: sAMAccountName
-        user_profile: LDAP_USER
-        #user_quota_on_default_tbs_mb: 200
-        user_grants:
-          - create session
-          - create table
-        group_role_map:
-          - {dn: "CN=prod_db_reader,OU=Security Groups,DC=domain,DC=int", group: "prod_db_reader"}  # noqa E501
-          - {dn: "CN=prod_db_writer,OU=Security Groups,DC=domain,DC=int", group: "prod_db_writer"}  # noqa E501
-      environment: "{{ oracle_env }}"
+    ldap_filter_parts:
+      - "(&(objectClass=person)"
+      - "(memberOf=CN=prod_db,OU=Security Groups,DC=domain,DC=int)"
+      - "(!(userAccountControl:1.2.840.113556.1.4.803:=2))"
+      - "(!(objectClass=COMPUTER)))"
+  environment:
+    ORACLE_HOME: /usr/lib/oracle/19/client64
+    LD_LIBRARY_PATH: /usr/lib/oracle/19/client64/lib
+
+- name: Synchronise users with password authentication and drop removed users
+  opitzconsulting.ansible_oracle.oracle_ldapuser:
+    service_name: orcl
+    ldap_connect: ldap://domain.int:389
+    ldap_binddn: reader@domain.int
+    ldap_bindpassword: "{{ ldap_password }}"
+    ldap_user_basedn: OU=Users,DC=domain,DC=int
+    user_default_password: "{{ initial_password }}"
+    user_quota_on_default_tbs_mb: 200
+    deleted_user_mode: drop
+'''
+
+RETURN = '''
+msg:
+    description:
+        - One entry per synchronised user in the form C(<USERNAME> - <ROLES>),
+          where C(<ROLES>) is the comma-separated list of roles from
+          O(group_role_map).
+        - Not returned in check mode.
+    returned: success
+    type: list
+    elements: str
+    sample: ["JDOE - PROD_DB_READER,PROD_DB_WRITER", "MMUSTER - "]
 '''
 
 

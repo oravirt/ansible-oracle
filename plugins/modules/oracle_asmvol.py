@@ -7,62 +7,148 @@ from ansible.module_utils.basic import AnsibleModule
 DOCUMENTATION = '''
 ---
 module: oracle_asmvol
-short_description: Manage Oracle ASMCMD Volumes
+short_description: Manage Oracle ASM Dynamic Volumes (ADVM)
 description:
-    - Manage Oracle advm Volumes
+    - Creates and drops ASM Dynamic Volumes (ADVM) in an ASM disk group.
+    - The module connects to the ASM instance with C(SYSASM) privileges and runs
+      C(ALTER DISKGROUP <diskgroup> ADD VOLUME <name> SIZE <size>) or
+      C(ALTER DISKGROUP <diskgroup> DROP VOLUME <name>).
+    - The existence of a volume is checked in C(V$ASM_VOLUME) joined with
+      C(V$ASM_DISKGROUP) (case-insensitive).
+    - The size of an existing volume is not changed.
+    - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
+      (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "2.1.0"
 options:
     name:
-        description: The name of the volume
-        required: True
-        default: None
-    size:
-        description: The size of the volume
-        default: None
-    column:
-        description: >
-            Number of columns in a stripe set
-        required: False
-    width:
-        description: Stripe width of a volume
-        required: False
+        description:
+            - The name of the volume.
+        type: str
+        required: true
+        aliases: ['volume_name']
     diskgroup:
-        description: >
-            The diskgroup in which to create the volume
-        required: True
-        default: None
+        description:
+            - The name of the disk group in which the volume is created or dropped.
+        type: str
+        required: true
         aliases: ['dg']
-    state:
-        description: The state of the volume.
-        default: present
-        choices: ['present','absent', 'status']
-    oracle_home:
-        description: The GI ORACLE_HOME
+    size:
+        description:
+            - The size of the volume, for example V(100G).
+            - The value is used as is in the C(SIZE) clause.
+            - Required with O(state=present), although not enforced by the
+              argument spec.
+        type: str
         required: false
-        default: None
+    column:
+        description:
+            - Number of columns in a stripe set.
+            - Currently not used by the module.
+        type: str
+        required: false
+    width:
+        description:
+            - Stripe width of the volume.
+            - Currently not used by the module.
+        type: str
+        required: false
+    redundancy:
+        description:
+            - Redundancy of the volume.
+            - Currently not used by the module.
+        type: str
+        required: false
+    state:
+        description:
+            - V(present) - the volume is created if it does not exist.
+            - V(absent) - the volume is dropped if it exists.
+        type: str
+        required: false
+        default: present
+        choices: ['present', 'absent']
+    user:
+        description:
+            - The user name to connect to the ASM instance (as C(SYSASM)).
+            - Omit O(user) and O(password) to connect with an Oracle wallet.
+        type: str
+        required: false
+        aliases: ['un', 'username']
+    password:
+        description:
+            - The password for O(user).
+        type: str
+        required: false
+        aliases: ['pw']
+    hostname:
+        description:
+            - The host of the ASM instance.
+            - Ignored when connecting with an Oracle wallet.
+        type: str
+        required: false
+        default: localhost
+        aliases: ['host']
+    port:
+        description:
+            - The listener port number on the host.
+            - Ignored when connecting with an Oracle wallet.
+        type: int
+        required: false
+        default: 1521
+    service_name:
+        description:
+            - The service name of the ASM instance.
+            - When connecting with an Oracle wallet, this is the TNS alias of the
+              wallet entry.
+        type: str
+        required: false
+        default: '+ASM'
+        aliases: ['sn']
+    oracle_home:
+        description:
+            - The Grid Infrastructure C(ORACLE_HOME).
+            - Currently not used by the module.
+        type: str
+        required: false
         aliases: ['oh']
-
 notes:
-
-author: Mikael Sandström, oravirt@gmail.com, @oravirt
+    - cx_Oracle needs to be installed
+requirements: [ "cx_Oracle" ]
+author:
+    - Mikael Sandström (@oravirt)
 '''
 
 EXAMPLES = '''
-# Create an ASM volume
-oracle_asmvol:
+- name: Create an ASM volume
+  opitzconsulting.ansible_oracle.oracle_asmvol:
     name: acfsvol
-    dg: acfsdg
+    diskgroup: acfsdg
     size: 100G
     state: present
-    oh: /u01/app/grid/12.1.0.2/grid
+    user: sys
+    password: "{{ asm_password }}"
 
-# Delete an ASM volume
-oracle_asmvol:
+- name: Drop an ASM volume (connection with Oracle wallet)
+  opitzconsulting.ansible_oracle.oracle_asmvol:
     name: acfsvol
-    dg: acfsdg
+    diskgroup: acfsdg
     state: absent
-    oh: /u01/app/grid/12.1.0.2/grid
+'''
 
+RETURN = '''
+msg:
+    description:
+        - Message describing the action that was executed.
+        - Not returned when the volume already exists with O(state=present)
+          (the message is returned in RV(msgt) instead).
+    returned: when a volume was created or dropped, or does not exist
+    type: str
+    sample: "Volume ACFSVOL successfully created. Size: 100G "
+msgt:
+    description:
+        - Message returned instead of RV(msg) when the volume already exists.
+    returned: when O(state=present) and the volume already exists
+    type: str
+    sample: "Volume ACFSVOL already exists"
 '''
 
 try:
