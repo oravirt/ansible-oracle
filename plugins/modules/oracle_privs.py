@@ -3,6 +3,10 @@
 
 import re
 from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.oracledb_connect import (  # noqa: E501
+    oracledb,
+    oracledb_connect,
+)
 
 DOCUMENTATION = '''
 ---
@@ -137,9 +141,12 @@ options:
         required: false
         default: true
 notes:
-    - cx_Oracle needs to be installed
+    - python-oracledb needs to be installed, e.g. with the role
+      C(opitzconsulting.ansible_oracle.pyoracledb).
+    - python-oracledb is used in thick mode. The Oracle Client libraries must be found,
+      e.g. with ORACLE_HOME and LD_LIBRARY_PATH set in the environment of the task.
     - Oracle RDBMS 11gR2 or later required
-requirements: [ "cx_Oracle", "re" ]
+requirements: [ "python-oracledb", "re" ]
 author:
     - Ilmar Kerm (@ilmarkerm)
 '''
@@ -228,18 +235,9 @@ msg:
 '''
 
 
-try:
-    import cx_Oracle
-except ImportError:
-    cx_oracle_exists = False
-else:
-    cx_oracle_exists = True
-
-
 # Ansible code
 def main():
     global conn, module
-    msg = ['']
     module = AnsibleModule(
         argument_spec=dict(
             hostname=dict(default='localhost'),
@@ -260,16 +258,6 @@ def main():
         ),
         supports_check_mode=True,
     )
-    # Check for required modules
-    if not cx_oracle_exists:
-        module.fail_json(
-            msg=(
-                "The cx_Oracle module is required. "
-                "'pip install cx_Oracle' should do the trick. "
-                "If cx_Oracle is installed, make sure ORACLE_HOME "
-                "& LD_LIBRARY_PATH is set"
-            )
-        )
     # Check input parameters
     re_priv = re.compile('^[A-Za-z0-9_]+[A-Za-z0-9_ ]*[A-Za-z0-9_]+$')
     re_role = re.compile('^[A-Za-z0-9_\$#\- ]+$')  # noqa W605
@@ -295,42 +283,7 @@ def main():
     user = module.params["user"]
     password = module.params["password"]
     mode = module.params["mode"]
-    wallet_connect = '/@%s' % service_name
-    try:
-        if not user and not password:
-            # If neither user or password is supplied, the use of an
-            # oracle wallet is assumed
-            if mode == 'sysdba':
-                connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
-            else:
-                connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
-
-        elif user and password:
-            if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(
-                    host=hostname, port=port, service_name=service_name
-                )
-                connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
-            else:
-                dsn = cx_Oracle.makedsn(
-                    host=hostname, port=port, service_name=service_name
-                )
-                connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
-
-        elif not (user) or not (password):
-            module.fail_json(msg='Missing username or password for cx_Oracle')
-
-    except cx_Oracle.DatabaseError as exc:
-        (error,) = exc.args
-        msg[0] = 'Could not connect to database - %s, connect descriptor: %s' % (
-            error.message,
-            connect,
-        )
-        module.fail_json(msg=msg[0], changed=False)
+    conn = oracledb_connect(module, hostname, port, service_name, user, password, mode)
     if conn.version < "11.2":
         module.fail_json(msg="Database version must be 11gR2 or greater", changed=False)
     #
@@ -338,26 +291,24 @@ def main():
         module.exit_json(changed=False)
     #
     c = conn.cursor()
-    var_changes = c.var(cx_Oracle.NUMBER)
-    var_error = c.var(cx_Oracle.NUMBER)
-    var_errstr = c.var(cx_Oracle.STRING)
-    var_privs = c.arrayvar(
-        cx_Oracle.STRING, [p.upper() for p in module.params['privs']]
-    )
+    var_changes = c.var(oracledb.NUMBER)
+    var_error = c.var(oracledb.NUMBER)
+    var_errstr = c.var(oracledb.STRING)
+    var_privs = c.arrayvar(oracledb.STRING, [p.upper() for p in module.params['privs']])
     objectslist = (
         [p.replace("_", "\_") for p in module.params['objs']]  # noqa W605
         if module.params['objs'] is not None
         else []
     )
     var_objs = c.arrayvar(
-        cx_Oracle.STRING,
+        oracledb.STRING,
         objectslist
         if not module.params['convert_to_upper']
         else [p.upper() for p in objectslist],
         100,
     )
     var_roles = c.arrayvar(
-        cx_Oracle.STRING,
+        oracledb.STRING,
         module.params['roles']
         if not module.params['convert_to_upper']
         else [p.upper() for p in module.params['roles']],
