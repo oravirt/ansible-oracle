@@ -407,6 +407,14 @@ The playbook `os.yml` executes `pyoracledb` in addition to `cxoracle`.
 IMPORTANT: The role `cxoracle` and its variables will be removed, when all modules are migrated to python-oracledb.
 Move the configuration from the `cxoracle` variables to the `pyoracledb` variables now.
 
+Modules migrated to python-oracledb require python-oracledb on the target hosts instead of cx_Oracle.
+python-oracledb is used in thick mode, so the Oracle Client libraries must be found
+(`ORACLE_HOME` and `LD_LIBRARY_PATH`), like with cx_Oracle before.
+
+Migrated modules:
+
+* `oracle_grants`
+
 Without changes in the inventory, `pyoracledb` installs the package `oracledb` from the Python package index (`pip3 install oracledb`).
 The installation fails, when the target hosts have no access to the package index.
 
