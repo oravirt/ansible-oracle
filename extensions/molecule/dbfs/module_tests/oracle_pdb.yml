@@ -1,0 +1,449 @@
+---
+# Tests for oracle_pdb in CDB DB1 with an own test PDB MOLTEST_PDB (ORCLPDB is not changed)
+# - create from seed (OMF), idempotence, saved state, states closed/read_only/restricted/open,
+#   status, unplug into XML file, plug in again, drop of an open and a closed PDB,
+#   create with save_state=false
+# - connection variants: sys as sysdba in CDB$ROOT (PDB management),
+#   wallet (status of ORCLPDB, read only), wrong password
+# - oracle_pdb does not support check mode
+- name: oracle_pdb | variables
+  ansible.builtin.set_fact:
+    _pdb_name: MOLTEST_PDB
+    _pdb_xml: /tmp/moltest_pdb.xml
+    _pdb_cleanup_sql: |
+      whenever sqlerror exit failure
+      declare
+        n number;
+      begin
+        select count(*) into n from v$pdbs where name = 'MOLTEST_PDB';
+        if n > 0 then
+          begin
+            execute immediate 'alter pluggable database MOLTEST_PDB close immediate instances=all';
+          exception when others then null;
+          end;
+          execute immediate 'drop pluggable database MOLTEST_PDB including datafiles';
+        end if;
+      end;
+      /
+      exit
+
+- name: oracle_pdb | cleanup PDB with sqlplus
+  ansible.builtin.command:
+    cmd: "{{ mt_oracle_home }}/bin/sqlplus -S -L / as sysdba"
+    stdin: "{{ _pdb_cleanup_sql }}"
+  changed_when: false
+  failed_when: false
+
+- name: oracle_pdb | cleanup XML file
+  ansible.builtin.file:
+    path: "{{ _pdb_xml }}"
+    state: absent
+
+- name: oracle_pdb | tests in CDB$ROOT as sysdba
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  block:
+    - name: oracle_pdb | create
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        pdb_admin_username: moltest_pdbadmin
+        pdb_admin_password: "{{ mt_system_password }}"
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check create
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_pdb | create again
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        pdb_admin_username: moltest_pdbadmin
+        pdb_admin_password: "{{ mt_system_password }}"
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check create again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_pdb | verify open mode after create
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "select open_mode || ',' || restricted from v$pdbs where name = '{{ _pdb_name }}';"
+        mt_sql_expect: "READ WRITE,NO"
+        mt_sql_id: oracle_pdb.cdb.create_sql
+
+    - name: oracle_pdb | verify saved state after create
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "select count(*) from dba_pdb_saved_states where con_name = '{{ _pdb_name }}';"
+        mt_sql_expect: "1"
+        mt_sql_id: oracle_pdb.cdb.create_save_state_sql
+
+    - name: oracle_pdb | close
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: closed
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check close
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.closed, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_pdb | close again
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: closed
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check close again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.closed_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_pdb | verify closed
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "select open_mode from v$pdbs where name = '{{ _pdb_name }}';"
+        mt_sql_expect: "MOUNTED"
+        mt_sql_id: oracle_pdb.cdb.closed_sql
+
+    - name: oracle_pdb | open read only
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: read_only
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check open read only
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.read_only, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_pdb | open read only again
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: read_only
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check open read only again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.read_only_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_pdb | verify read only
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "select open_mode || ',' || restricted from v$pdbs where name = '{{ _pdb_name }}';"
+        mt_sql_expect: "READ ONLY,NO"
+        mt_sql_id: oracle_pdb.cdb.read_only_sql
+
+    - name: oracle_pdb | open restricted
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: restricted
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check open restricted
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.restricted, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_pdb | open restricted again
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: restricted
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check open restricted again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.restricted_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_pdb | verify restricted
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "select open_mode || ',' || restricted from v$pdbs where name = '{{ _pdb_name }}';"
+        mt_sql_expect: "READ WRITE,YES"
+        mt_sql_id: oracle_pdb.cdb.restricted_sql
+
+    - name: oracle_pdb | open read write
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: open
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check open read write
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.open, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_pdb | open read write again (state read_write)
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: read_write
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check open read write again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.read_write_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_pdb | verify read write
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "select open_mode || ',' || restricted from v$pdbs where name = '{{ _pdb_name }}';"
+        mt_sql_expect: "READ WRITE,NO"
+        mt_sql_id: oracle_pdb.cdb.open_sql
+
+    - name: oracle_pdb | status
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: status
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check status
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.status, mt_res: "{{ _res }}", mt_expect: ok}
+
+    # documented: the status of the PDB is returned in msg
+    - name: oracle_pdb | check status message
+      ansible.builtin.include_tasks: _check.yml
+      vars:
+        mt_id: oracle_pdb.cdb.status_msg
+        mt_res:
+          changed: false
+          failed: "{{ 'open_mode' not in (_res.msg | default('') | string) }}"
+          msg: "{{ _res.msg | default('') | string }}"
+        mt_expect: ok
+
+    - name: oracle_pdb | get datafile directory of the PDB (OMF <GUID> directory)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: >-
+          select substr(d.name, 1, instr(d.name, '/', -1, 2) - 1) || ',' || p.guid
+          from v$datafile d join v$pdbs p on p.con_id = d.con_id
+          where p.name = '{{ _pdb_name }}' and rownum = 1;
+    - name: oracle_pdb | remember datafile directory
+      ansible.builtin.set_fact:
+        _pdb_dir: "{{ mt_sql_value.split(',')[0] }}"
+        _pdb_guid: "{{ mt_sql_value.split(',')[-1] }}"
+
+    - name: oracle_pdb | unplug
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        unplug_dest: "{{ _pdb_xml }}"
+        state: unplugged
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check unplug
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.unplug, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_pdb | unplug again
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        unplug_dest: "{{ _pdb_xml }}"
+        state: unplugged
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check unplug again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.unplug_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_pdb | verify unplug
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "select count(*) from v$pdbs where name = '{{ _pdb_name }}';"
+        mt_sql_expect: "0"
+        mt_sql_id: oracle_pdb.cdb.unplug_sql
+
+    - name: oracle_pdb | stat XML file
+      ansible.builtin.stat:
+        path: "{{ _pdb_xml }}"
+      register: _pdb_xml_stat
+    - name: oracle_pdb | check XML file
+      ansible.builtin.include_tasks: _check.yml
+      vars:
+        mt_id: oracle_pdb.cdb.unplug_xml
+        mt_res:
+          changed: false
+          failed: "{{ not _pdb_xml_stat.stat.exists }}"
+          msg: "XML file {{ _pdb_xml }} exists: {{ _pdb_xml_stat.stat.exists }}"
+        mt_expect: ok
+
+    - name: oracle_pdb | plug in
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        unplug_dest: "{{ _pdb_xml }}"
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check plug in
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.plug, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_pdb | plug in again
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        unplug_dest: "{{ _pdb_xml }}"
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check plug in again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.plug_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_pdb | verify plug in
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "select open_mode || ',' || restricted from v$pdbs where name = '{{ _pdb_name }}';"
+        mt_sql_expect: "READ WRITE,NO"
+        mt_sql_id: oracle_pdb.cdb.plug_sql
+
+    # drop of a closed PDB
+    - name: oracle_pdb | close before drop
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: closed
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check close before drop
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.closed_before_drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_pdb | drop closed PDB
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: absent
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check drop closed PDB
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.drop_closed, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_pdb | cleanup PDB with sqlplus after drop of closed PDB
+      ansible.builtin.command:
+        cmd: "{{ mt_oracle_home }}/bin/sqlplus -S -L / as sysdba"
+        stdin: "{{ _pdb_cleanup_sql }}"
+      changed_when: false
+      failed_when: false
+
+    - name: oracle_pdb | drop again
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: absent
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check drop again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_pdb | verify drop
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "select count(*) from v$pdbs where name = '{{ _pdb_name }}';"
+        mt_sql_expect: "0"
+        mt_sql_id: oracle_pdb.cdb.drop_sql
+
+    # remove the datafiles kept by unplug (KEEP DATAFILES) in the OMF <GUID> directory
+    - name: oracle_pdb | remove datafiles of the unplugged PDB
+      ansible.builtin.file:
+        path: "{{ _pdb_dir }}"
+        state: absent
+      when:
+        - mt_sql_value == '0'
+        - _pdb_dir | default('') | length > 0
+        - _pdb_guid | default('') | length == 32
+        - _pdb_dir | basename == _pdb_guid
+
+    - name: oracle_pdb | create without saving the state
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        pdb_admin_username: moltest_pdbadmin
+        pdb_admin_password: "{{ mt_system_password }}"
+        save_state: false
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check create without saving the state
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.create_no_save_state, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_pdb | verify no saved state
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "select count(*) from dba_pdb_saved_states where con_name = '{{ _pdb_name }}';"
+        mt_sql_expect: "0"
+        mt_sql_id: oracle_pdb.cdb.create_no_save_state_sql
+
+    - name: oracle_pdb | drop open PDB
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: absent
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check drop open PDB
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_pdb | verify drop open PDB
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "select count(*) from v$pdbs where name = '{{ _pdb_name }}';"
+        mt_sql_expect: "0"
+        mt_sql_id: oracle_pdb.cdb.drop_open_sql
+
+# Oracle wallet (ORCLPDB_SYSTEM): read only status of ORCLPDB, nothing is changed
+- name: oracle_pdb | status of ORCLPDB with wallet
+  opitzconsulting.ansible_oracle.oracle_pdb:
+    name: "{{ mt_pdb }}"
+    sourcedb: "{{ mt_cdb }}"
+    state: status
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_pdb | check status with wallet
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_pdb.pdb.wallet_status, mt_res: "{{ _res }}", mt_expect: ok}
+
+# error handling
+- name: oracle_pdb | wrong password
+  opitzconsulting.ansible_oracle.oracle_pdb:
+    name: "{{ _pdb_name }}"
+    sourcedb: "{{ mt_cdb }}"
+    state: status
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_pdb | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_pdb.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+# final cleanup (in case a step above failed)
+- name: oracle_pdb | final cleanup PDB with sqlplus
+  ansible.builtin.command:
+    cmd: "{{ mt_oracle_home }}/bin/sqlplus -S -L / as sysdba"
+    stdin: "{{ _pdb_cleanup_sql }}"
+  changed_when: false
+  failed_when: false
+
+- name: oracle_pdb | final cleanup XML file
+  ansible.builtin.file:
+    path: "{{ _pdb_xml }}"
+    state: absent

@@ -3,6 +3,7 @@
 # Usage:
 #   task --list
 #   task converge S=dbfs-ol9
+#   task module-test M=oracle_user,oracle_role L=cx_oracle
 #   task login S=default H=ol9
 #   task exec H=dbfs-ol9 U=oracle
 #
@@ -85,6 +86,19 @@ tasks:
     cmds:
       - task: _molecule
         vars: {CMD: side-effect, S: '{{.S}}'}
+
+  module-test:
+    desc: "Module tests in scenario dbfs (M=<module>[,<module>...], L=<label for result file>)"
+    dir: "{{.TASKFILE_DIR}}"
+    deps:
+      - _check-sw-dir
+    env:
+      MODULE_TESTS: '{{.M}}'
+      MODULE_TESTS_LABEL: '{{.L}}'
+    cmds:
+      # side-effect does not install the collection (only converge does) => install the current code
+      - task: collection
+      - molecule side-effect -s dbfs {{.CLI_ARGS}}
 
   idempotence:
     desc: "Run converge again and check for changes (S=<scenario>)"

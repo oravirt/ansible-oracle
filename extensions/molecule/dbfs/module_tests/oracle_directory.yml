@@ -1,0 +1,164 @@
+---
+# Tests for oracle_directory in PDB ORCLPDB
+# - create, idempotence, change path (enforce), directory_mode normal, drop
+# - connection variants: system (default), sys as sysdba, wallet, wrong password
+- name: oracle_directory | variables
+  ansible.builtin.set_fact:
+    _dir_name: MOLTEST_DIR
+    _dir_path1: /tmp/moltest_dir1
+    _dir_path2: /tmp/moltest_dir2
+
+- name: oracle_directory | cleanup
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+
+- name: oracle_directory | create
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name }}"
+    directory_path: "{{ _dir_path1 }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check create
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_directory | create again
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name }}"
+    directory_path: "{{ _dir_path1 }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check create again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_directory | verify path
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select directory_path from dba_directories where directory_name = '{{ _dir_name }}';"
+    mt_sql_expect: "{{ _dir_path1 }}"
+    mt_sql_id: oracle_directory.pdb.create_sql
+
+- name: oracle_directory | change path (enforce)
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name }}"
+    directory_path: "{{ _dir_path2 }}"
+    directory_mode: enforce
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check change path
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.change_path, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_directory | change path again (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name }}"
+    directory_path: "{{ _dir_path2 }}"
+    directory_mode: enforce
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check change path again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.change_path_idempotent_sysdba, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_directory | verify changed path
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select directory_path from dba_directories where directory_name = '{{ _dir_name }}';"
+    mt_sql_expect: "{{ _dir_path2 }}"
+    mt_sql_id: oracle_directory.pdb.change_path_sql
+
+# documented: the path of an existing directory is not changed
+- name: oracle_directory | other path with directory_mode normal
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name }}"
+    directory_path: "{{ _dir_path1 }}"
+    directory_mode: normal
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check directory_mode normal
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.mode_normal_other_path, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_directory | verify unchanged path
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select directory_path from dba_directories where directory_name = '{{ _dir_name }}';"
+    mt_sql_expect: "{{ _dir_path2 }}"
+    mt_sql_id: oracle_directory.pdb.mode_normal_sql
+
+- name: oracle_directory | drop
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check drop
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_directory | drop again
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check drop again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_directory | verify drop
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from dba_directories where directory_name = '{{ _dir_name }}';"
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_directory.pdb.drop_sql
+
+# Oracle wallet: create and drop with ORCLPDB_SYSTEM
+- name: oracle_directory | create with wallet
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name }}"
+    directory_path: "{{ _dir_path1 }}"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check create with wallet
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.wallet_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_directory | drop with wallet
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check drop with wallet
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.wallet_drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+# error handling
+- name: oracle_directory | wrong password
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}

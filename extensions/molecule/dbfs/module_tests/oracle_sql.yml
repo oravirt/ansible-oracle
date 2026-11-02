@@ -1,0 +1,287 @@
+---
+# Tests for oracle_sql in PDB ORCLPDB (and a query in the CDB)
+# - DDL, DML, query (result and changed=false), PL/SQL block, scripts with ';' and '/'
+# - error cases: invalid SQL, empty script, sql+script, neither sql nor script
+# - connection variants: system (default), sys as sysdba, system in CDB, wallet,
+#   wrong password
+- name: oracle_sql | variables
+  ansible.builtin.set_fact:
+    _sql_table: MOLTEST_SQL
+    _sql_proc: MOLTEST_SQL_PROC
+    _sql_script_semicolon: /tmp/moltest_sql_semicolon.sql
+    _sql_script_slash: /tmp/moltest_sql_slash.sql
+    _sql_script_empty: /tmp/moltest_sql_empty.sql
+
+- name: oracle_sql | cleanup
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: |-
+      begin
+        for r in (select owner, object_name, object_type from dba_objects
+                  where owner = 'SYSTEM'
+                  and object_name in ('{{ _sql_table }}', '{{ _sql_proc }}')
+                  and object_type in ('TABLE', 'PROCEDURE')) loop
+          execute immediate 'drop ' || r.object_type || ' ' || r.owner || '.'
+            || r.object_name
+            || case when r.object_type = 'TABLE' then ' purge' end;
+        end loop;
+      end;
+      /
+
+- name: oracle_sql | create script files
+  ansible.builtin.copy:
+    dest: "{{ item.dest }}"
+    content: "{{ item.content }}"
+    mode: '0644'
+  loop:
+    # ';' as delimiter, the ';' inside the quotes must not split the statement
+    - dest: "{{ _sql_script_semicolon }}"
+      content: |
+        insert into {{ _sql_table }} values (3, 'three');
+
+        insert into {{ _sql_table }} values (4, 'a;b');
+    # '/' as delimiter because of 'create or replace'
+    - dest: "{{ _sql_script_slash }}"
+      content: |
+        create or replace procedure {{ _sql_proc }} as
+        begin
+          null;
+        end;
+        /
+    - dest: "{{ _sql_script_empty }}"
+      content: ""
+  loop_control:
+    label: "{{ item.dest }}"
+
+- name: oracle_sql | create table
+  opitzconsulting.ansible_oracle.oracle_sql:
+    sql: "create table {{ _sql_table }} (id number, txt varchar2(30))"
+  register: _res
+  ignore_errors: true
+- name: oracle_sql | check create table
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_sql.pdb.create_table, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_sql | verify create table
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_tables
+      where owner = 'SYSTEM' and table_name = '{{ _sql_table }}';
+    mt_sql_expect: "1"
+    mt_sql_id: oracle_sql.pdb.create_table_sql
+
+# documented: every statement is committed
+- name: oracle_sql | insert (trailing ';' is removed)
+  opitzconsulting.ansible_oracle.oracle_sql:
+    sql: "insert into {{ _sql_table }} values (1, 'one');"
+  register: _res
+  ignore_errors: true
+- name: oracle_sql | check insert
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_sql.pdb.insert, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_sql | verify insert is committed
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from system.{{ _sql_table }};"
+    mt_sql_expect: "1"
+    mt_sql_id: oracle_sql.pdb.insert_sql
+
+# documented: a SELECT returns the rows in msg and changed=false
+- name: oracle_sql | select
+  opitzconsulting.ansible_oracle.oracle_sql:
+    sql: "select id, txt from {{ _sql_table }};"
+  register: _res
+  ignore_errors: true
+- name: oracle_sql | check select
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_sql.pdb.select, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_sql | check select result
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_sql.pdb.select_result
+    mt_res:
+      changed: false
+      failed: "{{ (_res.msg | default('') | to_json) != ([[1, 'one']] | to_json) }}"
+      msg: "expected [[1, 'one']] got {{ _res.msg | default('') }}"
+    mt_expect: ok
+
+- name: oracle_sql | PL/SQL block (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_sql:
+    sql: "begin insert into system.{{ _sql_table }} values (2, 'two'); end;"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_sql | check PL/SQL block
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_sql.pdb.plsql_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_sql | verify PL/SQL block
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from system.{{ _sql_table }};"
+    mt_sql_expect: "2"
+    mt_sql_id: oracle_sql.pdb.plsql_sysdba_sql
+
+- name: oracle_sql | script with ';' delimiter
+  opitzconsulting.ansible_oracle.oracle_sql:
+    script: "{{ _sql_script_semicolon }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_sql | check script with ';' delimiter
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_sql.pdb.script_semicolon, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_sql | verify script with ';' delimiter
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from system.{{ _sql_table }}
+      where (id = 3 and txt = 'three') or (id = 4 and txt = 'a;b');
+    mt_sql_expect: "2"
+    mt_sql_id: oracle_sql.pdb.script_semicolon_sql
+
+- name: oracle_sql | script with '/' delimiter (wallet)
+  opitzconsulting.ansible_oracle.oracle_sql:
+    script: "{{ _sql_script_slash }}"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_sql | check script with '/' delimiter
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_sql.pdb.wallet_script_slash, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_sql | verify script with '/' delimiter
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select status from dba_objects where owner = 'SYSTEM'
+      and object_name = '{{ _sql_proc }}' and object_type = 'PROCEDURE';
+    mt_sql_expect: "VALID"
+    mt_sql_id: oracle_sql.pdb.wallet_script_slash_sql
+
+- name: oracle_sql | query in the CDB
+  opitzconsulting.ansible_oracle.oracle_sql:
+    sql: "select name from v$database"
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_sql | check query in the CDB
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_sql.cdb.select, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_sql | check query result in the CDB
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_sql.cdb.select_result
+    mt_res:
+      changed: false
+      failed: "{{ (_res.msg | default('') | to_json) != ([[mt_cdb]] | to_json) }}"
+      msg: "expected [['{{ mt_cdb }}']] got {{ _res.msg | default('') }}"
+    mt_expect: ok
+
+# error handling
+- name: oracle_sql | invalid SQL
+  opitzconsulting.ansible_oracle.oracle_sql:
+    sql: "select * from moltest_sql_does_not_exist"
+  register: _res
+  ignore_errors: true
+- name: oracle_sql | check invalid SQL
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_sql.pdb.invalid_sql, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_sql | empty script
+  opitzconsulting.ansible_oracle.oracle_sql:
+    script: "{{ _sql_script_empty }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_sql | check empty script
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_sql.pdb.empty_script, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_sql | missing script file
+  opitzconsulting.ansible_oracle.oracle_sql:
+    script: /tmp/moltest_sql_does_not_exist.sql
+  register: _res
+  ignore_errors: true
+- name: oracle_sql | check missing script file
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_sql.pdb.missing_script, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_sql | sql and script (mutually exclusive)
+  opitzconsulting.ansible_oracle.oracle_sql:
+    sql: "select 1 from dual"
+    script: "{{ _sql_script_semicolon }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_sql | check sql and script
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_sql.pdb.sql_and_script, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_sql | neither sql nor script
+  opitzconsulting.ansible_oracle.oracle_sql: {}
+  register: _res
+  ignore_errors: true
+- name: oracle_sql | check neither sql nor script
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_sql.pdb.no_sql_no_script, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_sql | wrong password
+  opitzconsulting.ansible_oracle.oracle_sql:
+    sql: "select 1 from dual"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_sql | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_sql.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+# cleanup with the module
+- name: oracle_sql | drop procedure
+  opitzconsulting.ansible_oracle.oracle_sql:
+    sql: "drop procedure {{ _sql_proc }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_sql | check drop procedure
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_sql.pdb.drop_procedure, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_sql | drop table
+  opitzconsulting.ansible_oracle.oracle_sql:
+    sql: "drop table {{ _sql_table }} purge"
+  register: _res
+  ignore_errors: true
+- name: oracle_sql | check drop table
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_sql.pdb.drop_table, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_sql | verify drop
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_objects where owner = 'SYSTEM'
+      and object_name in ('{{ _sql_table }}', '{{ _sql_proc }}');
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_sql.pdb.drop_sql
+
+- name: oracle_sql | remove script files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ _sql_script_semicolon }}"
+    - "{{ _sql_script_slash }}"
+    - "{{ _sql_script_empty }}"

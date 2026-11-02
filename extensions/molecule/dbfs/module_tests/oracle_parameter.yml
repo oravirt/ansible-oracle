@@ -1,0 +1,381 @@
+---
+# Tests for oracle_parameter
+# - PDB ORCLPDB: set (scope both), idempotence, check mode, change as sysdba, wallet,
+#   scope spfile, comment, reset (check mode, reset, reset again, absent), error cases
+# - CDB DB1: idempotent call with the current value (scope memory, nothing is changed)
+# - underscore parameter: only read (value = current value) as sysdba, error without sysdba
+# The PDB value of optimizer_index_cost_adj is reset at the beginning and at the end,
+# so the PDB inherits the value of CDB$ROOT again.
+- name: oracle_parameter | variables
+  ansible.builtin.set_fact:
+    _par_name: optimizer_index_cost_adj
+    _par_hidden: _optimizer_adaptive_cursor_sharing
+
+- name: oracle_parameter | cleanup
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    state: reset
+    scope: both
+  register: _res
+  ignore_errors: true
+
+- name: oracle_parameter | get value in CDB$ROOT
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: CDB$ROOT
+    mt_sql: "select value from v$parameter where name = '{{ _par_name }}';"
+
+- name: oracle_parameter | remember value in CDB$ROOT
+  ansible.builtin.set_fact:
+    _par_root_value: "{{ mt_sql_value }}"
+    _par_val1: "{{ '91' if mt_sql_value != '91' else '81' }}"
+    _par_val2: "{{ '92' if mt_sql_value != '92' else '82' }}"
+    _par_val3: "{{ '93' if mt_sql_value != '93' else '83' }}"
+    _par_val4: "{{ '94' if mt_sql_value != '94' else '84' }}"
+
+# CDB: same value as the current one with scope memory => nothing to do
+- name: oracle_parameter | cdb same value
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    value: "{{ _par_root_value }}"
+    scope: memory
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check cdb same value
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.cdb.same_value, mt_res: "{{ _res }}", mt_expect: ok}
+
+# PDB
+- name: oracle_parameter | set
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    value: "{{ _par_val1 }}"
+    state: present
+    scope: both
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check set
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.set, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_parameter | set again
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    value: "{{ _par_val1 }}"
+    state: present
+    scope: both
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check set again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.set_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_parameter | verify set (memory)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select value from v$parameter where name = '{{ _par_name }}';"
+    mt_sql_expect: "{{ _par_val1 }}"
+    mt_sql_id: oracle_parameter.pdb.set_sql
+
+- name: oracle_parameter | verify set (spfile)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select value from v$spparameter where name = '{{ _par_name }}';"
+    mt_sql_expect: "{{ _par_val1 }}"
+    mt_sql_id: oracle_parameter.pdb.set_spfile_sql
+
+- name: oracle_parameter | set in check mode
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    value: "{{ _par_val2 }}"
+  check_mode: true
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check set in check mode
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.check_mode, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_parameter | verify check mode
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select value from v$parameter where name = '{{ _par_name }}';"
+    mt_sql_expect: "{{ _par_val1 }}"
+    mt_sql_id: oracle_parameter.pdb.check_mode_sql
+
+- name: oracle_parameter | change (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    value: "{{ _par_val2 }}"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check change
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.change_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_parameter | change again (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    value: "{{ _par_val2 }}"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check change again
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_parameter.pdb.change_idempotent_sysdba
+    mt_res: "{{ _res }}"
+    mt_expect: ok
+
+- name: oracle_parameter | change again (wallet)
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    value: "{{ _par_val2 }}"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check change again with wallet
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.wallet_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_parameter | verify change
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select value from v$parameter where name = '{{ _par_name }}';"
+    mt_sql_expect: "{{ _par_val2 }}"
+    mt_sql_id: oracle_parameter.pdb.change_sql
+
+# scope spfile: memory value is not changed, current value is read from v$spparameter
+- name: oracle_parameter | set scope spfile
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    value: "{{ _par_val3 }}"
+    scope: spfile
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check set scope spfile
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.spfile_set, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_parameter | set scope spfile again
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    value: "{{ _par_val3 }}"
+    scope: spfile
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check set scope spfile again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.spfile_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_parameter | verify scope spfile (spfile)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select value from v$spparameter where name = '{{ _par_name }}';"
+    mt_sql_expect: "{{ _par_val3 }}"
+    mt_sql_id: oracle_parameter.pdb.spfile_sql
+
+- name: oracle_parameter | verify scope spfile (memory unchanged)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select value from v$parameter where name = '{{ _par_name }}';"
+    mt_sql_expect: "{{ _par_val2 }}"
+    mt_sql_id: oracle_parameter.pdb.spfile_memory_sql
+
+# comment
+- name: oracle_parameter | set with comment
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    value: "{{ _par_val4 }}"
+    comment: MOLTEST
+    scope: both
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check set with comment
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.comment, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_parameter | verify comment
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select value || ',' || update_comment from v$spparameter
+      where name = '{{ _par_name }}';
+    mt_sql_expect: "{{ _par_val4 }},MOLTEST"
+    mt_sql_id: oracle_parameter.pdb.comment_sql
+
+# reset
+- name: oracle_parameter | reset in check mode
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    state: reset
+  check_mode: true
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check reset in check mode
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.reset_check_mode, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_parameter | verify reset in check mode
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from v$spparameter
+      where name = '{{ _par_name }}' and isspecified = 'TRUE';
+    mt_sql_expect: "1"
+    mt_sql_id: oracle_parameter.pdb.reset_check_mode_sql
+
+- name: oracle_parameter | reset
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    state: reset
+    scope: both
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check reset
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.reset, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_parameter | reset again
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    state: reset
+    scope: both
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check reset again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.reset_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_parameter | absent (same as reset)
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    state: absent
+    scope: both
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check absent
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.absent_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_parameter | verify reset (spfile)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from v$spparameter
+      where name = '{{ _par_name }}' and isspecified = 'TRUE';
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_parameter.pdb.reset_sql
+
+- name: oracle_parameter | verify reset (memory = value of CDB$ROOT)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select value from v$parameter where name = '{{ _par_name }}';"
+    mt_sql_expect: "{{ _par_root_value }}"
+    mt_sql_id: oracle_parameter.pdb.reset_memory_sql
+
+# check mode with scope spfile for a parameter that is not set in the spfile
+- name: oracle_parameter | check mode scope spfile, parameter not in spfile
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    value: "{{ _par_val1 }}"
+    scope: spfile
+  check_mode: true
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check check mode scope spfile
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_parameter.pdb.check_mode_spfile_unset
+    mt_res: "{{ _res }}"
+    mt_expect: changed
+
+# underscore parameter: only with sysdba, value = current value => nothing to do
+- name: oracle_parameter | get value of underscore parameter
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select lower(y.ksppstdvl) from x$ksppi x, x$ksppcv y
+      where x.indx = y.indx and x.ksppinm = '{{ _par_hidden }}';
+
+- name: oracle_parameter | underscore parameter as sysdba
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_hidden }}"
+    value: "{{ mt_sql_value }}"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check underscore parameter as sysdba
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_parameter.pdb.underscore_sysdba_same_value
+    mt_res: "{{ _res }}"
+    mt_expect: ok
+
+# error handling
+- name: oracle_parameter | underscore parameter without sysdba
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_hidden }}"
+    value: "true"
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check underscore parameter without sysdba
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.underscore_normal, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_parameter | parameter does not exist
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: moltest_no_such_parameter
+    value: "1"
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check parameter does not exist
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.not_exists, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_parameter | missing value
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check missing value
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.missing_value, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_parameter | wrong password
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    state: reset
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_parameter | final cleanup
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    state: reset
+    scope: both
+  register: _res
+  ignore_errors: true

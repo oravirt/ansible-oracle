@@ -1,0 +1,426 @@
+---
+# Tests for oracle_privs
+# - PDB ORCLPDB: system privileges and roles (grant, idempotence, check mode, revoke),
+#   object privileges with wildcard, objtypes and convert_to_upper, error cases
+# - CDB: system privilege for a common role
+# - connection variants: system (default), sys as sysdba, wallet, wrong password
+# Test objects are created and dropped with sqlplus (independent of the module).
+- name: oracle_privs | variables
+  ansible.builtin.set_fact:
+    _priv_owner: MOLTEST_PRIVO
+    _priv_user: MOLTEST_PRIVG
+    _priv_role: MOLTEST_PRIVR
+    _priv_crole: C##MOLTEST_PRIVR
+    _priv_drop_pdb: |
+      begin
+        for r in (select username from dba_users
+                  where username in ('MOLTEST_PRIVO', 'MOLTEST_PRIVG')) loop
+          execute immediate 'drop user ' || r.username || ' cascade';
+        end loop;
+        for r in (select role from dba_roles where role = 'MOLTEST_PRIVR') loop
+          execute immediate 'drop role ' || r.role;
+        end loop;
+      end;
+      /
+    _priv_drop_cdb: |
+      begin
+        for r in (select role from dba_roles where role = 'C##MOLTEST_PRIVR') loop
+          execute immediate 'drop role ' || r.role;
+        end loop;
+      end;
+      /
+
+- name: oracle_privs | cleanup PDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _priv_drop_pdb }}"
+
+- name: oracle_privs | cleanup CDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "{{ _priv_drop_cdb }}"
+
+- name: oracle_privs | create test objects in PDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: |
+      create user MOLTEST_PRIVO no authentication;
+      grant unlimited tablespace to MOLTEST_PRIVO;
+      create user MOLTEST_PRIVG no authentication;
+      create role MOLTEST_PRIVR;
+      create table MOLTEST_PRIVO.MOLTEST_TAB1 (id number);
+      create table MOLTEST_PRIVO.MOLTEST_TAB2 (id number);
+      create view MOLTEST_PRIVO.MOLTEST_VIEW1 as select id from MOLTEST_PRIVO.MOLTEST_TAB1;
+
+- name: oracle_privs | create common role in CDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "create role C##MOLTEST_PRIVR container=all;"
+
+# system privileges in the PDB
+- name: oracle_privs | grant system privileges
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs:
+      - CREATE SESSION
+      - CREATE TABLE
+    roles:
+      - "{{ _priv_role }}"
+      - "{{ _priv_user }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check grant system privileges
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.sys_grant, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_privs | grant system privileges again
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs:
+      - CREATE SESSION
+      - CREATE TABLE
+    roles:
+      - "{{ _priv_role }}"
+      - "{{ _priv_user }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check grant system privileges again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.sys_grant_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_privs | verify grant system privileges
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_sys_privs
+      where grantee in ('MOLTEST_PRIVR', 'MOLTEST_PRIVG')
+      and privilege in ('CREATE SESSION', 'CREATE TABLE');
+    mt_sql_expect: "4"
+    mt_sql_id: oracle_privs.pdb.sys_grant_sql
+
+# documented: check mode only connects and returns changed=false
+- name: oracle_privs | grant CREATE VIEW in check mode
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs: CREATE VIEW
+    roles: "{{ _priv_role }}"
+  check_mode: true
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check grant in check mode
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.check_mode, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_privs | verify nothing granted in check mode
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_sys_privs
+      where grantee = 'MOLTEST_PRIVR' and privilege = 'CREATE VIEW';
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_privs.pdb.check_mode_sql
+
+- name: oracle_privs | grant role (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs: SELECT_CATALOG_ROLE
+    roles: "{{ _priv_user }}"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check grant role
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.role_grant_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_privs | verify grant role
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_role_privs
+      where grantee = 'MOLTEST_PRIVG' and granted_role = 'SELECT_CATALOG_ROLE';
+    mt_sql_expect: "1"
+    mt_sql_id: oracle_privs.pdb.role_grant_sql
+
+# documented: grantees that do not exist are silently ignored
+- name: oracle_privs | grant to a grantee that does not exist
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs: CREATE SESSION
+    roles: MOLTEST_NOTEXIST
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check grant to a grantee that does not exist
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.grantee_not_exist, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_privs | revoke system privilege and role (quiet false)
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs:
+      - CREATE TABLE
+      - SELECT_CATALOG_ROLE
+    roles:
+      - "{{ _priv_role }}"
+      - "{{ _priv_user }}"
+    state: absent
+    quiet: false
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check revoke system privilege and role
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.sys_revoke, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_privs | revoke system privilege and role again
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs:
+      - CREATE TABLE
+      - SELECT_CATALOG_ROLE
+    roles:
+      - "{{ _priv_role }}"
+      - "{{ _priv_user }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check revoke system privilege and role again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.sys_revoke_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_privs | verify revoke system privilege and role
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select (select count(*) from dba_sys_privs
+              where grantee in ('MOLTEST_PRIVR', 'MOLTEST_PRIVG'))
+             || ':' ||
+             (select count(*) from dba_role_privs where grantee = 'MOLTEST_PRIVG')
+      from dual;
+    mt_sql_expect: "2:0"
+    mt_sql_id: oracle_privs.pdb.sys_revoke_sql
+
+# object privileges in the PDB (default objtypes TABLE, VIEW)
+- name: oracle_privs | grant object privileges with wildcard
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs:
+      - SELECT
+      - UPDATE
+    objs: "{{ _priv_owner }}.%"
+    roles: "{{ _priv_role }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check grant object privileges
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.obj_grant, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_privs | grant object privileges with wildcard again
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs:
+      - SELECT
+      - UPDATE
+    objs: "{{ _priv_owner }}.%"
+    roles: "{{ _priv_role }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check grant object privileges again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.obj_grant_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_privs | verify grant object privileges
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_tab_privs
+      where owner = 'MOLTEST_PRIVO' and grantee = 'MOLTEST_PRIVR'
+      and privilege in ('SELECT', 'UPDATE');
+    mt_sql_expect: "6"
+    mt_sql_id: oracle_privs.pdb.obj_grant_sql
+
+- name: oracle_privs | grant INSERT on tables only (wallet)
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs: INSERT
+    objs: "{{ _priv_owner }}.%"
+    objtypes: TABLE
+    roles: "{{ _priv_user }}"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check grant INSERT on tables only
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.obj_grant_objtypes_wallet, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_privs | verify grant INSERT on tables only
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_tab_privs
+      where owner = 'MOLTEST_PRIVO' and grantee = 'MOLTEST_PRIVG'
+      and privilege = 'INSERT';
+    mt_sql_expect: "2"
+    mt_sql_id: oracle_privs.pdb.obj_grant_objtypes_sql
+
+# convert_to_upper (default true): lower case names
+- name: oracle_privs | revoke UPDATE on one table with lower case names
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs: update
+    objs: moltest_privo.moltest_tab1
+    roles: moltest_privr
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check revoke with lower case names
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.obj_revoke_lowercase, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_privs | revoke UPDATE on one table with lower case names again
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs: update
+    objs: moltest_privo.moltest_tab1
+    roles: moltest_privr
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check revoke with lower case names again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.obj_revoke_lowercase_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_privs | verify revoke UPDATE on one table
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_tab_privs
+      where owner = 'MOLTEST_PRIVO' and grantee = 'MOLTEST_PRIVR'
+      and privilege = 'UPDATE';
+    mt_sql_expect: "2"
+    mt_sql_id: oracle_privs.pdb.obj_revoke_lowercase_sql
+
+- name: oracle_privs | revoke all object privileges (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs:
+      - SELECT
+      - UPDATE
+      - INSERT
+    objs: "{{ _priv_owner }}.%"
+    roles:
+      - "{{ _priv_role }}"
+      - "{{ _priv_user }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check revoke all object privileges
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.obj_revoke_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_privs | verify revoke all object privileges
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from dba_tab_privs where owner = 'MOLTEST_PRIVO';"
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_privs.pdb.obj_revoke_sql
+
+# CDB: common role
+- name: oracle_privs | grant system privilege to common role in CDB (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs: CREATE SESSION
+    roles: "{{ _priv_crole }}"
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check grant in CDB
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.cdb.sys_grant_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_privs | grant system privilege to common role in CDB again (system)
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs: CREATE SESSION
+    roles: "{{ _priv_crole }}"
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check grant in CDB again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.cdb.sys_grant_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_privs | verify grant in CDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: >-
+      select count(*) from dba_sys_privs
+      where grantee = 'C##MOLTEST_PRIVR' and privilege = 'CREATE SESSION';
+    mt_sql_expect: "1"
+    mt_sql_id: oracle_privs.cdb.sys_grant_sql
+
+- name: oracle_privs | revoke system privilege from common role in CDB
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs: CREATE SESSION
+    roles: "{{ _priv_crole }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check revoke in CDB
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.cdb.sys_revoke, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_privs | verify revoke in CDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "select count(*) from dba_sys_privs where grantee = 'C##MOLTEST_PRIVR';"
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_privs.cdb.sys_revoke_sql
+
+# error handling
+- name: oracle_privs | invalid privilege
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs: "CREATE;SESSION"
+    roles: "{{ _priv_role }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check invalid privilege
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.invalid_priv, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_privs | grantee SYSTEM is rejected
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs: CREATE SESSION
+    roles: SYSTEM
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check grantee SYSTEM
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.grantee_system, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_privs | wrong password
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs: CREATE SESSION
+    roles: "{{ _priv_role }}"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_privs | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+# cleanup
+- name: oracle_privs | drop test objects in PDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _priv_drop_pdb }}"
+
+- name: oracle_privs | drop common role in CDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "{{ _priv_drop_cdb }}"

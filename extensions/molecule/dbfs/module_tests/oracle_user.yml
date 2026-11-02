@@ -1,0 +1,589 @@
+---
+# Tests for oracle_user
+# PDB ORCLPDB (local users MOLTEST_USER, MOLTEST_USER2, MOLTEST_EXT):
+# - create, idempotence, states locked/unlocked/expired/expired & locked/present,
+#   change default tablespace, update_password on_create, password hash, external user,
+#   drop, error cases (missing schema, missing password, wrong password)
+# CDB$ROOT (common users C##MOLTEST_USER, C##MOLTEST_CD):
+# - create with container=all, container_data, drop
+# - connection variants: system (default), sys as sysdba (PDB and CDB), system in CDB, wallet
+# - oracle_user does not support check mode
+- name: oracle_user | variables
+  ansible.builtin.set_fact:
+    _usr_name: MOLTEST_USER
+    _usr_name2: MOLTEST_USER2
+    _usr_ext: MOLTEST_EXT
+    _usr_common: C##MOLTEST_USER
+    _usr_common_cd: C##MOLTEST_CD
+    _usr_password: "Moltest_Pw_1#x"
+    _usr_password2: "Moltest_Pw_2#y"
+
+# documented requirement: the connect user needs READ on SYS.USER$ (password check)
+# ORCLPDB on 26ai has no tablespace USERS => own smallfile tablespace
+- name: oracle_user | setup grant on SYS.USER$ for SYSTEM
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "grant read on sys.user$ to system container=all;"
+
+- name: oracle_user | setup tablespace MOLTEST_USERS
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: |
+      declare
+        n number;
+      begin
+        select count(*) into n from dba_tablespaces where tablespace_name = 'MOLTEST_USERS';
+        if n = 0 then
+          execute immediate 'create smallfile tablespace MOLTEST_USERS datafile size 10M '
+                         || 'autoextend on next 10M maxsize 200M';
+        end if;
+      end;
+      /
+
+- name: oracle_user | cleanup PDB users
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ _usr_name }}"
+    - "{{ _usr_name2 }}"
+    - "{{ _usr_ext }}"
+  register: _res
+  ignore_errors: true
+
+- name: oracle_user | cleanup CDB users
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ _usr_common }}"
+    - "{{ _usr_common_cd }}"
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+
+# ---------------------------------------------------------------- PDB
+- name: oracle_user | create
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    schema_password: "{{ _usr_password }}"
+    default_tablespace: MOLTEST_USERS
+    default_temp_tablespace: TEMP
+    profile: DEFAULT
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check create
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+# documented: the password is checked against the S: hash, without S: hash it is reset
+- name: oracle_user | create again with password
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    schema_password: "{{ _usr_password }}"
+    default_tablespace: MOLTEST_USERS
+    default_temp_tablespace: TEMP
+    profile: DEFAULT
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check create again with password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user | create again without password
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    default_tablespace: MOLTEST_USERS
+    default_temp_tablespace: TEMP
+    profile: DEFAULT
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check create again without password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.create_idempotent_nopw, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user | verify create
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select account_status || ',' || default_tablespace || ',' || temporary_tablespace
+      || ',' || profile || ',' || authentication_type
+      from dba_users where username = '{{ _usr_name }}';
+    mt_sql_expect: "OPEN,MOLTEST_USERS,TEMP,DEFAULT,PASSWORD"
+    mt_sql_id: oracle_user.pdb.create_sql
+
+- name: oracle_user | verify quota on default tablespace
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select max_bytes from dba_ts_quotas
+      where username = '{{ _usr_name }}' and tablespace_name = 'MOLTEST_USERS';
+    mt_sql_expect: "-1"
+    mt_sql_id: oracle_user.pdb.create_quota_sql
+
+# update_password=on_create: the password of an existing user is not changed
+- name: oracle_user | other password with update_password on_create
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    schema_password: "{{ _usr_password2 }}"
+    update_password: on_create
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check update_password on_create
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.update_password_on_create, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user | change default tablespace (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    default_tablespace: SYSAUX
+    state: present
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check change default tablespace
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.change_tablespace_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user | change default tablespace again
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    default_tablespace: SYSAUX
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check change default tablespace again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.change_tablespace_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user | verify default tablespace
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select default_tablespace from dba_users where username = '{{ _usr_name }}';"
+    mt_sql_expect: "SYSAUX"
+    mt_sql_id: oracle_user.pdb.change_tablespace_sql
+
+- name: oracle_user | lock
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: locked
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check lock
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.locked, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user | lock again (wallet)
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: locked
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check lock again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.locked_idempotent_wallet, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user | verify lock
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select account_status from dba_users where username = '{{ _usr_name }}';"
+    mt_sql_expect: "LOCKED"
+    mt_sql_id: oracle_user.pdb.locked_sql
+
+- name: oracle_user | unlock
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: unlocked
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check unlock
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.unlocked, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user | unlock again
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: unlocked
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check unlock again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.unlocked_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user | verify unlock
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select account_status from dba_users where username = '{{ _usr_name }}';"
+    mt_sql_expect: "OPEN"
+    mt_sql_id: oracle_user.pdb.unlocked_sql
+
+- name: oracle_user | expire
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: expired
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check expire
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.expired, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user | expire again
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: expired
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check expire again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.expired_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user | verify expire
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select account_status from dba_users where username = '{{ _usr_name }}';"
+    mt_sql_expect: "EXPIRED"
+    mt_sql_id: oracle_user.pdb.expired_sql
+
+- name: oracle_user | expire and lock
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: expired & locked
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check expire and lock
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.expired_locked, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user | expire and lock again
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: expired & locked
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check expire and lock again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.expired_locked_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user | verify expire and lock
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select account_status from dba_users where username = '{{ _usr_name }}';"
+    mt_sql_expect: "EXPIRED & LOCKED"
+    mt_sql_id: oracle_user.pdb.expired_locked_sql
+
+# documented: present unlocks an existing user (ACCOUNT UNLOCK), the password stays expired
+- name: oracle_user | present after expired & locked
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check present after expired & locked
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.present_after_expired, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user | present again after expired
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check present again after expired
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.present_after_expired_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user | verify present after expired
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select account_status from dba_users where username = '{{ _usr_name }}';"
+    mt_sql_expect: "EXPIRED"
+    mt_sql_id: oracle_user.pdb.present_after_expired_sql
+
+# password hash: create a second user with the hash of the first user
+- name: oracle_user | get password hash of the first user
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select spare4 from sys.user$ where name = '{{ _usr_name }}';"
+- name: oracle_user | remember password hash
+  ansible.builtin.set_fact:
+    _usr_hash: "{{ mt_sql_value }}"
+
+- name: oracle_user | create with password hash
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name2 }}"
+    schema_password_hash: "{{ _usr_hash }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check create with password hash
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.create_hash, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user | create with password hash again
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name2 }}"
+    schema_password_hash: "{{ _usr_hash }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check create with password hash again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.create_hash_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user | verify password hash
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select spare4 from sys.user$ where name = '{{ _usr_name2 }}';"
+    mt_sql_expect: "{{ _usr_hash }}"
+    mt_sql_id: oracle_user.pdb.create_hash_sql
+
+# external authentication
+- name: oracle_user | create external user
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_ext }}"
+    authentication_type: external
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check create external user
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.create_external, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user | create external user again
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_ext }}"
+    authentication_type: external
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check create external user again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.create_external_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user | verify external user
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select authentication_type from dba_users where username = '{{ _usr_ext }}';"
+    mt_sql_expect: "EXTERNAL"
+    mt_sql_id: oracle_user.pdb.create_external_sql
+
+- name: oracle_user | drop
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ item.schema }}"
+    state: absent
+  loop:
+    - {schema: "{{ _usr_name }}", id: oracle_user.pdb.drop}
+    - {schema: "{{ _usr_name2 }}", id: oracle_user.pdb.drop_hash_user}
+    - {schema: "{{ _usr_ext }}", id: oracle_user.pdb.drop_external_user}
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check drop
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: "{{ _usr_item.item.id }}", mt_res: "{{ _usr_item }}", mt_expect: changed}
+  loop: "{{ _res.results }}"
+  loop_control:
+    loop_var: _usr_item
+
+- name: oracle_user | drop again
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check drop again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user | verify drop
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_users
+      where username in ('{{ _usr_name }}', '{{ _usr_name2 }}', '{{ _usr_ext }}');
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_user.pdb.drop_sql
+
+# error handling
+- name: oracle_user | create without password
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check create without password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.create_no_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+# documented: schema is required in practice
+- name: oracle_user | missing schema
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema_password: "{{ _usr_password }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check missing schema
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.missing_schema, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_user | wrong password
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+# ---------------------------------------------------------------- CDB
+- name: oracle_user | create common user (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_common }}"
+    schema_password: "{{ _usr_password }}"
+    container: all
+    state: present
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check create common user
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.cdb.create_common_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user | create common user again (system)
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_common }}"
+    container: all
+    state: present
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check create common user again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.cdb.create_common_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user | verify common user in CDB$ROOT
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "select common || ',' || account_status from dba_users where username = '{{ _usr_common }}';"
+    mt_sql_expect: "YES,OPEN"
+    mt_sql_id: oracle_user.cdb.create_common_sql
+
+- name: oracle_user | verify common user in ORCLPDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select common from dba_users where username = '{{ _usr_common }}';"
+    mt_sql_expect: "YES"
+    mt_sql_id: oracle_user.cdb.create_common_pdb_sql
+
+- name: oracle_user | lock common user
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_common }}"
+    state: locked
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check lock common user
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.cdb.locked_common, mt_res: "{{ _res }}", mt_expect: changed}
+
+# documented: container_data sets CONTAINER_DATA=<container> after the creation
+- name: oracle_user | create common user with container_data
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_common_cd }}"
+    schema_password: "{{ _usr_password }}"
+    container: all
+    container_data: all
+    state: present
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check create common user with container_data
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.cdb.create_container_data, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user | verify container_data
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: >-
+      select count(*) from dba_container_data
+      where username = '{{ _usr_common_cd }}' and all_containers = 'Y';
+    mt_sql_expect: "1"
+    mt_sql_id: oracle_user.cdb.create_container_data_sql
+
+- name: oracle_user | drop common users
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ item.schema }}"
+    state: absent
+  loop:
+    - {schema: "{{ _usr_common }}", id: oracle_user.cdb.drop_common}
+    - {schema: "{{ _usr_common_cd }}", id: oracle_user.cdb.drop_container_data}
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check drop common users
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: "{{ _usr_item.item.id }}", mt_res: "{{ _usr_item }}", mt_expect: changed}
+  loop: "{{ _res.results }}"
+  loop_control:
+    loop_var: _usr_item
+
+- name: oracle_user | drop common user again
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_common }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check drop common user again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.cdb.drop_common_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user | verify drop common users
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: >-
+      select count(*) from dba_users
+      where username in ('{{ _usr_common }}', '{{ _usr_common_cd }}');
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_user.cdb.drop_sql
+
+- name: oracle_user | teardown tablespace MOLTEST_USERS
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "drop tablespace MOLTEST_USERS including contents and datafiles;"
+
+- name: oracle_user | teardown grant on SYS.USER$ for SYSTEM
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "revoke read on sys.user$ from system container=all;"

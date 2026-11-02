@@ -1,0 +1,399 @@
+---
+# Tests for oracle_job in PDB ORCLPDB (jobs in schema SYSTEM)
+# - create PL/SQL block job, idempotence, check mode, change comments, enable,
+#   job without logging_level, stored procedure job with arguments,
+#   convert_to_upper=false, drop, error cases
+# - connection variants: system (default), sys as sysdba, wallet, wrong password
+- name: oracle_job | variables
+  ansible.builtin.set_fact:
+    _job_name: SYSTEM.MOLTEST_JOB
+    _job_name_args: SYSTEM.MOLTEST_JOB_ARGS
+    _job_name_mixed: SYSTEM.MolTest_Job_Mixed
+    _job_action: "begin null; end;"
+    _job_interval: "FREQ=HOURLY;INTERVAL=3"
+    _job_cleanup_sql: |
+      whenever sqlerror exit failure
+      alter session set container={{ mt_pdb }};
+      begin
+        for j in (select owner, job_name from dba_scheduler_jobs
+                  where owner = 'SYSTEM' and upper(job_name) like 'MOLTEST\_JOB%' escape '\') loop
+          dbms_scheduler.drop_job('"' || j.owner || '"."' || j.job_name || '"', force => true);
+        end loop;
+      end;
+      /
+      exit
+
+- name: oracle_job | cleanup with sqlplus
+  ansible.builtin.command:
+    cmd: "{{ mt_oracle_home }}/bin/sqlplus -S -L / as sysdba"
+    stdin: "{{ _job_cleanup_sql }}"
+  changed_when: false
+  failed_when: false
+
+- name: oracle_job | create
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name }}"
+    job_type: plsql_block
+    job_action: "{{ _job_action }}"
+    repeat_interval: "{{ _job_interval }}"
+    comments: moltest job
+    logging_level: runs
+    restartable: true
+    enabled: false
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check create
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_job | create again
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name }}"
+    job_type: plsql_block
+    job_action: "{{ _job_action }}"
+    repeat_interval: "{{ _job_interval }}"
+    comments: moltest job
+    logging_level: runs
+    restartable: true
+    enabled: false
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check create again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_job | verify create
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select job_type || ',' || job_action || ',' || repeat_interval || ',' || enabled
+      || ',' || restartable || ',' || logging_level || ',' || comments
+      from dba_scheduler_jobs where owner = 'SYSTEM' and job_name = 'MOLTEST_JOB';
+    mt_sql_expect: "PLSQL_BLOCK,{{ _job_action }},{{ _job_interval }},FALSE,TRUE,RUNS,moltest job"
+    mt_sql_id: oracle_job.pdb.create_sql
+
+# documented: in check mode the job is not checked and changed=false is returned
+- name: oracle_job | change comments in check mode
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name }}"
+    job_type: plsql_block
+    job_action: "{{ _job_action }}"
+    repeat_interval: "{{ _job_interval }}"
+    comments: moltest job changed
+    logging_level: runs
+    restartable: true
+    enabled: false
+    state: present
+  check_mode: true
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check change comments in check mode
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.check_mode, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_job | verify check mode
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select comments from dba_scheduler_jobs where owner = 'SYSTEM' and job_name = 'MOLTEST_JOB';"
+    mt_sql_expect: "moltest job"
+    mt_sql_id: oracle_job.pdb.check_mode_sql
+
+- name: oracle_job | change comments and enable (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name }}"
+    job_type: plsql_block
+    job_action: "{{ _job_action }}"
+    repeat_interval: "{{ _job_interval }}"
+    comments: moltest job changed
+    logging_level: runs
+    restartable: true
+    enabled: true
+    state: present
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check change comments and enable
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.change_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_job | change comments and enable again
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name }}"
+    job_type: plsql_block
+    job_action: "{{ _job_action }}"
+    repeat_interval: "{{ _job_interval }}"
+    comments: moltest job changed
+    logging_level: runs
+    restartable: true
+    enabled: true
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check change comments and enable again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.change_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_job | verify change
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select enabled || ',' || comments
+      from dba_scheduler_jobs where owner = 'SYSTEM' and job_name = 'MOLTEST_JOB';
+    mt_sql_expect: "TRUE,moltest job changed"
+    mt_sql_id: oracle_job.pdb.change_sql
+
+# documented: without logging_level the default of the job class is used (the job differs => recreated)
+- name: oracle_job | without logging_level
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name }}"
+    job_type: plsql_block
+    job_action: "{{ _job_action }}"
+    repeat_interval: "{{ _job_interval }}"
+    comments: moltest job changed
+    restartable: true
+    enabled: false
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check without logging_level
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.no_logging_level, mt_res: "{{ _res }}", mt_expect: changed}
+
+# stored procedure job with positional arguments
+- name: oracle_job | create job with arguments
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name_args }}"
+    job_type: stored_procedure
+    job_action: DBMS_SESSION.SLEEP
+    job_arguments:
+      - "1"
+    repeat_interval: "{{ _job_interval }}"
+    logging_level: failed runs
+    enabled: false
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check create job with arguments
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.create_args, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_job | create job with arguments again
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name_args }}"
+    job_type: stored_procedure
+    job_action: DBMS_SESSION.SLEEP
+    job_arguments:
+      - "1"
+    repeat_interval: "{{ _job_interval }}"
+    logging_level: failed runs
+    enabled: false
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check create job with arguments again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.create_args_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_job | verify job arguments
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select j.number_of_arguments || ',' || a.value || ',' || j.logging_level
+      from dba_scheduler_jobs j join dba_scheduler_job_args a
+      on a.owner = j.owner and a.job_name = j.job_name
+      where j.owner = 'SYSTEM' and j.job_name = 'MOLTEST_JOB_ARGS' and a.argument_position = 1;
+    mt_sql_expect: "1,1,FAILED RUNS"
+    mt_sql_id: oracle_job.pdb.create_args_sql
+
+- name: oracle_job | change job arguments
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name_args }}"
+    job_type: stored_procedure
+    job_action: DBMS_SESSION.SLEEP
+    job_arguments:
+      - "2"
+    repeat_interval: "{{ _job_interval }}"
+    logging_level: failed runs
+    enabled: false
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check change job arguments
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.change_args, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_job | drop job with arguments
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name_args }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check drop job with arguments
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.drop_args, mt_res: "{{ _res }}", mt_expect: changed}
+
+# convert_to_upper=false: case sensitive job name
+- name: oracle_job | create mixed case job
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name_mixed }}"
+    job_action: "{{ _job_action }}"
+    repeat_interval: "{{ _job_interval }}"
+    logging_level: runs
+    enabled: false
+    convert_to_upper: false
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check create mixed case job
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.mixed_case_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_job | create mixed case job again
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name_mixed }}"
+    job_action: "{{ _job_action }}"
+    repeat_interval: "{{ _job_interval }}"
+    logging_level: runs
+    enabled: false
+    convert_to_upper: false
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check create mixed case job again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.mixed_case_create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_job | verify mixed case job
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from dba_scheduler_jobs where owner = 'SYSTEM' and job_name = 'MolTest_Job_Mixed';"
+    mt_sql_expect: "1"
+    mt_sql_id: oracle_job.pdb.mixed_case_sql
+
+- name: oracle_job | drop mixed case job
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name_mixed }}"
+    convert_to_upper: false
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check drop mixed case job
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.mixed_case_drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_job | drop
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check drop
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_job | drop again
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check drop again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_job | verify drop
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_scheduler_jobs
+      where owner = 'SYSTEM' and job_name in ('MOLTEST_JOB', 'MOLTEST_JOB_ARGS');
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_job.pdb.drop_sql
+
+# Oracle wallet: create and drop with ORCLPDB_SYSTEM
+- name: oracle_job | create with wallet
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name }}"
+    job_action: "{{ _job_action }}"
+    repeat_interval: "{{ _job_interval }}"
+    logging_level: runs
+    enabled: false
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check create with wallet
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.wallet_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_job | drop with wallet
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check drop with wallet
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.wallet_drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+# error handling
+- name: oracle_job | job name without owner
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: MOLTEST_JOB
+    job_action: "{{ _job_action }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check job name without owner
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.invalid_name, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_job | neither job_action nor program_name
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check neither job_action nor program_name
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.missing_action, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_job | lightweight job without program_name
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name }}"
+    job_action: "{{ _job_action }}"
+    lightweight: true
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check lightweight job without program_name
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.lightweight_no_program, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_job | wrong password
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_job | final cleanup with sqlplus
+  ansible.builtin.command:
+    cmd: "{{ mt_oracle_home }}/bin/sqlplus -S -L / as sysdba"
+    stdin: "{{ _job_cleanup_sql }}"
+  changed_when: false
+  failed_when: false

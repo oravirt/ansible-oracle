@@ -1,0 +1,38 @@
+---
+# Compare the result of a module call with the expectation and record it.
+#
+# mt_id:     unique id of the check: <module>.<container>.<step>, e.g. oracle_user.pdb.create
+# mt_res:    registered result of the module call (task with ignore_errors: true)
+# mt_expect: changed | ok | failed
+#
+# A failed check does not stop the test run. side_effect.yml fails at the end.
+- name: "check | {{ mt_id }} | expect {{ mt_expect }}"
+  vars:
+    _actual: >-
+      {{ 'failed' if (mt_res.failed | default(false) | bool)
+         else ('changed' if (mt_res.changed | default(false) | bool) else 'ok') }}
+    _msg: "{{ (mt_res.msg | default('') | string)[:500] }}"
+  ansible.builtin.set_fact:
+    mt_results: >-
+      {{ mt_results + [{'id': mt_id, 'expect': mt_expect, 'actual': _actual, 'msg': _msg}] }}
+    mt_failures: >-
+      {{ mt_failures
+         + ([mt_id ~ ': expected ' ~ mt_expect ~ ', got ' ~ _actual ~ ' - ' ~ _msg]
+            if (_actual != mt_expect and mt_id not in mt_known_bugs) else []) }}
+    mt_known: >-
+      {{ mt_known
+         + ([mt_id ~ ': ' ~ mt_known_bugs[mt_id]]
+            if (_actual != mt_expect and mt_id in mt_known_bugs) else []) }}
+    mt_fixed: >-
+      {{ mt_fixed + ([mt_id] if (_actual == mt_expect and mt_id in mt_known_bugs) else []) }}
+
+- name: "check | {{ mt_id }} | show deviation"
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'KNOWN BUG' if mt_id in mt_known_bugs else 'FAILED' }}: expected {{ mt_expect }},
+      got {{ 'failed' if (mt_res.failed | default(false) | bool)
+             else ('changed' if (mt_res.changed | default(false) | bool) else 'ok') }}:
+      {{ mt_res.msg | default('') }}
+  when: >-
+    ('failed' if (mt_res.failed | default(false) | bool)
+     else ('changed' if (mt_res.changed | default(false) | bool) else 'ok')) != mt_expect

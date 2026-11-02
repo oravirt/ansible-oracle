@@ -1,0 +1,272 @@
+---
+# Tests for oracle_services in PDB ORCLPDB (no Grid Infrastructure => DBMS_SERVICE)
+# - create, start, status, stop, restart, remove, idempotence
+# - connection variants: system (default), wallet, wrong password, missing password
+# - the module has no option mode => no sysdba connection possible
+# Steps that depend on a state the module should have created (exists/running)
+# set this state with sqlplus first, so a failing step does not break the next one.
+- name: oracle_services | variables
+  ansible.builtin.set_fact:
+    _svc_name: MOLTEST_SVC
+    _svc_sql_cleanup: |
+      begin
+        begin dbms_service.stop_service('MOLTEST_SVC');
+        exception when others then null; end;
+        begin dbms_service.delete_service('MOLTEST_SVC');
+        exception when others then null; end;
+      end;
+      /
+    _svc_sql_ensure_running: |
+      begin
+        begin dbms_service.create_service('MOLTEST_SVC', 'MOLTEST_SVC');
+        exception when others then null; end;
+        begin dbms_service.start_service('MOLTEST_SVC');
+        exception when others then null; end;
+      end;
+      /
+    _svc_sql_exists: >-
+      select count(*) from dba_services where name = 'MOLTEST_SVC';
+    _svc_sql_running: >-
+      select count(*) from v$active_services where name = 'MOLTEST_SVC';
+
+- name: oracle_services | cleanup
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _svc_sql_cleanup }}"
+
+# state=present: created, not started
+- name: oracle_services | create
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_pdb }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_services | check create
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services.pdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_services | verify create
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _svc_sql_exists }}"
+    mt_sql_expect: "1"
+    mt_sql_id: oracle_services.pdb.create_sql
+
+- name: oracle_services | create again
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_pdb }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_services | check create again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services.pdb.create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+# state=started
+- name: oracle_services | prepare start (service exists, not running)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: |
+      begin
+        begin dbms_service.create_service('MOLTEST_SVC', 'MOLTEST_SVC');
+        exception when others then null; end;
+        begin dbms_service.stop_service('MOLTEST_SVC');
+        exception when others then null; end;
+      end;
+      /
+
+- name: oracle_services | start
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_pdb }}"
+    state: started
+  register: _res
+  ignore_errors: true
+- name: oracle_services | check start
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services.pdb.start, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_services | start again
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_pdb }}"
+    state: started
+  register: _res
+  ignore_errors: true
+- name: oracle_services | check start again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services.pdb.start_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_services | verify start
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _svc_sql_running }}"
+    mt_sql_expect: "1"
+    mt_sql_id: oracle_services.pdb.start_sql
+
+# state=status: never changes anything
+- name: oracle_services | prepare status (service running)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _svc_sql_ensure_running }}"
+
+- name: oracle_services | status
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_pdb }}"
+    state: status
+  register: _res
+  ignore_errors: true
+- name: oracle_services | check status
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services.pdb.status, mt_res: "{{ _res }}", mt_expect: ok}
+
+# state=stopped
+- name: oracle_services | stop
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_pdb }}"
+    state: stopped
+  register: _res
+  ignore_errors: true
+- name: oracle_services | check stop
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services.pdb.stop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_services | stop again
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_pdb }}"
+    state: stopped
+  register: _res
+  ignore_errors: true
+- name: oracle_services | check stop again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services.pdb.stop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_services | verify stop
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _svc_sql_running }}"
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_services.pdb.stop_sql
+
+# state=restarted: stop and start of a running service
+- name: oracle_services | prepare restart (service running)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _svc_sql_ensure_running }}"
+
+- name: oracle_services | restart
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_pdb }}"
+    state: restarted
+  register: _res
+  ignore_errors: true
+- name: oracle_services | check restart
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services.pdb.restart, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_services | verify restart
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _svc_sql_running }}"
+    mt_sql_expect: "1"
+    mt_sql_id: oracle_services.pdb.restart_sql
+
+# state=absent: running service is stopped and removed
+- name: oracle_services | prepare remove (service running)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _svc_sql_ensure_running }}"
+
+- name: oracle_services | remove
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_pdb }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_services | check remove
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services.pdb.drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_services | remove again
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_pdb }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_services | check remove again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services.pdb.drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_services | verify remove
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _svc_sql_exists }}"
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_services.pdb.drop_sql
+
+# Oracle wallet
+- name: oracle_services | status with wallet
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_pdb }}"
+    state: status
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_services | check status with wallet
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services.pdb.wallet_status, mt_res: "{{ _res }}", mt_expect: ok}
+
+# error handling
+- name: oracle_services | wrong password
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_pdb }}"
+    state: status
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_services | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_services | user without password
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_pdb }}"
+    state: status
+  vars:
+    mt_conn:
+      service_name: "{{ mt_pdb }}"
+      user: system
+  register: _res
+  ignore_errors: true
+- name: oracle_services | check user without password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services.pdb.missing_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_services | final cleanup
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _svc_sql_cleanup }}"

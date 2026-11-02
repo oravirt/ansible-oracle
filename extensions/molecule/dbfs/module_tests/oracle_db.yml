@@ -1,0 +1,136 @@
+---
+# Tests for oracle_db against the existing CDB DB1 (no Grid Infrastructure => oratab/sqlplus)
+# Only low-risk checks: no dbca, no shutdown/restart.
+# - state=started on the running database (startup returns ORA-01081 => ok)
+# - state=present with the current settings of DB1 (no restart because archivelog is unchanged)
+# - state=started/absent for a database that does not exist (only checks /etc/oratab)
+# Connection: the module always connects as sys as sysdba (sys_password) to the service
+# db_name; there is no wallet entry for DB1, so the wallet variant is not tested.
+- name: oracle_db | variables
+  ansible.builtin.set_fact:
+    _db_args:
+      oracle_home: "{{ mt_oracle_home }}"
+      db_name: "{{ mt_cdb }}"
+      sid: "{{ mt_oracle_sid }}"
+      sys_password: "{{ mt_sys_password }}"
+      port: "{{ mt_port }}"
+    _db_settings_sql: >-
+      select log_mode || ',' || force_logging || ',' || flashback_on || ','
+             || supplemental_log_data_min
+      from v$database;
+
+- name: oracle_db | started on running database
+  opitzconsulting.ansible_oracle.oracle_db:
+    oracle_home: "{{ _db_args.oracle_home }}"
+    db_name: "{{ _db_args.db_name }}"
+    sid: "{{ _db_args.sid }}"
+    sys_password: "{{ _db_args.sys_password }}"
+    port: "{{ _db_args.port }}"
+    state: started
+  register: _res
+  ignore_errors: true
+- name: oracle_db | check started on running database
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_db.cdb.started_running, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_db | read current settings
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "{{ _db_settings_sql }}"
+
+- name: oracle_db | remember current settings
+  ansible.builtin.set_fact:
+    _db_settings: "{{ mt_sql_value }}"
+    _db_log_mode: "{{ mt_sql_value.split(',')[0] }}"
+    _db_force_logging: "{{ mt_sql_value.split(',')[1] }}"
+    _db_flashback: "{{ mt_sql_value.split(',')[2] }}"
+    _db_supplemental: "{{ mt_sql_value.split(',')[3] }}"
+
+- name: oracle_db | read default tablespace type
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: >-
+      select lower(property_value) from database_properties
+      where property_name = 'DEFAULT_TBS_TYPE';
+
+- name: oracle_db | remember default tablespace type
+  ansible.builtin.set_fact:
+    _db_tbs_type: "{{ mt_sql_value }}"
+
+# Run state=present only if all settings are known values, so that the module
+# never switches the archivelog mode (=> restart) or another setting of DB1.
+- name: oracle_db | present with current settings
+  when:
+    - _db_log_mode in ['ARCHIVELOG', 'NOARCHIVELOG']
+    - _db_force_logging in ['YES', 'NO']
+    - _db_flashback in ['YES', 'NO']
+    - _db_supplemental in ['YES', 'NO']
+    - _db_tbs_type in ['smallfile', 'bigfile']
+  block:
+    - name: oracle_db | present with current settings
+      opitzconsulting.ansible_oracle.oracle_db:
+        oracle_home: "{{ _db_args.oracle_home }}"
+        db_name: "{{ _db_args.db_name }}"
+        sid: "{{ _db_args.sid }}"
+        sys_password: "{{ _db_args.sys_password }}"
+        port: "{{ _db_args.port }}"
+        archivelog: "{{ _db_log_mode == 'ARCHIVELOG' }}"
+        force_logging: "{{ _db_force_logging == 'YES' }}"
+        flashback: "{{ _db_flashback == 'YES' }}"
+        supplemental_logging: "{{ _db_supplemental == 'YES' }}"
+        default_tablespace_type: "{{ _db_tbs_type }}"
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_db | check present with current settings
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_db.cdb.present_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_db | verify settings unchanged
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "{{ _db_settings_sql }}"
+        mt_sql_expect: "{{ _db_settings }}"
+        mt_sql_id: oracle_db.cdb.present_idempotent_sql
+
+# databases that do not exist: only /etc/oratab is checked, no database access
+- name: oracle_db | started for missing database
+  opitzconsulting.ansible_oracle.oracle_db:
+    oracle_home: "{{ _db_args.oracle_home }}"
+    db_name: MOLTEST_NODB
+    sid: MOLTEST_NODB
+    sys_password: "{{ _db_args.sys_password }}"
+    state: started
+  register: _res
+  ignore_errors: true
+- name: oracle_db | check started for missing database
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_db.cdb.started_missing, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_db | absent for missing database
+  opitzconsulting.ansible_oracle.oracle_db:
+    oracle_home: "{{ _db_args.oracle_home }}"
+    db_name: MOLTEST_NODB
+    sid: MOLTEST_NODB
+    sys_password: "{{ _db_args.sys_password }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_db | check absent for missing database
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_db.cdb.absent_missing, mt_res: "{{ _res }}", mt_expect: ok}
+
+# error handling: wrong sys password (state=present connects to the database)
+- name: oracle_db | wrong sys password
+  opitzconsulting.ansible_oracle.oracle_db:
+    oracle_home: "{{ _db_args.oracle_home }}"
+    db_name: "{{ _db_args.db_name }}"
+    sid: "{{ _db_args.sid }}"
+    sys_password: wrong_password
+    port: "{{ _db_args.port }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_db | check wrong sys password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_db.cdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}

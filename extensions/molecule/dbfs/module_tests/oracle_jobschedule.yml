@@ -1,0 +1,278 @@
+---
+# Tests for oracle_jobschedule in PDB ORCLPDB (schedules in schema SYSTEM)
+# - create, idempotence, check mode, change interval, remove comments,
+#   convert_to_upper=false, drop, error cases
+# - connection variants: system (default), sys as sysdba, wallet, wrong password
+- name: oracle_jobschedule | variables
+  ansible.builtin.set_fact:
+    _sch_name: SYSTEM.MOLTEST_SCHEDULE
+    _sch_name_mixed: SYSTEM.MolTest_Schedule_Mixed
+    _sch_interval1: "FREQ=HOURLY;INTERVAL=1"
+    _sch_interval2: "FREQ=DAILY;BYHOUR=3"
+    _sch_cleanup_sql: |
+      whenever sqlerror exit failure
+      alter session set container={{ mt_pdb }};
+      begin
+        for s in (select owner, schedule_name from dba_scheduler_schedules
+                  where owner = 'SYSTEM' and upper(schedule_name) like 'MOLTEST\_SCHEDULE%' escape '\') loop
+          dbms_scheduler.drop_schedule('"' || s.owner || '"."' || s.schedule_name || '"', force => true);
+        end loop;
+      end;
+      /
+      exit
+
+- name: oracle_jobschedule | cleanup with sqlplus
+  ansible.builtin.command:
+    cmd: "{{ mt_oracle_home }}/bin/sqlplus -S -L / as sysdba"
+    stdin: "{{ _sch_cleanup_sql }}"
+  changed_when: false
+  failed_when: false
+
+- name: oracle_jobschedule | create
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    name: "{{ _sch_name }}"
+    repeat_interval: "{{ _sch_interval1 }}"
+    comments: moltest schedule
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_jobschedule | check create
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobschedule.pdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobschedule | create again
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    name: "{{ _sch_name }}"
+    repeat_interval: "{{ _sch_interval1 }}"
+    comments: moltest schedule
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_jobschedule | check create again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobschedule.pdb.create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobschedule | verify create
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select repeat_interval || ',' || comments from dba_scheduler_schedules
+      where owner = 'SYSTEM' and schedule_name = 'MOLTEST_SCHEDULE';
+    mt_sql_expect: "{{ _sch_interval1 }},moltest schedule"
+    mt_sql_id: oracle_jobschedule.pdb.create_sql
+
+# documented: in check mode the schedule is not checked and changed=false is returned
+- name: oracle_jobschedule | change interval in check mode
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    name: "{{ _sch_name }}"
+    repeat_interval: "{{ _sch_interval2 }}"
+    comments: moltest schedule
+    state: present
+  check_mode: true
+  register: _res
+  ignore_errors: true
+- name: oracle_jobschedule | check change interval in check mode
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobschedule.pdb.check_mode, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobschedule | verify check mode
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select repeat_interval from dba_scheduler_schedules
+      where owner = 'SYSTEM' and schedule_name = 'MOLTEST_SCHEDULE';
+    mt_sql_expect: "{{ _sch_interval1 }}"
+    mt_sql_id: oracle_jobschedule.pdb.check_mode_sql
+
+- name: oracle_jobschedule | change interval (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    name: "{{ _sch_name }}"
+    repeat_interval: "{{ _sch_interval2 }}"
+    comments: moltest schedule
+    state: present
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobschedule | check change interval
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobschedule.pdb.change_interval_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobschedule | change interval again
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    name: "{{ _sch_name }}"
+    repeat_interval: "{{ _sch_interval2 }}"
+    comments: moltest schedule
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_jobschedule | check change interval again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobschedule.pdb.change_interval_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobschedule | verify change interval
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select repeat_interval from dba_scheduler_schedules
+      where owner = 'SYSTEM' and schedule_name = 'MOLTEST_SCHEDULE';
+    mt_sql_expect: "{{ _sch_interval2 }}"
+    mt_sql_id: oracle_jobschedule.pdb.change_interval_sql
+
+# documented: without comments existing comments are removed
+- name: oracle_jobschedule | remove comments
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    name: "{{ _sch_name }}"
+    repeat_interval: "{{ _sch_interval2 }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_jobschedule | check remove comments
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobschedule.pdb.remove_comments, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobschedule | remove comments again
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    name: "{{ _sch_name }}"
+    repeat_interval: "{{ _sch_interval2 }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_jobschedule | check remove comments again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobschedule.pdb.remove_comments_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobschedule | verify remove comments
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select nvl(comments, 'NULL') from dba_scheduler_schedules
+      where owner = 'SYSTEM' and schedule_name = 'MOLTEST_SCHEDULE';
+    mt_sql_expect: "NULL"
+    mt_sql_id: oracle_jobschedule.pdb.remove_comments_sql
+
+# convert_to_upper=false: case sensitive schedule name
+- name: oracle_jobschedule | create mixed case schedule
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    name: "{{ _sch_name_mixed }}"
+    repeat_interval: "{{ _sch_interval1 }}"
+    convert_to_upper: false
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_jobschedule | check create mixed case schedule
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobschedule.pdb.mixed_case_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobschedule | create mixed case schedule again
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    name: "{{ _sch_name_mixed }}"
+    repeat_interval: "{{ _sch_interval1 }}"
+    convert_to_upper: false
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_jobschedule | check create mixed case schedule again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobschedule.pdb.mixed_case_create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobschedule | verify mixed case schedule
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_scheduler_schedules
+      where owner = 'SYSTEM' and schedule_name = 'MolTest_Schedule_Mixed';
+    mt_sql_expect: "1"
+    mt_sql_id: oracle_jobschedule.pdb.mixed_case_sql
+
+- name: oracle_jobschedule | drop mixed case schedule
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    name: "{{ _sch_name_mixed }}"
+    repeat_interval: "{{ _sch_interval1 }}"
+    convert_to_upper: false
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_jobschedule | check drop mixed case schedule
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobschedule.pdb.mixed_case_drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobschedule | drop (wallet)
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    name: "{{ _sch_name }}"
+    repeat_interval: "{{ _sch_interval2 }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobschedule | check drop
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobschedule.pdb.drop_wallet, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobschedule | drop again
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    name: "{{ _sch_name }}"
+    repeat_interval: "{{ _sch_interval2 }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_jobschedule | check drop again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobschedule.pdb.drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobschedule | verify drop
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_scheduler_schedules
+      where owner = 'SYSTEM' and upper(schedule_name) like 'MOLTEST%';
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_jobschedule.pdb.drop_sql
+
+# error handling
+- name: oracle_jobschedule | schedule name without owner
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    name: MOLTEST_SCHEDULE
+    repeat_interval: "{{ _sch_interval1 }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobschedule | check schedule name without owner
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobschedule.pdb.invalid_name, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_jobschedule | invalid repeat interval
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    name: "{{ _sch_name }}"
+    repeat_interval: "FREQ=SOMETIMES"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobschedule | check invalid repeat interval
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobschedule.pdb.invalid_interval, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_jobschedule | wrong password
+  opitzconsulting.ansible_oracle.oracle_jobschedule:
+    name: "{{ _sch_name }}"
+    repeat_interval: "{{ _sch_interval1 }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobschedule | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobschedule.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_jobschedule | final cleanup with sqlplus
+  ansible.builtin.command:
+    cmd: "{{ mt_oracle_home }}/bin/sqlplus -S -L / as sysdba"
+    stdin: "{{ _sch_cleanup_sql }}"
+  changed_when: false
+  failed_when: false

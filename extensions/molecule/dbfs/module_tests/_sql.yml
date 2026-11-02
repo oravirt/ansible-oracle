@@ -1,0 +1,36 @@
+---
+# Independent verification with sqlplus / as sysdba (does not use cx_Oracle/oracledb).
+#
+# mt_sql:           query, must end with ';'
+# mt_sql_container: CDB$ROOT (default) or PDB name
+# mt_sql_expect:    (optional) expected value of the output (trimmed)
+# mt_sql_id:        (optional) id of the check, default: <mt_module>.sql
+#
+# Result: mt_sql_value (trimmed output)
+- name: "sql | {{ mt_sql_container | default('CDB$ROOT') }} | {{ mt_sql }}"
+  ansible.builtin.command:
+    cmd: "{{ mt_oracle_home }}/bin/sqlplus -S -L / as sysdba"
+    stdin: |
+      whenever sqlerror exit failure
+      set heading off feedback off pagesize 0 linesize 4000 trimspool on verify off
+      alter session set container={{ mt_sql_container | default('CDB$ROOT') }};
+      {{ mt_sql }}
+      exit
+  register: _mt_sql_out
+  changed_when: false
+
+- name: "sql | set mt_sql_value"
+  ansible.builtin.set_fact:
+    mt_sql_value: "{{ _mt_sql_out.stdout | trim }}"
+
+- name: "sql | check value"
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: "{{ mt_sql_id | default(mt_module ~ '.sql') }}"
+    mt_res:
+      changed: false
+      # compare with the raw output: set_fact converts YES/NO to a boolean
+      failed: "{{ (_mt_sql_out.stdout | trim) != (mt_sql_expect | string) }}"
+      msg: "sql: {{ mt_sql }} expected: '{{ mt_sql_expect }}' got: '{{ _mt_sql_out.stdout | trim }}'"
+    mt_expect: ok
+  when: mt_sql_expect is defined

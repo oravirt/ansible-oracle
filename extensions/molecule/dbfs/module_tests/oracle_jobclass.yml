@@ -1,0 +1,293 @@
+---
+# Tests for oracle_jobclass
+# - PDB ORCLPDB: create, idempotence, check mode, change logging/history, resource group,
+#   omitted attributes are set to NULL, drop, error cases
+# - CDB DB1: create and drop a job class
+# - connection variants: system (default), sys as sysdba, wallet, wrong password
+- name: oracle_jobclass | variables
+  ansible.builtin.set_fact:
+    _jc_name: MOLTEST_JOBCLASS
+    _jc_name2: MOLTEST_JOBCLASS2
+    _jc_name_cdb: MOLTEST_JOBCLASS_CDB
+    _jc_group: DEFAULT_CONSUMER_GROUP
+    _jc_sql: >-
+      select logging_level || ',' || log_history || ',' || resource_consumer_group
+      || ',' || comments from dba_scheduler_job_classes where owner = 'SYS'
+
+- name: oracle_jobclass | cleanup pdb
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ _jc_name }}"
+    - "{{ _jc_name2 }}"
+  register: _res
+  ignore_errors: true
+
+- name: oracle_jobclass | cleanup cdb
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name_cdb }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+
+- name: oracle_jobclass | create
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name }}"
+    logging: failed runs
+    history: 14
+    comments: moltest job class
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_jobclass | check create
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobclass.pdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobclass | create again
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name }}"
+    logging: failed runs
+    history: 14
+    comments: moltest job class
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_jobclass | check create again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobclass.pdb.create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobclass | verify create
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _jc_sql }} and job_class_name = '{{ _jc_name }}';"
+    mt_sql_expect: "FAILED RUNS,14,,moltest job class"
+    mt_sql_id: oracle_jobclass.pdb.create_sql
+
+# documented: in check mode the module exits with changed=false without checking
+- name: oracle_jobclass | change in check mode
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name }}"
+    logging: full
+    history: 30
+    comments: moltest job class
+  check_mode: true
+  register: _res
+  ignore_errors: true
+- name: oracle_jobclass | check change in check mode
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobclass.pdb.check_mode, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobclass | verify check mode
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _jc_sql }} and job_class_name = '{{ _jc_name }}';"
+    mt_sql_expect: "FAILED RUNS,14,,moltest job class"
+    mt_sql_id: oracle_jobclass.pdb.check_mode_sql
+
+- name: oracle_jobclass | change logging and history (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name }}"
+    logging: full
+    history: 30
+    comments: moltest job class
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobclass | check change logging and history
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobclass.pdb.change_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobclass | change logging and history again (wallet)
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name }}"
+    logging: full
+    history: 30
+    comments: moltest job class
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobclass | check change logging and history again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobclass.pdb.wallet_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobclass | verify change logging and history
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _jc_sql }} and job_class_name = '{{ _jc_name }}';"
+    mt_sql_expect: "FULL,30,,moltest job class"
+    mt_sql_id: oracle_jobclass.pdb.change_sql
+
+- name: oracle_jobclass | set resource group
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name }}"
+    logging: full
+    history: 30
+    comments: moltest job class
+    resource_group: "{{ _jc_group }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobclass | check set resource group
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobclass.pdb.resource_group, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobclass | set resource group again
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name }}"
+    logging: full
+    history: 30
+    comments: moltest job class
+    resource_group: "{{ _jc_group }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobclass | check set resource group again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobclass.pdb.resource_group_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobclass | verify resource group
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _jc_sql }} and job_class_name = '{{ _jc_name }}';"
+    mt_sql_expect: "FULL,30,{{ _jc_group }},moltest job class"
+    mt_sql_id: oracle_jobclass.pdb.resource_group_sql
+
+# documented: omitted optional attributes are set to NULL
+- name: oracle_jobclass | omit optional attributes
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name }}"
+    logging: runs
+  register: _res
+  ignore_errors: true
+- name: oracle_jobclass | check omit optional attributes
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobclass.pdb.omit_attributes, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobclass | omit optional attributes again
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name }}"
+    logging: runs
+  register: _res
+  ignore_errors: true
+- name: oracle_jobclass | check omit optional attributes again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobclass.pdb.omit_attributes_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobclass | verify omit optional attributes
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _jc_sql }} and job_class_name = '{{ _jc_name }}';"
+    mt_sql_expect: "RUNS,,,"
+    mt_sql_id: oracle_jobclass.pdb.omit_attributes_sql
+
+- name: oracle_jobclass | drop
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_jobclass | check drop
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobclass.pdb.drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobclass | drop again
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_jobclass | check drop again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobclass.pdb.drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobclass | verify drop
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_scheduler_job_classes where job_class_name = '{{ _jc_name }}';
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_jobclass.pdb.drop_sql
+
+# CDB
+- name: oracle_jobclass | create in cdb
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name_cdb }}"
+    logging: "off"
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobclass | check create in cdb
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobclass.cdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobclass | verify create in cdb
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: CDB$ROOT
+    mt_sql: "{{ _jc_sql }} and job_class_name = '{{ _jc_name_cdb }}';"
+    mt_sql_expect: "OFF,,,"
+    mt_sql_id: oracle_jobclass.cdb.create_sql
+
+- name: oracle_jobclass | drop in cdb (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name_cdb }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobclass | check drop in cdb
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobclass.cdb.drop_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+# error handling
+- name: oracle_jobclass | resource group does not exist
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name2 }}"
+    resource_group: MOLTEST_NO_SUCH_GROUP
+  register: _res
+  ignore_errors: true
+- name: oracle_jobclass | check resource group does not exist
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobclass.pdb.invalid_resource_group, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_jobclass | verify job class not created
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_scheduler_job_classes where job_class_name = '{{ _jc_name2 }}';
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_jobclass.pdb.invalid_resource_group_sql
+
+- name: oracle_jobclass | wrong password
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ _jc_name }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobclass | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobclass.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_jobclass | final cleanup pdb
+  opitzconsulting.ansible_oracle.oracle_jobclass:
+    name: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ _jc_name }}"
+    - "{{ _jc_name2 }}"
+  register: _res
+  ignore_errors: true

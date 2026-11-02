@@ -1,0 +1,275 @@
+---
+# Tests for oracle_role
+# - PDB ORCLPDB: create, idempotence, change authentication (password, external, none),
+#   drop, create with password, error cases
+# - CDB DB1: common role C##MOLTEST_ROLE create and drop
+# - connection variants: system (default), sys as sysdba, wallet, wrong password
+# Check mode is not supported by the module and is not tested.
+- name: oracle_role | variables
+  ansible.builtin.set_fact:
+    _role_name: MOLTEST_ROLE
+    _role_name2: MOLTEST_ROLE_PW
+    _role_name_cdb: C##MOLTEST_ROLE
+    _role_password: Moltest_Role_123
+
+- name: oracle_role | cleanup pdb
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ _role_name }}"
+    - "{{ _role_name2 }}"
+  register: _res
+  ignore_errors: true
+
+- name: oracle_role | cleanup cdb
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name_cdb }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+
+- name: oracle_role | create
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_role | check create
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_role.pdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_role | create again
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_role | check create again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_role.pdb.create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_role | verify create
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select authentication_type from dba_roles where role = '{{ _role_name }}';"
+    mt_sql_expect: NONE
+    mt_sql_id: oracle_role.pdb.create_sql
+
+- name: oracle_role | change to password authentication
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name }}"
+    auth: password
+    auth_conf: "{{ _role_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_role | check change to password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_role.pdb.change_password, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_role | change to password authentication again (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name }}"
+    auth: password
+    auth_conf: "{{ _role_password }}"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_role | check change to password again
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_role.pdb.change_password_idempotent_sysdba
+    mt_res: "{{ _res }}"
+    mt_expect: ok
+
+- name: oracle_role | verify password authentication
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select authentication_type from dba_roles where role = '{{ _role_name }}';"
+    mt_sql_expect: PASSWORD
+    mt_sql_id: oracle_role.pdb.change_password_sql
+
+- name: oracle_role | change to external authentication
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name }}"
+    auth: external
+  register: _res
+  ignore_errors: true
+- name: oracle_role | check change to external
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_role.pdb.change_external, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_role | verify external authentication
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select authentication_type from dba_roles where role = '{{ _role_name }}';"
+    mt_sql_expect: EXTERNAL
+    mt_sql_id: oracle_role.pdb.change_external_sql
+
+- name: oracle_role | change to no authentication
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name }}"
+    auth: none
+  register: _res
+  ignore_errors: true
+- name: oracle_role | check change to none
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_role.pdb.change_none, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_role | verify no authentication
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select authentication_type from dba_roles where role = '{{ _role_name }}';"
+    mt_sql_expect: NONE
+    mt_sql_id: oracle_role.pdb.change_none_sql
+
+- name: oracle_role | drop
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_role | check drop
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_role.pdb.drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_role | drop again
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_role | check drop again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_role.pdb.drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_role | verify drop
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from dba_roles where role = '{{ _role_name }}';"
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_role.pdb.drop_sql
+
+# Oracle wallet: create a password protected role and drop it
+- name: oracle_role | create with password (wallet)
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name2 }}"
+    auth: password
+    auth_conf: "{{ _role_password }}"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_role | check create with password (wallet)
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_role.pdb.wallet_create_password, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_role | verify create with password
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select authentication_type from dba_roles where role = '{{ _role_name2 }}';"
+    mt_sql_expect: PASSWORD
+    mt_sql_id: oracle_role.pdb.wallet_create_password_sql
+
+- name: oracle_role | drop (wallet)
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name2 }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_role | check drop (wallet)
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_role.pdb.wallet_drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+# CDB: common role
+- name: oracle_role | create common role
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name_cdb }}"
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_role | check create common role
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_role.cdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_role | create common role again (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name_cdb }}"
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_role | check create common role again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_role.cdb.create_idempotent_sysdba, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_role | verify common role
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: CDB$ROOT
+    mt_sql: "select common from dba_roles where role = '{{ _role_name_cdb }}';"
+    mt_sql_expect: "YES"
+    mt_sql_id: oracle_role.cdb.create_sql
+
+- name: oracle_role | drop common role
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name_cdb }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_role | check drop common role
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_role.cdb.drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_role | verify drop common role
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: CDB$ROOT
+    mt_sql: "select count(*) from dba_roles where role = '{{ _role_name_cdb }}';"
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_role.cdb.drop_sql
+
+# error handling
+- name: oracle_role | password authentication without auth_conf
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name }}"
+    auth: password
+  register: _res
+  ignore_errors: true
+- name: oracle_role | check password authentication without auth_conf
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_role.pdb.password_missing, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_role | verify role not created
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from dba_roles where role = '{{ _role_name }}';"
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_role.pdb.password_missing_sql
+
+- name: oracle_role | wrong password
+  opitzconsulting.ansible_oracle.oracle_role:
+    role: "{{ _role_name }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_role | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_role.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}

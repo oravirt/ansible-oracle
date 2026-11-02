@@ -1,0 +1,375 @@
+---
+# Tests for oracle_jobwindow
+# - PDB ORCLPDB: create (enabled), idempotence, check mode, disable, change duration,
+#   resource plan, priority, remove comment, enable, drop, error cases
+# - CDB DB1: create and drop a window
+# - connection variants: system (default), sys as sysdba, wallet, wrong password
+# The window only opens on January 1st, so it does not activate the resource plan
+# during the test.
+- name: oracle_jobwindow | variables
+  ansible.builtin.set_fact:
+    _win_name: MOLTEST_WINDOW
+    _win_name_cdb: MOLTEST_WINDOW_CDB
+    _win_interval: freq=yearly;bymonth=JAN;bymonthday=1;byhour=3;byminute=0;bysecond=0
+    _win_plan: DEFAULT_MAINTENANCE_PLAN
+    _win_sql: >-
+      select enabled || ',' || (extract(day from duration) * 1440
+      + extract(hour from duration) * 60 + extract(minute from duration))
+      || ',' || window_priority || ',' || resource_plan || ',' || comments
+      from dba_scheduler_windows where owner = 'SYS'
+
+- name: oracle_jobwindow | cleanup pdb
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_min: 60
+    state: absent
+  register: _res
+  ignore_errors: true
+
+- name: oracle_jobwindow | cleanup cdb
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name_cdb }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_min: 60
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+
+- name: oracle_jobwindow | create
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_min: 60
+    comments: moltest window
+    state: enabled
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check create
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.pdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobwindow | create again
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_min: 60
+    comments: moltest window
+    state: enabled
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check create again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.pdb.create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobwindow | verify create
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _win_sql }} and window_name = '{{ _win_name }}';"
+    mt_sql_expect: "TRUE,60,LOW,,moltest window"
+    mt_sql_id: oracle_jobwindow.pdb.create_sql
+
+# documented: in check mode the module exits with changed=false without checking
+- name: oracle_jobwindow | change in check mode
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_min: 90
+    comments: moltest window
+  check_mode: true
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check change in check mode
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.pdb.check_mode, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobwindow | verify check mode
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _win_sql }} and window_name = '{{ _win_name }}';"
+    mt_sql_expect: "TRUE,60,LOW,,moltest window"
+    mt_sql_id: oracle_jobwindow.pdb.check_mode_sql
+
+- name: oracle_jobwindow | disable
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_min: 60
+    comments: moltest window
+    state: disabled
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check disable
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.pdb.disable, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobwindow | disable again
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_min: 60
+    comments: moltest window
+    state: disabled
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check disable again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.pdb.disable_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobwindow | change duration (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_hour: 2
+    comments: moltest window
+    state: disabled
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check change duration
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.pdb.change_duration_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobwindow | change duration again (wallet)
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_min: 120
+    comments: moltest window
+    state: disabled
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check change duration again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.pdb.wallet_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobwindow | verify change duration
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _win_sql }} and window_name = '{{ _win_name }}';"
+    mt_sql_expect: "FALSE,120,LOW,,moltest window"
+    mt_sql_id: oracle_jobwindow.pdb.change_duration_sql
+
+- name: oracle_jobwindow | set resource plan and priority
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_hour: 2
+    comments: moltest window
+    resource_plan: "{{ _win_plan }}"
+    window_priority: high
+    state: disabled
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check set resource plan and priority
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.pdb.change_plan_priority, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobwindow | set resource plan and priority again
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_hour: 2
+    comments: moltest window
+    resource_plan: "{{ _win_plan | lower }}"
+    priority: high
+    state: disabled
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check set resource plan and priority again
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_jobwindow.pdb.change_plan_priority_idempotent
+    mt_res: "{{ _res }}"
+    mt_expect: ok
+
+- name: oracle_jobwindow | verify resource plan and priority
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _win_sql }} and window_name = '{{ _win_name }}';"
+    mt_sql_expect: "FALSE,120,HIGH,{{ _win_plan }},moltest window"
+    mt_sql_id: oracle_jobwindow.pdb.change_plan_priority_sql
+
+# documented: an omitted comment removes the existing comment,
+# an omitted resource plan is removed when other attributes are changed
+- name: oracle_jobwindow | remove comment and enable
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    interval: "{{ _win_interval }}"
+    duration_hour: 2
+    window_priority: high
+    state: enabled
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check remove comment and enable
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.pdb.remove_comment_enable, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobwindow | remove comment and enable again
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    interval: "{{ _win_interval }}"
+    duration_hour: 2
+    window_priority: high
+    state: enabled
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check remove comment and enable again
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_jobwindow.pdb.remove_comment_enable_idempotent
+    mt_res: "{{ _res }}"
+    mt_expect: ok
+
+- name: oracle_jobwindow | verify remove comment and enable
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _win_sql }} and window_name = '{{ _win_name }}';"
+    mt_sql_expect: "TRUE,120,HIGH,,"
+    mt_sql_id: oracle_jobwindow.pdb.remove_comment_enable_sql
+
+- name: oracle_jobwindow | drop
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_hour: 2
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check drop
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.pdb.drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobwindow | drop again
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_hour: 2
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check drop again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.pdb.drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_jobwindow | verify drop
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_scheduler_windows where window_name = '{{ _win_name }}';
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_jobwindow.pdb.drop_sql
+
+# CDB
+- name: oracle_jobwindow | create in cdb (disabled)
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name_cdb }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_min: 30
+    state: disabled
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check create in cdb
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.cdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_jobwindow | verify create in cdb
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: CDB$ROOT
+    mt_sql: "{{ _win_sql }} and window_name = '{{ _win_name_cdb }}';"
+    mt_sql_expect: "FALSE,30,LOW,,"
+    mt_sql_id: oracle_jobwindow.cdb.create_sql
+
+- name: oracle_jobwindow | drop in cdb (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name_cdb }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_min: 30
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check drop in cdb
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.cdb.drop_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+# error handling
+- name: oracle_jobwindow | missing duration
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check missing duration
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.pdb.missing_duration, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_jobwindow | duration_min and duration_hour
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_min: 60
+    duration_hour: 1
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check duration_min and duration_hour
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.pdb.duration_exclusive, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_jobwindow | invalid repeat interval
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: freq=moltest
+    duration_min: 60
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check invalid repeat interval
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.pdb.invalid_interval, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_jobwindow | verify window not created
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_scheduler_windows where window_name = '{{ _win_name }}';
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_jobwindow.pdb.invalid_interval_sql
+
+- name: oracle_jobwindow | wrong password
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_min: 60
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_jobwindow | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_jobwindow.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_jobwindow | final cleanup pdb
+  opitzconsulting.ansible_oracle.oracle_jobwindow:
+    name: "{{ _win_name }}"
+    repeat_interval: "{{ _win_interval }}"
+    duration_min: 60
+    state: absent
+  register: _res
+  ignore_errors: true

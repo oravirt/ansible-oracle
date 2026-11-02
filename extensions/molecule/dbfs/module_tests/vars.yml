@@ -1,0 +1,90 @@
+---
+# Variables for the module tests (side_effect.yml)
+
+# Selection: MODULE_TESTS=oracle_user,oracle_role (empty = all)
+mt_all_modules:
+  - oracle_directory
+  - oracle_user
+  - oracle_role
+  - oracle_profile
+  - oracle_grants
+  - oracle_privs
+  - oracle_tablespace
+  - oracle_sql
+  - oracle_parameter
+  - oracle_job
+  - oracle_jobclass
+  - oracle_jobschedule
+  - oracle_jobwindow
+  - oracle_rsrc_consgroup
+  - oracle_stats_prefs
+  - oracle_awr
+  - oracle_facts
+  # slower tests
+  - oracle_services
+  - oracle_redo
+  - oracle_datapatch
+  - oracle_db
+  - oracle_pdb
+mt_modules: >-
+  {{ (lookup('ansible.builtin.env', 'MODULE_TESTS') | split(',') | map('trim') | select | list)
+     or mt_all_modules }}
+
+# Result file on the controller: module_tests/results/<MODULE_TESTS_LABEL>.json
+# e.g. MODULE_TESTS_LABEL=cx_oracle before and MODULE_TESTS_LABEL=oracledb after the migration
+mt_label: "{{ lookup('ansible.builtin.env', 'MODULE_TESTS_LABEL') | default('latest', true) }}"
+mt_result_file: "{{ playbook_dir }}/module_tests/results/{{ mt_label }}.json"
+
+mt_oracle_home: /u01/app/oracle/product/26/db_26.1
+mt_oracle_sid: DB1
+mt_env:
+  ORACLE_HOME: "{{ mt_oracle_home }}"
+  ORACLE_SID: "{{ mt_oracle_sid }}"
+  LD_LIBRARY_PATH: "{{ mt_oracle_home }}/lib"
+  # read-only ORACLE_HOME: tnsnames.ora, sqlnet.ora are in ORACLE_BASE_HOME
+  TNS_ADMIN: /u01/app/oracle/homes/db261siee/network/admin
+
+# module_defaults are templated for gather_facts too => default for missing facts
+mt_hostname: "{{ ansible_facts['hostname'] | default(inventory_hostname) }}"
+mt_port: 1521
+mt_cdb: DB1
+mt_pdb: ORCLPDB
+
+# same logic as oradb_manage_db (lower case keys in dbpasswords)
+mt_system_password: "{{ dbpasswords[mt_cdb]['system'] | default(default_dbpass) }}"
+mt_sys_password: "{{ dbpasswords[mt_cdb]['sys'] | default(default_dbpass) }}"
+
+# Connection variants for module_defaults in side_effect.yml.
+# Set mt_conn on a task or an include to switch the connection.
+mt_conn_cdb:
+  service_name: "{{ mt_cdb }}"
+  user: system
+  password: "{{ mt_system_password }}"
+  mode: normal
+mt_conn_pdb:
+  service_name: "{{ mt_pdb }}"
+  user: system
+  password: "{{ mt_system_password }}"
+  mode: normal
+mt_conn_cdb_sysdba:
+  service_name: "{{ mt_cdb }}"
+  user: sys
+  password: "{{ mt_sys_password }}"
+  mode: sysdba
+mt_conn_pdb_sysdba:
+  service_name: "{{ mt_pdb }}"
+  user: sys
+  password: "{{ mt_sys_password }}"
+  mode: sysdba
+# Oracle wallet: no user/password, service_name is the TNS alias of the wallet credential
+mt_conn_pdb_wallet:
+  service_name: "{{ mt_pdb }}_SYSTEM"
+# not existing user => ORA-01017 without locking an account (FAILED_LOGIN_ATTEMPTS)
+mt_conn_pdb_wrong_password:
+  service_name: "{{ mt_pdb }}"
+  user: moltest_nouser
+  password: wrong_password
+  mode: normal
+
+# default connection
+mt_conn: "{{ mt_conn_pdb }}"

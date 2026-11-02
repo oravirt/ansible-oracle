@@ -1,0 +1,306 @@
+---
+# Tests for oracle_rsrc_consgroup
+# PDB ORCLPDB:
+# - create with switch grants (users, profile) and mappings, idempotence, check mode,
+#   change (comment, grants, mappings incl. map_oracle_user_profile), drop
+# - connection variants: system (default), sys as sysdba, wallet, wrong password
+# CDB DB1: create fails with sys as sysdba (ORA-65046, no consumer groups in CDB$ROOT)
+# Test users and profile are created with sqlplus.
+- name: oracle_rsrc_consgroup | variables
+  ansible.builtin.set_fact:
+    _cg_name: MOLTEST_CG
+    _cg_name_cdb: MOLTEST_CG_CDB
+    _cg_sql_cleanup: |
+      declare
+        procedure x(p_sql varchar2) is
+        begin
+          execute immediate p_sql;
+        exception when others then null;
+        end;
+      begin
+        x('drop user MOLTEST_CG_USER1 cascade');
+        x('drop user MOLTEST_CG_USER2 cascade');
+        x('drop profile MOLTEST_CG_PROF cascade');
+      end;
+      /
+    _cg_sql_grants: >-
+      select listagg(grantee, ',') within group (order by grantee)
+      from dba_rsrc_consumer_group_privs where granted_group = 'MOLTEST_CG';
+    _cg_sql_mappings: >-
+      select listagg(attribute || '=' || value, ',')
+      within group (order by attribute, value)
+      from dba_rsrc_group_mappings where consumer_group = 'MOLTEST_CG';
+    _cg_sql_comment: >-
+      select comments from dba_rsrc_consumer_groups where consumer_group = 'MOLTEST_CG';
+
+- name: oracle_rsrc_consgroup | cleanup consumer group
+  opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+    name: "{{ _cg_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+
+- name: oracle_rsrc_consgroup | cleanup test users and profile
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _cg_sql_cleanup }}"
+
+- name: oracle_rsrc_consgroup | create test users and profile
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: |
+      begin
+        execute immediate 'create profile MOLTEST_CG_PROF limit sessions_per_user unlimited';
+        execute immediate 'create user MOLTEST_CG_USER1 no authentication';
+        execute immediate
+          'create user MOLTEST_CG_USER2 no authentication profile MOLTEST_CG_PROF';
+      end;
+      /
+
+- name: oracle_rsrc_consgroup | create
+  opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+    name: "{{ _cg_name }}"
+    comments: moltest
+    grant_name:
+      - MOLTEST_CG_USER1
+    grant_user_profile:
+      - MOLTEST_CG_PROF
+    map_oracle_user:
+      - MOLTEST_CG_USER1
+    map_client_machine:
+      - moltest_host1
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_rsrc_consgroup | check create
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_rsrc_consgroup.pdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_rsrc_consgroup | create again
+  opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+    name: "{{ _cg_name }}"
+    comments: moltest
+    grant_name:
+      - MOLTEST_CG_USER1
+    grant_user_profile:
+      - MOLTEST_CG_PROF
+    map_oracle_user:
+      - MOLTEST_CG_USER1
+    map_client_machine:
+      - moltest_host1
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_rsrc_consgroup | check create again
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_rsrc_consgroup.pdb.create_idempotent
+    mt_res: "{{ _res }}"
+    mt_expect: ok
+
+- name: oracle_rsrc_consgroup | verify create (attributes)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select mgmt_method || '|' || category || '|' || comments
+      from dba_rsrc_consumer_groups where consumer_group = 'MOLTEST_CG';
+    mt_sql_expect: "ROUND-ROBIN|OTHER|moltest"
+    mt_sql_id: oracle_rsrc_consgroup.pdb.create_sql
+
+- name: oracle_rsrc_consgroup | verify create (grants)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _cg_sql_grants }}"
+    mt_sql_expect: "MOLTEST_CG_USER1,MOLTEST_CG_USER2"
+    mt_sql_id: oracle_rsrc_consgroup.pdb.create_grants_sql
+
+- name: oracle_rsrc_consgroup | verify create (mappings)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _cg_sql_mappings }}"
+    mt_sql_expect: "CLIENT_MACHINE=MOLTEST_HOST1,ORACLE_USER=MOLTEST_CG_USER1"
+    mt_sql_id: oracle_rsrc_consgroup.pdb.create_mappings_sql
+
+# documented: check mode only connects and returns changed=false
+- name: oracle_rsrc_consgroup | change comment in check mode
+  opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+    name: "{{ _cg_name }}"
+    comments: moltest check mode
+    grant_name:
+      - MOLTEST_CG_USER1
+    grant_user_profile:
+      - MOLTEST_CG_PROF
+    map_oracle_user:
+      - MOLTEST_CG_USER1
+    map_client_machine:
+      - moltest_host1
+  check_mode: true
+  register: _res
+  ignore_errors: true
+- name: oracle_rsrc_consgroup | check change in check mode
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_rsrc_consgroup.pdb.check_mode, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_rsrc_consgroup | verify check mode
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _cg_sql_comment }}"
+    mt_sql_expect: "moltest"
+    mt_sql_id: oracle_rsrc_consgroup.pdb.check_mode_sql
+
+# change: comment, grants (USER2 revoked), mappings (host replaced,
+# ORACLE_USER from profile => USER2 instead of USER1)
+- name: oracle_rsrc_consgroup | change
+  opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+    name: "{{ _cg_name }}"
+    comments: moltest changed
+    grant_name:
+      - MOLTEST_CG_USER1
+    map_oracle_user_profile:
+      - MOLTEST_CG_PROF
+    map_client_machine:
+      - moltest_host2
+  register: _res
+  ignore_errors: true
+- name: oracle_rsrc_consgroup | check change
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_rsrc_consgroup.pdb.change, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_rsrc_consgroup | change again (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+    name: "{{ _cg_name }}"
+    comments: moltest changed
+    grant_name:
+      - MOLTEST_CG_USER1
+    map_oracle_user_profile:
+      - MOLTEST_CG_PROF
+    map_client_machine:
+      - moltest_host2
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_rsrc_consgroup | check change again
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_rsrc_consgroup.pdb.change_idempotent_sysdba
+    mt_res: "{{ _res }}"
+    mt_expect: ok
+
+- name: oracle_rsrc_consgroup | verify change (comment)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _cg_sql_comment }}"
+    mt_sql_expect: "moltest changed"
+    mt_sql_id: oracle_rsrc_consgroup.pdb.change_sql
+
+- name: oracle_rsrc_consgroup | verify change (grants)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _cg_sql_grants }}"
+    mt_sql_expect: "MOLTEST_CG_USER1"
+    mt_sql_id: oracle_rsrc_consgroup.pdb.change_grants_sql
+
+- name: oracle_rsrc_consgroup | verify change (mappings)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _cg_sql_mappings }}"
+    mt_sql_expect: "CLIENT_MACHINE=MOLTEST_HOST2,ORACLE_USER=MOLTEST_CG_USER2"
+    mt_sql_id: oracle_rsrc_consgroup.pdb.change_mappings_sql
+
+- name: oracle_rsrc_consgroup | drop
+  opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+    name: "{{ _cg_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_rsrc_consgroup | check drop
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_rsrc_consgroup.pdb.drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_rsrc_consgroup | drop again
+  opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+    name: "{{ _cg_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_rsrc_consgroup | check drop again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_rsrc_consgroup.pdb.drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_rsrc_consgroup | verify drop
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_rsrc_consumer_groups where consumer_group = 'MOLTEST_CG';
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_rsrc_consgroup.pdb.drop_sql
+
+# Oracle wallet; documented: grantees that do not exist are silently ignored
+- name: oracle_rsrc_consgroup | create with wallet (non-existing grantee)
+  opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+    name: "{{ _cg_name }}"
+    grant_name:
+      - MOLTEST_CG_NOUSER
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_rsrc_consgroup | check create with wallet
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_rsrc_consgroup.pdb.wallet_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_rsrc_consgroup | drop with wallet
+  opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+    name: "{{ _cg_name }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_rsrc_consgroup | check drop with wallet
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_rsrc_consgroup.pdb.wallet_drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+# CDB root: consumer groups are not allowed in CDB$ROOT (ORA-65046)
+- name: oracle_rsrc_consgroup | create in CDB (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+    name: "{{ _cg_name_cdb }}"
+    comments: moltest cdb
+    category: batch
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_rsrc_consgroup | check create in CDB
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_rsrc_consgroup.cdb.create_sysdba, mt_res: "{{ _res }}", mt_expect: failed}
+
+# error handling
+- name: oracle_rsrc_consgroup | wrong password
+  opitzconsulting.ansible_oracle.oracle_rsrc_consgroup:
+    name: "{{ _cg_name }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_rsrc_consgroup | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_rsrc_consgroup.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_rsrc_consgroup | final cleanup test users and profile
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _cg_sql_cleanup }}"
