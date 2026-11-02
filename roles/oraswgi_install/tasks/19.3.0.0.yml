@@ -1,6 +1,6 @@
 ---
 # IMPORTANT !!!
-# This file is shared with 21.3.0.0.yml via symbolic link.
+# This file is shared with 21.3.0.0.yml and 26.1.0.0.yml via symbolic link.
 #
 # execute when Home is not registered in oraInventory
 - name: include 19c/21c | install_home_gi
@@ -135,13 +135,15 @@
   when: not olrloc.stat.exists | bool
   vars:
     # get 1st opatchauto patch with state=present
+    # => {} when no patch is defined (installation without -applyRU)
+    #    ternary() evaluates both values, even when apply_patches_gi is false
     # @todo information: Check if path for patches is ok with patch_id/patch_id
     __applyruopatchauto: |-
-      {{ gi_patches[oracle_install_version_gi]['opatchauto']
-        | selectattr('state', 'equalto', 'present') | list | first }}
+      {{ ((gi_patches[oracle_install_version_gi] | default({}))['opatchauto'] | default([])
+        | selectattr('state', 'equalto', 'present') | list + [{}]) | first }}
     __patchru_dir: |-
       {{ oracle_sw_copy | bool | ternary(oracle_stage, oracle_stage_remote) }}/patches/{{ oracle_install_version_gi }}/
-      {{- __applyruopatchauto['path'] | default((__applyruopatchauto['patchid'] | string) + '/' + __applyruopatchauto['patchid'] | string) }}
+      {{- __applyruopatchauto['path'] | default((__applyruopatchauto['patchid'] | default('') | string) + '/' + (__applyruopatchauto['patchid'] | default('') | string)) }}
 
   block:
 
