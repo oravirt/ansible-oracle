@@ -22,9 +22,10 @@ else:
     ORACLEDB_IMPORT_ERROR = None
 
 
-def _auth_mode_sysdba():
-    # AUTH_MODE_SYSDBA is the new name, SYSDBA is kept for compatibility
-    return getattr(oracledb, 'AUTH_MODE_SYSDBA', None) or oracledb.SYSDBA
+def _auth_mode(mode):
+    # AUTH_MODE_<mode> is the new name, <mode> is kept for compatibility
+    name = mode.upper()
+    return getattr(oracledb, 'AUTH_MODE_' + name, None) or getattr(oracledb, name)
 
 
 def oracledb_init(module):
@@ -56,15 +57,15 @@ def oracledb_connect(module, hostname, port, service_name, user, password, mode)
 
     - neither user nor password: Oracle wallet with the TNS alias service_name
     - user and password: host, port and service_name
-    - mode: 'sysdba' or 'normal'
+    - mode: 'normal', 'sysdba' or 'sysasm'
 
     Returns the connection. Calls module.fail_json() on errors.
     """
     oracledb_init(module)
 
     params = {}
-    if mode == 'sysdba':
-        params['mode'] = _auth_mode_sysdba()
+    if mode in ('sysdba', 'sysasm'):
+        params['mode'] = _auth_mode(mode)
 
     connect = None
     try:

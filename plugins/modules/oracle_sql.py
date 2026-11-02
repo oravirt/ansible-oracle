@@ -4,6 +4,10 @@
 import os
 import re
 from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.oracledb_connect import (  # noqa: E501
+    oracledb,
+    oracledb_connect,
+)
 
 DOCUMENTATION = '''
 ---
@@ -91,10 +95,13 @@ options:
         type: str
         required: false
 notes:
-    - cx_Oracle needs to be installed
+    - python-oracledb needs to be installed, e.g. with the role
+      C(opitzconsulting.ansible_oracle.pyoracledb).
+    - python-oracledb is used in thick mode. The Oracle Client libraries must be found,
+      e.g. with ORACLE_HOME and LD_LIBRARY_PATH set in the environment of the task.
     - Oracle client libraries need to be installed along with ORACLE_HOME and
       LD_LIBRARY_PATH settings.
-requirements: [ "cx_Oracle" ]
+requirements: [ "python-oracledb" ]
 author:
     - Mikael Sandström (@oravirt)
 '''
@@ -142,19 +149,12 @@ msg:
     sample: [["SYS"], ["SYSTEM"]]
 '''
 
-try:
-    import cx_Oracle
-except ImportError:
-    cx_oracle_exists = False
-else:
-    cx_oracle_exists = True
-
 
 def execute_sql_get(module, cursor, sql):
     try:
         cursor.execute(sql)
         result = cursor.fetchall()
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
             error.message,
@@ -174,7 +174,7 @@ def execute_sql(module, cursor, conn, sql):
     try:
         # module.exit_json(msg=sql.strip())
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Something went wrong while executing sql - %s sql: %s' % (
             error.message,
@@ -231,57 +231,7 @@ def main():
     sql = module.params["sql"]
     script = module.params["script"]
 
-    if not cx_oracle_exists:
-        msg = "The cx_Oracle module is required. Also set LD_LIBRARY_PATH & ORACLE_HOME"
-        module.fail_json(msg=msg)
-
-    wallet_connect = '/@%s' % service_name
-
-    try:
-        if not user and not password:
-            # If neither user or password is supplied, the use of an
-            # oracle wallet is assumed
-            if mode == 'sysdba':
-                connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
-            elif mode == 'sysasm':
-                connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSASM)
-            else:
-                connect = wallet_connect
-                conn = cx_Oracle.connect(wallet_connect)
-
-        elif user and password:
-            if mode == 'sysdba':
-                dsn = cx_Oracle.makedsn(
-                    host=hostname, port=port, service_name=service_name
-                )
-                connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
-            elif mode == 'sysasm':
-                dsn = cx_Oracle.makedsn(
-                    host=hostname, port=port, service_name=service_name
-                )
-                connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSASM)
-            else:
-                dsn = cx_Oracle.makedsn(
-                    host=hostname, port=port, service_name=service_name
-                )
-                connect = dsn
-                conn = cx_Oracle.connect(user, password, dsn)
-
-        elif not user or not password:
-            module.fail_json(msg='Missing username or password for cx_Oracle')
-
-    except cx_Oracle.DatabaseError as exc:
-        (error,) = exc.args
-        msg = 'Could not connect to database - %s, connect descriptor: %s' % (
-            error.message,
-            connect,
-        )
-        module.fail_json(msg=msg, changed=False)
-
+    conn = oracledb_connect(module, hostname, port, service_name, user, password, mode)
     cursor = conn.cursor()
 
     if sql:
