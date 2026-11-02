@@ -1,8 +1,58 @@
 ---
+# Scenario dbfs: Oracle AI Database 26ai on filesystem as base for the module tests
+#
+# converge:    ORACLE_HOME 26ai, CDB DB1 with PDB ORCLPDB, wallet with ORCLPDB_SYSTEM
+# side_effect: module tests (extensions/molecule/dbfs/module_tests)
+#
+# The 19c patching tests are done in dbfs-ol9 and dbfs-ol10.
+# Only one CDB with one PDB to keep the converge as short as possible.
+
+db_homes_installed:
+  - home: db26-si-ee
+    state: present
+    apply_patches: false
+
+listener_installed:
+  - home: db26-si-ee
+    listener_name: LISTENER
+    state: present
+
+# alias for the wallet credential (items2dict in group_vars drops 'alias')
+oracle_tnsnames_config:
+  ORCLPDB:
+    alias:
+      - ORCLPDB_SYSTEM
+    connect:
+      service_name: ORCLPDB
+    address:
+      - host: "{{ ansible_hostname }}"
+
+tnsnames_installed:
+  - tnsname: "{{ oracle_pdbs[0]['pdb_name'] }}"
+    home: db26-si-ee
+    state: present
+
+sqlnet_installed:
+  - home: db26-si-ee
+    sqlnet: sqlnetalias1
+    state: present
+
+# wallet from group_vars uses home db19-si-ee
+oracle_wallet_config:
+  - name: wallet1
+    home: db26-si-ee
+    path: /u01/app/oracle/wallet
+    state: present
+    dbcredentials:
+      - tns_name: "{{ oracle_pdbs[0]['pdb_name'] }}_SYSTEM"
+        db_name: "{{ oracle_pdbs[0]['pdb_name'] }}"
+        db_user: system
+        state: present
+
 oracle_databases:
-  - home: db19-si-ee
+  - home: db26-si-ee
     oradb_facts_ignore_unreachable: true
-    oracle_db_name: &oracle_db_name DB1
+    oracle_db_name: DB1
     oracle_db_type: SI
     is_container: true
     storage_type: FS
@@ -10,61 +60,13 @@ oracle_databases:
     redolog_size: 50M
     redolog_groups: 3
     datafile_dest: /u01/app/oracle/oradata
-    recoveryfile_dest: /u01/app/oracle//fra
+    recoveryfile_dest: /u01/app/oracle/fra
     listener_name: LISTENER
-    listener_port: &cdb_listener_port 1521
-    # *local_listener is used in initparam as an achor
-    local_listener: &local_listener "{{ ansible_hostname }}:1521"
+    listener_port: 1521
     archivelog: false
     flashback: false
     force_logging: true
     state: present
-    statspack:
-      purgedays: 14
-      snaplevel: 7
-      tablespace: PERFSTAT
-      state: present
-    tablespaces:
-      - name: PERFSTAT
-        size: 10M
-        autoextend: true
-        next: 50M
-        maxsize: 4G
-        content: permanent
-        state: present
-    init_parameters:
-      - {name: db_create_file_dest, value: '/u01/app/oracle/oradata', scope: both, state: present}
-      - {name: db_create_online_log_dest_1, value: '/u01/app/oracle/oradata', scope: both, state: present}
-      - {name: recyclebin, value: 'off', scope: spfile, state: present}
-      - {name: pga_aggregate_target, value: '128M', scope: both, state: present}
-      - {name: sga_target, value: '1808M', scope: spfile, state: present}
-  - home: db19-si-ee
-    oradb_facts_ignore_unreachable: true
-    oracle_db_name: &oracle_db_name2 DB2
-    oracle_db_type: SI
-    is_container: true
-    storage_type: FS
-    oracle_database_type: MULTIPURPOSE
-    redolog_size: 50M
-    redolog_groups: 3
-    datafile_dest: /u01/app/oracle/oradata
-    recoveryfile_dest: /u01/app/oracle//fra
-    listener_name: LISTENER1522
-    listener_port: *cdb_listener_port
-    # *local_listener is used in initparam as an achor
-    local_listener: *local_listener
-    archivelog: false
-    flashback: false
-    force_logging: false
-    state: present
-    tablespaces:
-      - name: TEST
-        size: 10M
-        autoextend: true
-        next: 50M
-        maxsize: 4G
-        content: permanent
-        state: present
     init_parameters:
       - {name: db_create_file_dest, value: '/u01/app/oracle/oradata', scope: both, state: present}
       - {name: db_create_online_log_dest_1, value: '/u01/app/oracle/oradata', scope: both, state: present}
@@ -74,40 +76,9 @@ oracle_databases:
 
 oracle_pdbs:
   - cdb: DB1
-    home: db19-si-ee
+    home: db26-si-ee
     pdb_name: ORCLPDB
     pdbadmin_user: PDBROOT
-    listener_port: 1521
-    state: present
-    datafile_dest: /u01/app/oracle/oradata
-    statspack:
-      purgedays: 14
-      snaplevel: 7
-      tablespace: PERFSTAT
-      state: present
-    tablespaces:
-      - name: PERFSTAT
-        size: 10M
-        autoextend: true
-        next: 50M
-        maxsize: 4G
-        content: permanent
-        state: present
-  - cdb: DB2
-    home: db19-si-ee
-    pdb_name: ORCLPDB1
-    listener_port: 1521
-    state: present
-    datafile_dest: /u01/app/oracle/oradata
-  - cdb: DB2
-    home: db19-si-ee
-    pdb_name: ORCLPDB2
-    listener_port: 1521
-    state: present
-    datafile_dest: /u01/app/oracle/oradata
-  - cdb: DB2
-    home: db19-si-ee
-    pdb_name: ORCLPDB3
     listener_port: 1521
     state: present
     datafile_dest: /u01/app/oracle/oradata

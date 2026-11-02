@@ -1,0 +1,273 @@
+---
+# Tests for oracle_profile
+# - PDB ORCLPDB: create with attributes, idempotence, change attribute, unlimited,
+#   oracle_home option, drop, error cases
+# - CDB DB1: common profile C##MOLTEST_PROFILE create and drop
+# - connection variants: system (default), sys as sysdba, wallet, wrong password
+# Check mode is not supported by the module and is not tested.
+- name: oracle_profile | variables
+  ansible.builtin.set_fact:
+    _prof_name: MOLTEST_PROFILE
+    _prof_name_cdb: C##MOLTEST_PROFILE
+    _prof_sql: >-
+      select listagg(lower(resource_name) || '=' || lower(limit), ',')
+      within group (order by resource_name) from dba_profiles
+      where resource_name in ('PASSWORD_REUSE_MAX', 'SESSIONS_PER_USER')
+
+- name: oracle_profile | cleanup pdb
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name }}"
+    attribute_name: []
+    attribute_value: []
+    state: absent
+  register: _res
+  ignore_errors: true
+
+- name: oracle_profile | cleanup cdb
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name_cdb }}"
+    attribute_name: []
+    attribute_value: []
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+
+- name: oracle_profile | create
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name }}"
+    attribute_name:
+      - password_reuse_max
+      - sessions_per_user
+    attribute_value:
+      - 6
+      - 5
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_profile | check create
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_profile.pdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_profile | create again
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name }}"
+    attribute_name:
+      - password_reuse_max
+      - sessions_per_user
+    attribute_value:
+      - 6
+      - 5
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_profile | check create again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_profile.pdb.create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_profile | verify create
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _prof_sql }} and profile = '{{ _prof_name }}';"
+    mt_sql_expect: "password_reuse_max=6,sessions_per_user=5"
+    mt_sql_id: oracle_profile.pdb.create_sql
+
+- name: oracle_profile | change attribute (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name }}"
+    attribute_name:
+      - sessions_per_user
+    attribute_value:
+      - 10
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_profile | check change attribute
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_profile.pdb.change_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_profile | change attribute again (wallet)
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name }}"
+    attribute_name:
+      - sessions_per_user
+    attribute_value:
+      - 10
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_profile | check change attribute again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_profile.pdb.wallet_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_profile | verify change attribute
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _prof_sql }} and profile = '{{ _prof_name }}';"
+    mt_sql_expect: "password_reuse_max=6,sessions_per_user=10"
+    mt_sql_id: oracle_profile.pdb.change_sql
+
+- name: oracle_profile | set unlimited (option oracle_home)
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name }}"
+    attribute_name:
+      - PASSWORD_REUSE_MAX
+    attribute_value:
+      - UNLIMITED
+    oracle_home: "{{ mt_oracle_home }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_profile | check set unlimited
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_profile.pdb.change_unlimited, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_profile | set unlimited again
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name }}"
+    attribute_name:
+      - password_reuse_max
+    attribute_value:
+      - unlimited
+  register: _res
+  ignore_errors: true
+- name: oracle_profile | check set unlimited again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_profile.pdb.change_unlimited_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_profile | verify unlimited
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _prof_sql }} and profile = '{{ _prof_name }}';"
+    mt_sql_expect: "password_reuse_max=unlimited,sessions_per_user=10"
+    mt_sql_id: oracle_profile.pdb.change_unlimited_sql
+
+- name: oracle_profile | drop
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name }}"
+    attribute_name: []
+    attribute_value: []
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_profile | check drop
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_profile.pdb.drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_profile | drop again
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name }}"
+    attribute_name: []
+    attribute_value: []
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_profile | check drop again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_profile.pdb.drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_profile | verify drop
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from dba_profiles where profile = '{{ _prof_name }}';"
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_profile.pdb.drop_sql
+
+# CDB: common profile
+- name: oracle_profile | create common profile
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name_cdb }}"
+    attribute_name:
+      - sessions_per_user
+    attribute_value:
+      - 7
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_profile | check create common profile
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_profile.cdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_profile | verify common profile
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: CDB$ROOT
+    mt_sql: >-
+      select common || ',' || limit from dba_profiles
+      where profile = '{{ _prof_name_cdb }}' and resource_name = 'SESSIONS_PER_USER';
+    mt_sql_expect: "YES,7"
+    mt_sql_id: oracle_profile.cdb.create_sql
+
+- name: oracle_profile | drop common profile (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name_cdb }}"
+    attribute_name: []
+    attribute_value: []
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_profile | check drop common profile
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_profile.cdb.drop_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_profile | verify drop common profile
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: CDB$ROOT
+    mt_sql: "select count(*) from dba_profiles where profile = '{{ _prof_name_cdb }}';"
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_profile.cdb.drop_sql
+
+# error handling
+- name: oracle_profile | invalid attribute name
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name }}"
+    attribute_name:
+      - moltest_no_such_limit
+    attribute_value:
+      - 1
+  register: _res
+  ignore_errors: true
+- name: oracle_profile | check invalid attribute name
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_profile.pdb.invalid_attribute, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_profile | verify profile not created
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from dba_profiles where profile = '{{ _prof_name }}';"
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_profile.pdb.invalid_attribute_sql
+
+- name: oracle_profile | wrong password
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name }}"
+    attribute_name: []
+    attribute_value: []
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_profile | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_profile.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_profile | final cleanup pdb
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name }}"
+    attribute_name: []
+    attribute_value: []
+    state: absent
+  register: _res
+  ignore_errors: true

@@ -1,0 +1,185 @@
+---
+# Tests for oracle_redo in the CDB DB1 (online redo logs belong to the CDB)
+# - add groups, change size (incl. CURRENT group), remove groups, idempotence, error cases
+# - the initial state (3 groups of 50M) is restored at the beginning and at the end
+# - connection variants: system in CDB, sys as sysdba, wallet (PDB, no change), wrong password
+- name: oracle_redo | variables
+  ansible.builtin.set_fact:
+    _redo_sql: >-
+      select count(*) || ':' || min(bytes) / 1048576 || ':' || max(bytes) / 1048576
+      from v$log;
+
+- name: oracle_redo | cleanup (restore 3 groups of 50M)
+  opitzconsulting.ansible_oracle.oracle_redo:
+    size: 50M
+    groups: 3
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+
+- name: oracle_redo | verify initial state
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "{{ _redo_sql }}"
+    mt_sql_expect: "3:50:50"
+    mt_sql_id: oracle_redo.cdb.initial_sql
+
+- name: oracle_redo | add a group
+  opitzconsulting.ansible_oracle.oracle_redo:
+    size: 50M
+    groups: 4
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_redo | check add a group
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_redo.cdb.add_group, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_redo | add a group again
+  opitzconsulting.ansible_oracle.oracle_redo:
+    size: 50M
+    groups: 4
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_redo | check add a group again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_redo.cdb.add_group_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_redo | verify add a group
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "{{ _redo_sql }}"
+    mt_sql_expect: "4:50:50"
+    mt_sql_id: oracle_redo.cdb.add_group_sql
+
+# all groups are replaced, including the CURRENT one (log switch + checkpoint)
+- name: oracle_redo | change size (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_redo:
+    size: 100M
+    groups: 4
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_redo | check change size
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_redo.cdb.change_size_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_redo | change size again
+  opitzconsulting.ansible_oracle.oracle_redo:
+    size: 100M
+    groups: 4
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_redo | check change size again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_redo.cdb.change_size_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_redo | verify change size
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "{{ _redo_sql }}"
+    mt_sql_expect: "4:100:100"
+    mt_sql_id: oracle_redo.cdb.change_size_sql
+
+# wallet connects to the PDB: nothing to change, so only V$LOG/V$THREAD are read
+- name: oracle_redo | same state with wallet
+  opitzconsulting.ansible_oracle.oracle_redo:
+    size: 100M
+    groups: 4
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_redo | check same state with wallet
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_redo.pdb.idempotent_wallet, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_redo | remove a group
+  opitzconsulting.ansible_oracle.oracle_redo:
+    size: 100M
+    groups: 3
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_redo | check remove a group
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_redo.cdb.remove_group, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_redo | verify remove a group
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "{{ _redo_sql }}"
+    mt_sql_expect: "3:100:100"
+    mt_sql_id: oracle_redo.cdb.remove_group_sql
+
+# error handling: documented suffix is an uppercase M, G or T
+- name: oracle_redo | size with lower case suffix
+  opitzconsulting.ansible_oracle.oracle_redo:
+    size: 100m
+    groups: 3
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_redo | check size with lower case suffix
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_redo.cdb.size_lowercase_suffix, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_redo | size without valid suffix
+  opitzconsulting.ansible_oracle.oracle_redo:
+    size: 100MB
+    groups: 3
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_redo | check size without valid suffix
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_redo.cdb.size_invalid_suffix, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_redo | wrong password
+  opitzconsulting.ansible_oracle.oracle_redo:
+    size: 100M
+    groups: 3
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_redo | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_redo.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_redo | verify unchanged after errors
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "{{ _redo_sql }}"
+    mt_sql_expect: "3:100:100"
+    mt_sql_id: oracle_redo.cdb.errors_unchanged_sql
+
+# restore the initial state
+- name: oracle_redo | restore 3 groups of 50M
+  opitzconsulting.ansible_oracle.oracle_redo:
+    size: 50M
+    groups: 3
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_redo | check restore
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_redo.cdb.restore, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_redo | verify restore
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "{{ _redo_sql }}"
+    mt_sql_expect: "3:50:50"
+    mt_sql_id: oracle_redo.cdb.restore_sql

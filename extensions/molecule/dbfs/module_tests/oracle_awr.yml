@@ -1,0 +1,182 @@
+---
+# Tests for oracle_awr in CDB$ROOT of DB1
+# - change interval/retention, idempotence, check mode, interval 0 (disabled), aliases
+# - parameter validation (interval < 10, interval > 1000, retention 0)
+# - connection variants: system (CDB), sys as sysdba (CDB), wallet (PDB, check mode only),
+#   wrong password
+# The original AWR settings of the CDB are saved at the beginning and restored at the end.
+- name: oracle_awr | save original AWR settings (minutes, 0 = disabled/unlimited)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: >-
+      select decode(sign(i - 57816000), -1, i, 0) || ',' || decode(sign(r - 57816000), -1, r, 0)
+      from (select extract(day from c.snap_interval) * 1440
+                   + extract(hour from c.snap_interval) * 60
+                   + extract(minute from c.snap_interval) i,
+                   extract(day from c.retention) * 1440
+                   + extract(hour from c.retention) * 60
+                   + extract(minute from c.retention) r
+            from dba_hist_wr_control c join v$database d on c.dbid = d.dbid);
+
+- name: oracle_awr | remember original AWR settings
+  ansible.builtin.set_fact:
+    _awr_orig_interval: "{{ mt_sql_value.split(',')[0] }}"
+    _awr_orig_retention: "{{ mt_sql_value.split(',')[1] }}"
+
+- name: oracle_awr | AWR settings in CDB$ROOT
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  block:
+    - name: oracle_awr | cleanup (set 60 minutes / 8 days)
+      opitzconsulting.ansible_oracle.oracle_awr:
+        snapshot_interval_min: 60
+        snapshot_retention_days: 8
+      register: _res
+      ignore_errors: true
+
+    - name: oracle_awr | change settings
+      opitzconsulting.ansible_oracle.oracle_awr:
+        snapshot_interval_min: 45
+        snapshot_retention_days: 9
+      register: _res
+      ignore_errors: true
+    - name: oracle_awr | check change settings
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_awr.cdb.change, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_awr | change settings again (aliases, sys as sysdba)
+      opitzconsulting.ansible_oracle.oracle_awr:
+        interval: 45
+        retention: 9
+      vars:
+        mt_conn: "{{ mt_conn_cdb_sysdba }}"
+      register: _res
+      ignore_errors: true
+    - name: oracle_awr | check change settings again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_awr.cdb.change_idempotent_sysdba, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_awr | verify change settings
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: >-
+          select extract(day from c.snap_interval) * 1440 + extract(hour from c.snap_interval) * 60
+                 + extract(minute from c.snap_interval) || ','
+                 || (extract(day from c.retention) * 1440 + extract(hour from c.retention) * 60
+                     + extract(minute from c.retention))
+          from dba_hist_wr_control c join v$database d on c.dbid = d.dbid;
+        mt_sql_expect: "45,12960"
+        mt_sql_id: oracle_awr.cdb.change_sql
+
+    # documented: check mode only connects and returns changed=false
+    - name: oracle_awr | check mode with other settings
+      opitzconsulting.ansible_oracle.oracle_awr:
+        snapshot_interval_min: 30
+        snapshot_retention_days: 10
+      check_mode: true
+      register: _res
+      ignore_errors: true
+    - name: oracle_awr | check check mode
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_awr.cdb.check_mode, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_awr | verify check mode changed nothing
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: >-
+          select extract(day from c.snap_interval) * 1440 + extract(hour from c.snap_interval) * 60
+                 + extract(minute from c.snap_interval)
+          from dba_hist_wr_control c join v$database d on c.dbid = d.dbid;
+        mt_sql_expect: "45"
+        mt_sql_id: oracle_awr.cdb.check_mode_sql
+
+    # documented: 0 disables automatic snapshots (interval 40150 days)
+    - name: oracle_awr | disable snapshots
+      opitzconsulting.ansible_oracle.oracle_awr:
+        snapshot_interval_min: 0
+        snapshot_retention_days: 9
+      register: _res
+      ignore_errors: true
+    - name: oracle_awr | check disable snapshots
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_awr.cdb.disable, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_awr | disable snapshots again
+      opitzconsulting.ansible_oracle.oracle_awr:
+        snapshot_interval_min: 0
+        snapshot_retention_days: 9
+      register: _res
+      ignore_errors: true
+    - name: oracle_awr | check disable snapshots again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_awr.cdb.disable_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_awr | verify disable snapshots
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: >-
+          select extract(day from c.snap_interval)
+          from dba_hist_wr_control c join v$database d on c.dbid = d.dbid;
+        mt_sql_expect: "40150"
+        mt_sql_id: oracle_awr.cdb.disable_sql
+
+    # parameter validation
+    - name: oracle_awr | interval below 10
+      opitzconsulting.ansible_oracle.oracle_awr:
+        snapshot_interval_min: 5
+      register: _res
+      ignore_errors: true
+    - name: oracle_awr | check interval below 10
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_awr.cdb.interval_too_small, mt_res: "{{ _res }}", mt_expect: failed}
+
+    - name: oracle_awr | interval above 1000
+      opitzconsulting.ansible_oracle.oracle_awr:
+        snapshot_interval_min: 1001
+      register: _res
+      ignore_errors: true
+    - name: oracle_awr | check interval above 1000
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_awr.cdb.interval_too_large, mt_res: "{{ _res }}", mt_expect: failed}
+
+    - name: oracle_awr | retention 0
+      opitzconsulting.ansible_oracle.oracle_awr:
+        snapshot_retention_days: 0
+      register: _res
+      ignore_errors: true
+    - name: oracle_awr | check retention 0
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_awr.cdb.retention_zero, mt_res: "{{ _res }}", mt_expect: failed}
+
+# Oracle wallet (only available for ORCLPDB): check mode, the PDB settings are not changed
+- name: oracle_awr | check mode with wallet
+  opitzconsulting.ansible_oracle.oracle_awr:
+    snapshot_interval_min: 30
+    snapshot_retention_days: 10
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  check_mode: true
+  register: _res
+  ignore_errors: true
+- name: oracle_awr | check check mode with wallet
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_awr.pdb.wallet_check_mode, mt_res: "{{ _res }}", mt_expect: ok}
+
+# error handling
+- name: oracle_awr | wrong password
+  opitzconsulting.ansible_oracle.oracle_awr:
+    snapshot_interval_min: 60
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_awr | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_awr.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_awr | restore original AWR settings
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: >-
+      exec dbms_workload_repository.modify_snapshot_settings(retention => {{ _awr_orig_retention }},
+      interval => {{ _awr_orig_interval }});

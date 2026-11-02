@@ -1,0 +1,169 @@
+---
+# Tests for oracle_stats_prefs in PDB ORCLPDB with the global preference TABLE_CACHED_BLOCKS
+# - set, idempotence, check mode, present without value, reset (absent), invalid name
+# - connection variants: system (default), sys as sysdba, wallet, wrong password
+# The original value is saved at the beginning and restored at the end.
+- name: oracle_stats_prefs | variables
+  ansible.builtin.set_fact:
+    _sp_name: TABLE_CACHED_BLOCKS
+    _sp_value: "16"
+    _sp_sql: "select dbms_stats.get_prefs('TABLE_CACHED_BLOCKS') from dual;"
+
+- name: oracle_stats_prefs | save original value
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _sp_sql }}"
+
+- name: oracle_stats_prefs | remember original value
+  ansible.builtin.set_fact:
+    _sp_orig: "{{ mt_sql_value }}"
+
+- name: oracle_stats_prefs | cleanup (reset to default)
+  opitzconsulting.ansible_oracle.oracle_stats_prefs:
+    preference_name: "{{ _sp_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+
+- name: oracle_stats_prefs | read default value
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _sp_sql }}"
+
+- name: oracle_stats_prefs | remember default value
+  ansible.builtin.set_fact:
+    _sp_default: "{{ mt_sql_value }}"
+
+- name: oracle_stats_prefs | set
+  opitzconsulting.ansible_oracle.oracle_stats_prefs:
+    preference_name: "{{ _sp_name }}"
+    preference_value: "{{ _sp_value }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_stats_prefs | check set
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_stats_prefs.pdb.set, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_stats_prefs | set again (aliases, sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_stats_prefs:
+    pname: "{{ _sp_name }}"
+    pvalue: "{{ _sp_value }}"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_stats_prefs | check set again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_stats_prefs.pdb.set_idempotent_sysdba, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_stats_prefs | set again with wallet
+  opitzconsulting.ansible_oracle.oracle_stats_prefs:
+    preference_name: "{{ _sp_name }}"
+    preference_value: "{{ _sp_value }}"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_stats_prefs | check set again with wallet
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_stats_prefs.pdb.wallet_set_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_stats_prefs | verify set
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _sp_sql }}"
+    mt_sql_expect: "{{ _sp_value }}"
+    mt_sql_id: oracle_stats_prefs.pdb.set_sql
+
+# documented: check mode only connects and returns changed=false
+- name: oracle_stats_prefs | check mode with other value
+  opitzconsulting.ansible_oracle.oracle_stats_prefs:
+    preference_name: "{{ _sp_name }}"
+    preference_value: "8"
+  check_mode: true
+  register: _res
+  ignore_errors: true
+- name: oracle_stats_prefs | check check mode
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_stats_prefs.pdb.check_mode, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_stats_prefs | verify check mode changed nothing
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _sp_sql }}"
+    mt_sql_expect: "{{ _sp_value }}"
+    mt_sql_id: oracle_stats_prefs.pdb.check_mode_sql
+
+# documented: without a value nothing is changed
+- name: oracle_stats_prefs | present without value
+  opitzconsulting.ansible_oracle.oracle_stats_prefs:
+    preference_name: "{{ _sp_name }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_stats_prefs | check present without value
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_stats_prefs.pdb.present_no_value, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_stats_prefs | reset
+  opitzconsulting.ansible_oracle.oracle_stats_prefs:
+    preference_name: "{{ _sp_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_stats_prefs | check reset
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_stats_prefs.pdb.reset, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_stats_prefs | reset again
+  opitzconsulting.ansible_oracle.oracle_stats_prefs:
+    preference_name: "{{ _sp_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_stats_prefs | check reset again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_stats_prefs.pdb.reset_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_stats_prefs | verify reset
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _sp_sql }}"
+    mt_sql_expect: "{{ _sp_default }}"
+    mt_sql_id: oracle_stats_prefs.pdb.reset_sql
+
+# error handling
+- name: oracle_stats_prefs | invalid preference name
+  opitzconsulting.ansible_oracle.oracle_stats_prefs:
+    preference_name: MOLTEST_NO_SUCH_PREF
+    preference_value: "1"
+  register: _res
+  ignore_errors: true
+- name: oracle_stats_prefs | check invalid preference name
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_stats_prefs.pdb.invalid_name, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_stats_prefs | wrong password
+  opitzconsulting.ansible_oracle.oracle_stats_prefs:
+    preference_name: "{{ _sp_name }}"
+    preference_value: "{{ _sp_value }}"
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_stats_prefs | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_stats_prefs.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_stats_prefs | restore original value
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "exec dbms_stats.set_global_prefs('{{ _sp_name }}', '{{ _sp_orig }}');"
+  when: _sp_orig != _sp_default

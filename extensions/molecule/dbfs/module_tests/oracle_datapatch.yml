@@ -1,0 +1,68 @@
+---
+# Tests for oracle_datapatch (CDB DB1, no Grid Infrastructure => existence check in /etc/oratab)
+# - no-op datapatch run on DB1 (all patches already applied => changed=false)
+# - database that does not exist (fail_on_db_not_exist true/false)
+# - the connection options are not used by the module; password is required by the spec,
+#   so the wallet variant (no password) fails. The module has no option mode (no sysdba).
+- name: oracle_datapatch | count applied SQL patches before
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "select count(*) from dba_registry_sqlpatch;"
+
+- name: oracle_datapatch | remember count of applied SQL patches
+  ansible.builtin.set_fact:
+    _dp_sqlpatch_count: "{{ mt_sql_value }}"
+
+- name: oracle_datapatch | no-op run on DB1
+  opitzconsulting.ansible_oracle.oracle_datapatch:
+    oracle_home: "{{ mt_oracle_home }}"
+    db_name: "{{ mt_cdb }}"
+    sid: "{{ mt_oracle_sid }}"
+    output: verbose
+  register: _res
+  ignore_errors: true
+- name: oracle_datapatch | check no-op run
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_datapatch.cdb.noop, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_datapatch | verify no SQL patch applied
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "select count(*) from dba_registry_sqlpatch;"
+    mt_sql_expect: "{{ _dp_sqlpatch_count }}"
+    mt_sql_id: oracle_datapatch.cdb.noop_sql
+
+- name: oracle_datapatch | database does not exist, fail_on_db_not_exist false
+  opitzconsulting.ansible_oracle.oracle_datapatch:
+    oracle_home: "{{ mt_oracle_home }}"
+    db_name: MOLTEST_NODB
+    fail_on_db_not_exist: false
+  register: _res
+  ignore_errors: true
+- name: oracle_datapatch | check database does not exist, no fail
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_datapatch.cdb.db_not_exist_nofail, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_datapatch | database does not exist
+  opitzconsulting.ansible_oracle.oracle_datapatch:
+    oracle_home: "{{ mt_oracle_home }}"
+    db_name: MOLTEST_NODB
+  register: _res
+  ignore_errors: true
+- name: oracle_datapatch | check database does not exist
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_datapatch.cdb.db_not_exist, mt_res: "{{ _res }}", mt_expect: failed}
+
+# documented: password is required by the argument spec (although not used)
+- name: oracle_datapatch | wallet variant without password
+  opitzconsulting.ansible_oracle.oracle_datapatch:
+    oracle_home: "{{ mt_oracle_home }}"
+    db_name: MOLTEST_NODB
+    fail_on_db_not_exist: false
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_datapatch | check wallet variant without password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_datapatch.cdb.wallet_no_password, mt_res: "{{ _res }}", mt_expect: failed}

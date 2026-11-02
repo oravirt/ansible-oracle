@@ -1,0 +1,447 @@
+---
+# Tests for oracle_grants in PDB ORCLPDB and CDB DB1
+# - PDB user: roles, system, object and directory privileges, idempotence,
+#   grants_mode append/enforce, state absent, state REMOVEALL
+# - PDB role: present/absent
+# - CDB common user: system privilege with container=all
+# - error cases: user does not exist, schema and role, wrong password
+# - connection variants: system (default), sys as sysdba, system in CDB, wallet,
+#   wrong password
+- name: oracle_grants | variables
+  ansible.builtin.set_fact:
+    _gr_user: MOLTEST_GRANTS
+    _gr_owner: MOLTEST_GRANTS_OWNER
+    _gr_role: MOLTEST_GRANTS_ROLE
+    _gr_dir: MOLTEST_GRANTS_DIR
+    _gr_cdb_user: C##MOLTEST_GRANTS
+    _gr_password: Moltest_Grants_26ai
+
+- name: oracle_grants | cleanup and setup in PDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: |-
+      begin
+        for r in (select 'drop user ' || username || ' cascade' s from dba_users
+                  where username in ('{{ _gr_user }}', '{{ _gr_owner }}')
+                  union all
+                  select 'drop role ' || role from dba_roles
+                  where role = '{{ _gr_role }}'
+                  union all
+                  select 'drop directory ' || directory_name from dba_directories
+                  where directory_name = '{{ _gr_dir }}') loop
+          execute immediate r.s;
+        end loop;
+      end;
+      /
+      create user {{ _gr_user }} identified by "{{ _gr_password }}";
+      create user {{ _gr_owner }} no authentication;
+      create table {{ _gr_owner }}.MOLTEST_GRANTS_T1 (id number);
+      create table {{ _gr_owner }}.MOLTEST_GRANTS_T2 (id number);
+      create role {{ _gr_role }};
+      create directory {{ _gr_dir }} as '/tmp/moltest_grants_dir';
+      grant read, write on directory {{ _gr_dir }} to system with grant option;
+
+- name: oracle_grants | cleanup and setup in CDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: |-
+      begin
+        for r in (select username from dba_users
+                  where username = '{{ _gr_cdb_user }}') loop
+          execute immediate 'drop user ' || r.username || ' cascade';
+        end loop;
+      end;
+      /
+      create user {{ _gr_cdb_user }} identified by "{{ _gr_password }}" container=all;
+
+# PDB user: grant everything
+- name: oracle_grants | grant privileges
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _gr_user }}"
+    grants:
+      - create session
+      - connect
+    object_privs:
+      - select:{{ _gr_owner | lower }}.moltest_grants_t1
+    directory_privs:
+      - read,write:sys.{{ _gr_dir | lower }}
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check grant privileges
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.grant, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_grants | grant privileges again
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _gr_user }}"
+    grants:
+      - create session
+      - connect
+    object_privs:
+      - select:{{ _gr_owner | lower }}.moltest_grants_t1
+    directory_privs:
+      - read,write:sys.{{ _gr_dir | lower }}
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check grant privileges again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.grant_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_grants | verify grant privileges
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select (select count(*) from dba_sys_privs where grantee = '{{ _gr_user }}'
+              and privilege = 'CREATE SESSION')
+      || ',' || (select count(*) from dba_role_privs where grantee = '{{ _gr_user }}'
+                 and granted_role = 'CONNECT')
+      || ',' || (select count(*) from dba_tab_privs where grantee = '{{ _gr_user }}'
+                 and owner = '{{ _gr_owner }}' and table_name = 'MOLTEST_GRANTS_T1'
+                 and privilege = 'SELECT')
+      || ',' || (select count(*) from dba_tab_privs where grantee = '{{ _gr_user }}'
+                 and table_name = '{{ _gr_dir }}' and privilege in ('READ', 'WRITE'))
+      from dual;
+    mt_sql_expect: "1,1,1,2"
+    mt_sql_id: oracle_grants.pdb.grant_sql
+
+# grants_mode append: nothing is revoked
+- name: oracle_grants | append role (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _gr_user }}"
+    grants:
+      - resource
+    grants_mode: append
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check append role
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.append_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_grants | append role again
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _gr_user }}"
+    grants:
+      - resource
+    grants_mode: append
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check append role again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.append_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_grants | verify append role
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select (select count(*) from dba_sys_privs where grantee = '{{ _gr_user }}')
+      || ',' || (select count(*) from dba_role_privs where grantee = '{{ _gr_user }}')
+      || ',' || (select count(*) from dba_tab_privs where grantee = '{{ _gr_user }}')
+      from dual;
+    mt_sql_expect: "1,2,3"
+    mt_sql_id: oracle_grants.pdb.append_sql
+
+# grants_mode enforce: roles connect/resource, privilege write are revoked
+- name: oracle_grants | enforce privileges
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _gr_user }}"
+    grants:
+      - create session
+    object_privs:
+      - select:{{ _gr_owner | lower }}.moltest_grants_t1
+      - select:{{ _gr_owner | lower }}.moltest_grants_t2
+    directory_privs:
+      - read:sys.{{ _gr_dir | lower }}
+    grants_mode: enforce
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check enforce privileges
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.enforce, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_grants | enforce privileges again
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _gr_user }}"
+    grants:
+      - create session
+    object_privs:
+      - select:{{ _gr_owner | lower }}.moltest_grants_t1
+      - select:{{ _gr_owner | lower }}.moltest_grants_t2
+    directory_privs:
+      - read:sys.{{ _gr_dir | lower }}
+    grants_mode: enforce
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check enforce privileges again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.enforce_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_grants | verify enforce privileges
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select (select count(*) from dba_sys_privs where grantee = '{{ _gr_user }}'
+              and privilege = 'CREATE SESSION')
+      || ',' || (select count(*) from dba_role_privs where grantee = '{{ _gr_user }}')
+      || ',' || (select count(*) from dba_tab_privs where grantee = '{{ _gr_user }}'
+                 and owner = '{{ _gr_owner }}' and privilege = 'SELECT'
+                 and table_name in ('MOLTEST_GRANTS_T1', 'MOLTEST_GRANTS_T2'))
+      || ',' || (select listagg(privilege, ',') within group (order by privilege)
+                 from dba_tab_privs where grantee = '{{ _gr_user }}'
+                 and table_name = '{{ _gr_dir }}')
+      from dual;
+    mt_sql_expect: "1,0,2,READ"
+    mt_sql_id: oracle_grants.pdb.enforce_sql
+
+# state absent: only the listed system privilege, object privileges are kept
+- name: oracle_grants | revoke system privilege
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _gr_user }}"
+    grants:
+      - create session
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check revoke system privilege
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.absent, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_grants | revoke system privilege again
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _gr_user }}"
+    grants:
+      - create session
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check revoke system privilege again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.absent_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_grants | verify revoke system privilege
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select (select count(*) from dba_sys_privs where grantee = '{{ _gr_user }}')
+      || ',' || (select count(*) from dba_tab_privs where grantee = '{{ _gr_user }}')
+      from dual;
+    mt_sql_expect: "0,3"
+    mt_sql_id: oracle_grants.pdb.absent_sql
+
+# state REMOVEALL: all roles and system privileges, object privileges are kept
+- name: oracle_grants | grant privileges for REMOVEALL
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _gr_user }}"
+    grants:
+      - create session
+      - create table
+      - connect
+    grants_mode: append
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check grant privileges for REMOVEALL
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.removeall_prepare, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_grants | REMOVEALL (wallet)
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _gr_user }}"
+    grants: all
+    state: REMOVEALL
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check REMOVEALL
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.wallet_removeall, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_grants | REMOVEALL again (wallet)
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _gr_user }}"
+    grants: all
+    state: REMOVEALL
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check REMOVEALL again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.wallet_removeall_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_grants | verify REMOVEALL
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select (select count(*) from dba_sys_privs where grantee = '{{ _gr_user }}')
+      || ',' || (select count(*) from dba_role_privs where grantee = '{{ _gr_user }}')
+      || ',' || (select count(*) from dba_tab_privs where grantee = '{{ _gr_user }}')
+      from dual;
+    mt_sql_expect: "0,0,3"
+    mt_sql_id: oracle_grants.pdb.removeall_sql
+
+# role instead of user
+- name: oracle_grants | grant privilege to role
+  opitzconsulting.ansible_oracle.oracle_grants:
+    role: "{{ _gr_role }}"
+    grants:
+      - create session
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check grant privilege to role
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.role_grant, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_grants | grant privilege to role again
+  opitzconsulting.ansible_oracle.oracle_grants:
+    role: "{{ _gr_role }}"
+    grants:
+      - create session
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check grant privilege to role again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.role_grant_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_grants | verify grant privilege to role
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from dba_sys_privs where grantee = '{{ _gr_role }}';"
+    mt_sql_expect: "1"
+    mt_sql_id: oracle_grants.pdb.role_grant_sql
+
+- name: oracle_grants | revoke privilege from role
+  opitzconsulting.ansible_oracle.oracle_grants:
+    role: "{{ _gr_role }}"
+    grants:
+      - create session
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check revoke privilege from role
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.role_absent, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_grants | verify revoke privilege from role
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from dba_sys_privs where grantee = '{{ _gr_role }}';"
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_grants.pdb.role_absent_sql
+
+# CDB: common user with container=all
+- name: oracle_grants | grant to common user (CDB)
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _gr_cdb_user }}"
+    grants:
+      - create session
+    container: all
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check grant to common user
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.cdb.grant_container_all, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_grants | grant to common user again (CDB, sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _gr_cdb_user }}"
+    grants:
+      - create session
+    container: all
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check grant to common user again
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_grants.cdb.grant_container_all_idempotent_sysdba
+    mt_res: "{{ _res }}"
+    mt_expect: ok
+
+- name: oracle_grants | verify grant to common user in the PDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_sys_privs where grantee = '{{ _gr_cdb_user }}'
+      and privilege = 'CREATE SESSION' and common = 'YES';
+    mt_sql_expect: "1"
+    mt_sql_id: oracle_grants.cdb.grant_container_all_sql
+
+# error handling
+- name: oracle_grants | user does not exist (present)
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: MOLTEST_GRANTS_NOUSER
+    grants:
+      - create session
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check user does not exist (present)
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.nouser_present, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_grants | user does not exist (absent)
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: MOLTEST_GRANTS_NOUSER
+    grants:
+      - create session
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check user does not exist (absent)
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.nouser_absent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_grants | schema and role (mutually exclusive)
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _gr_user }}"
+    role: "{{ _gr_role }}"
+    grants:
+      - create session
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check schema and role
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.schema_and_role, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_grants | wrong password
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _gr_user }}"
+    grants:
+      - create session
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_grants | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_grants | cleanup in PDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: |-
+      drop user {{ _gr_user }} cascade;
+      drop user {{ _gr_owner }} cascade;
+      drop role {{ _gr_role }};
+      drop directory {{ _gr_dir }};
+
+- name: oracle_grants | cleanup in CDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "drop user {{ _gr_cdb_user }} cascade;"

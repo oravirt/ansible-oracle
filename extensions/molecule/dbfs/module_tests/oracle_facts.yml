@@ -1,0 +1,136 @@
+---
+# Tests for oracle_facts (read only)
+# - facts of CDB$ROOT (system), PDB ORCLPDB (sys as sysdba, wallet), check mode, wrong password
+# - content checks of the returned facts and comparison with sqlplus
+- name: oracle_facts | CDB$ROOT with system
+  opitzconsulting.ansible_oracle.oracle_facts:
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_facts | check CDB$ROOT with system
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_facts.cdb.gather, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_facts | check content of CDB$ROOT facts
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    _f: "{{ _res.ansible_facts | default({}) }}"
+    mt_id: oracle_facts.cdb.content
+    mt_res:
+      changed: false
+      failed: >-
+        {{ not (
+             (_f.version | default('')) != ''
+             and (_f.database | default({})).NAME | default('') == mt_cdb
+             and (_f.database | default({})).CDB | default('') == 'YES'
+             and (_f.instance | default({})).INSTANCE_NAME | default('') | upper == mt_oracle_sid
+             and (_f.rac | default([])) | length >= 1
+             and mt_pdb in ((_f.pdb | default([])) | map(attribute='NAME') | list)
+             and (_f.tablespace | default([])) | length > 0
+             and (_f.temp_tablespace | default([])) | length > 0
+             and (_f.redolog | default([])) | length > 0
+             and (_f.option | default([])) | length > 0
+             and 'db_name' in (_f.parameter | default({}))
+             and (_f.userenv | default({})).CON_NAME | default('') == 'CDB$ROOT'
+             and (_f.userenv | default({})).CURRENT_USER | default('') == 'SYSTEM'
+           ) }}
+      msg: "facts: {{ (_f | to_json)[:400] }}"
+    mt_expect: ok
+
+- name: oracle_facts | verify db_name parameter
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "select value from v$parameter where name = 'db_name';"
+    mt_sql_expect: "{{ ((_res.ansible_facts | default({})).parameter | default({})).db_name.value | default('') }}"
+    mt_sql_id: oracle_facts.cdb.db_name_sql
+
+- name: oracle_facts | verify number of redo log groups
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "select count(*) from v$log;"
+    mt_sql_expect: "{{ ((_res.ansible_facts | default({})).redolog | default([])) | length }}"
+    mt_sql_id: oracle_facts.cdb.redolog_sql
+
+- name: oracle_facts | PDB with sys as sysdba
+  opitzconsulting.ansible_oracle.oracle_facts:
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_facts | check PDB with sys as sysdba
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_facts.pdb.gather_sysdba, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_facts | check content of PDB facts
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    _f: "{{ _res.ansible_facts | default({}) }}"
+    mt_id: oracle_facts.pdb.content_sysdba
+    mt_res:
+      changed: false
+      failed: >-
+        {{ not (
+             (_f.userenv | default({})).CON_NAME | default('') == mt_pdb
+             and (_f.userenv | default({})).ISDBA | default('') == 'TRUE'
+             and mt_pdb in ((_f.pdb | default([])) | map(attribute='NAME') | list)
+             and (_f.tablespace | default([])) | length > 0
+           ) }}
+      msg: "facts: {{ (_f | to_json)[:400] }}"
+    mt_expect: ok
+
+- name: oracle_facts | PDB with wallet
+  opitzconsulting.ansible_oracle.oracle_facts:
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_facts | check PDB with wallet
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_facts.pdb.wallet_gather, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_facts | check content of PDB facts (wallet)
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    _f: "{{ _res.ansible_facts | default({}) }}"
+    mt_id: oracle_facts.pdb.wallet_content
+    mt_res:
+      changed: false
+      failed: >-
+        {{ not (
+             (_f.userenv | default({})).CON_NAME | default('') == mt_pdb
+             and (_f.userenv | default({})).CURRENT_USER | default('') == 'SYSTEM'
+           ) }}
+      msg: "facts: {{ (_f | to_json)[:400] }}"
+    mt_expect: ok
+
+# documented: in check mode no facts are returned
+- name: oracle_facts | check mode
+  opitzconsulting.ansible_oracle.oracle_facts:
+  check_mode: true
+  register: _res
+  ignore_errors: true
+- name: oracle_facts | check check mode
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_facts.pdb.check_mode, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_facts | check check mode returns no facts
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_facts.pdb.check_mode_no_facts
+    mt_res:
+      changed: false
+      failed: "{{ (_res.ansible_facts | default({})) | length > 0 }}"
+      msg: "ansible_facts: {{ (_res.ansible_facts | default({}) | to_json)[:400] }}"
+    mt_expect: ok
+
+# error handling
+- name: oracle_facts | wrong password
+  opitzconsulting.ansible_oracle.oracle_facts:
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_facts | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_facts.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}

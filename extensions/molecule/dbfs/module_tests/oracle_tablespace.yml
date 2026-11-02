@@ -1,0 +1,637 @@
+---
+# Tests for oracle_tablespace in PDB ORCLPDB (OMF: db_create_file_dest is set) and CDB DB1
+# - OMF tablespace: create with numfiles, add files, autoextend settings, status changes
+#   (read_only, read_write, offline, online, present), drop
+# - explicit data files: add a file, bigfile tablespace, more than one file for bigfile
+# - temporary and undo tablespace
+# - connection variants: system (default), sys as sysdba, system in CDB, wallet,
+#   wrong password
+- name: oracle_tablespace | variables
+  ansible.builtin.set_fact:
+    _ts_name: MOLTEST_TS
+    _ts_df: MOLTEST_TS_DF
+    _ts_big: MOLTEST_TS_BIG
+    _ts_temp: MOLTEST_TS_TEMP
+    _ts_undo: MOLTEST_TS_UNDO
+    _ts_cdb: MOLTEST_TS_CDB
+    _ts_dir: /u01/app/oracle/oradata
+    _ts_all: [MOLTEST_TS, MOLTEST_TS_DF, MOLTEST_TS_BIG, MOLTEST_TS_TEMP, MOLTEST_TS_UNDO]
+
+- name: oracle_tablespace | cleanup in PDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: |-
+      begin
+        for r in (select tablespace_name from dba_tablespaces
+                  where tablespace_name like 'MOLTEST\_TS%' escape '\') loop
+          execute immediate 'drop tablespace ' || r.tablespace_name
+            || ' including contents and datafiles';
+        end loop;
+      end;
+      /
+
+# data files left over from an aborted run (tablespaces are dropped above)
+- name: oracle_tablespace | cleanup explicit data files
+  ansible.builtin.file:
+    path: "{{ _ts_dir }}/{{ item }}"
+    state: absent
+  loop:
+    - moltest_ts_df01.dbf
+    - moltest_ts_df02.dbf
+    - moltest_ts_big01.dbf
+    - moltest_ts_big02.dbf
+
+- name: oracle_tablespace | cleanup in CDB
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_cdb }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+
+# OMF tablespace (smallfile, bigfile: false is the default)
+- name: oracle_tablespace | create OMF tablespace
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    numfiles: 1
+    size: 10M
+    autoextend: true
+    nextsize: 1M
+    maxsize: 100M
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check create OMF tablespace
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.create_omf, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | create OMF tablespace again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    numfiles: 1
+    size: 10M
+    autoextend: true
+    nextsize: 1M
+    maxsize: 100M
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check create OMF tablespace again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.create_omf_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify create OMF tablespace
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select t.bigfile || ',' || t.status || ',' || count(f.file_name) || ','
+      || min(f.autoextensible) || ',' || min(f.maxbytes) || ',' || max(f.maxbytes)
+      from dba_tablespaces t join dba_data_files f on f.tablespace_name = t.tablespace_name
+      where t.tablespace_name = '{{ _ts_name }}' group by t.bigfile, t.status;
+    mt_sql_expect: "NO,ONLINE,1,YES,104857600,104857600"
+    mt_sql_id: oracle_tablespace.pdb.create_omf_sql
+
+- name: oracle_tablespace | add OMF file (numfiles 2)
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    numfiles: 2
+    size: 10M
+    autoextend: true
+    nextsize: 1M
+    maxsize: 100M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check add OMF file
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.add_omf_file, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | add OMF file again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    numfiles: 2
+    size: 10M
+    autoextend: true
+    nextsize: 1M
+    maxsize: 100M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check add OMF file again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.add_omf_file_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify add OMF file
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from dba_data_files where tablespace_name = '{{ _ts_name }}';"
+    mt_sql_expect: "2"
+    mt_sql_id: oracle_tablespace.pdb.add_omf_file_sql
+
+# autoextend settings are enforced on all files
+- name: oracle_tablespace | change maxsize
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    size: 10M
+    autoextend: true
+    nextsize: 2M
+    maxsize: 200M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check change maxsize
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.change_autoextend, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | change maxsize again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    size: 10M
+    autoextend: true
+    nextsize: 2M
+    maxsize: 200M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check change maxsize again
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_tablespace.pdb.change_autoextend_idempotent
+    mt_res: "{{ _res }}"
+    mt_expect: ok
+
+- name: oracle_tablespace | verify change maxsize
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_data_files f join dba_tablespaces t
+      on t.tablespace_name = f.tablespace_name
+      where f.tablespace_name = '{{ _ts_name }}'
+      and (f.maxbytes <> 209715200 or f.increment_by * t.block_size <> 2097152
+           or f.autoextensible <> 'YES');
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_tablespace.pdb.change_autoextend_sql
+
+# status changes (without size/autoextend/maxsize: defaults autoextend on, unlimited)
+- name: oracle_tablespace | read only (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    state: read_only
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check read only
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.read_only_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | read only again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    state: read_only
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check read only again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.read_only_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify read only
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select status from dba_tablespaces where tablespace_name = '{{ _ts_name }}';"
+    mt_sql_expect: "READ ONLY"
+    mt_sql_id: oracle_tablespace.pdb.read_only_sql
+
+- name: oracle_tablespace | read write
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    state: read_write
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check read write
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.read_write, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | read write again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    state: read_write
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check read write again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.read_write_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify read write
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select status from dba_tablespaces where tablespace_name = '{{ _ts_name }}';"
+    mt_sql_expect: "ONLINE"
+    mt_sql_id: oracle_tablespace.pdb.read_write_sql
+
+- name: oracle_tablespace | offline
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    state: offline
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check offline
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.offline, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | offline again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    state: offline
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check offline again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.offline_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify offline
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select status from dba_tablespaces where tablespace_name = '{{ _ts_name }}';"
+    mt_sql_expect: "OFFLINE"
+    mt_sql_id: oracle_tablespace.pdb.offline_sql
+
+- name: oracle_tablespace | online
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    state: online
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check online
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.online, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | online again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    state: online
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check online again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.online_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify online
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select status from dba_tablespaces where tablespace_name = '{{ _ts_name }}';"
+    mt_sql_expect: "ONLINE"
+    mt_sql_id: oracle_tablespace.pdb.online_sql
+
+# documented: state present sets a read only tablespace to read write
+- name: oracle_tablespace | read only before present
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    state: read_only
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check read only before present
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.read_only_2, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | present on read only tablespace (wallet)
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    state: present
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check present on read only tablespace
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_tablespace.pdb.wallet_present_read_only
+    mt_res: "{{ _res }}"
+    mt_expect: changed
+
+- name: oracle_tablespace | verify present on read only tablespace
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select status from dba_tablespaces where tablespace_name = '{{ _ts_name }}';"
+    mt_sql_expect: "ONLINE"
+    mt_sql_id: oracle_tablespace.pdb.wallet_present_read_only_sql
+
+# documented: autoextend false switches off autoextend on all files
+- name: oracle_tablespace | autoextend off
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    size: 10M
+    autoextend: false
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check autoextend off
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.autoextend_off, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | autoextend off again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    size: 10M
+    autoextend: false
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check autoextend off again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.autoextend_off_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify autoextend off
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_data_files
+      where tablespace_name = '{{ _ts_name }}' and autoextensible = 'YES';
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_tablespace.pdb.autoextend_off_sql
+
+- name: oracle_tablespace | drop OMF tablespace
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check drop OMF tablespace
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | drop OMF tablespace again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check drop OMF tablespace again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify drop OMF tablespace
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from dba_tablespaces where tablespace_name = '{{ _ts_name }}';"
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_tablespace.pdb.drop_sql
+
+# explicit data files: a missing file of the list is added
+- name: oracle_tablespace | create with data file
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_df }}"
+    datafile:
+      - "{{ _ts_dir }}/moltest_ts_df01.dbf"
+    size: 10M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check create with data file
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.datafile_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | add data file
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_df }}"
+    datafile:
+      - "{{ _ts_dir }}/moltest_ts_df01.dbf"
+      - "{{ _ts_dir }}/moltest_ts_df02.dbf"
+    size: 10M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check add data file
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.datafile_add, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | add data file again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_df }}"
+    datafile:
+      - "{{ _ts_dir }}/moltest_ts_df01.dbf"
+      - "{{ _ts_dir }}/moltest_ts_df02.dbf"
+    size: 10M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check add data file again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.datafile_add_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify add data file
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select listagg(file_name, ',') within group (order by file_name)
+      from dba_data_files where tablespace_name = '{{ _ts_df }}';
+    mt_sql_expect: "{{ _ts_dir }}/moltest_ts_df01.dbf,{{ _ts_dir }}/moltest_ts_df02.dbf"
+    mt_sql_id: oracle_tablespace.pdb.datafile_add_sql
+
+# bigfile tablespace
+- name: oracle_tablespace | bigfile with two data files
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_big }}"
+    bigfile: true
+    datafile:
+      - "{{ _ts_dir }}/moltest_ts_big01.dbf"
+      - "{{ _ts_dir }}/moltest_ts_big02.dbf"
+    size: 10M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check bigfile with two data files
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.bigfile_two_files, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_tablespace | create bigfile tablespace
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_big }}"
+    bigfile: true
+    datafile:
+      - "{{ _ts_dir }}/moltest_ts_big01.dbf"
+    size: 20M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check create bigfile tablespace
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.bigfile_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | create bigfile tablespace again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_big }}"
+    bigfile: true
+    datafile:
+      - "{{ _ts_dir }}/moltest_ts_big01.dbf"
+    size: 20M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check create bigfile tablespace again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.bigfile_create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify bigfile tablespace
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select t.bigfile || ',' || count(*) from dba_tablespaces t
+      join dba_data_files f on f.tablespace_name = t.tablespace_name
+      where t.tablespace_name = '{{ _ts_big }}' group by t.bigfile;
+    mt_sql_expect: "YES,1"
+    mt_sql_id: oracle_tablespace.pdb.bigfile_create_sql
+
+# temporary tablespace (OMF)
+- name: oracle_tablespace | create temporary tablespace
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_temp }}"
+    content: temp
+    size: 10M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check create temporary tablespace
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.temp_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | create temporary tablespace again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_temp }}"
+    content: temp
+    size: 10M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check create temporary tablespace again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.temp_create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify temporary tablespace
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select t.contents || ',' || count(*) from dba_tablespaces t
+      join dba_temp_files f on f.tablespace_name = t.tablespace_name
+      where t.tablespace_name = '{{ _ts_temp }}' group by t.contents;
+    mt_sql_expect: "TEMPORARY,1"
+    mt_sql_id: oracle_tablespace.pdb.temp_create_sql
+
+# undo tablespace (OMF)
+- name: oracle_tablespace | create undo tablespace
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_undo }}"
+    content: undo
+    size: 10M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check create undo tablespace
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.undo_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | create undo tablespace again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_undo }}"
+    content: undo
+    size: 10M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check create undo tablespace again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.undo_create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify undo tablespace
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select contents from dba_tablespaces where tablespace_name = '{{ _ts_undo }}';"
+    mt_sql_expect: "UNDO"
+    mt_sql_id: oracle_tablespace.pdb.undo_create_sql
+
+# CDB
+- name: oracle_tablespace | create tablespace in CDB
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_cdb }}"
+    size: 10M
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check create tablespace in CDB
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.cdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | verify create tablespace in CDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "select count(*) from dba_tablespaces where tablespace_name = '{{ _ts_cdb }}';"
+    mt_sql_expect: "1"
+    mt_sql_id: oracle_tablespace.cdb.create_sql
+
+- name: oracle_tablespace | drop tablespace in CDB (sys as sysdba)
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_cdb }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check drop tablespace in CDB
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.cdb.drop_sysdba, mt_res: "{{ _res }}", mt_expect: changed}
+
+# error handling
+- name: oracle_tablespace | datafile and numfiles (mutually exclusive)
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    datafile:
+      - "{{ _ts_dir }}/moltest_ts01.dbf"
+    numfiles: 1
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check datafile and numfiles
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.datafile_and_numfiles, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_tablespace | autoextend without nextsize
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    size: 10M
+    autoextend: true
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check autoextend without nextsize
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.autoextend_no_next, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_tablespace | wrong password
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_name }}"
+    state: absent
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+# cleanup with the module
+- name: oracle_tablespace | drop test tablespaces
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ item }}"
+    state: absent
+  loop: "{{ _ts_all }}"
+  register: _res_loop
+  ignore_errors: true
+
+- name: oracle_tablespace | verify cleanup
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from dba_tablespaces
+      where tablespace_name like 'MOLTEST\_TS%' escape '\';
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_tablespace.pdb.cleanup_sql
