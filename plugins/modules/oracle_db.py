@@ -6,6 +6,11 @@ import re
 import subprocess
 import time
 from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.oracledb_connect import (  # noqa: E501
+    oracledb,
+    oracledb_connect,
+    oracledb_init,
+)
 
 DOCUMENTATION = '''
 ---
@@ -371,8 +376,11 @@ options:
         type: bool
         default: false
 notes:
-    - cx_Oracle needs to be installed
-requirements: [ "cx_Oracle" ]
+    - python-oracledb needs to be installed, e.g. with the role
+      C(opitzconsulting.ansible_oracle.pyoracledb).
+    - python-oracledb is used in thick mode. The Oracle Client libraries must be found,
+      e.g. with ORACLE_HOME and LD_LIBRARY_PATH set in the environment of the task.
+requirements: [ "python-oracledb" ]
 author:
     - Mikael Sandström (@oravirt)
 '''
@@ -442,14 +450,6 @@ restart_reason:
     elements: str
     sample: ["sga_target:1536M -> 2G"]
 '''
-
-
-try:
-    import cx_Oracle  # noqa E402
-except ImportError:
-    cx_oracle_exists = False
-else:
-    cx_oracle_exists = True
 
 
 def get_version(module, oracle_home, script_env):
@@ -1280,7 +1280,7 @@ def execute_sql_get(module, cursor, sql):
     try:
         cursor.execute(sql)
         result = cursor.fetchall()
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
             error.message,
@@ -1293,7 +1293,7 @@ def execute_sql_get(module, cursor, sql):
 def execute_sql(module, cursor, sql):
     try:
         cursor.execute(sql)
-    except cx_Oracle.DatabaseError as exc:
+    except oracledb.DatabaseError as exc:
         (error,) = exc.args
         msg = 'Something went wrong while executing sql - %s sql: %s' % (
             error.message,
@@ -1305,30 +1305,10 @@ def execute_sql(module, cursor, sql):
 
 def getconn(module):
     hostname = os.uname()[1]
-    wallet_connect = '/@%s' % service_name
-    try:
-        if not user and not password:
-            # If neither user or password is supplied, the use of an
-            # oracle wallet is assumed
-            connect = wallet_connect
-            conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
-
-        elif user and password:
-            dsn = cx_Oracle.makedsn(host=hostname, port=port, service_name=service_name)
-            connect = dsn
-            conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
-
-        elif not user or not password:
-            module.fail_json(msg='Missing username or password for cx_Oracle')
-
-    except cx_Oracle.DatabaseError as exc:
-        (error,) = exc.args
-        msg = 'Could not connect to database - %s, connect descriptor: %s' % (
-            error.message,
-            connect,
-        )
-        module.fail_json(msg=msg, changed=False)
-
+    # oracle_db connects always as SYSDBA
+    conn = oracledb_connect(
+        module, hostname, port, service_name, user, password, 'sysdba'
+    )
     cursor = conn.cursor()
     return cursor
 
@@ -1462,18 +1442,14 @@ def main():
         msg = 'ORACLE_HOME variable not set. Please set it and re-run the command'  # noqa E501
         module.fail_json(msg=msg, changed=False)
 
-    if not cx_oracle_exists:
-        msg = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"  # noqa E501
-        module.fail_json(msg=msg)
+    # fail before dbca, when python-oracledb or the Oracle Client libraries are missing
+    oracledb_init(module)
 
     # Decide whether to use srvctl or sqlplus
     if os.path.exists('/etc/oracle/olr.loc'):
         gimanaged = True
     else:
         gimanaged = False
-        if not cx_oracle_exists:
-            msg = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH are set"  # noqa E501
-            module.fail_json(msg=msg)
 
     # If gimanaged, check whether it's Oracle Restart or Oracle Clusterware
     is_cluster = False

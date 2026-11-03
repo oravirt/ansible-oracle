@@ -21,6 +21,9 @@ else:
     HAS_ORACLEDB = True
     ORACLEDB_IMPORT_ERROR = None
 
+# init_oracle_client() is called only once per module execution
+_thick_mode_initialized = False
+
 
 def _auth_mode(mode):
     # AUTH_MODE_<mode> is the new name, <mode> is kept for compatibility
@@ -31,15 +34,22 @@ def _auth_mode(mode):
 def oracledb_init(module):
     """Check the import of python-oracledb and enable the thick mode.
 
+    Can be called several times, e.g. to fail early before the first connection.
     Calls module.fail_json() on errors.
     """
+    global _thick_mode_initialized
+
     if not HAS_ORACLEDB:
         module.fail_json(
             msg=missing_required_lib('oracledb'), exception=ORACLEDB_IMPORT_ERROR
         )
 
+    if _thick_mode_initialized:
+        return
+
     try:
         oracledb.init_oracle_client()
+        _thick_mode_initialized = True
     except oracledb.Error as exc:
         (error,) = exc.args
         module.fail_json(
