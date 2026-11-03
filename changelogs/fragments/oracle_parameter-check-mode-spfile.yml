@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - "oracle_parameter: check mode with scope=spfile failed with an AttributeError for a parameter that is not set in the spfile (the current value is NULL)"
+  - "oracle_parameter: state=reset/absent with scope=both was never idempotent with 23ai and newer, because ALTER SYSTEM RESET does not raise ORA-32010 any more. The module checks V$SPPARAMETER.ISSPECIFIED and V$PARAMETER.ISMODIFIED before the reset now, so check mode returns the correct changed state as well."
+  - "oracle_parameter: state=reset/absent with scope=memory failed with ORA-32012 for a parameter that is not modified in memory, it returns changed=false now"
+  - "oracle_parameter: errors of ALTER SYSTEM RESET were reported without the Oracle error message"
