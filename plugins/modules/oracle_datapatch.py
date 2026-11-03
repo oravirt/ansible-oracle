@@ -159,13 +159,6 @@ msg:
     sample: "Datapatch run successfully for database: orcl"
 '''
 
-# try:
-#     import cx_Oracle
-# except ImportError:
-#     cx_oracle_exists = False
-# else:
-#     cx_oracle_exists = True
-
 
 def get_version(module, msg, oracle_home, script_env):
     command = '%s/bin/sqlplus -V' % (oracle_home)
@@ -287,9 +280,6 @@ def run_datapatch(module, msg, hostname, oracle_home, db_name, sid, script_env):
                 module.exit_json(msg=msg, changed=False)
 
     else:
-        # check_outcome_sql = 'select count(*) from registry$history'
-        # before = execute_sql_get(module,msg,cursor,check_outcome_sql)
-
         datapatch_sql = '''
         connect / as sysdba
         @?/rdbms/admin/catbundle.sql psu apply
@@ -313,77 +303,6 @@ def run_datapatch(module, msg, hostname, oracle_home, db_name, sid, script_env):
             module.fail_json(msg=msg, changed=False)
         else:
             return True
-            # after = execute_sql_get(module,msg,cursor,check_outcome_sql)
-            # if after[0][0] != before[0][0]:
-            #     if output == 'short':
-            #         return True
-            #     else:
-            #         msg = 'STDOUT: %s, sql: %s' % (stdout, datapatch_sql)
-            #         module.exit_json(msg=msg, changed=True)
-            # else:
-            #     msg = 'No changes applied'
-            #     module.exit_json(msg=msg, changed=False)
-
-
-# def execute_sql_get(module, msg, cursor, sql):
-#     try:
-#         cursor.execute(sql)
-#         result = cursor.fetchall()
-#     except cx_Oracle.DatabaseError as exc:
-#         (error,) = exc.args
-#         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
-#             error.message,
-#             sql,
-#         )
-#         module.fail_json(msg=msg, changed=False)
-#         return False
-#     return result
-
-
-# def execute_sql(module, msg, cursor, sql):
-#
-#     try:
-#         cursor.execute(sql)
-#     except cx_Oracle.DatabaseError as exc:
-#         error, = exc.args
-#         msg = 'Something went wrong while executing sql - %s sql: %s'
-# % (error.message, sql)
-#         module.fail_json(msg=msg, changed=False)
-#         return False
-#     return True
-
-
-# def getconn(module, msg, hostname):
-#     if not hostname:
-#         hostname = os.uname()[1]
-#     wallet_connect = '/@%s' % service_name
-#     try:
-#         if not user and not password:
-#             # If neither user or password is supplied, the use of
-#             # an oracle wallet is assumed
-#             connect = wallet_connect
-#             conn = cx_Oracle.connect(wallet_connect, mode=cx_Oracle.SYSDBA)
-#         elif user and password:
-#             dsn = cx_Oracle.makedsn(
-#                 host=hostname,
-#                 port=port,
-#                 service_name=service_name,
-#             )
-#             connect = dsn
-#             conn = cx_Oracle.connect(user, password, dsn, mode=cx_Oracle.SYSDBA)
-#         elif not (user) or not (password):
-#             module.fail_json(msg='Missing username or password for cx_Oracle')
-
-#     except cx_Oracle.DatabaseError as exc:
-#         (error,) = exc.args
-#         msg = 'Could not connect to database - %s, connect descriptor: %s' % (
-#             error.message,
-#             connect,
-#         )
-#         module.fail_json(msg=msg, changed=False)
-
-#     cursor = conn.cursor()
-#     return cursor
 
 
 def main():
@@ -396,10 +315,7 @@ def main():
     global hostname
     global port
     global output
-    global cursor
     global is_cluster
-
-    cursor = None
 
     module = AnsibleModule(
         argument_spec=dict(
@@ -456,15 +372,6 @@ def main():
             ['grep', '-Piq', '^\\s*local_only\\s*=\\s*false', ocr_loc]
         )
         is_cluster = not bool(ocr_grep.returncode)
-
-    # if not cx_oracle_exists:
-    #     msg = (
-    #         "The cx_Oracle module is required. "
-    #         "'pip install cx_Oracle' should do the trick. "
-    #         "If cx_Oracle is installed, make sure "
-    #         "ORACLE_HOME & LD_LIBRARY_PATH is set"
-    #     )
-    #     module.fail_json(msg=msg)
 
     # Connection details for database
     if service_name is not None:
