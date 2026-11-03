@@ -1,0 +1,100 @@
+---
+# Module tests for opitzconsulting.ansible_oracle, shared by the scenarios dbfs and has-ol9.
+# Imported by side_effect.yml of the scenario. The scenario specific variables (database,
+# ORACLE_HOME, module list, known bugs) are in <scenario>/module_tests.yml.
+# The tests are repeatable: every test removes its objects at the beginning and at the end.
+# See README.md for usage, conventions and the result files.
+- name: Side-Effect - Module tests
+  hosts: all
+  gather_facts: true
+  become: true
+  become_user: oracle
+  environment: "{{ mt_env }}"
+  vars_files:
+    - vars.yml
+    - known_bugs.yml
+    - "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') }}/module_tests.yml"
+  module_defaults:
+    opitzconsulting.ansible_oracle.oracle_awr: &mt_conn
+      hostname: "{{ mt_hostname }}"
+      port: "{{ mt_port }}"
+      service_name: "{{ mt_conn.service_name }}"
+      user: "{{ mt_conn.user | default(omit) }}"
+      password: "{{ mt_conn.password | default(omit) }}"
+      mode: "{{ mt_conn.mode | default(omit) }}"
+    opitzconsulting.ansible_oracle.oracle_directory: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_facts: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_grants: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_job: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_jobclass: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_jobschedule: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_jobwindow: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_parameter: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_pdb: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_privs: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_profile: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_redo: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_role: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_rsrc_consgroup: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_sql: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_stats_prefs: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_tablespace: *mt_conn
+    opitzconsulting.ansible_oracle.oracle_user: *mt_conn
+    # no option mode
+    opitzconsulting.ansible_oracle.oracle_services: &mt_conn_nomode
+      hostname: "{{ mt_hostname }}"
+      port: "{{ mt_port }}"
+      service_name: "{{ mt_conn.service_name }}"
+      user: "{{ mt_conn.user | default(omit) }}"
+      password: "{{ mt_conn.password | default(omit) }}"
+    opitzconsulting.ansible_oracle.oracle_datapatch: *mt_conn_nomode
+    opitzconsulting.ansible_oracle.oracle_asmdg: *mt_conn_nomode
+  tasks:
+    - name: Initialize test results
+      ansible.builtin.set_fact:
+        mt_results: []
+        mt_failures: []
+        mt_known: []
+        mt_fixed: []
+
+    - name: Show selected module tests
+      ansible.builtin.debug:
+        msg: "Module tests: {{ mt_modules | join(', ') }}"
+
+    - name: Run module tests
+      ansible.builtin.include_tasks: "{{ mt_module }}.yml"
+      loop: "{{ mt_modules }}"
+      loop_control:
+        loop_var: mt_module
+
+    - name: Create directory for result files
+      ansible.builtin.file:
+        path: "{{ mt_result_file | dirname }}"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      become: false
+
+    - name: Write result file on controller
+      ansible.builtin.copy:
+        content: "{{ mt_results | to_nice_json }}\n"
+        dest: "{{ mt_result_file }}"
+        mode: '0644'
+      delegate_to: localhost
+      become: false
+
+    - name: Summary of module tests
+      ansible.builtin.debug:
+        msg:
+          - "result file: {{ mt_result_file }}"
+          - "checks: {{ mt_results | length }}, failed: {{ mt_failures | length }},
+            known bugs: {{ mt_known | length }}, known bugs not reproduced: {{ mt_fixed | length }}"
+          - "FAILED: {{ mt_failures }}"
+          - "KNOWN BUGS: {{ mt_known }}"
+          - "KNOWN BUGS NOT REPRODUCED (remove from known_bugs.yml?): {{ mt_fixed }}"
+
+    - name: Assert that all checks passed
+      ansible.builtin.assert:
+        that: mt_failures | length == 0
+        fail_msg: "{{ mt_failures }}"
+        quiet: true

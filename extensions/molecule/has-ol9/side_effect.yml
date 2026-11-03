@@ -1,11 +1,7 @@
 ---
-# This playbook is a special step in molecule.
-# 2nd run of the configuration: nothing should be changed
-- name: Side-Effect - swgi
-  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swgi
-  vars:
-    oracle_sw_copy: false
-    is_sw_source_local: true
-
-- name: Side-Effect - Manage-DB
-  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db
+# Module tests (extensions/molecule/shared_config/module_tests) against CDB DBHAS with
+# PDB ORCLPDB1 and the ASM instance of Oracle Restart.
+# The scenario specific variables are in module_tests.yml.
+# A 2nd run of the configuration (idempotence) is done with 'task idempotence S=has-ol9'.
+- name: Side-Effect - Module tests
+  ansible.builtin.import_playbook: ../shared_config/module_tests/module_tests.yml

@@ -358,12 +358,14 @@
         mt_sql_id: oracle_pdb.cdb.drop_sql
 
     # remove the datafiles kept by unplug (KEEP DATAFILES) in the OMF <GUID> directory
+    # (filesystem only, in ASM the files are removed by drop ... including datafiles)
     - name: oracle_pdb | remove datafiles of the unplugged PDB
       ansible.builtin.file:
         path: "{{ _pdb_dir }}"
         state: absent
       when:
         - mt_sql_value == '0'
+        - not (_pdb_dir | default('')).startswith('+')
         - _pdb_dir | default('') | length > 0
         - _pdb_guid | default('') | length == 32
         - _pdb_dir | basename == _pdb_guid

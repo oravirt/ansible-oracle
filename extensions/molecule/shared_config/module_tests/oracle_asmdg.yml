@@ -1,0 +1,278 @@
+---
+# Tests for oracle_asmdg in the ASM instance of Oracle Restart (scenario has-ol9)
+# - own disk group MOLTEST_DG on the first two spare disks (mt_asm_spare_disks, created in converge)
+# - create with attributes, idempotence, add disk, drop disk, change attribute, status, drop
+# - connection variants: sys (sysasm, the module always connects as SYSASM), wrong password
+# Check mode is not supported by the module and is not tested.
+# Variables of the scenario: mt_asm_oracle_home, mt_asm_sid, mt_asm_spare_disks, mt_conn_asm
+- name: oracle_asmdg | variables
+  ansible.builtin.set_fact:
+    _dg_name: MOLTEST_DG
+    _dg_disk1: "{{ mt_asm_spare_disks[0] }}"
+    _dg_disk2: "{{ mt_asm_spare_disks[1] }}"
+    _dg_disks_sql: >-
+      select count(*) from v$asm_disk d join v$asm_diskgroup g on g.group_number = d.group_number
+      where g.name = 'MOLTEST_DG' and d.state = 'NORMAL';
+    _dg_attr_sql: >-
+      select listagg(a.name || '=' || a.value, ',') within group (order by a.name)
+      from v$asm_attribute a join v$asm_diskgroup g on g.group_number = a.group_number
+      where g.name = 'MOLTEST_DG' and a.name in ('compatible.asm', 'compatible.rdbms');
+
+# ASM does not support PL/SQL => single statements, errors are ignored
+- name: oracle_asmdg | cleanup disk group
+  ansible.builtin.command:
+    cmd: "{{ mt_asm_oracle_home }}/bin/sqlplus -S -L / as sysasm"
+    stdin: |
+      drop diskgroup moltest_dg including contents;
+      drop diskgroup moltest_dg force including contents;
+      exit
+  environment:
+    ORACLE_HOME: "{{ mt_asm_oracle_home }}"
+    ORACLE_SID: "{{ mt_asm_sid }}"
+    LD_LIBRARY_PATH: "{{ mt_asm_oracle_home }}/lib"
+  changed_when: false
+  failed_when: false
+
+- name: oracle_asmdg | tests as sysasm
+  vars:
+    mt_conn: "{{ mt_conn_asm }}"
+  block:
+    - name: oracle_asmdg | create
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg_name }}"
+        disks:
+          - "{{ _dg_disk1 }}"
+        redundancy: external
+        attribute_name:
+          - compatible.asm
+          - compatible.rdbms
+        attribute_value:
+          - 23.0.0.0.0
+          - 19.0.0.0.0
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check create
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_asmdg | create again
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg_name }}"
+        disks:
+          - "{{ _dg_disk1 }}"
+        redundancy: external
+        attribute_name:
+          - compatible.asm
+          - compatible.rdbms
+        attribute_value:
+          - 23.0.0.0.0
+          - 19.0.0.0.0
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check create again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_asmdg | verify create
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: >-
+          select state || ',' || type || ',' || total_mb from v$asm_diskgroup
+          where name = 'MOLTEST_DG';
+        mt_sql_expect: "MOUNTED,EXTERN,2048"
+        mt_sql_id: oracle_asmdg.asm.create_sql
+
+    - name: oracle_asmdg | verify attributes
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: "{{ _dg_attr_sql }}"
+        mt_sql_expect: "compatible.asm=23.0.0.0.0,compatible.rdbms=19.0.0.0.0"
+        mt_sql_id: oracle_asmdg.asm.create_attr_sql
+
+    - name: oracle_asmdg | add disk
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg_name }}"
+        disks:
+          - "{{ _dg_disk1 }}"
+          - "{{ _dg_disk2 }}"
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check add disk
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.add_disk, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_asmdg | add disk again
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg_name }}"
+        disks:
+          - "{{ _dg_disk1 }}"
+          - "{{ _dg_disk2 }}"
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check add disk again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.add_disk_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_asmdg | verify add disk
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: "{{ _dg_disks_sql }}"
+        mt_sql_expect: "2"
+        mt_sql_id: oracle_asmdg.asm.add_disk_sql
+
+    - name: oracle_asmdg | status
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg_name }}"
+        state: status
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check status
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.status, mt_res: "{{ _res }}", mt_expect: ok}
+
+    # documented: the disks of the disk group are returned in msg
+    - name: oracle_asmdg | check status message
+      ansible.builtin.include_tasks: _check.yml
+      vars:
+        mt_id: oracle_asmdg.asm.status_msg
+        mt_res:
+          changed: false
+          failed: >-
+            {{ _dg_disk1 not in (_res.msg | default('') | string)
+               or _dg_disk2 not in (_res.msg | default('') | string) }}
+          msg: "{{ _res.msg | default('') | string }}"
+        mt_expect: ok
+
+    - name: oracle_asmdg | drop disk
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg_name }}"
+        disks:
+          - "{{ _dg_disk1 }}"
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check drop disk
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.drop_disk, mt_res: "{{ _res }}", mt_expect: changed}
+
+    # the dropped disk stays in the disk group (state DROPPING) until the rebalance is finished
+    - name: oracle_asmdg | wait for the end of the rebalance
+      ansible.builtin.command:
+        cmd: "{{ mt_asm_oracle_home }}/bin/sqlplus -S -L / as sysasm"
+        stdin: |
+          set heading off feedback off pagesize 0
+          select count(*) from v$asm_disk d join v$asm_diskgroup g on g.group_number = d.group_number
+          where g.name = 'MOLTEST_DG' and d.state <> 'NORMAL';
+          exit
+      environment:
+        ORACLE_HOME: "{{ mt_asm_oracle_home }}"
+        ORACLE_SID: "{{ mt_asm_sid }}"
+        LD_LIBRARY_PATH: "{{ mt_asm_oracle_home }}/lib"
+      register: _dg_rebalance
+      until: _dg_rebalance.stdout | trim == '0'
+      retries: 30
+      delay: 5
+      changed_when: false
+      failed_when: false
+
+    - name: oracle_asmdg | drop disk again
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg_name }}"
+        disks:
+          - "{{ _dg_disk1 }}"
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check drop disk again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.drop_disk_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_asmdg | verify drop disk
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: "{{ _dg_disks_sql }}"
+        mt_sql_expect: "1"
+        mt_sql_id: oracle_asmdg.asm.drop_disk_sql
+
+    - name: oracle_asmdg | change attribute
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg_name }}"
+        disks:
+          - "{{ _dg_disk1 }}"
+        attribute_name:
+          - compatible.rdbms
+        attribute_value:
+          - 23.0.0.0.0
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check change attribute
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.change_attribute, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_asmdg | change attribute again
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg_name }}"
+        disks:
+          - "{{ _dg_disk1 }}"
+        attribute_name:
+          - COMPATIBLE.RDBMS
+        attribute_value:
+          - 23.0.0.0.0
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check change attribute again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.change_attribute_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_asmdg | verify change attribute
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: "{{ _dg_attr_sql }}"
+        mt_sql_expect: "compatible.asm=23.0.0.0.0,compatible.rdbms=23.0.0.0.0"
+        mt_sql_id: oracle_asmdg.asm.change_attribute_sql
+
+    - name: oracle_asmdg | drop
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg_name }}"
+        state: absent
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check drop
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_asmdg | drop again
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg_name }}"
+        state: absent
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check drop again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_asmdg | verify drop
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: "select count(*) from v$asm_diskgroup where name = 'MOLTEST_DG';"
+        mt_sql_expect: "0"
+        mt_sql_id: oracle_asmdg.asm.drop_sql
+
+# error handling
+- name: oracle_asmdg | wrong password
+  opitzconsulting.ansible_oracle.oracle_asmdg:
+    name: "{{ _dg_name }}"
+    state: status
+  vars:
+    mt_conn: "{{ mt_conn_asm_wrong_password }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_asmdg | check wrong password
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_asmdg.asm.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}

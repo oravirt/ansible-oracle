@@ -33,6 +33,10 @@
   hosts: all
   gather_facts: false
   any_errors_fatal: true
+  vars:
+    _asm_disks: >-
+      {{ (asm_diskgroups | subelements('disk') | map(attribute='1') | list)
+         + molecule_asm_spare_disks | default([]) }}
   tasks:
     # init.ohasd refuses to start in Docker with cgroupv2:
     #   'cgroupv2 not supported for Docker containers' + exit 1
@@ -69,23 +73,24 @@
         group: oinstall
         mode: "0755"
 
+    # disks of asm_diskgroups and spare disks for the module tests (molecule_asm_spare_disks)
     - name: Create ASM disks
       ansible.builtin.command:
-        argv: [truncate, -s, "{{ item.1.size }}", "{{ item.1.device }}"]
-        creates: "{{ item.1.device }}"
-      loop: "{{ asm_diskgroups | subelements('disk') }}"
+        argv: [truncate, -s, "{{ item.size }}", "{{ item.device }}"]
+        creates: "{{ item.device }}"
+      loop: "{{ _asm_disks }}"
       loop_control:
-        label: "{{ item.1.device }}"
+        label: "{{ item.device }}"
 
     - name: Set ownership of ASM disks
       ansible.builtin.file:
-        path: "{{ item.1.device }}"
+        path: "{{ item.device }}"
         owner: oracle
         group: asmadmin
         mode: "0660"
-      loop: "{{ asm_diskgroups | subelements('disk') }}"
+      loop: "{{ _asm_disks }}"
       loop_control:
-        label: "{{ item.1.device }}"
+        label: "{{ item.device }}"
 
 # ASM accepts plain files as disks only on NFS
 # => ORA-15059: invalid device type for ASM disk
