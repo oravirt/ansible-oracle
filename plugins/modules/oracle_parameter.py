@@ -20,6 +20,14 @@ description:
     - Underscore (hidden) parameters can only be handled with O(mode=sysdba).
     - With O(state=present), the current value is read and compared (case-insensitive)
       with O(value). The parameter is only changed when the values differ.
+    - Size parameters (C(V$PARAMETER.TYPE=6), e.g. V(sga_target) or
+      V(pga_aggregate_target)) are compared in bytes, O(value) can have the units
+      V(K), V(M), V(G), V(T) or V(P). The memory value of SGA components (e.g.
+      V(sga_target), V(shared_pool_size), V(db_cache_size)) is rounded up to the
+      granule size by Oracle, so it is unchanged when it is at most one granule
+      (C(V$SGAINFO)) larger than O(value). The spfile value is compared exactly.
+      With O(scope=both), the memory and the spfile value for O(sid) are compared. If
+      only the spfile value differs, the parameter is set with C(SCOPE=SPFILE).
     - With O(scope=spfile), the current value is read from C(V$SPPARAMETER), otherwise
       from C(V$PARAMETER). With O(mode=sysdba), the C(X$) tables are used instead.
       O(sid) is not considered when reading the current value.
@@ -239,9 +247,16 @@ def modify_parameter(module, mode, msg, cursor, name, value, comment, scope, sid
         )
         return False
 
+    size_scope = get_size_parameter_scope(module, cursor, name, value, scope, sid)
     currval = get_curr_value(module, mode, msg, cursor, name, scope)
 
-    if currval == value.lower() or not currval and value == "''":
+    if size_scope is None:
+        is_set = currval == value.lower() or not currval and value == "''"
+    else:
+        is_set = size_scope == ''
+        scope = size_scope or scope
+
+    if is_set:
         module.exit_json(
             msg='The parameter (%s) is already set to %s' % (name, value), changed=False
         )
@@ -285,6 +300,106 @@ def modify_parameter(module, mode, msg, cursor, name, value, comment, scope, sid
     )
     module.exit_json(msg=msg, changed=True)
     return True
+
+
+# SGA components: the memory value is rounded up to the granule size
+GRANULE_PARAMETERS = (
+    'sga_target',
+    'sga_max_size',
+    'memory_target',
+    'memory_max_target',
+    'shared_pool_size',
+    'large_pool_size',
+    'java_pool_size',
+    'streams_pool_size',
+    'db_cache_size',
+    'db_keep_cache_size',
+    'db_recycle_cache_size',
+)
+
+SIZE_UNITS = {
+    '': 1,
+    'k': 1024,
+    'm': 1024**2,
+    'g': 1024**3,
+    't': 1024**4,
+    'p': 1024**5,
+}
+
+
+def size_to_bytes(value):
+    match = re.match(r'^\s*(\d+)\s*([kmgtp]?)\s*$', str(value).lower())
+    if not match:
+        return None
+    return int(match.group(1)) * SIZE_UNITS[match.group(2)]
+
+
+def execute_sql_get(module, cursor, sql, binds):
+    try:
+        cursor.execute(sql, binds)
+        return cursor.fetchall()
+    except oracledb.DatabaseError as exc:
+        (error,) = exc.args
+        module.fail_json(
+            msg='Something went wrong while getting current value - %s sql: %s'
+            % (error.message, sql),
+            changed=False,
+        )
+
+
+def get_size_parameter_scope(module, cursor, name, value, scope, sid):
+    """Compare a size parameter in bytes.
+
+    Returns None if the parameter is no size parameter or value is no size,
+    '' if nothing has to be changed, otherwise the scope for ALTER SYSTEM SET.
+    """
+    name = clean_string(name).lower()
+    wanted = size_to_bytes(value)
+    if name.startswith('_') or wanted is None:
+        return None
+
+    result = execute_sql_get(
+        module,
+        cursor,
+        'select type, value from v$parameter where name = :name',
+        {'name': name},
+    )
+    if not result or result[0][0] != 6:
+        return None
+
+    memory_ok = True
+    if scope in ('memory', 'both'):
+        current = int(result[0][1] or 0)
+        granule = 1
+        if name in GRANULE_PARAMETERS or re.match(r'^db_\d+k_cache_size$', name):
+            granule_result = execute_sql_get(
+                module,
+                cursor,
+                'select bytes from v$sgainfo where name = \'Granule Size\'',
+                {},
+            )
+            if granule_result:
+                granule = max(int(granule_result[0][0]), 1)
+        memory_ok = wanted <= current < wanted + granule
+
+    spfile_ok = True
+    if scope in ('spfile', 'both'):
+        result = execute_sql_get(
+            module,
+            cursor,
+            'select value from v$spparameter '
+            'where name = :name and sid = :sid and isspecified = \'TRUE\'',
+            {'name': name, 'sid': sid},
+        )
+        spfile_ok = bool(result) and size_to_bytes(result[0][0]) == wanted
+
+    if memory_ok and spfile_ok:
+        return ''
+    if memory_ok:
+        # ALTER SYSTEM SET ... SCOPE=BOTH does not write the spfile, when the memory
+        # value is not changed
+        return 'spfile'
+    return scope
 
 
 def quote_value(value):
