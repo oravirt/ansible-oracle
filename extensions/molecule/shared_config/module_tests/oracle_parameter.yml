@@ -289,6 +289,124 @@
     mt_sql_expect: "{{ _par_root_value }}"
     mt_sql_id: oracle_parameter.pdb.reset_memory_sql
 
+# documented: reset only when the parameter is set in the spfile or modified in memory
+- name: oracle_parameter | reset in check mode, parameter not set
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    state: reset
+  check_mode: true
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check reset in check mode, parameter not set
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.reset_check_mode_not_set, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_parameter | reset scope memory, parameter not modified (ORA-32012)
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    state: reset
+    scope: memory
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check reset scope memory, parameter not modified
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.reset_memory_not_set, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_parameter | set value only in memory
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    value: "{{ _par_val1 }}"
+    scope: memory
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check set value only in memory
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.set_memory_only, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_parameter | reset scope spfile, parameter only in memory
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    state: reset
+    scope: spfile
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check reset scope spfile, parameter only in memory
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.reset_spfile_memory_only, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_parameter | reset scope both, parameter only in memory
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    state: reset
+    scope: both
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check reset scope both, parameter only in memory
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.reset_both_memory_only, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_parameter | verify reset scope both, parameter only in memory
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select value || ',' || ismodified from v$parameter where name = '{{ _par_name }}';"
+    mt_sql_expect: "{{ _par_root_value }},FALSE"
+    mt_sql_id: oracle_parameter.pdb.reset_both_memory_only_sql
+
+- name: oracle_parameter | set value only in spfile
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    value: "{{ _par_val2 }}"
+    scope: spfile
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check set value only in spfile
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.set_spfile_only, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_parameter | reset scope memory, parameter only in spfile
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    state: reset
+    scope: memory
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check reset scope memory, parameter only in spfile
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.reset_memory_spfile_only, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_parameter | reset scope spfile
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    state: reset
+    scope: spfile
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check reset scope spfile
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.reset_spfile, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_parameter | reset scope spfile again
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    name: "{{ _par_name }}"
+    state: reset
+    scope: spfile
+  register: _res
+  ignore_errors: true
+- name: oracle_parameter | check reset scope spfile again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_parameter.pdb.reset_spfile_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_parameter | verify reset scope spfile
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select count(*) from v$spparameter
+      where name = '{{ _par_name }}' and isspecified = 'TRUE';
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_parameter.pdb.reset_spfile_sql
+
 # check mode with scope spfile for a parameter that is not set in the spfile
 - name: oracle_parameter | check mode scope spfile, parameter not in spfile
   opitzconsulting.ansible_oracle.oracle_parameter:
