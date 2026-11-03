@@ -2,7 +2,8 @@
 
 Install python-oracledb with pip.
 
-python-oracledb is the successor of cx_Oracle. The role is the counterpart of the role `cxoracle`.
+python-oracledb is the successor of cx_Oracle and is used by the modules of ansible-oracle.
+The role replaces the removed role `cxoracle`.
 
 This role has a dependency to `orasw_meta`.
 

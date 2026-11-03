@@ -59,9 +59,9 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |`db_homes_config` contains an ORACLE_HOME with a `version` other than `19.3.0.0` or `26.1.0.0`
 |Upgrade the databases to 19c or 26ai, then remove the old ORACLE_HOMEs from `db_homes_config`. Emergency switch: `assert_db_homes_config: false`
 
-|<<python-oracledb installed by playbook os.yml>>
-|Playbook `os.yml` is used *and* the target hosts have no access to the Python package index, a proxy is needed (`use_proxy`, `http_proxy`) or `cx_oracle_source` / `cx_oracle3_source` are set in inventory
-|Set the new variables `pyoracledb_source`, `pyoracledb_use_proxy` and `pyoracledb_http_proxy`
+|<<python-oracledb replaces cx_Oracle>>
+|Always: the modules require python-oracledb instead of cx_Oracle on the target hosts. Action needed if the target hosts have no access to the Python package index, a proxy is needed (`use_proxy`, `http_proxy`), `install_cx_oracle` / `cx_oracle_source` / `cx_oracle3_source` / `cx_oracle_umask` are set in inventory or the role `cxoracle` is used in own playbooks
+|Set the new variables `pyoracledb_source`, `pyoracledb_use_proxy` and `pyoracledb_http_proxy`, replace the role `cxoracle` by `pyoracledb`
 |===
 
 ==== Minimum ansible-core 2.16
@@ -398,16 +398,21 @@ WARNING: `assert_db_homes_config: false` disables all checks of `db_homes_config
 Missing `oracle_home`, `edition` or `opatch_minversion` are no longer detected.
 ORACLE_HOMEs with other versions are not tested with `ansible-oracle` 5.x.
 
-==== python-oracledb installed by playbook os.yml
+==== python-oracledb replaces cx_Oracle
 
 python-oracledb (Python package `oracledb`) is the successor of cx_Oracle.
-The new role `pyoracledb` installs python-oracledb with `pip3` on the target hosts and prepares the migration of the modules from cx_Oracle to python-oracledb.
-The playbook `os.yml` executes `pyoracledb` in addition to `cxoracle`.
+All modules of `ansible-oracle` are migrated from cx_Oracle to python-oracledb.
+cx_Oracle is no longer used.
 
-IMPORTANT: The role `cxoracle` and its variables will be removed, when all modules are migrated to python-oracledb.
-Move the configuration from the `cxoracle` variables to the `pyoracledb` variables now.
+The new role `pyoracledb` installs python-oracledb with `pip3` on the target hosts.
+The playbook `os.yml` executes `pyoracledb` instead of `cxoracle`.
 
-Modules migrated to python-oracledb require python-oracledb on the target hosts instead of cx_Oracle.
+IMPORTANT: The role `cxoracle` and its variables are removed.
+Variables like `install_cx_oracle` or `cx_oracle_source` in the inventory have no effect anymore.
+Own playbooks using the role `opitzconsulting.ansible_oracle.cxoracle` fail, replace it by `opitzconsulting.ansible_oracle.pyoracledb`.
+cx_Oracle is not removed from existing target hosts.
+
+The modules require python-oracledb on the target hosts instead of cx_Oracle.
 python-oracledb is used in thick mode, so the Oracle Client libraries must be found
 (`ORACLE_HOME` and `LD_LIBRARY_PATH`), like with cx_Oracle before.
 
@@ -442,7 +447,7 @@ Without changes in the inventory, `pyoracledb` installs the package `oracledb` f
 The installation fails, when the target hosts have no access to the package index.
 
 The role `pyoracledb` uses own variables with the prefix `pyoracledb_`.
-The variables of the role `cxoracle` are not used by `pyoracledb`, even `use_proxy`, `http_proxy` and `extra_args`:
+The variables of the removed role `cxoracle` are not used by `pyoracledb`, even `use_proxy`, `http_proxy` and `extra_args`:
 
 [cols="1,1,3",options="header"]
 |===
@@ -472,6 +477,25 @@ The variables of the role `cxoracle` are not used by `pyoracledb`, even `use_pro
 |`pyoracledb_extra_args`
 |Additional arguments for pip. The default contains the proxy and the client certificates `get_url_ssl_client_cert` / `get_url_ssl_client_key`
 |===
+
+Renaming the variables is not enough for `cx_oracle_source` / `cx_oracle3_source`:
+the value points to a cx_Oracle package, `pyoracledb_source` needs a python-oracledb package (`oracledb`).
+`use_proxy`, `http_proxy` and `extra_args` can be kept in the inventory, if they are used for other purposes.
+
+Example of the migration of the inventory:
+
+[source,yaml]
+----
+# before (cxoracle)
+cx_oracle_source: "file:///sw/cx_Oracle-8.3.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+use_proxy: true
+http_proxy: proxy.example:3128
+
+# after (pyoracledb)
+pyoracledb_source: "file:///sw/oracledb-3.4.0-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl"
+pyoracledb_use_proxy: true
+pyoracledb_http_proxy: proxy.example:3128
+----
 
 `pyoracledb_source` supports the same kinds of sources as `cx_oracle_source`:
 
