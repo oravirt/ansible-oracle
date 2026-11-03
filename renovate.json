@@ -87,6 +87,13 @@
       "enabled": true
     },
     {
+      "description": "python-oracledb in role pyoracledb: renovate does not check requires_python",
+      "matchPackageNames": ["oracledb"],
+      "prBodyNotes": [
+        "**pyoracledb:** check `requires_python` of the new version on PyPI. If a Python version is no longer supported, add `pyoracledb_version_py<major><minor>` with the last supported release to `roles/pyoracledb/defaults/main.yml`."
+      ]
+    },
+    {
       "description": "website/go.mod: the go directive is not used by hugo",
       "matchManagers": ["gomod"],
       "matchDepTypes": ["golang"],
@@ -120,6 +127,14 @@
         "pip install (?<depName>[A-Za-z0-9._-]+)==(?<currentValue>[\\w.-]+)"
       ],
       "datasourceTemplate": "pypi"
+    },
+    {
+      "description": "Versions in role defaults with a '# renovate: datasource=... depName=...' comment above",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)roles/[^/]+/defaults/main\\.ya?ml$/"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*[a-z0-9_]+:\\s*['\"]?(?<currentValue>[\\w.-]+)"
+      ]
     },
     {
       "description": "Versions in Taskfiles with a '# renovate: datasource=... depName=...' comment above",
