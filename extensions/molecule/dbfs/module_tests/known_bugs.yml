@@ -6,33 +6,20 @@
 mt_known_bugs:
   oracle_directory.pdb.mode_normal_other_path: >-
     directory_mode=normal with a different path ends without exit_json (module failure without msg)
-  oracle_services.pdb.create: >-
-    without GI execute_sql_get always returns True, so the service is never created;
-    ensure_service_state calls srvctl also without GI and fails
-  oracle_services.pdb.create_sql: >-
-    service is not created without GI (execute_sql_get always True)
   oracle_services.pdb.create_idempotent: >-
-    without GI ensure_service_state runs srvctl config/modify and fails;
-    additionally UnboundLocalError for 'change' in state=present
+    without GI ensure_service_state runs srvctl config/modify and fails
   oracle_services.pdb.start: >-
-    without GI ensure_service_state runs srvctl modify and fails
+    without GI ensure_service_state runs srvctl config/modify and fails
   oracle_services.pdb.start_idempotent: >-
-    without GI ensure_service_state runs srvctl modify and fails
+    without GI ensure_service_state runs srvctl config/modify and fails
   oracle_services.pdb.start_sql: >-
-    service is not started because state=started fails (srvctl without GI)
+    service is not started/stopped, because the module fails before (srvctl without GI)
   oracle_services.pdb.stop: >-
-    without GI ensure_service_state runs srvctl modify and fails
+    without GI ensure_service_state runs srvctl config/modify and fails
   oracle_services.pdb.stop_idempotent: >-
-    without GI ensure_service_state runs srvctl modify and fails
+    without GI ensure_service_state runs srvctl config/modify and fails
   oracle_services.pdb.stop_sql: >-
-    service is not stopped because state=stopped fails (srvctl without GI)
-  oracle_services.pdb.restart: >-
-    state=restarted calls start_service with a missing argument (TypeError)
-  oracle_services.pdb.restart_sql: >-
-    state=restarted stops the service, then crashes before starting it
-  oracle_services.pdb.drop_idempotent: >-
-    without GI the service always "exists" (execute_sql_get always True),
-    dbms_service.stop_service fails with ORA-44304
+    service is not started/stopped, because the module fails before (srvctl without GI)
   oracle_db.cdb.present_idempotent: >-
     state=present on 19c+ always executes ALTER DATABASE ADD/DROP SUPPLEMENTAL LOG DATA
     (comparison with empty slcomp) and reports changed=true
@@ -54,26 +41,9 @@ mt_known_bugs:
     and create fails (ORA-27477)
   oracle_job.pdb.mixed_case_drop: >-
     query_existing always uses upper case owner/name, mixed case job is not found and not dropped
-  oracle_grants.pdb.role_grant: >-
-    check_role_exists compares the fetchone() tuple/None with 0 (TypeError on Python 3), role is unusable
-  oracle_grants.pdb.role_grant_idempotent: >-
-    check_role_exists compares the fetchone() tuple/None with 0 (TypeError on Python 3), role is unusable
-  oracle_grants.pdb.role_grant_sql: >-
-    nothing granted to the role because of the TypeError in check_role_exists
-  oracle_grants.pdb.role_absent: >-
-    check_role_exists compares the fetchone() tuple/None with 0 (TypeError on Python 3), role is unusable
   oracle_parameter.pdb.check_mode_spfile_unset: >-
     check mode with scope=spfile for a parameter not set in the spfile fails
     (currval.upper() on NULL)
-  oracle_profile.pdb.create_idempotent: >-
-    zip iterator wanted_attributes is consumed before the comparison, ALTER PROFILE runs
-    on every call (always changed)
-  oracle_profile.pdb.wallet_idempotent: >-
-    zip iterator wanted_attributes is consumed before the comparison, ALTER PROFILE runs
-    on every call (always changed)
-  oracle_profile.pdb.change_unlimited_idempotent: >-
-    zip iterator wanted_attributes is consumed before the comparison, ALTER PROFILE runs
-    on every call (always changed)
   oracle_parameter.pdb.reset_idempotent: >-
     reset is only detected as unchanged by ORA-32010, but ALTER SYSTEM RESET ... SCOPE=BOTH
     does not raise ORA-32010 when the parameter is not in the spfile (26ai) => always changed

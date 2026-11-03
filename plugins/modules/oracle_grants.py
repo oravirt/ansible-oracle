@@ -297,7 +297,7 @@ def check_role_exists(module, msg, cursor, role):
         msg = error.message + 'sql: ' + sql
         return False
 
-    if result > 0:
+    if result:
         # module.exit_json(msg='(role) sql %s'% sql, changed=False)
         return True
     else:
