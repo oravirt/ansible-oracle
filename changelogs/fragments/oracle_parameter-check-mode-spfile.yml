@@ -4,3 +4,5 @@ bugfixes:
   - "oracle_parameter: state=reset/absent with scope=both was never idempotent with 23ai and newer, because ALTER SYSTEM RESET does not raise ORA-32010 any more. The module checks V$SPPARAMETER.ISSPECIFIED and V$PARAMETER.ISMODIFIED before the reset now, so check mode returns the correct changed state as well."
   - "oracle_parameter: state=reset/absent with scope=memory failed with ORA-32012 for a parameter that is not modified in memory, it returns changed=false now"
   - "oracle_parameter: errors of ALTER SYSTEM RESET were reported without the Oracle error message"
+  - "oracle_parameter: size parameters (e.g. sga_target, shared_pool_size) were changed on every run, because Oracle rounds the memory value up to the granule size. Size parameters are compared in bytes now (units K, M, G, T, P), the memory value of SGA components may be up to one granule larger than value."
+  - "oracle_parameter: with scope=both the spfile value of a size parameter is compared as well. If only the spfile value differs, the parameter is set with SCOPE=SPFILE, because ALTER SYSTEM SET ... SCOPE=BOTH does not write the spfile when the memory value is unchanged."
