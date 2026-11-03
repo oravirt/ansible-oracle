@@ -77,9 +77,8 @@ options:
     schema:
         description:
             - The name of the user/schema to manage.
-            - Required in practice, although not enforced by the argument spec.
         type: str
-        required: false
+        required: true
         aliases: ['name']
     schema_password:
         description:
@@ -162,13 +161,19 @@ options:
         required: false
     state:
         description:
-            - V(present) - the user is created if missing. An existing user is
-              unlocked (C(ACCOUNT UNLOCK)).
+            - V(present) - the user is created if missing. An existing locked user is
+              unlocked (C(ACCOUNT UNLOCK)). An expired password stays expired.
             - V(unlocked) - same as V(present).
             - V(locked) - the user is created or changed with C(ACCOUNT LOCK).
+              An expired password stays expired.
             - V(expired) - the user is created or changed with C(PASSWORD EXPIRE).
+              A lock is not changed.
             - V(expired & locked) - the user is created or changed with
               C(ACCOUNT LOCK PASSWORD EXPIRE).
+            - Only the part of C(DBA_USERS.ACCOUNT_STATUS) that belongs to O(state)
+              (lock and/or password expiry) is compared. A timed lock after failed
+              logins (C(LOCKED(TIMED))) is unlocked by V(present) and replaced by a
+              permanent lock with V(locked).
             - V(absent) - the user is dropped with C(DROP USER ... CASCADE). The users
               C(SYS), C(SYSTEM) and C(DBSNMP) are never dropped.
         type: str
@@ -456,25 +461,19 @@ def modify_user(
         sql += ' profile %s ' % profile
         sql_get_curr_def += ' ,lower(profile)'
 
-    want_account_status = ''
     if state == 'present' or state == 'unlocked':
-        want_account_status = 'open'
         sql += ' account unlock'
 
     elif state == 'locked':
-        want_account_status = state
         sql += ' account lock'
 
     elif state == 'expired':
-        want_account_status = state
         sql += ' password expire'
 
     elif state == 'expired & locked':
-        want_account_status = state
         sql += ' account lock password expire'
 
     wanted_list = []
-    wanted_list.append(want_account_status)
 
     if authentication_type != 'password' and update_password == 'always':
         wanted_list.append(authentication_type)
@@ -494,7 +493,12 @@ def modify_user(
     curr_defaults = execute_sql_get(module, cursor, sql_get_curr_def)
     curr_defaults = [list(t) for t in curr_defaults]
 
-    if wanted_list in curr_defaults:
+    # the first column is the account status, it is compared separately
+    if (
+        curr_defaults
+        and account_status_matches(state, curr_defaults[0][0])
+        and (wanted_list == curr_defaults[0][1:])
+    ):
         if update_password == 'always' and pw_change_needed:
             execute_sql(module, cursor, sql)
             module.exit_json(
@@ -513,6 +517,25 @@ def modify_user(
             msg='Successfully altered the user (%s, %s)' % (schema, sql), changed=True
         )
 
+    return True
+
+
+def account_status_matches(state, account_status):
+    # account_status: DBA_USERS.ACCOUNT_STATUS in lower case, e.g. 'open',
+    # 'expired & locked', 'locked(timed)', 'expired(grace)', 'open & in rollover'
+    parts = [p.strip() for p in account_status.split('&')]
+    locked = 'locked' in parts
+    timed_locked = any(p.startswith('locked(') for p in parts)
+    expired = 'expired' in parts
+
+    if state in ('present', 'unlocked'):
+        return not locked and not timed_locked
+    if state == 'locked':
+        return locked
+    if state == 'expired':
+        return expired
+    if state == 'expired & locked':
+        return expired and locked
     return True
 
 
@@ -577,7 +600,7 @@ def main():
             user=dict(required=False),
             password=dict(required=False, no_log=True),
             mode=dict(default='normal', choices=["normal", "sysdba"]),
-            schema=dict(default=None, aliases=['name']),
+            schema=dict(required=True, aliases=['name']),
             schema_password=dict(default=None, no_log=True),
             schema_password_hash=dict(default=None, no_log=True),
             state=dict(
