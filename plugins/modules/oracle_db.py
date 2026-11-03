@@ -797,7 +797,6 @@ def ensure_db_state(
 ):
     cursor = getconn(module)
     global israc
-    slcomp = ''
     alterdb_sql = 'alter database'
 
     propsql = "select lower(property_value) from database_properties where \
@@ -824,14 +823,16 @@ def ensure_db_state(
             SUPPLEMENTAL_LOG_DATA_PK, SUPPLEMENTAL_LOG_DATA_UI \
             from v$database'
         supp_log_check_ = execute_sql_get(module, cursor, supp_log_check_sql)
-        if supp_log_check_[0][0] != slcomp:
-            if supplemental_logging is True:
-                slcomp = 'YES'
-                slsql = alterdb_sql + ' add supplemental log data'
-            else:
-                slcomp = 'NO'
-                slsql = alterdb_sql + ' drop supplemental log data'
+        # SUPPLEMENTAL_LOG_DATA_MIN: YES, NO or IMPLICIT (enabled by other
+        # supplemental logging, e.g. primary key)
+        if supplemental_logging is True:
+            slcomp = ('YES', 'IMPLICIT')
+            slsql = alterdb_sql + ' add supplemental log data'
+        else:
+            slcomp = ('NO',)
+            slsql = alterdb_sql + ' drop supplemental log data'
 
+        if supp_log_check_[0][0] not in slcomp:
             change_db_sql.append(slsql)
 
     if israc_[0][0] == 'NO':
