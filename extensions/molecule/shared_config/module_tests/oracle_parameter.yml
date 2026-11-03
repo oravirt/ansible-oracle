@@ -4,6 +4,7 @@
 #   scope spfile, comment, reset (check mode, reset, reset again, absent), error cases
 # - CDB DB1: idempotent call with the current value (scope memory, nothing is changed)
 # - underscore parameter: only read (value = current value) as sysdba, error without sysdba
+# - size parameters in CDB$ROOT (oracle_parameter_size.yml)
 # The PDB value of optimizer_index_cost_adj is reset at the beginning and at the end,
 # so the PDB inherits the value of CDB$ROOT again.
 - name: oracle_parameter | variables
@@ -497,3 +498,7 @@
     scope: both
   register: _res
   ignore_errors: true
+
+# size parameters in CDB$ROOT (rounding to the granule size)
+- name: oracle_parameter | size parameters
+  ansible.builtin.include_tasks: oracle_parameter_size.yml
