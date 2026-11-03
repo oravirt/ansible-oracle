@@ -61,7 +61,7 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 
 |<<python-oracledb replaces cx_Oracle>>
 |Always: the modules require python-oracledb instead of cx_Oracle on the target hosts. Action needed if the target hosts have no access to the Python package index, a proxy is needed (`use_proxy`, `http_proxy`), `install_cx_oracle` / `cx_oracle_source` / `cx_oracle3_source` / `cx_oracle_umask` are set in inventory or the role `cxoracle` is used in own playbooks
-|Set the new variables `pyoracledb_source`, `pyoracledb_use_proxy` and `pyoracledb_http_proxy`, replace the role `cxoracle` by `pyoracledb`
+|Set the new variables `pyoracledb_wheel_dir`, `pyoracledb_use_proxy` and `pyoracledb_http_proxy`, replace the role `cxoracle` by `pyoracledb`
 |===
 
 ==== Minimum ansible-core 2.16
@@ -443,8 +443,40 @@ Migrated modules:
 * `oracle_tablespace`
 * `oracle_user`
 
-Without changes in the inventory, `pyoracledb` installs the package `oracledb` from the Python package index (`pip3 install oracledb`).
+The role `pyoracledb` installs a fixed version of python-oracledb, depending on the Python version of the target host
+(`ansible_python_interpreter`, needs `gather_facts`):
+
+[cols="1,1,2",options="header"]
+|===
+|Python on the target host |Variable |Default
+
+|3.6 (Oracle Linux / RHEL 8, SLES 15)
+|`pyoracledb_version_py36`
+|1.4.2
+
+|3.7
+|`pyoracledb_version_py37`
+|2.3.0
+
+|3.8
+|`pyoracledb_version_py38`
+|3.0.0
+
+|3.9 (Oracle Linux / RHEL 9)
+|`pyoracledb_version_py39`
+|4.0.2
+
+|all other versions
+|`pyoracledb_version`
+|26.1.0 (updated by renovate)
+|===
+
+Without changes in the inventory, `pyoracledb` installs this version from the Python package index (`pip install oracledb==<version>`).
 The installation fails, when the target hosts have no access to the package index.
+
+The wheel files of python-oracledb need pip 19.3 or newer (`manylinux2014`).
+The system pip of Oracle Linux / RHEL 8 is 9.0.3, it would try to build python-oracledb from source, which fails.
+Therefore `pyoracledb` installs `pip>=19.3` first, if pip is older (Python 3.6: pip 21.3.1 in `/usr/local`).
 
 The role `pyoracledb` uses own variables with the prefix `pyoracledb_`.
 The variables of the removed role `cxoracle` are not used by `pyoracledb`, even `use_proxy`, `http_proxy` and `extra_args`:
@@ -458,8 +490,8 @@ The variables of the removed role `cxoracle` are not used by `pyoracledb`, even 
 |Install the package? Default: `true`
 
 |`cx_oracle_source`, `cx_oracle3_source`
-|`pyoracledb_source`
-|Source for `pip3 install`. Default: `oracledb` from the package index
+|`pyoracledb_wheel_dir` (and `pyoracledb_version*`)
+|Directory with wheel files instead of a single package or file. Default: package index
 
 |`cx_oracle_umask`
 |`pyoracledb_umask`
@@ -475,11 +507,18 @@ The variables of the removed role `cxoracle` are not used by `pyoracledb`, even 
 
 |`extra_args`
 |`pyoracledb_extra_args`
-|Additional arguments for pip. The default contains the proxy and the client certificates `get_url_ssl_client_cert` / `get_url_ssl_client_key`
+|Additional arguments for pip, e.g. `--index-url=...` for an internal mirror. The default contains the proxy and the client certificates `get_url_ssl_client_cert` / `get_url_ssl_client_key`
 |===
 
-Renaming the variables is not enough for `cx_oracle_source` / `cx_oracle3_source`:
-the value points to a cx_Oracle package, `pyoracledb_source` needs a python-oracledb package (`oracledb`).
+`cx_oracle_source` / `cx_oracle3_source` pointed to one package or file.
+`pyoracledb_wheel_dir` points to a directory with wheel files of python-oracledb, pip selects the file matching the Python version
+(`pip install --no-index --find-links <pyoracledb_wheel_dir> oracledb==<version>`).
+One directory can contain the wheel files for all Python versions of the target hosts (e.g. `cp36` and `cp39`):
+
+* local directory on the Ansible controller, copied to `<oracle_stage>/pyoracledb` when `is_sw_source_local: true` and `oracle_sw_copy: true`.
+  With `oracle_sw_copy: false` the directory must exist on the target host (e.g. NFS).
+* URL (`http://`, `https://`) of a page with links to the wheel files, used directly by pip
+
 `use_proxy`, `http_proxy` and `extra_args` can be kept in the inventory, if they are used for other purposes.
 
 Example of the migration of the inventory:
@@ -492,43 +531,23 @@ use_proxy: true
 http_proxy: proxy.example:3128
 
 # after (pyoracledb)
-pyoracledb_source: "file:///sw/oracledb-3.4.0-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl"
+pyoracledb_wheel_dir: /sw/python-oracledb
 pyoracledb_use_proxy: true
 pyoracledb_http_proxy: proxy.example:3128
 ----
 
-`pyoracledb_source` supports the same kinds of sources as `cx_oracle_source`:
-
-* package name with optional version, e.g. `oracledb==3.4.0`
-* local file on the Ansible controller (`/path` or `file:///path`), copied when `is_sw_source_local: true` and `oracle_sw_copy: true`.
-  With `oracle_sw_copy: false` the path must exist on the target host.
-* URL (`http://`, `https://`, `ftp://`), downloaded on the target host when `is_sw_source_local: false` and `oracle_sw_copy: true`
-
-Example for target hosts without access to the package index, with a wheel file on the controller:
-
-[source,yaml]
-----
-pyoracledb_source: "file:///sw/oracledb-3.4.0-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl"
-----
-
-Example with a proxy:
-
-[source,yaml]
-----
-pyoracledb_use_proxy: true
-pyoracledb_http_proxy: proxy.example:3128
-----
-
-The wheel file must match the Python version of the target host (`cp36`, `cp39`, ...).
-Current versions of python-oracledb require Python 3.9 or newer.
-Oracle Linux / RHEL 8 and SLES 15 use Python 3.6 as system Python. The last version of python-oracledb for Python 3.6 is 1.4.2.
-
-Download a wheel file for the target hosts on a host with access to the package index:
+Download the wheel files for the target hosts on a host with access to the package index,
+one command per Python version with the matching version from the table above:
 
 [source,shell]
 ----
+pip download --no-deps --only-binary=:all: --python-version 3.6 \
+  --platform manylinux2014_x86_64 -d /sw/python-oracledb oracledb==1.4.2
+# pip for Python 3.6 (the system pip of OL8 is too old for the wheel files)
+pip download --no-deps --only-binary=:all: --python-version 3.6 \
+  -d /sw/python-oracledb pip==21.3.1
 pip download --no-deps --only-binary=:all: --python-version 3.9 \
-  --platform manylinux2014_x86_64 -d /sw oracledb==3.4.0
+  --platform manylinux2014_x86_64 -d /sw/python-oracledb oracledb==4.0.2
 ----
 
 Skip the installation of python-oracledb:

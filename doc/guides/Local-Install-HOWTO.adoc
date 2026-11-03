@@ -155,11 +155,11 @@ into `~/.ssh/authorized_keys`.
 
 The target (database) host needs `python-oracledb` installed. The modules of Ansible-Oracle
 use this package in thick mode (Oracle Client libraries of the ORACLE_HOME) to issue database queries.
-The Playbook `os.yml` installs this package with the role `pyoracledb`, when it can be downloaded
-or when you point it to the package from your inventory, e.g.,
-`pyoracledb_source: "file:///tmp/python-packages/oracledb-3.4.0-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl"`.
-
-The wheel file must match the Python version of the target host (e.g. `cp39` for Python 3.9).
+The Playbook `os.yml` installs this package with the role `pyoracledb`. The version depends on the
+Python version of the target host (1.4.2 for Python 3.6 on OL8, 4.0.2 for Python 3.9 on OL9).
+Without access to the Python package index, put the wheel files into a directory and point to it from your
+inventory, e.g., `pyoracledb_wheel_dir: /tmp/python-packages`. pip selects the wheel file matching
+the Python version of the target host.
 
 Otherwise, the package must be manually installed as root.
 

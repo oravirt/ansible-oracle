@@ -1,0 +1,22 @@
+---
+# version of python-oracledb for the Python version of the target host (needs gather_facts)
+_pyoracledb_version: >-
+  {{ lookup('ansible.builtin.vars',
+            'pyoracledb_version_py' ~ ansible_facts.python.version.major
+            ~ ansible_facts.python.version.minor,
+            default=pyoracledb_version) }}
+
+# copy a local wheel directory to the target host, a URL is used directly by pip
+_pyoracledb_copy_wheels: >-
+  {{ pyoracledb_wheel_dir is defined
+     and pyoracledb_wheel_dir is not match('^https?://')
+     and is_sw_source_local | bool
+     and oracle_sw_copy | bool }}
+
+_pyoracledb_wheel_dir: >-
+  {{ (oracle_stage ~ '/pyoracledb') if _pyoracledb_copy_wheels | bool
+     else pyoracledb_wheel_dir | default('') }}
+
+_pyoracledb_pip_args: >-
+  {{ pyoracledb_extra_args | trim }}
+  {{ ('--no-index --find-links=' ~ _pyoracledb_wheel_dir) if pyoracledb_wheel_dir is defined else '' }}

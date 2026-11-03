@@ -1,66 +1,30 @@
 ---
-# python-oracledb install playbook
 - name: Installation block
   when: pyoracledb_install | bool
   tags: pyoracledb
   block:
-    - name: pyoracledb | Get python-oracledb image filename
-      ansible.builtin.set_fact:
-        _pyoracledb_filename: "{{ pyoracledb_source | basename }}"
-
-    - name: pyoracledb | Create temp download dir
-      ansible.builtin.tempfile:
-        state: directory
-      register: _pyoracledb_tempdir
-
-    # Accept only if src is a file-URL or path
-    - name: pyoracledb | Transfer python-oracledb to server (local)
+    - name: pyoracledb | Copy wheel files to the target host
       ansible.builtin.copy:
-        src: "{{ pyoracledb_source | regex_replace('^file://', '') }}"
-        dest: "{{ _pyoracledb_tempdir.path }}/{{ _pyoracledb_filename }}"
-        mode: 0644
-      register: _pyoracledb_copy
-      when:
-        - is_sw_source_local | bool
-        - oracle_sw_copy | bool
-        - pyoracledb_source is match('^(file://)?/')
+        src: "{{ pyoracledb_wheel_dir | regex_replace('/*$', '') }}/"
+        dest: "{{ _pyoracledb_wheel_dir }}/"
+        mode: '0644'
+        directory_mode: '0755'
+      when: _pyoracledb_copy_wheels | bool
 
-    # Accept only if src is of a supported protocol (http, https, ftp)
-    - name: pyoracledb | Transfer python-oracledb to server (www)
-      ansible.builtin.get_url:
-        url: "{{ pyoracledb_source }}"
-        dest: "{{ _pyoracledb_tempdir.path }}/{{ _pyoracledb_filename }}"
-        mode: 0644
-        force: false
-        client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
-        client_key: "{{ get_url_ssl_client_key | default(omit) }}"
-      environment: "{{ proxy_env | default(omit) }}"
-      register: _pyoracledb_download
-      when:
-        - not is_sw_source_local | bool
-        - oracle_sw_copy | bool
-        - pyoracledb_source is match('^(http(s)?|ftp)://')
-
-    # The ansible-oracle modules are using Python3 only
-    # => Install python-oracledb for Python3 only
-    # A local file that was not copied (oracle_sw_copy: false) is installed
-    # from its path on the managed node.
-    - name: pyoracledb | Install python-oracledb for Python3
+    # pip < 19.3 (e.g. Python 3.6 on OL8) does not know manylinux2014 wheels and would try
+    # to build python-oracledb from source, which fails.
+    # Without executable, the pip of the Python running the modules is used
+    # (ansible_python_interpreter), so the version and the installation match.
+    - name: pyoracledb | Ensure pip supports manylinux2014 wheels
       ansible.builtin.pip:
-        name: >-
-          {{
-            _pyoracledb_tempdir.path ~ '/' ~ _pyoracledb_filename
-            if _pyoracledb_copy is not skipped or _pyoracledb_download is not skipped
-            else (pyoracledb_source | regex_replace('^file://', ''))
-          }}
-        executable: pip3
-        extra_args: "{{ pyoracledb_extra_args }}"
+        name: "pip>=19.3"
+        extra_args: "{{ _pyoracledb_pip_args }}"
         umask: "{{ pyoracledb_umask | default(omit) }}"
         state: present
 
-  always:
-    - name: "Cleanup python-oracledb from {{ _pyoracledb_tempdir.path }}"
-      ansible.builtin.file:
-        path: "{{ _pyoracledb_tempdir.path }}"
-        state: absent
-      when: _pyoracledb_tempdir.path is defined
+    - name: pyoracledb | Install python-oracledb
+      ansible.builtin.pip:
+        name: "oracledb=={{ _pyoracledb_version }}"
+        extra_args: "{{ _pyoracledb_pip_args }}"
+        umask: "{{ pyoracledb_umask | default(omit) }}"
+        state: present
