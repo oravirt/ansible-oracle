@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - "oracle_tablespace: bigfile=false (default) created a BIGFILE tablespace on 23ai and newer, because the default tablespace type of the database (BIGFILE) was used. The tablespace is created with SMALLFILE now (also temporary and undo tablespaces), so adding files with numfiles or datafile works."
+  - "oracle_tablespace: files were added to an existing bigfile tablespace when bigfile was not set, which failed. The type of the existing tablespace (DBA_TABLESPACES.BIGFILE) is used now."

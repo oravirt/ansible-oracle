@@ -2,7 +2,10 @@
 # Tests for oracle_tablespace in PDB ORCLPDB (OMF: db_create_file_dest is set) and CDB DB1
 # - OMF tablespace: create with numfiles, add files, autoextend settings, status changes
 #   (read_only, read_write, offline, online, present), drop
-# - explicit data files: add a file, bigfile tablespace, more than one file for bigfile
+# - explicit data files: add a file, bigfile tablespace, more than one file for bigfile,
+#   no file is added to an existing bigfile tablespace
+# - bigfile: false creates SMALLFILE tablespaces (also temporary and undo), independent of
+#   the default tablespace type of the database (BIGFILE in 26ai)
 # - grow/shrink of autoextend nextsize/maxsize with units in lower case (k, m, g),
 #   size of existing files is not changed
 # - temporary and undo tablespace
@@ -497,6 +500,31 @@
     mt_sql_expect: "YES,1"
     mt_sql_id: oracle_tablespace.pdb.bigfile_create_sql
 
+# documented: no files are added to an existing bigfile tablespace, also without bigfile: true
+- name: oracle_tablespace | existing bigfile tablespace with two data files, bigfile not set
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_big }}"
+    datafile:
+      - "{{ _ts_dir }}/moltest_ts_big01.dbf"
+      - "{{ _ts_dir }}/moltest_ts_big02.dbf"
+    size: 20M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check existing bigfile tablespace with two data files
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.bigfile_existing_no_add, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify existing bigfile tablespace unchanged
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select t.bigfile || ',' || count(*) from dba_tablespaces t
+      join dba_data_files f on f.tablespace_name = t.tablespace_name
+      where t.tablespace_name = '{{ _ts_big }}' group by t.bigfile;
+    mt_sql_expect: "YES,1"
+    mt_sql_id: oracle_tablespace.pdb.bigfile_existing_no_add_sql
+
 # grow and shrink with units in lower case (k, m, g)
 # The files are not resized (documented): grow/shrink = autoextend nextsize/maxsize.
 # Changes are only detected for M, G and T (documented) => k and unlimited are not applied.
@@ -839,10 +867,10 @@
   vars:
     mt_sql_container: "{{ mt_pdb }}"
     mt_sql: >-
-      select t.contents || ',' || count(*) from dba_tablespaces t
+      select t.contents || ',' || t.bigfile || ',' || count(*) from dba_tablespaces t
       join dba_temp_files f on f.tablespace_name = t.tablespace_name
-      where t.tablespace_name = '{{ _ts_temp }}' group by t.contents;
-    mt_sql_expect: "TEMPORARY,1"
+      where t.tablespace_name = '{{ _ts_temp }}' group by t.contents, t.bigfile;
+    mt_sql_expect: "TEMPORARY,NO,1"
     mt_sql_id: oracle_tablespace.pdb.temp_create_sql
 
 # undo tablespace (OMF)
@@ -872,8 +900,8 @@
   ansible.builtin.include_tasks: _sql.yml
   vars:
     mt_sql_container: "{{ mt_pdb }}"
-    mt_sql: "select contents from dba_tablespaces where tablespace_name = '{{ _ts_undo }}';"
-    mt_sql_expect: "UNDO"
+    mt_sql: "select contents || ',' || bigfile from dba_tablespaces where tablespace_name = '{{ _ts_undo }}';"
+    mt_sql_expect: "UNDO,NO"
     mt_sql_id: oracle_tablespace.pdb.undo_create_sql
 
 # CDB

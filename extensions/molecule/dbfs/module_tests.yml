@@ -34,7 +34,7 @@ mt_cdb: DB1
 mt_pdb: ORCLPDB
 mt_datafile_dir: /u01/app/oracle/oradata
 
-# known bugs without Grid Infrastructure and with 26ai
+# known bugs without Grid Infrastructure
 mt_known_bugs_scenario:
   oracle_services.pdb.create_idempotent: >-
     without GI ensure_service_state runs srvctl config/modify and fails
@@ -50,17 +50,3 @@ mt_known_bugs_scenario:
     without GI ensure_service_state runs srvctl config/modify and fails
   oracle_services.pdb.stop_sql: >-
     service is not started/stopped, because the module fails before (srvctl without GI)
-  oracle_tablespace.pdb.create_omf_sql: >-
-    bigfile: false does not add SMALLFILE, the 26ai default tablespace type BIGFILE is used
-  oracle_tablespace.pdb.add_omf_file: >-
-    bigfile: false does not add SMALLFILE, tablespace is bigfile on 26ai, adding a file fails
-  oracle_tablespace.pdb.add_omf_file_idempotent: >-
-    bigfile: false does not add SMALLFILE, tablespace is bigfile on 26ai, adding a file fails
-  oracle_tablespace.pdb.add_omf_file_sql: >-
-    bigfile: false does not add SMALLFILE, tablespace is bigfile on 26ai, adding a file fails
-  oracle_tablespace.pdb.datafile_add: >-
-    bigfile: false does not add SMALLFILE, tablespace is bigfile on 26ai, adding a file fails
-  oracle_tablespace.pdb.datafile_add_idempotent: >-
-    bigfile: false does not add SMALLFILE, tablespace is bigfile on 26ai, adding a file fails
-  oracle_tablespace.pdb.datafile_add_sql: >-
-    bigfile: false does not add SMALLFILE, tablespace is bigfile on 26ai, adding a file fails

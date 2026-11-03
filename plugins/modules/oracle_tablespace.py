@@ -97,10 +97,14 @@ options:
     bigfile:
         description:
             - Create the tablespace as bigfile tablespace.
+            - With V(false), the tablespace is created with C(SMALLFILE), independent
+              of the default tablespace type of the database (C(BIGFILE) for 23ai
+              and newer).
             - The module fails if more than one file is given in O(datafile).
             - With OMF, the bigfile tablespace is created with O(size) only, the
               autoextend settings are applied afterwards.
-            - No files are added to an existing bigfile tablespace.
+            - No files are added to an existing bigfile tablespace
+              (C(DBA_TABLESPACES.BIGFILE)), independent of this option.
         type: bool
         required: false
         default: false
@@ -372,7 +376,7 @@ def create_tablespace(
                         size,
                     )
                 else:
-                    sql = 'create undo tablespace %s datafile  %s' % (
+                    sql = 'create smallfile undo tablespace %s datafile  %s' % (
                         tablespace,
                         datafile_list,
                     )
@@ -384,7 +388,7 @@ def create_tablespace(
                         size,
                     )
                 else:
-                    sql = 'create temporary tablespace %s tempfile %s' % (
+                    sql = 'create smallfile temporary tablespace %s tempfile %s' % (
                         tablespace,
                         datafile_list,
                     )
@@ -396,7 +400,7 @@ def create_tablespace(
                         size,
                     )
                 else:
-                    sql = 'create tablespace %s datafile  %s' % (
+                    sql = 'create smallfile tablespace %s datafile  %s' % (
                         tablespace,
                         datafile_list,
                     )
@@ -448,7 +452,7 @@ def create_tablespace(
                     datafile_list,
                 )
             else:
-                sql = 'create undo tablespace %s datafile %s' % (
+                sql = 'create smallfile undo tablespace %s datafile %s' % (
                     tablespace,
                     datafile_list,
                 )
@@ -460,7 +464,7 @@ def create_tablespace(
                     datafile_list,
                 )
             else:
-                sql = 'create temporary tablespace %s tempfile %s' % (
+                sql = 'create smallfile temporary tablespace %s tempfile %s' % (
                     tablespace,
                     datafile_list,
                 )
@@ -472,7 +476,10 @@ def create_tablespace(
                     datafile_list,
                 )
             else:
-                sql = 'create tablespace %s datafile %s' % (tablespace, datafile_list)
+                sql = 'create smallfile tablespace %s datafile %s' % (
+                    tablespace,
+                    datafile_list,
+                )
 
         if execute_sql(module, msg, cursor, sql):
             crfiles = len(datafile)
@@ -577,6 +584,18 @@ def ensure_tablespace_state(
         sql = 'alter tablespace %s %s' % (tablespace, enforcesql)
         alter_tbs_list.append(sql)
 
+    # files are only added to a smallfile tablespace (type of the existing tablespace)
+    bigfile_curr = (
+        execute_sql_get(
+            module,
+            msg,
+            cursor,
+            'select bigfile from dba_tablespaces where tablespace_name = upper(\'%s\')'
+            % (tablespace),
+        )[0][0]
+        == 'YES'
+    )
+
     alter_tbs_sql = 'alter tablespace %s' % (tablespace)
     numfiles_curr_sql = (
         'select count(*) from %s where tablespace_name = upper(\'%s\')'
@@ -598,7 +617,7 @@ def ensure_tablespace_state(
     elif (
         numfiles is not None
         and int(numfiles_curr_[0][0]) < int(numfiles)
-        and not bigfile
+        and not bigfile_curr
         and skip_datafile
     ):
         '''
@@ -636,7 +655,7 @@ def ensure_tablespace_state(
 
     elif (
         numfiles is None
-        and not bigfile
+        and not bigfile_curr
         and datafile is not None
         and int(numfiles_curr_[0][0]) < int(len(datafile))
     ):
