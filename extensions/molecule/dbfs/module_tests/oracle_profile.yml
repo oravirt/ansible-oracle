@@ -313,6 +313,28 @@
   ansible.builtin.include_tasks: _check.yml
   vars: {mt_id: oracle_profile.pdb.issue564_drop, mt_res: "{{ _res }}", mt_expect: changed}
 
+# issue #566: profile names with '/', in double quotes (case-sensitive) and without (uppercase)
+- name: oracle_profile | issue 566 profile names
+  ansible.builtin.set_fact:
+    _prof_566:
+      - {id: quoted, name: '"Moltest/Profile"', db_name: Moltest/Profile}
+      - {id: unquoted, name: moltest/profile, db_name: MOLTEST/PROFILE}
+
+- name: oracle_profile | issue 566 cleanup
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ item.name }}"
+    attribute_name: []
+    attribute_value: []
+    state: absent
+  loop: "{{ _prof_566 }}"
+  ignore_errors: true
+
+- name: oracle_profile | issue 566 tests
+  ansible.builtin.include_tasks: oracle_profile_566.yml
+  loop: "{{ _prof_566 }}"
+  loop_control:
+    loop_var: _prof
+
 # error handling
 - name: oracle_profile | invalid attribute name
   opitzconsulting.ansible_oracle.oracle_profile:

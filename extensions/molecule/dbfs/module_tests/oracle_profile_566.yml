@@ -1,0 +1,71 @@
+---
+# issue #566: create, change and drop a profile with '/' in the name
+# _prof: {id: <check id>, name: <name for the module>, db_name: <name in DBA_PROFILES>}
+- name: "oracle_profile | issue 566 {{ _prof.id }} create"
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof.name }}"
+    attribute_name: "{{ _prof_564_names }}"
+    attribute_value: "{{ _prof_564_values }}"
+  register: _res
+  ignore_errors: true
+- name: "oracle_profile | check issue 566 {{ _prof.id }} create"
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: "oracle_profile.pdb.issue566_{{ _prof.id }}_create", mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: "oracle_profile | issue 566 {{ _prof.id }} create again"
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof.name }}"
+    attribute_name: "{{ _prof_564_names }}"
+    attribute_value: "{{ _prof_564_values }}"
+  register: _res
+  ignore_errors: true
+- name: "oracle_profile | check issue 566 {{ _prof.id }} create again"
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: "oracle_profile.pdb.issue566_{{ _prof.id }}_idempotent", mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: "oracle_profile | issue 566 {{ _prof.id }} change attribute"
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof.name }}"
+    attribute_name:
+      - sessions_per_user
+    attribute_value:
+      - 3
+  register: _res
+  ignore_errors: true
+- name: "oracle_profile | check issue 566 {{ _prof.id }} change attribute"
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: "oracle_profile.pdb.issue566_{{ _prof.id }}_change", mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: "oracle_profile | issue 566 {{ _prof.id }} verify"
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select limit from dba_profiles
+      where profile = '{{ _prof.db_name }}' and resource_name = 'SESSIONS_PER_USER';
+    mt_sql_expect: "3"
+    mt_sql_id: "oracle_profile.pdb.issue566_{{ _prof.id }}_sql"
+
+- name: "oracle_profile | issue 566 {{ _prof.id }} drop"
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof.name }}"
+    attribute_name: []
+    attribute_value: []
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: "oracle_profile | check issue 566 {{ _prof.id }} drop"
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: "oracle_profile.pdb.issue566_{{ _prof.id }}_drop", mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: "oracle_profile | issue 566 {{ _prof.id }} drop again"
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof.name }}"
+    attribute_name: []
+    attribute_value: []
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: "oracle_profile | check issue 566 {{ _prof.id }} drop again"
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: "oracle_profile.pdb.issue566_{{ _prof.id }}_drop_idempotent", mt_res: "{{ _res }}", mt_expect: ok}
