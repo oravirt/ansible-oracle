@@ -227,6 +227,92 @@
     mt_sql_expect: "0"
     mt_sql_id: oracle_profile.cdb.drop_sql
 
+# issue #564: changed=true for an existing profile with the same DEFAULT/UNLIMITED/NULL values
+- name: oracle_profile | issue 564 variables
+  ansible.builtin.set_fact:
+    _prof_564_names:
+      - SESSIONS_PER_USER
+      - CPU_PER_SESSION
+      - CPU_PER_CALL
+      - CONNECT_TIME
+      - IDLE_TIME
+      - LOGICAL_READS_PER_SESSION
+      - LOGICAL_READS_PER_CALL
+      - COMPOSITE_LIMIT
+      - PRIVATE_SGA
+      - FAILED_LOGIN_ATTEMPTS
+      - PASSWORD_LIFE_TIME
+      - PASSWORD_REUSE_TIME
+      - PASSWORD_REUSE_MAX
+      - PASSWORD_LOCK_TIME
+      - PASSWORD_GRACE_TIME
+      - PASSWORD_VERIFY_FUNCTION
+    _prof_564_values:
+      - DEFAULT
+      - DEFAULT
+      - DEFAULT
+      - DEFAULT
+      - DEFAULT
+      - DEFAULT
+      - DEFAULT
+      - DEFAULT
+      - DEFAULT
+      - UNLIMITED
+      - UNLIMITED
+      - UNLIMITED
+      - UNLIMITED
+      - UNLIMITED
+      - UNLIMITED
+      - "NULL"
+
+- name: oracle_profile | issue 564 create
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name }}"
+    attribute_name: "{{ _prof_564_names }}"
+    attribute_value: "{{ _prof_564_values }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_profile | check issue 564 create
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_profile.pdb.issue564_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_profile | issue 564 create again
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name }}"
+    attribute_name: "{{ _prof_564_names }}"
+    attribute_value: "{{ _prof_564_values }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_profile | check issue 564 create again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_profile.pdb.issue564_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_profile | issue 564 verify
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select listagg(lower(resource_name) || '=' || lower(limit), ',')
+      within group (order by resource_name) from dba_profiles
+      where profile = '{{ _prof_name }}'
+      and resource_name in ('CPU_PER_CALL', 'FAILED_LOGIN_ATTEMPTS', 'PASSWORD_VERIFY_FUNCTION');
+    mt_sql_expect: "cpu_per_call=default,failed_login_attempts=unlimited,password_verify_function=null"
+    mt_sql_id: oracle_profile.pdb.issue564_sql
+
+- name: oracle_profile | issue 564 drop
+  opitzconsulting.ansible_oracle.oracle_profile:
+    name: "{{ _prof_name }}"
+    attribute_name: []
+    attribute_value: []
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_profile | check issue 564 drop
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_profile.pdb.issue564_drop, mt_res: "{{ _res }}", mt_expect: changed}
+
 # error handling
 - name: oracle_profile | invalid attribute name
   opitzconsulting.ansible_oracle.oracle_profile:

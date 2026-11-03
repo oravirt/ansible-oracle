@@ -1,7 +1,7 @@
 ---
 bugfixes:
   - "oracle_grants: the option role failed on Python 3, because the result of fetchone() was compared with 0 (fix by Rafal Kolodziej, oravirt#588)"
-  - "oracle_profile: the module was not idempotent and changed an existing profile on every run, because the zip iterator was consumed before the comparison (fix by Rafal Kolodziej, oravirt#588)"
+  - "oracle_profile: the module was not idempotent and changed an existing profile on every run, because the zip iterator was consumed before the comparison (oravirt#564, fix by Rafal Kolodziej, oravirt#588)"
   - "oracle_services: UnboundLocalError for state=present without changes, state=restarted failed with a TypeError, every srvctl stop error was treated as 'already stopped' (CRS-2500) and without Grid Infrastructure every service was reported as existing (fix by Rafal Kolodziej, oravirt#588)"
   - "oracle_sql: every statement was committed, because the check for insert/delete/update was always true (fix by Rafal Kolodziej, oravirt#588)"
   - "oracle_ldapuser: python-ldap returns bytes on Python 3, so user names and memberOf could not be compared and invalid names raised a RuntimeError (fix by Rafal Kolodziej, oravirt#588)"
