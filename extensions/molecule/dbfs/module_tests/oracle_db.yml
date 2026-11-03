@@ -41,10 +41,6 @@
 - name: oracle_db | remember current settings
   ansible.builtin.set_fact:
     _db_settings: "{{ mt_sql_value }}"
-    _db_log_mode: "{{ mt_sql_value.split(',')[0] }}"
-    _db_force_logging: "{{ mt_sql_value.split(',')[1] }}"
-    _db_flashback: "{{ mt_sql_value.split(',')[2] }}"
-    _db_supplemental: "{{ mt_sql_value.split(',')[3] }}"
 
 - name: oracle_db | read default tablespace type
   ansible.builtin.include_tasks: _sql.yml
@@ -60,6 +56,12 @@
 # Run state=present only if all settings are known values, so that the module
 # never switches the archivelog mode (=> restart) or another setting of DB1.
 - name: oracle_db | present with current settings
+  # vars instead of set_fact: set_fact converts YES/NO to a boolean
+  vars:
+    _db_log_mode: "{{ _db_settings.split(',')[0] }}"
+    _db_force_logging: "{{ _db_settings.split(',')[1] }}"
+    _db_flashback: "{{ _db_settings.split(',')[2] }}"
+    _db_supplemental: "{{ _db_settings.split(',')[3] }}"
   when:
     - _db_log_mode in ['ARCHIVELOG', 'NOARCHIVELOG']
     - _db_force_logging in ['YES', 'NO']
