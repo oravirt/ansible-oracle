@@ -12,6 +12,7 @@ task converge S=dbfs                                    # once (creates the data
 task module-test                                        # all module tests
 task module-test M=oracle_user,oracle_role              # selected modules
 task module-test L=cx_oracle                            # result file results/cx_oracle.json
+task module-test M=oracle_user C=false                  # without reinstalling the collection
 ```
 
 `task module-test` installs the collection from the repository (`task collection`)
@@ -20,6 +21,10 @@ and runs `molecule side-effect -s dbfs` with the environment variables
 
 IMPORTANT: `molecule side-effect` alone does not install the collection, only `converge` does.
 Without `task collection` the tests use the code of the last converge.
+
+`C=false` skips `task collection`, e.g. for repeated runs when only the tests in
+`module_tests/` have changed (they are read from the repository, not from the installed collection).
+Changes in `plugins/` or `roles/` are not used until the collection is installed again.
 
 ## Result file
 
