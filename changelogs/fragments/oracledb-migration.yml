@@ -23,8 +23,11 @@ minor_changes:
   - "oracle_awr: migrated from cx_Oracle to python-oracledb (thick mode). The module requires python-oracledb, e.g. installed with the role pyoracledb"
   - "oracle_datapatch: removed the commented out cx_Oracle code and the unused variable cursor. The module does not use a database driver, only sqlplus and datapatch"
   - "oracle_ldapuser: migrated from cx_Oracle to python-oracledb (thick mode). The module requires python-oracledb, e.g. installed with the role pyoracledb. Not tested against a database (no LDAP server in the test environment)"
+  - "oracle_asmdg: migrated from cx_Oracle to python-oracledb (thick mode). The module requires python-oracledb, e.g. installed with the role pyoracledb. Not tested against ASM yet"
+  - "oracle_asmvol: migrated from cx_Oracle to python-oracledb (thick mode). The module requires python-oracledb, e.g. installed with the role pyoracledb. Not tested against ASM yet"
   - "module_utils oracledb_connect: new shared connection handling with python-oracledb in thick mode (wallet, sysdba, sysasm) for the modules"
 bugfixes:
   - "oracle_rsrc_consgroup: a failed connection ended with a MODULE FAILURE (IndexError in the error handling) instead of the error message of the database"
 security_fixes:
+  - "oracle_asmdg, oracle_asmvol: the error message of a failed connection contained the user and the password in plain text. The message is now the same as in the other modules (error and connect descriptor only)"
   - "oracle_profile: the error message of a failed connection contained the user and the password in plain text. The message is now the same as in the other modules (error and connect descriptor only)"
