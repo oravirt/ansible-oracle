@@ -14,8 +14,11 @@ module: oracle_profile
 short_description: Manage profiles in an Oracle database
 description:
     - Creates, changes and drops profiles (C(CREATE PROFILE)) in an Oracle database.
-    - The existence of a profile is checked in C(DBA_PROFILES). The profile name is
-      not quoted in the SQL statements, so it is always stored in uppercase.
+    - The existence of a profile is checked in C(DBA_PROFILES).
+    - The profile name is used in uppercase like an unquoted identifier in SQL.
+      A name in double quotes (e.g. V("Gestion/Monitorizacion")) is used
+      case-sensitive. The name is always quoted in the SQL statements, so special
+      characters like V(/) are possible.
     - O(attribute_name) and O(attribute_value) are matched by position, i.e. the
       first name gets the first value and so on.
     - A new profile is created with all given attributes in one
@@ -24,8 +27,6 @@ description:
       C(DBA_PROFILES.LIMIT) (case-insensitive). If they differ, an
       C(ALTER PROFILE ... LIMIT) statement is executed for every given attribute.
       Attributes that are not given are not changed.
-    - Due to a bug in the comparison, the C(ALTER PROFILE) statements are currently
-      executed on every run for an existing profile and C(changed=true) is returned.
     - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
       (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "2.4.1.0"
@@ -33,6 +34,7 @@ options:
     name:
         description:
             - The name of the profile.
+            - Converted to uppercase unless it is enclosed in double quotes.
         type: str
         required: true
         aliases: ['profile']
@@ -166,12 +168,22 @@ msg:
 '''
 
 
+def profile_name(name):
+    # like an identifier in SQL: case-sensitive in double quotes, otherwise uppercase
+    if len(name) > 1 and name.startswith('"') and name.endswith('"'):
+        return name[1:-1]
+    return name.upper()
+
+
+def quote_name(name):
+    # always quoted, so names with special characters like '/' are possible
+    return '"%s"' % name
+
+
 # Check if the profile exists
 def check_profile_exists(cursor, module, msg, name):
-    sql = 'select count(*) from dba_profiles where lower (profile) = \'%s\'' % (
-        name.lower()
-    )
-    result = execute_sql_get(module, msg, cursor, sql)
+    sql = 'select count(*) from dba_profiles where profile = :name'
+    result = execute_sql_get(module, msg, cursor, sql, {'name': name})
 
     if result[0][0] > 0:
         return True
@@ -196,7 +208,7 @@ def create_profile(
             ]
         )
 
-    sql = 'create profile %s limit ' % (name)
+    sql = 'create profile %s limit ' % (quote_name(name))
     if add_attr:
         sql += ' %s' % (attributes.lower())
 
@@ -207,7 +219,7 @@ def create_profile(
 
 
 def remove_profile(cursor, module, msg, oracle_home, name):
-    dropsql = 'drop profile %s' % (name)
+    dropsql = 'drop profile %s' % (quote_name(name))
     if execute_sql(module, msg, cursor, dropsql):
         return True
     else:
@@ -238,7 +250,9 @@ def ensure_profile_state(
             # Convert to dict and compare current with wanted
             if dict(current_attributes) != dict(wanted_attributes):
                 for i, v in zip(attribute_name, attribute_value):
-                    total_sql.append("alter profile %s limit %s %s " % (name, i, v))
+                    total_sql.append(
+                        "alter profile %s limit %s %s " % (quote_name(name), i, v)
+                    )
 
     # module.exit_json(msg=total_sql, changed=True)
     if len(total_sql) > 0:
@@ -261,17 +275,17 @@ def ensure_profile_state_sql(module, msg, cursor, total_sql):
 def get_current_attributes(cursor, module, msg, name, attribute_names_):
     sql = 'select lower(resource_name),lower(limit) '
     sql += 'from dba_profiles '
-    sql += 'where lower(profile) = \'%s\' ' % (name.lower())
+    sql += 'where profile = :name '
     sql += 'and lower(resource_name) in (%s) ' % (attribute_names_.lower())
 
-    result = execute_sql_get(module, msg, cursor, sql)
+    result = execute_sql_get(module, msg, cursor, sql, {'name': name})
 
     return result
 
 
-def execute_sql_get(module, msg, cursor, sql):
+def execute_sql_get(module, msg, cursor, sql, binds=None):
     try:
-        cursor.execute(sql)
+        cursor.execute(sql, binds or {})
         result = cursor.fetchall()
     except oracledb.DatabaseError as exc:
         (error,) = exc.args
@@ -319,7 +333,7 @@ def main():
         ),
     )
 
-    name = module.params["name"]
+    name = profile_name(module.params["name"])
     attribute_name = module.params["attribute_name"]
     attribute_value = module.params["attribute_value"]
     state = module.params["state"]
