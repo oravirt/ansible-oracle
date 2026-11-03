@@ -1,0 +1,164 @@
+---
+# Tests for oracle_parameter with size parameters in CDB$ROOT (included by oracle_parameter.yml)
+# - shared_pool_size scope=memory: Oracle rounds the value up to the granule size
+#   => idempotent with the unrounded value and with the rounded value in bytes
+# - sga_target scope=spfile: the spfile value is not rounded => exact comparison
+# - sga_target scope=both: memory unchanged, only the spfile differs => SCOPE=SPFILE
+# All values are calculated from the granule size and the current values, the original
+# values are restored at the end.
+- name: oracle_parameter | size | read granule size and current values
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: >-
+      select (select bytes from v$sgainfo where name = 'Granule Size')
+        || ',' || (select value from v$parameter where name = 'shared_pool_size')
+        || ',' || (select value from v$parameter where name = 'sga_target')
+        || ',' || (select nvl(max(value), 'NOTSET') from v$spparameter
+                   where name = 'sga_target' and sid = '*' and isspecified = 'TRUE')
+      from dual;
+
+- name: oracle_parameter | size | variables
+  ansible.builtin.set_fact:
+    _size_granule: "{{ mt_sql_value.split(',')[0] | int }}"
+    _size_sp_orig: "{{ mt_sql_value.split(',')[1] | int }}"
+    _size_sga_mem: "{{ mt_sql_value.split(',')[2] | int }}"
+    _size_sga_spfile: "{{ mt_sql_value.split(',')[3] }}"
+
+# 6.5 granules => rounded up to 7 granules
+- name: oracle_parameter | size | values
+  ansible.builtin.set_fact:
+    _size_sp_mb: "{{ (_size_granule | int * 13 // 2) // 1048576 }}"
+    _size_sp_rounded: "{{ _size_granule | int * 7 }}"
+    # half a granule less than the current memory value, not a multiple of the granule
+    _size_sga_mb: "{{ (_size_sga_mem | int - _size_granule | int // 2) // 1048576 }}"
+
+- name: oracle_parameter | size | tests in CDB$ROOT
+  vars:
+    mt_conn: "{{ mt_conn_cdb }}"
+  block:
+    - name: oracle_parameter | size | shared_pool_size scope memory
+      opitzconsulting.ansible_oracle.oracle_parameter:
+        name: shared_pool_size
+        value: "{{ _size_sp_mb }}M"
+        scope: memory
+      register: _res
+      ignore_errors: true
+    - name: oracle_parameter | size | check shared_pool_size scope memory
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_parameter.cdb.size_memory, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_parameter | size | verify shared_pool_size rounded to granule
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "select value from v$parameter where name = 'shared_pool_size';"
+        mt_sql_expect: "{{ _size_sp_rounded }}"
+        mt_sql_id: oracle_parameter.cdb.size_memory_sql
+
+    - name: oracle_parameter | size | shared_pool_size scope memory again (rounded by Oracle)
+      opitzconsulting.ansible_oracle.oracle_parameter:
+        name: shared_pool_size
+        value: "{{ _size_sp_mb }}m"
+        scope: memory
+      register: _res
+      ignore_errors: true
+    - name: oracle_parameter | size | check shared_pool_size scope memory again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_parameter.cdb.size_memory_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_parameter | size | shared_pool_size with the rounded value in bytes
+      opitzconsulting.ansible_oracle.oracle_parameter:
+        name: shared_pool_size
+        value: "{{ _size_sp_rounded }}"
+        scope: memory
+      register: _res
+      ignore_errors: true
+    - name: oracle_parameter | size | check shared_pool_size with the rounded value in bytes
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_parameter.cdb.size_memory_bytes, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_parameter | size | restore shared_pool_size
+      opitzconsulting.ansible_oracle.oracle_parameter:
+        name: shared_pool_size
+        value: "{{ _size_sp_orig }}"
+        scope: memory
+      register: _res
+      ignore_errors: true
+    - name: oracle_parameter | size | check restore shared_pool_size
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_parameter.cdb.size_memory_restore, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_parameter | size | sga_target tests
+      when: _size_sga_mem | int > 0
+      block:
+        - name: oracle_parameter | size | sga_target scope spfile
+          opitzconsulting.ansible_oracle.oracle_parameter:
+            name: sga_target
+            value: "{{ _size_sga_mb }}M"
+            scope: spfile
+          register: _res
+          ignore_errors: true
+        - name: oracle_parameter | size | check sga_target scope spfile
+          ansible.builtin.include_tasks: _check.yml
+          vars: {mt_id: oracle_parameter.cdb.size_spfile, mt_res: "{{ _res }}", mt_expect: changed}
+
+        - name: oracle_parameter | size | sga_target scope spfile again
+          opitzconsulting.ansible_oracle.oracle_parameter:
+            name: sga_target
+            value: "{{ _size_sga_mb }}M"
+            scope: spfile
+          register: _res
+          ignore_errors: true
+        - name: oracle_parameter | size | check sga_target scope spfile again
+          ansible.builtin.include_tasks: _check.yml
+          vars: {mt_id: oracle_parameter.cdb.size_spfile_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+        - name: oracle_parameter | size | verify sga_target in spfile (not rounded)
+          ansible.builtin.include_tasks: _sql.yml
+          vars:
+            mt_sql: >-
+              select value from v$spparameter
+              where name = 'sga_target' and sid = '*' and isspecified = 'TRUE';
+            mt_sql_expect: "{{ _size_sga_mb | int * 1048576 }}"
+            mt_sql_id: oracle_parameter.cdb.size_spfile_sql
+
+        # memory value is unchanged, only the spfile differs
+        - name: oracle_parameter | size | sga_target scope both with the memory value
+          opitzconsulting.ansible_oracle.oracle_parameter:
+            name: sga_target
+            value: "{{ _size_sga_mem | int // 1048576 }}M"
+            scope: both
+          register: _res
+          ignore_errors: true
+        - name: oracle_parameter | size | check sga_target scope both with the memory value
+          ansible.builtin.include_tasks: _check.yml
+          vars: {mt_id: oracle_parameter.cdb.size_both_spfile_only, mt_res: "{{ _res }}", mt_expect: changed}
+
+        - name: oracle_parameter | size | sga_target scope both again
+          opitzconsulting.ansible_oracle.oracle_parameter:
+            name: sga_target
+            value: "{{ _size_sga_mem | int // 1048576 }}M"
+            scope: both
+          register: _res
+          ignore_errors: true
+        - name: oracle_parameter | size | check sga_target scope both again
+          ansible.builtin.include_tasks: _check.yml
+          vars: {mt_id: oracle_parameter.cdb.size_both_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+        - name: oracle_parameter | size | verify sga_target in spfile after scope both
+          ansible.builtin.include_tasks: _sql.yml
+          vars:
+            mt_sql: >-
+              select value from v$spparameter
+              where name = 'sga_target' and sid = '*' and isspecified = 'TRUE';
+            mt_sql_expect: "{{ _size_sga_mem }}"
+            mt_sql_id: oracle_parameter.cdb.size_both_spfile_sql
+
+      always:
+        # independent of the module: original spfile value of sga_target
+        - name: oracle_parameter | size | restore sga_target in spfile
+          ansible.builtin.include_tasks: _sql.yml
+          vars:
+            mt_sql: >-
+              {{ "alter system reset sga_target scope=spfile sid='*';"
+                 if _size_sga_spfile == 'NOTSET'
+                 else "alter system set sga_target=" ~ _size_sga_spfile ~ " scope=spfile sid='*';" }}
