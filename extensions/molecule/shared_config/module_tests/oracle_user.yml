@@ -316,6 +316,56 @@
     mt_sql_expect: "EXPIRED"
     mt_sql_id: oracle_user.pdb.present_after_expired_sql
 
+# documented: locked only locks, the expired password stays expired
+- name: oracle_user | lock expired user
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: locked
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check lock expired user
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.locked_after_expired, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user | lock expired user again
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: locked
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check lock expired user again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.locked_after_expired_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+# documented: expired does not change the lock => nothing to do for EXPIRED & LOCKED
+- name: oracle_user | expire locked user
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: expired
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check expire locked user
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.expired_after_locked_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user | verify lock expired user
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select account_status from dba_users where username = '{{ _usr_name }}';"
+    mt_sql_expect: "EXPIRED & LOCKED"
+    mt_sql_id: oracle_user.pdb.locked_after_expired_sql
+
+- name: oracle_user | unlock expired user
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _usr_name }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_user | check unlock expired user
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.unlocked_after_expired, mt_res: "{{ _res }}", mt_expect: changed}
+
 # password hash: create a second user with the hash of the first user
 - name: oracle_user | get password hash of the first user
   ansible.builtin.include_tasks: _sql.yml
@@ -435,7 +485,7 @@
   ansible.builtin.include_tasks: _check.yml
   vars: {mt_id: oracle_user.pdb.create_no_password, mt_res: "{{ _res }}", mt_expect: failed}
 
-# documented: schema is required in practice
+# documented: schema is required
 - name: oracle_user | missing schema
   opitzconsulting.ansible_oracle.oracle_user:
     schema_password: "{{ _usr_password }}"
