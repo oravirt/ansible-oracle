@@ -44,6 +44,13 @@ asm_diskgroups:
     disk:
       - {device: /u01/asmdisks/fra01, asmlabel: fra01, size: 15G}
 
+# Spare ASM disks without disk group for the module tests (oracle_asmdg),
+# created in converge.yml like the disks of asm_diskgroups
+molecule_asm_spare_disks:
+  - {device: /u01/asmdisks/spare01, size: 2G}
+  - {device: /u01/asmdisks/spare02, size: 2G}
+  - {device: /u01/asmdisks/spare03, size: 2G}
+
 # DB-Home must not be newer than GI
 db_homes_config:
   db19-gi-ee:
@@ -66,10 +73,38 @@ listener_installed:
     use_gi_home: true
     state: present
 
+# tnsnames.ora, sqlnet.ora and wallet for the module tests (side_effect)
 # group_vars/all references db19-si-ee
-sqlnet_installed: []
-tnsnames_installed: []
-oracle_wallet_config: []
+# alias for the wallet credential (items2dict in group_vars drops 'alias')
+oracle_tnsnames_config:
+  ORCLPDB1:
+    alias:
+      - ORCLPDB1_SYSTEM
+    connect:
+      service_name: ORCLPDB1
+    address:
+      - host: "{{ ansible_hostname }}"
+
+tnsnames_installed:
+  - tnsname: "{{ oracle_pdbs[0]['pdb_name'] }}"
+    home: db19-gi-ee
+    state: present
+
+sqlnet_installed:
+  - home: db19-gi-ee
+    sqlnet: sqlnetalias1
+    state: present
+
+oracle_wallet_config:
+  - name: wallet1
+    home: db19-gi-ee
+    path: /u01/app/oracle/wallet
+    state: present
+    dbcredentials:
+      - tns_name: "{{ oracle_pdbs[0]['pdb_name'] }}_SYSTEM"
+        db_name: "{{ oracle_pdbs[0]['pdb_name'] }}"
+        db_user: system
+        state: present
 
 oracle_databases:
   - home: db19-gi-ee

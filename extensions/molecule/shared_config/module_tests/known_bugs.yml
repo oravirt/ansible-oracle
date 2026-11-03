@@ -1,0 +1,34 @@
+---
+# Known bugs in the modules that occur in all scenarios: <check id>: <description>
+# Known bugs that depend on the environment (version, Grid Infrastructure) are in
+# mt_known_bugs_scenario in <scenario>/module_tests.yml.
+# A failing check with an id from this list is reported as KNOWN BUG and does not fail the test run.
+# A passing check with an id from this list is reported as KNOWN BUG NOT REPRODUCED
+# => remove the entry after the bug has been fixed.
+mt_known_bugs_common:
+  oracle_directory.pdb.mode_normal_other_path: >-
+    directory_mode=normal with a different path ends without exit_json (module failure without msg)
+  oracle_db.cdb.present_idempotent: >-
+    state=present on 19c+ always executes ALTER DATABASE ADD/DROP SUPPLEMENTAL LOG DATA
+    (comparison with empty slcomp) and reports changed=true
+  oracle_user.pdb.present_after_expired_idempotent: >-
+    state=present wants account_status OPEN, ACCOUNT UNLOCK does not reset EXPIRED => never idempotent
+  oracle_user.pdb.missing_schema: >-
+    missing schema ends with "Undhandled exit" (ok) instead of failing
+  oracle_pdb.cdb.status_msg: >-
+    state=status returns msg [''], check_pdb_status sets msg only locally
+  oracle_pdb.cdb.create_no_save_state: >-
+    create_pdb returns True only with save_state=true;
+    with save_state=false the PDB is created but the module fails
+  oracle_pdb.cdb.drop_closed: >-
+    state=absent on a closed PDB runs CLOSE IMMEDIATE first (probably ORA-65020), not verified
+  oracle_job.pdb.no_logging_level: >-
+    existing job without logging_level: AttributeError on None.upper() in the comparison
+  oracle_job.pdb.mixed_case_create_idempotent: >-
+    query_existing always uses upper case owner/name, mixed case job is not found
+    and create fails (ORA-27477)
+  oracle_job.pdb.mixed_case_drop: >-
+    query_existing always uses upper case owner/name, mixed case job is not found and not dropped
+  oracle_parameter.pdb.check_mode_spfile_unset: >-
+    check mode with scope=spfile for a parameter not set in the spfile fails
+    (currval.upper() on NULL)

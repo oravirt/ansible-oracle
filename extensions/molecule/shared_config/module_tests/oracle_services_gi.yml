@@ -1,0 +1,257 @@
+---
+# Tests for oracle_services with Grid Infrastructure (Oracle Restart, scenario has-ol9)
+# The module uses srvctl from oracle_home (ORACLE_HOME of the database), the connection
+# options are ignored. The tests without Grid Infrastructure are in oracle_services.yml.
+# - create in PDB mt_pdb, start, status, stop, restart, change clbgoal, remove, idempotence
+# Every step is verified with srvctl config/status service.
+- name: oracle_services_gi | variables
+  ansible.builtin.set_fact:
+    _svc_name: MOLTEST_SVC
+    _svc_srvctl: "{{ mt_oracle_home }}/bin/srvctl"
+
+- name: oracle_services_gi | cleanup
+  ansible.builtin.shell:
+    cmd: >-
+      {{ _svc_srvctl }} stop service -db {{ mt_cdb }} -service {{ _svc_name }};
+      {{ _svc_srvctl }} remove service -db {{ mt_cdb }} -service {{ _svc_name }} -force
+  changed_when: false
+  failed_when: false
+
+- name: oracle_services_gi | create
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_cdb }}"
+    pdb: "{{ mt_pdb }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_services_gi | check create
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services_gi.cdb.create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_services_gi | create again
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_cdb }}"
+    pdb: "{{ mt_pdb }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_services_gi | check create again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services_gi.cdb.create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_services_gi | srvctl config after create
+  ansible.builtin.command:
+    argv: ["{{ _svc_srvctl }}", config, service, -db, "{{ mt_cdb }}", -service, "{{ _svc_name }}"]
+  register: _svc_config
+  changed_when: false
+  failed_when: false
+- name: oracle_services_gi | check srvctl config after create
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_services_gi.cdb.create_srvctl
+    mt_res:
+      changed: false
+      failed: >-
+        {{ _svc_config.rc != 0
+           or ('Pluggable database name: ' ~ mt_pdb) not in _svc_config.stdout }}
+      msg: "{{ _svc_config.stdout ~ _svc_config.stderr }}"
+    mt_expect: ok
+
+- name: oracle_services_gi | start
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_cdb }}"
+    state: started
+  register: _res
+  ignore_errors: true
+- name: oracle_services_gi | check start
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services_gi.cdb.start, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_services_gi | start again
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_cdb }}"
+    state: started
+  register: _res
+  ignore_errors: true
+- name: oracle_services_gi | check start again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services_gi.cdb.start_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_services_gi | srvctl status after start
+  ansible.builtin.command:
+    argv: ["{{ _svc_srvctl }}", status, service, -db, "{{ mt_cdb }}", -service, "{{ _svc_name }}"]
+  register: _svc_status
+  changed_when: false
+  failed_when: false
+- name: oracle_services_gi | check srvctl status after start
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_services_gi.cdb.start_srvctl
+    mt_res:
+      changed: false
+      failed: "{{ ' is running' not in _svc_status.stdout }}"
+      msg: "{{ _svc_status.stdout ~ _svc_status.stderr }}"
+    mt_expect: ok
+
+- name: oracle_services_gi | status
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_cdb }}"
+    state: status
+  register: _res
+  ignore_errors: true
+- name: oracle_services_gi | check status
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services_gi.cdb.status, mt_res: "{{ _res }}", mt_expect: ok}
+
+# documented: the output of srvctl status service is returned
+- name: oracle_services_gi | check status message
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_services_gi.cdb.status_msg
+    mt_res:
+      changed: false
+      failed: "{{ ' is running' not in (_res.msg | default('') | string) }}"
+      msg: "{{ _res.msg | default('') | string }}"
+    mt_expect: ok
+
+- name: oracle_services_gi | restart
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_cdb }}"
+    state: restarted
+  register: _res
+  ignore_errors: true
+- name: oracle_services_gi | check restart
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services_gi.cdb.restart, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_services_gi | change clbgoal
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_cdb }}"
+    clbgoal: SHORT
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_services_gi | check change clbgoal
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services_gi.cdb.change_clbgoal, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_services_gi | change clbgoal again
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_cdb }}"
+    clbgoal: SHORT
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_services_gi | check change clbgoal again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services_gi.cdb.change_clbgoal_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_services_gi | srvctl config after change clbgoal
+  ansible.builtin.command:
+    argv: ["{{ _svc_srvctl }}", config, service, -db, "{{ mt_cdb }}", -service, "{{ _svc_name }}"]
+  register: _svc_config
+  changed_when: false
+  failed_when: false
+- name: oracle_services_gi | check srvctl config after change clbgoal
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_services_gi.cdb.change_clbgoal_srvctl
+    mt_res:
+      changed: false
+      failed: "{{ 'Connection Load Balancing Goal: SHORT' not in _svc_config.stdout }}"
+      msg: "{{ _svc_config.stdout ~ _svc_config.stderr }}"
+    mt_expect: ok
+
+- name: oracle_services_gi | stop
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_cdb }}"
+    clbgoal: SHORT
+    state: stopped
+  register: _res
+  ignore_errors: true
+- name: oracle_services_gi | check stop
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services_gi.cdb.stop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_services_gi | stop again
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_cdb }}"
+    clbgoal: SHORT
+    state: stopped
+  register: _res
+  ignore_errors: true
+- name: oracle_services_gi | check stop again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services_gi.cdb.stop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_services_gi | srvctl status after stop
+  ansible.builtin.command:
+    argv: ["{{ _svc_srvctl }}", status, service, -db, "{{ mt_cdb }}", -service, "{{ _svc_name }}"]
+  register: _svc_status
+  changed_when: false
+  failed_when: false
+- name: oracle_services_gi | check srvctl status after stop
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_services_gi.cdb.stop_srvctl
+    mt_res:
+      changed: false
+      failed: "{{ ' is not running' not in _svc_status.stdout }}"
+      msg: "{{ _svc_status.stdout ~ _svc_status.stderr }}"
+    mt_expect: ok
+
+- name: oracle_services_gi | remove
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_cdb }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_services_gi | check remove
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services_gi.cdb.remove, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_services_gi | remove again
+  opitzconsulting.ansible_oracle.oracle_services:
+    name: "{{ _svc_name }}"
+    database_name: "{{ mt_cdb }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_services_gi | check remove again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_services_gi.cdb.remove_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_services_gi | srvctl config after remove
+  ansible.builtin.command:
+    argv: ["{{ _svc_srvctl }}", config, service, -db, "{{ mt_cdb }}", -service, "{{ _svc_name }}"]
+  register: _svc_config
+  changed_when: false
+  failed_when: false
+- name: oracle_services_gi | check srvctl config after remove
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_services_gi.cdb.remove_srvctl
+    mt_res:
+      changed: false
+      failed: "{{ _svc_config.rc == 0 }}"
+      msg: "{{ _svc_config.stdout ~ _svc_config.stderr }}"
+    mt_expect: ok
+
+- name: oracle_services_gi | final cleanup
+  ansible.builtin.shell:
+    cmd: >-
+      {{ _svc_srvctl }} stop service -db {{ mt_cdb }} -service {{ _svc_name }};
+      {{ _svc_srvctl }} remove service -db {{ mt_cdb }} -service {{ _svc_name }} -force
+  changed_when: false
+  failed_when: false

@@ -5,6 +5,7 @@
 #   task converge S=dbfs-ol9
 #   task module-test M=oracle_user,oracle_role L=cx_oracle
 #   task module-test M=oracle_user C=false   (without reinstalling the collection)
+#   task module-test S=has-ol9 M=oracle_asmdg
 #   task login S=default H=ol9
 #   task exec H=dbfs-ol9 U=oracle
 #
@@ -90,8 +91,8 @@ tasks:
 
   module-test:
     desc: >-
-      Module tests in scenario dbfs (M=<module>[,<module>...], L=<label for result file>,
-      C=false: do not reinstall the collection)
+      Module tests (S=dbfs|has-ol9, default dbfs, M=<module>[,<module>...],
+      L=<label for result file>, C=false: do not reinstall the collection)
     dir: "{{.TASKFILE_DIR}}"
     deps:
       - _check-sw-dir
@@ -102,7 +103,7 @@ tasks:
       # side-effect does not install the collection (only converge does) => install the current code
       # C=false skips the installation (go-task 3.45 has no if: for commands)
       - '[ "{{.C}}" = "false" ] || ansible-galaxy collection install --force ..'
-      - molecule side-effect -s dbfs {{.CLI_ARGS}}
+      - molecule side-effect -s {{if eq .S "default"}}dbfs{{else}}{{.S}}{{end}} {{.CLI_ARGS}}
 
   idempotence:
     desc: "Run converge again and check for changes (S=<scenario>)"

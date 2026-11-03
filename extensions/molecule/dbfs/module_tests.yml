@@ -1,11 +1,41 @@
 ---
-# Known bugs in the modules: <check id>: <description>
-# A failing check with an id from this list is reported as KNOWN BUG and does not fail the test run.
-# A passing check with an id from this list is reported as KNOWN BUG NOT REPRODUCED
-# => remove the entry after the bug has been fixed.
-mt_known_bugs:
-  oracle_directory.pdb.mode_normal_other_path: >-
-    directory_mode=normal with a different path ends without exit_json (module failure without msg)
+# Scenario variables for the module tests (shared_config/module_tests)
+# Oracle AI Database 26ai on filesystem without Grid Infrastructure: CDB DB1 with PDB ORCLPDB
+mt_all_modules:
+  - oracle_directory
+  - oracle_user
+  - oracle_role
+  - oracle_profile
+  - oracle_grants
+  - oracle_privs
+  - oracle_tablespace
+  - oracle_sql
+  - oracle_parameter
+  - oracle_job
+  - oracle_jobclass
+  - oracle_jobschedule
+  - oracle_jobwindow
+  - oracle_rsrc_consgroup
+  - oracle_stats_prefs
+  - oracle_awr
+  - oracle_facts
+  # slower tests
+  - oracle_services
+  - oracle_redo
+  - oracle_datapatch
+  - oracle_db
+  - oracle_pdb
+
+mt_oracle_home: /u01/app/oracle/product/26/db_26.1
+mt_oracle_sid: DB1
+# read-only ORACLE_HOME: tnsnames.ora, sqlnet.ora are in ORACLE_BASE_HOME
+mt_tns_admin: /u01/app/oracle/homes/db261siee/network/admin
+mt_cdb: DB1
+mt_pdb: ORCLPDB
+mt_datafile_dir: /u01/app/oracle/oradata
+
+# known bugs without Grid Infrastructure and with 26ai
+mt_known_bugs_scenario:
   oracle_services.pdb.create_idempotent: >-
     without GI ensure_service_state runs srvctl config/modify and fails
   oracle_services.pdb.start: >-
@@ -20,30 +50,6 @@ mt_known_bugs:
     without GI ensure_service_state runs srvctl config/modify and fails
   oracle_services.pdb.stop_sql: >-
     service is not started/stopped, because the module fails before (srvctl without GI)
-  oracle_db.cdb.present_idempotent: >-
-    state=present on 19c+ always executes ALTER DATABASE ADD/DROP SUPPLEMENTAL LOG DATA
-    (comparison with empty slcomp) and reports changed=true
-  oracle_user.pdb.present_after_expired_idempotent: >-
-    state=present wants account_status OPEN, ACCOUNT UNLOCK does not reset EXPIRED => never idempotent
-  oracle_user.pdb.missing_schema: >-
-    missing schema ends with "Undhandled exit" (ok) instead of failing
-  oracle_pdb.cdb.status_msg: >-
-    state=status returns msg [''], check_pdb_status sets msg only locally
-  oracle_pdb.cdb.create_no_save_state: >-
-    create_pdb returns True only with save_state=true;
-    with save_state=false the PDB is created but the module fails
-  oracle_pdb.cdb.drop_closed: >-
-    state=absent on a closed PDB runs CLOSE IMMEDIATE first (probably ORA-65020), not verified
-  oracle_job.pdb.no_logging_level: >-
-    existing job without logging_level: AttributeError on None.upper() in the comparison
-  oracle_job.pdb.mixed_case_create_idempotent: >-
-    query_existing always uses upper case owner/name, mixed case job is not found
-    and create fails (ORA-27477)
-  oracle_job.pdb.mixed_case_drop: >-
-    query_existing always uses upper case owner/name, mixed case job is not found and not dropped
-  oracle_parameter.pdb.check_mode_spfile_unset: >-
-    check mode with scope=spfile for a parameter not set in the spfile fails
-    (currval.upper() on NULL)
   oracle_parameter.pdb.reset_idempotent: >-
     reset is only detected as unchanged by ORA-32010, but ALTER SYSTEM RESET ... SCOPE=BOTH
     does not raise ORA-32010 when the parameter is not in the spfile (26ai) => always changed

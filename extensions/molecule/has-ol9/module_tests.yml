@@ -1,0 +1,55 @@
+---
+# Scenario variables for the module tests (shared_config/module_tests)
+# Oracle Restart 26ai with ASM, Oracle Database 19c: CDB DBHAS with PDB ORCLPDB1 in +DATA
+mt_all_modules:
+  - oracle_directory
+  - oracle_user
+  - oracle_role
+  - oracle_profile
+  - oracle_grants
+  - oracle_privs
+  - oracle_tablespace
+  - oracle_sql
+  - oracle_parameter
+  - oracle_job
+  - oracle_jobclass
+  - oracle_jobschedule
+  - oracle_jobwindow
+  - oracle_rsrc_consgroup
+  - oracle_stats_prefs
+  - oracle_awr
+  - oracle_facts
+  - oracle_asmdg
+  # slower tests
+  # oracle_services with Grid Infrastructure (srvctl) instead of DBMS_SERVICE
+  - oracle_services_gi
+  - oracle_redo
+  - oracle_datapatch
+  - oracle_db
+  - oracle_pdb
+
+mt_oracle_home: /u01/app/oracle/product/19/db_19.33
+mt_oracle_sid: DBHAS
+# read-only ORACLE_HOME: tnsnames.ora, sqlnet.ora are in ORACLE_BASE_HOME
+mt_tns_admin: /u01/app/oracle/homes/db1933giee/network/admin
+mt_cdb: DBHAS
+mt_pdb: ORCLPDB1
+mt_datafile_dir: +DATA
+
+# ASM instance of Oracle Restart
+mt_asm_oracle_home: /u01/app/oracle/product/26/restart_26.04
+mt_asm_sid: +ASM
+# spare ASM disks without disk group (created in converge.yml)
+mt_asm_spare_disks: "{{ molecule_asm_spare_disks | map(attribute='device') | list }}"
+mt_conn_asm:
+  service_name: +ASM
+  user: sys
+  password: "{{ default_gipass }}"
+# not existing user => ORA-01017 without locking SYS
+mt_conn_asm_wrong_password:
+  service_name: +ASM
+  user: moltest_nouser
+  password: wrong_password
+
+# known bugs with Grid Infrastructure and 19c
+mt_known_bugs_scenario: {}

@@ -23,7 +23,8 @@
              || ',' || f.autoextensible
       from dba_tablespaces t join dba_data_files f on f.tablespace_name = t.tablespace_name
       where t.tablespace_name = 'MOLTEST_TS_RESIZE';
-    _ts_dir: /u01/app/oracle/oradata
+    # directory or ASM disk group (+DATA) for explicit data files
+    _ts_dir: "{{ mt_datafile_dir }}"
     _ts_all: [MOLTEST_TS, MOLTEST_TS_DF, MOLTEST_TS_BIG, MOLTEST_TS_TEMP, MOLTEST_TS_UNDO,
               MOLTEST_TS_RESIZE]
 
@@ -42,10 +43,12 @@
       /
 
 # data files left over from an aborted run (tablespaces are dropped above)
+# ASM: the files are removed by drop tablespace ... including datafiles
 - name: oracle_tablespace | cleanup explicit data files
   ansible.builtin.file:
     path: "{{ _ts_dir }}/{{ item }}"
     state: absent
+  when: not _ts_dir.startswith('+')
   loop:
     - moltest_ts_df01.dbf
     - moltest_ts_df02.dbf

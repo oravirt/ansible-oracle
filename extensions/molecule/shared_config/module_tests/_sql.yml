@@ -1,21 +1,31 @@
 ---
-# Independent verification with sqlplus / as sysdba (does not use cx_Oracle/oracledb).
+# Independent verification with sqlplus / as sysdba (does not use python-oracledb).
 #
 # mt_sql:           query, must end with ';'
 # mt_sql_container: CDB$ROOT (default) or PDB name
+# mt_sql_asm:       (optional) true: sqlplus / as sysasm in the ASM instance
+#                   (mt_asm_oracle_home, mt_asm_sid), mt_sql_container is ignored
 # mt_sql_expect:    (optional) expected value of the output (trimmed)
 # mt_sql_id:        (optional) id of the check, default: <mt_module>.sql
 #
 # Result: mt_sql_value (trimmed output)
-- name: "sql | {{ mt_sql_container | default('CDB$ROOT') }} | {{ mt_sql }}"
+- name: "sql | {{ 'ASM' if mt_sql_asm | default(false) | bool else mt_sql_container | default('CDB$ROOT') }} | {{ mt_sql }}"
   ansible.builtin.command:
-    cmd: "{{ mt_oracle_home }}/bin/sqlplus -S -L / as sysdba"
+    cmd: >-
+      {{ mt_asm_oracle_home if _mt_sql_asm | bool else mt_oracle_home }}/bin/sqlplus -S -L
+      / as {{ 'sysasm' if _mt_sql_asm | bool else 'sysdba' }}
     stdin: |
       whenever sqlerror exit failure
       set heading off feedback off pagesize 0 linesize 4000 trimspool on verify off
+      {% if not _mt_sql_asm | bool %}
       alter session set container={{ mt_sql_container | default('CDB$ROOT') }};
+      {% endif %}
       {{ mt_sql }}
       exit
+  vars:
+    _mt_sql_asm: "{{ mt_sql_asm | default(false) | bool }}"
+  environment: "{{ {'ORACLE_HOME': mt_asm_oracle_home, 'ORACLE_SID': mt_asm_sid,
+                    'LD_LIBRARY_PATH': mt_asm_oracle_home ~ '/lib'} if _mt_sql_asm | bool else {} }}"
   register: _mt_sql_out
   changed_when: false
 
