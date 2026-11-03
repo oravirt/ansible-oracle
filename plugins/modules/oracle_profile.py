@@ -226,7 +226,7 @@ def ensure_profile_state(
         # Make sure attributes are lower case
         attribute_name = [x.lower() for x in attribute_name]
         attribute_value = [str(y).lower() for y in attribute_value]
-        wanted_attributes = zip(attribute_name, attribute_value)
+        wanted_attributes = list(zip(attribute_name, attribute_value))
 
         # Check the current attributes
         attribute_names_ = ','.join(['\'' + n[0] + '\'' for n in (wanted_attributes)])

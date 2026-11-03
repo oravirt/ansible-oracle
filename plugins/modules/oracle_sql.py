@@ -166,7 +166,7 @@ def execute_sql_get(module, cursor, sql):
 
 
 def execute_sql(module, cursor, conn, sql):
-    if 'insert' or 'delete' or 'update' in sql.lower():
+    if any(keyword in sql.lower() for keyword in ('insert', 'delete', 'update')):
         docommit = True
     else:
         docommit = False

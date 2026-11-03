@@ -496,7 +496,7 @@ def main():
         ],
     )
     # Check input parameters
-    re_name = re.compile("^[A-Za-z0-9_\$#]+\.[A-Za-z0-9_\$#]+$")  # noqa W605
+    re_name = re.compile(r"^[A-Za-z0-9_\$#]+\.[A-Za-z0-9_\$#]+$")
     if not re_name.match(module.params['job_name']):
         module.fail_json(msg="Invalid job name")
     job_fullname = (

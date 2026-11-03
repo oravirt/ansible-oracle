@@ -178,7 +178,7 @@ def main():
         supports_check_mode=True,
     )
     # Check input parameters
-    re_name = re.compile("^[A-Za-z0-9_\$#]+\.[A-Za-z0-9_\$#]+$")  # noqa W605
+    re_name = re.compile(r"^[A-Za-z0-9_\$#]+\.[A-Za-z0-9_\$#]+$")
     if not re_name.match(module.params['name']):
         module.fail_json(msg="Invalid schedule name")
     job_fullname = (

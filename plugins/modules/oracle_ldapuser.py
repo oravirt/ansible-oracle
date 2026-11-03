@@ -280,11 +280,15 @@ def clean_string(s):
     # This function should uppercase and clean all strings sent as identifiers to Oracle
     # raise exception if string cannot be cleaned
     global oraclepattern
+    # Python 3 python-ldap may return LDAP attribute values as bytes,
+    # decode before processing
+    if isinstance(s, bytes):
+        s = s.decode('utf-8')
     supper = s.upper()
     if oraclepattern is None:
         oraclepattern = re.compile('^[A-Z]+[A-Z0-9_]*[A-Z0-9]+$')
     if (len(s) > 32) or not oraclepattern.match(supper):
-        raise
+        raise ValueError
     return supper
 
 
@@ -310,9 +314,20 @@ def query_ldap_users():
             try:
                 userinfo = {'username': clean_string(user[lparam['username']][0])}
                 if module.params['group_role_map'] is not None:
-                    userinfo['memberOf'] = user['memberOf']
+                    # Python 3 python-ldap may return memberOf values as bytes,
+                    # decode to str for comparisons
+                    userinfo['memberOf'] = [
+                        x.decode('utf-8') if isinstance(x, bytes) else x
+                        for x in user['memberOf']
+                    ]
                 users.append(userinfo)
-            except ldap.LDAPError:
+            except (
+                ldap.LDAPError,
+                ValueError,
+                TypeError,
+                KeyError,
+                UnicodeDecodeError,
+            ):
                 pass
     except ldap.LDAPError as e:
         module.fail_json(msg="Error querying LDAP: %s" % e, changed=False)
@@ -413,7 +428,13 @@ def main():
                 if gr['dn'] in user['memberOf']:
                     try:
                         mgroups.append("%s" % clean_string(gr['group']))
-                    except ldap.LDAPError:
+                    except (
+                        ldap.LDAPError,
+                        ValueError,
+                        TypeError,
+                        KeyError,
+                        UnicodeDecodeError,
+                    ):
                         pass
             g = ",".join(mgroups)
         else:

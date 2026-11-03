@@ -355,6 +355,7 @@ def ensure_service_state(
     rlbgoal,
 ):
     configchange = False
+    change = False
     if not newservice:
         _wanted_ai = ['']
         _wanted_pi = ['']
@@ -638,7 +639,7 @@ def stop_service(cursor, module, msg, oracle_home, name, database_name):
 
         if rc != 0:
             if (
-                'PRCR-1005' in stdout or 'CRS-2500' or 'PRCD-1316' in stdout
+                'PRCR-1005' in stdout or 'CRS-2500' in stdout or 'PRCD-1316' in stdout
             ):  # Already stopped
                 return False
             elif 'PRCR-1001' in stdout or 'PRCD-1132' in stdout:
@@ -678,16 +679,14 @@ def execute_sql_get(module, msg, cursor, sql):
     # module.exit_json(msg="In execute_sql_get %s" % sql, changed=False)
     try:
         cursor.execute(sql)
-        result = cursor.fetchone()  # noqa F841
-
-    except oracledb.DatabaseError as exc:
-        (dberror,) = exc.args
-        if dberror.code == 1403:
-            # no_data_found
-            return False
+        result = cursor.fetchone()
 
     except oracledb.DatabaseError as exc:
         (error,) = exc.args
+        if error.code == 1403:
+            # no_data_found
+            return False
+
         msg = 'Something went wrong while executing sql_get - %s sql: %s' % (
             error.message,
             sql,
@@ -695,9 +694,11 @@ def execute_sql_get(module, msg, cursor, sql):
         module.fail_json(msg=msg, changed=False)
         return False
 
-    # we had no error fetching the row from database
-    # => True
-    return True
+    # True only if the query returned a row
+    if result:
+        return True
+    else:
+        return False
 
 
 def execute_sql(module, msg, cursor, sql):
@@ -901,7 +902,9 @@ def main():
 
     elif state == 'restarted':
         if stop_service(cursor, module, msg, oracle_home, name, database_name):
-            if start_service(cursor, module, msg, oracle_home, name, database_name):
+            if start_service(
+                cursor, module, msg, oracle_home, name, database_name, configchange
+            ):
                 msg = "Service %s restarted in database %s" % (name, database_name)
                 module.exit_json(msg=msg, changed=True)
             else:
