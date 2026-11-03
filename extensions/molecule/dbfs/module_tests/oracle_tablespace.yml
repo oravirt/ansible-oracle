@@ -3,6 +3,8 @@
 # - OMF tablespace: create with numfiles, add files, autoextend settings, status changes
 #   (read_only, read_write, offline, online, present), drop
 # - explicit data files: add a file, bigfile tablespace, more than one file for bigfile
+# - grow/shrink of autoextend nextsize/maxsize with units in lower case (k, m, g),
+#   size of existing files is not changed
 # - temporary and undo tablespace
 # - connection variants: system (default), sys as sysdba, system in CDB, wallet,
 #   wrong password
@@ -14,8 +16,16 @@
     _ts_temp: MOLTEST_TS_TEMP
     _ts_undo: MOLTEST_TS_UNDO
     _ts_cdb: MOLTEST_TS_CDB
+    _ts_resize: MOLTEST_TS_RESIZE
+    _ts_resize_sql: >-
+      select t.bigfile || ',' || f.bytes/1048576 || ','
+             || f.increment_by*t.block_size/1048576 || ',' || f.maxbytes/1048576
+             || ',' || f.autoextensible
+      from dba_tablespaces t join dba_data_files f on f.tablespace_name = t.tablespace_name
+      where t.tablespace_name = 'MOLTEST_TS_RESIZE';
     _ts_dir: /u01/app/oracle/oradata
-    _ts_all: [MOLTEST_TS, MOLTEST_TS_DF, MOLTEST_TS_BIG, MOLTEST_TS_TEMP, MOLTEST_TS_UNDO]
+    _ts_all: [MOLTEST_TS, MOLTEST_TS_DF, MOLTEST_TS_BIG, MOLTEST_TS_TEMP, MOLTEST_TS_UNDO,
+              MOLTEST_TS_RESIZE]
 
 - name: oracle_tablespace | cleanup in PDB
   ansible.builtin.include_tasks: _sql.yml
@@ -483,6 +493,320 @@
       where t.tablespace_name = '{{ _ts_big }}' group by t.bigfile;
     mt_sql_expect: "YES,1"
     mt_sql_id: oracle_tablespace.pdb.bigfile_create_sql
+
+# grow and shrink with units in lower case (k, m, g)
+# The files are not resized (documented): grow/shrink = autoextend nextsize/maxsize.
+# Changes are only detected for M, G and T (documented) => k and unlimited are not applied.
+# verify: bigfile,size MB,next MB,maxsize MB,autoextensible
+- name: oracle_tablespace | create resize tablespace (10m, next 1m, max 100m)
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 10m
+    nextsize: 1m
+    maxsize: 100m
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check create resize tablespace (10m, next 1m, max 100m)
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | verify resize_create
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _ts_resize_sql }}"
+    mt_sql_expect: "YES,10,1,100,YES"
+    mt_sql_id: oracle_tablespace.pdb.resize_create_sql
+
+- name: oracle_tablespace | create resize tablespace again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 10m
+    nextsize: 1m
+    maxsize: 100m
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check create resize tablespace again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | same sizes with upper case units
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 10M
+    nextsize: 1M
+    maxsize: 100M
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check same sizes with upper case units
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_upper_units_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | grow maxsize to 200m
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 10m
+    nextsize: 1m
+    maxsize: 200m
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check grow maxsize to 200m
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_grow_max, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | grow maxsize to 200m again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 10m
+    nextsize: 1m
+    maxsize: 200m
+  vars:
+    mt_conn: "{{ mt_conn_pdb_sysdba }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check grow maxsize to 200m again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_grow_max_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify resize_grow_max
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _ts_resize_sql }}"
+    mt_sql_expect: "YES,10,1,200,YES"
+    mt_sql_id: oracle_tablespace.pdb.resize_grow_max_sql
+
+- name: oracle_tablespace | shrink maxsize to 50m
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 10m
+    nextsize: 1m
+    maxsize: 50m
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check shrink maxsize to 50m
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_shrink_max, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | shrink maxsize to 50m again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 10m
+    nextsize: 1m
+    maxsize: 50m
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check shrink maxsize to 50m again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_shrink_max_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify resize_shrink_max
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _ts_resize_sql }}"
+    mt_sql_expect: "YES,10,1,50,YES"
+    mt_sql_id: oracle_tablespace.pdb.resize_shrink_max_sql
+
+- name: oracle_tablespace | grow nextsize to 2m
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 10m
+    nextsize: 2m
+    maxsize: 50m
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check grow nextsize to 2m
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_grow_next, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | grow nextsize to 2m again
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 10m
+    nextsize: 2m
+    maxsize: 50m
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check grow nextsize to 2m again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_grow_next_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify resize_grow_next
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _ts_resize_sql }}"
+    mt_sql_expect: "YES,10,2,50,YES"
+    mt_sql_id: oracle_tablespace.pdb.resize_grow_next_sql
+
+- name: oracle_tablespace | shrink nextsize to 1m
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 10m
+    nextsize: 1m
+    maxsize: 50m
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check shrink nextsize to 1m
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_shrink_next, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | verify resize_shrink_next
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _ts_resize_sql }}"
+    mt_sql_expect: "YES,10,1,50,YES"
+    mt_sql_id: oracle_tablespace.pdb.resize_shrink_next_sql
+
+- name: oracle_tablespace | grow maxsize to 1g
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 10m
+    nextsize: 1m
+    maxsize: 1g
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check grow maxsize to 1g
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_grow_max_g, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | maxsize 1024m equals 1g
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 10m
+    nextsize: 1m
+    maxsize: 1024m
+  vars:
+    mt_conn: "{{ mt_conn_pdb_wallet }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check maxsize 1024m equals 1g
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_max_g_as_m_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify resize_grow_max_g
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _ts_resize_sql }}"
+    mt_sql_expect: "YES,10,1,1024,YES"
+    mt_sql_id: oracle_tablespace.pdb.resize_grow_max_g_sql
+
+- name: oracle_tablespace | size 20m on existing file (not resized)
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 20m
+    nextsize: 1m
+    maxsize: 1g
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check size 20m on existing file (not resized)
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_size_not_applied, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | size 5m on existing file (not resized)
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 5m
+    nextsize: 1m
+    maxsize: 1g
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check size 5m on existing file (not resized)
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_size_shrink_not_applied, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify resize_size_not_applied
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _ts_resize_sql }}"
+    mt_sql_expect: "YES,10,1,1024,YES"
+    mt_sql_id: oracle_tablespace.pdb.resize_size_not_applied_sql
+
+- name: oracle_tablespace | nextsize 512k (k is not supported)
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 10m
+    nextsize: 512k
+    maxsize: 1g
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check nextsize 512k (k is not supported)
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_next_k_not_applied, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | maxsize unlimited (not detected)
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    bigfile: true
+    autoextend: true
+    size: 10m
+    nextsize: 1m
+    maxsize: unlimited
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check maxsize unlimited (not detected)
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_max_unlimited_not_applied, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_tablespace | verify resize_k_unlimited_not_applied
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _ts_resize_sql }}"
+    mt_sql_expect: "YES,10,1,1024,YES"
+    mt_sql_id: oracle_tablespace.pdb.resize_k_unlimited_not_applied_sql
+
+- name: oracle_tablespace | drop resize tablespace
+  opitzconsulting.ansible_oracle.oracle_tablespace:
+    tablespace: "{{ _ts_resize }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_tablespace | check drop resize tablespace
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_tablespace.pdb.resize_drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_tablespace | verify drop resize tablespace
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from dba_tablespaces where tablespace_name = '{{ _ts_resize }}';"
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_tablespace.pdb.resize_drop_sql
 
 # temporary tablespace (OMF)
 - name: oracle_tablespace | create temporary tablespace
