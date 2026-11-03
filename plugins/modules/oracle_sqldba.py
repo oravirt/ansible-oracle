@@ -218,8 +218,6 @@ def dictify(r, root=True):
 
 
 def sqlplus():
-    global oracle_home
-
     sql_bin = os.path.join(oracle_home, "bin", "sqlplus")
     return [sql_bin, "-l", "-s", "/nolog"]
 
@@ -249,14 +247,14 @@ def sql_input(sql, username, password, pdb):
 
 
 def kill_process():
-    global err_msg, sql_process
+    global err_msg
 
     sql_process.kill()
     err_msg = "Timeout occured after %d seconds. " % timeout
 
 
 def run_sql_p(sql, username, password, scope, pdb_list, ignorable_err):
-    global changed, err_msg, sql_process
+    global err_msg
 
     err_msg = ""
     result = ""
@@ -336,7 +334,7 @@ def is_container():
 
 
 def get_all_pdbs():
-    global result, pdb_list
+    global pdb_list
 
     sql = (
         "select listagg(pdb_name, ' ') within group (order by pdb_name) "
@@ -347,7 +345,7 @@ def get_all_pdbs():
 
 def run_catcon_pl(catcon_pl):
     # after pre-processing in main() the parameter scope is not necessary any more
-    global oracle_home, changed, result, err_msg, pdb_list, sql_process
+    global changed, result, err_msg, sql_process
 
     err_msg = ""
     catcon_pl = re.sub(r"^(\$ORACLE_HOME|\?)", oracle_home, catcon_pl)  # noqa W805
@@ -401,7 +399,7 @@ def run_catcon_pl(catcon_pl):
 
 
 def main():
-    global oracle_home, changed, result, err_msg, pdb_list, ignorable_err
+    global oracle_home, result, pdb_list, ignorable_err
     module = AnsibleModule(
         argument_spec=dict(
             sql=dict(required=False),
