@@ -95,6 +95,78 @@
         mt_sql_expect: "{{ _db_settings }}"
         mt_sql_id: oracle_db.cdb.present_idempotent_sql
 
+    # switch minimal supplemental logging (online, no restart) and back
+    - name: oracle_db | switch supplemental logging
+      opitzconsulting.ansible_oracle.oracle_db:
+        oracle_home: "{{ _db_args.oracle_home }}"
+        db_name: "{{ _db_args.db_name }}"
+        sid: "{{ _db_args.sid }}"
+        sys_password: "{{ _db_args.sys_password }}"
+        port: "{{ _db_args.port }}"
+        archivelog: "{{ _db_log_mode == 'ARCHIVELOG' }}"
+        force_logging: "{{ _db_force_logging == 'YES' }}"
+        flashback: "{{ _db_flashback == 'YES' }}"
+        supplemental_logging: "{{ _db_supplemental != 'YES' }}"
+        default_tablespace_type: "{{ _db_tbs_type }}"
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_db | check switch supplemental logging
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_db.cdb.supplemental_switch, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_db | switch supplemental logging again
+      opitzconsulting.ansible_oracle.oracle_db:
+        oracle_home: "{{ _db_args.oracle_home }}"
+        db_name: "{{ _db_args.db_name }}"
+        sid: "{{ _db_args.sid }}"
+        sys_password: "{{ _db_args.sys_password }}"
+        port: "{{ _db_args.port }}"
+        archivelog: "{{ _db_log_mode == 'ARCHIVELOG' }}"
+        force_logging: "{{ _db_force_logging == 'YES' }}"
+        flashback: "{{ _db_flashback == 'YES' }}"
+        supplemental_logging: "{{ _db_supplemental != 'YES' }}"
+        default_tablespace_type: "{{ _db_tbs_type }}"
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_db | check switch supplemental logging again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_db.cdb.supplemental_switch_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_db | verify switch supplemental logging
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "select supplemental_log_data_min from v$database;"
+        mt_sql_expect: "{{ 'NO' if _db_supplemental == 'YES' else 'YES' }}"
+        mt_sql_id: oracle_db.cdb.supplemental_switch_sql
+
+    - name: oracle_db | restore supplemental logging
+      opitzconsulting.ansible_oracle.oracle_db:
+        oracle_home: "{{ _db_args.oracle_home }}"
+        db_name: "{{ _db_args.db_name }}"
+        sid: "{{ _db_args.sid }}"
+        sys_password: "{{ _db_args.sys_password }}"
+        port: "{{ _db_args.port }}"
+        archivelog: "{{ _db_log_mode == 'ARCHIVELOG' }}"
+        force_logging: "{{ _db_force_logging == 'YES' }}"
+        flashback: "{{ _db_flashback == 'YES' }}"
+        supplemental_logging: "{{ _db_supplemental == 'YES' }}"
+        default_tablespace_type: "{{ _db_tbs_type }}"
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_db | check restore supplemental logging
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_db.cdb.supplemental_restore, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_db | verify settings restored
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "{{ _db_settings_sql }}"
+        mt_sql_expect: "{{ _db_settings }}"
+        mt_sql_id: oracle_db.cdb.supplemental_restore_sql
+
 # databases that do not exist: only /etc/oratab is checked, no database access
 - name: oracle_db | started for missing database
   opitzconsulting.ansible_oracle.oracle_db:
