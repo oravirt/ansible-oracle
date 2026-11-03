@@ -23,8 +23,11 @@ description:
     - With O(scope=spfile), the current value is read from C(V$SPPARAMETER), otherwise
       from C(V$PARAMETER). With O(mode=sysdba), the C(X$) tables are used instead.
       O(sid) is not considered when reading the current value.
-    - With O(state=reset) or O(state=absent), C(ALTER SYSTEM RESET) is executed. If the
-      parameter is not set (ORA-32010), the module returns C(changed=false).
+    - With O(state=reset) or O(state=absent), C(ALTER SYSTEM RESET) is executed when the
+      parameter is set in the spfile (C(V$SPPARAMETER.ISSPECIFIED) for O(sid), with
+      O(scope=spfile) or O(scope=both)) or modified in memory
+      (C(V$PARAMETER.ISMODIFIED), with O(scope=memory) or O(scope=both)).
+      Otherwise the module returns C(changed=false).
     - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
       (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "1.9.1"
@@ -245,7 +248,12 @@ def modify_parameter(module, mode, msg, cursor, name, value, comment, scope, sid
         return True
 
     if module.check_mode:
-        msg = '%s will be changed, new: %s, old: %s' % (name, value, currval.upper())
+        # currval is None for a parameter that is not set in the spfile
+        msg = '%s will be changed, new: %s, old: %s' % (
+            name,
+            value,
+            (currval or '').upper(),
+        )
         module.exit_json(msg=msg, changed=True)
 
     if name.startswith(starters):
@@ -299,14 +307,60 @@ def clean_string(item):
     return item
 
 
+def parameter_is_set(module, cursor, name, scope, sid):
+    # ALTER SYSTEM RESET ... SCOPE=BOTH does not raise ORA-32010 any more (23ai and
+    # newer), when the parameter is not set => check the spfile and the memory first
+    name = clean_string(name).lower()
+    checks = []
+    if scope in ('spfile', 'both'):
+        checks.append(
+            (
+                'select count(*) from v$spparameter '
+                'where name = :name and sid = :sid and isspecified = \'TRUE\'',
+                {'name': name, 'sid': sid},
+            )
+        )
+    if scope in ('memory', 'both'):
+        checks.append(
+            (
+                'select count(*) from v$parameter '
+                'where name = :name and ismodified <> \'FALSE\'',
+                {'name': name},
+            )
+        )
+
+    for sql, binds in checks:
+        try:
+            cursor.execute(sql, binds)
+            if cursor.fetchone()[0] > 0:
+                return True
+        except oracledb.DatabaseError as exc:
+            (error,) = exc.args
+            module.fail_json(
+                msg='Something went wrong while checking the parameter - %s sql: %s'
+                % (error.message, sql),
+                changed=False,
+            )
+    return False
+
+
 def reset_parameter(module, mode, msg, cursor, name, value, comment, scope, sid):
     starters = ('+', '_', '"', '"_')
     if not (name):
         module.fail_json(msg='Error: Missing parameter name', changed=False)
         return False
 
+    msg_default = 'The parameter (%s) is already set to its default value' % (
+        clean_string(name)
+    )
+    if not parameter_is_set(module, cursor, name, scope, sid):
+        module.exit_json(msg=msg_default, changed=False)
+
+    msg = 'The parameter (%s) has been reset to its default value' % (
+        clean_string(name)
+    )
     if module.check_mode:
-        module.exit_json(changed=True)
+        module.exit_json(msg=msg, changed=True)
 
     if name.startswith(starters):
         name = quote_name(name)
@@ -317,20 +371,17 @@ def reset_parameter(module, mode, msg, cursor, name, value, comment, scope, sid)
         cursor.execute(sql)
     except oracledb.DatabaseError as exc:
         (error,) = exc.args
-        if error.code == 32010:
-            name = clean_string(name)
-            msg = 'The parameter (%s) is already set to its default value' % (name)
-            module.exit_json(msg=msg, changed=False)
-            return True
+        # ORA-32010: not in the spfile, ORA-32012: memory value not modified
+        if error.code in (32010, 32012):
+            module.exit_json(msg=msg_default, changed=False)
 
-        msg = (
-            'Blergh, something went wrong while resetting the parameter - %s sql: %s'
-            % (error.message, sql)
+        module.fail_json(
+            msg='Something went wrong while resetting the parameter - %s sql: %s'
+            % (error.message, sql),
+            changed=False,
         )
-        return False
 
-    name = clean_string(name)
-    msg = 'The parameter (%s) has been reset to its default value' % (name)
+    module.exit_json(msg=msg, changed=True)
     return True
 
 
