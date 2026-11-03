@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - "oracle_user: state=present/unlocked was never idempotent for a user with an expired password (ACCOUNT UNLOCK does not reset EXPIRED), state=locked for an expired user and state=expired for a locked user changed the user on every run. Only the part of ACCOUNT_STATUS that belongs to state (lock and/or password expiry) is compared now. A timed lock (LOCKED(TIMED)) is unlocked by state=present."
+  - "oracle_user: the option schema is required now. Without schema the module did nothing and returned 'Undhandled exit' with changed=false."
