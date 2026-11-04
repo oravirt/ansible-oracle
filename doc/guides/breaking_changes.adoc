@@ -63,9 +63,9 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |Always: the modules require python-oracledb instead of cx_Oracle on the target hosts. Action needed if the target hosts have no access to the Python package index, a proxy is needed (`use_proxy`, `http_proxy`), `install_cx_oracle` / `cx_oracle_source` / `cx_oracle3_source` / `cx_oracle_umask` are set in inventory or the role `cxoracle` is used in own playbooks
 |Set the new variables `pyoracledb_wheel_dir`, `pyoracledb_use_proxy` and `pyoracledb_http_proxy`, replace the role `cxoracle` by `pyoracledb`
 
-|<<oracle_profile and oracle_job: names in double quotes are case sensitive>>
-|A profile name (`oracle_profile`, `profiles` in `oracle_databases` / `oracle_pdbs`) is enclosed in `"` by mistake, *or* an existing profile has a name in lower or mixed case
-|Remove the `"` from the name, or write the name exactly as stored in `DBA_PROFILES` in `"`
+|<<oracle_profile, oracle_job and oracle_directory: names in double quotes are case sensitive>>
+|A profile name (`oracle_profile`, `profiles` in `oracle_databases` / `oracle_pdbs`) or a directory name in own playbooks (`oracle_directory`) is enclosed in `"` by mistake, *or* an existing profile has a name in lower or mixed case
+|Remove the `"` from the name, or write the name exactly as stored in `DBA_PROFILES` / `DBA_DIRECTORIES` in `"`
 |===
 
 ==== Minimum ansible-core 2.16
@@ -561,9 +561,9 @@ Skip the installation of python-oracledb:
 pyoracledb_install: false
 ----
 
-==== oracle_profile and oracle_job: names in double quotes are case sensitive
+==== oracle_profile, oracle_job and oracle_directory: names in double quotes are case sensitive
 
-The modules `oracle_profile` and `oracle_job` handle names like SQL (ANSI): a name in double quotes (`"`) is case sensitive, a name without quotes is converted to uppercase.
+The modules `oracle_profile`, `oracle_job` and `oracle_directory` handle names like SQL (ANSI): a name in double quotes (`"`) is case sensitive, a name without quotes is converted to uppercase.
 All other modules are not changed.
 The functions for this are in `plugins/module_utils/oracle_identifier.py` and can be used by more modules in the future.
 Such a change will be listed here.
@@ -582,6 +582,13 @@ A name without `"` is used in uppercase and compared exactly with `DBA_PROFILES`
 |A `job_name` with `"` failed with `Invalid job name`.
 |A part of `job_name` in `"` is case sensitive, e.g. `job_name: 'SYSTEM."My_Job"'`.
 `convert_to_upper` works as before for parts without `"`.
+
+|`oracle_directory`
+|The name was not quoted in the SQL statements and compared in uppercase with `DBA_DIRECTORIES`.
+A name in `"` was created case sensitive, but not found in the next run (ORA-00955).
+|A name in `"` is used case sensitive, e.g. `directory_name: '"MyDir"'`.
+`"MyDir"` and `MYDIR` are two different directories.
+A name without `"` is used in uppercase as before.
 |===
 
 PDB names are not affected: Oracle stores them always in uppercase, `oracle_pdb` converts the name to uppercase as before.
@@ -589,7 +596,8 @@ PDB names are not affected: Oracle stores them always in uppercase, `oracle_pdb`
 For most inventories nothing changes, because names without `"` are stored in uppercase as before.
 
 IMPORTANT: Check names which are enclosed in `"` by mistake, e.g. from a copied SQL statement.
-They are case sensitive now and refer to a different object than before, so the module creates a new profile with the exact name.
+They are case sensitive now and refer to a different object than before, so the module creates a new profile or directory with the exact name.
+The roles of `ansible-oracle` do not use `oracle_directory`, so only own playbooks are affected for directories.
 
 An existing profile with a name in lower or mixed case (created outside of `ansible-oracle`) was found before with a name in any case.
 Now the name must be given exactly in `"`, otherwise the module creates a new profile in uppercase.

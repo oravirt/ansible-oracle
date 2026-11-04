@@ -6,6 +6,10 @@ from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.ora
     oracledb,
     oracledb_connect,
 )
+from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.oracle_identifier import (  # noqa: E501
+    normalize_identifier,
+    quote_identifier,
+)
 
 DOCUMENTATION = '''
 ---
@@ -15,8 +19,9 @@ description:
     - Creates, changes and drops directory objects (C(CREATE DIRECTORY))
       in an Oracle database.
     - The existence of a directory is checked in C(DBA_DIRECTORIES).
-    - The directory name is not quoted in the SQL statements, so it is always
-      stored in uppercase.
+    - The directory name is used in uppercase like an unquoted identifier in SQL.
+      A name in double quotes (e.g. V("MyDir")) is used case sensitive. The name is
+      always quoted in the SQL statements.
     - The module does not check or create the path on the database server.
     - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
       (C(/@<service_name>)) is used. Otherwise both must be set.
@@ -64,6 +69,7 @@ options:
     directory_name:
         description:
             - The name of the directory object.
+            - Converted to uppercase unless it is enclosed in double quotes.
             - Required in practice, although not enforced by the argument spec.
         type: str
         required: false
@@ -78,7 +84,8 @@ options:
             - How to handle an existing directory with a different path.
             - V(enforce) - the directory is recreated with
               C(CREATE OR REPLACE DIRECTORY) to point to O(directory_path).
-            - V(normal) - the path of an existing directory is not changed.
+            - V(normal) - the path of an existing directory is not changed, the module
+              returns C(changed=false).
         type: str
         required: false
         default: enforce
@@ -135,14 +142,10 @@ def check_directory_exists(module, msg, cursor, directory_name):
         module.fail_json(msg='Error: Missing directory name', changed=False)
         return False
 
-    sql = (
-        'select count(*) '
-        'from dba_directories '
-        'where directory_name= upper(\'%s\')' % directory_name
-    )
+    sql = 'select count(*) from dba_directories where directory_name = :name'
 
     try:
-        cursor.execute(sql)
+        cursor.execute(sql, {'name': directory_name})
         result = cursor.fetchone()[0]
     except oracledb.DatabaseError as exc:
         (error,) = exc.args
@@ -160,16 +163,16 @@ def ensure_directory(
 ):
     if check_directory_exists(module, msg, cursor, directory_name):
         check_path_sql = (
-            'select directory_path '
-            'from dba_directories '
-            'where directory_name = upper(\'%s\')' % directory_name
+            'select directory_path from dba_directories where directory_name = :name'
         )
-        _curr_path = execute_sql_get(module, msg, cursor, check_path_sql)
+        _curr_path = execute_sql_get(
+            module, msg, cursor, check_path_sql, {'name': directory_name}
+        )
 
         if _curr_path[0][0] != directory_path:
             if directory_mode == 'enforce':
                 directory_sql = 'create or replace directory %s as \'%s\'' % (
-                    directory_name,
+                    quote_identifier(directory_name),
                     directory_path,
                 )
                 if execute_sql(module, msg, cursor, directory_sql):
@@ -178,6 +181,13 @@ def ensure_directory(
                         % (directory_name, directory_path, _curr_path[0][0]),
                         changed=True,
                     )
+            else:
+                module.exit_json(
+                    msg='Directory %s exists with path %s, not changed to %s '
+                    '(directory_mode=normal)'
+                    % (directory_name, _curr_path[0][0], directory_path),
+                    changed=False,
+                )
         else:
             module.exit_json(
                 msg='Directory %s already exists (%s)'
@@ -186,7 +196,7 @@ def ensure_directory(
             )
     else:
         directory_sql = 'create directory %s as \'%s\'' % (
-            directory_name,
+            quote_identifier(directory_name),
             directory_path,
         )
 
@@ -199,7 +209,7 @@ def ensure_directory(
 
 
 def drop_directory(module, msg, cursor, directory_name):
-    drop_sql = 'drop directory %s' % (directory_name)
+    drop_sql = 'drop directory %s' % (quote_identifier(directory_name))
 
     if execute_sql(module, msg, cursor, drop_sql):
         module.exit_json(
@@ -221,9 +231,9 @@ def execute_sql(module, msg, cursor, sql):
     return True
 
 
-def execute_sql_get(module, msg, cursor, sql):
+def execute_sql_get(module, msg, cursor, sql, binds=None):
     try:
-        cursor.execute(sql)
+        cursor.execute(sql, binds or {})
         result = cursor.fetchall()
     except oracledb.DatabaseError as exc:
         (error,) = exc.args
@@ -262,6 +272,8 @@ def main():
     password = module.params["password"]
     mode = module.params["mode"]
     directory_name = module.params["directory_name"]
+    if directory_name:
+        directory_name = normalize_identifier(directory_name)
     directory_path = module.params["directory_path"]
     directory_mode = module.params["directory_mode"]
     state = module.params["state"]

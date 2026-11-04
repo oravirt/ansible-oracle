@@ -28,7 +28,7 @@ mt_env:
   TNS_ADMIN: "{{ mt_tns_admin }}"
 
 # common known bugs (known_bugs.yml) and known bugs of the scenario
-mt_known_bugs: "{{ mt_known_bugs_common | combine(mt_known_bugs_scenario | default({})) }}"
+mt_known_bugs: "{{ mt_known_bugs_common | default({}, true) | combine(mt_known_bugs_scenario | default({}, true)) }}"
 
 # module_defaults are templated for gather_facts too => default for missing facts
 mt_hostname: "{{ ansible_facts['hostname'] | default(inventory_hostname) }}"
