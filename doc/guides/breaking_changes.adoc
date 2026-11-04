@@ -74,6 +74,10 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<Quotas for users in oracle_user and oradb_manage_users>>
 |`quotas` is set for a user (new option, without `quotas` no quota is removed or changed), *or* own playbooks use `quotas` from the old module PR (`'<tablespace>:<size>'`)
 |No action without `quotas`, the quotas of the user are not changed. With `quotas`: add the default tablespace to `quotas`, if the user needs a quota there, and use the format `{tablespace: <name>, size: <size>}`
+
+|<<Internal variables of oraasm_manage_diskgroups removed>>
+|Own playbooks or inventories use the internal variables `_oraasm_manage_diskgroups_attr_name` or `_oraasm_manage_diskgroups_attr_value`
+|No action for inventories with `asm_diskgroups`. Otherwise use `attributes` of `asm_diskgroups`
 |===
 
 ==== Minimum ansible-core 2.16
@@ -731,6 +735,30 @@ oracle_pdbs:
 
 NOTE: The old pull request for quotas in `ansible-oracle-modules` (link:https://github.com/oravirt/ansible-oracle-modules/pull/158[#158]) used a list of strings `'<tablespace>:<size>'`.
 This format is not supported, use `{tablespace: <name>, size: <size>}`.
+
+==== Internal variables of oraasm_manage_diskgroups removed
+
+This is not a breaking change for inventories, the variables were internal (prefix `_`).
+It is listed here for own playbooks or roles which used them.
+
+The role `oraasm_manage_diskgroups` built the attributes for `oracle_asmdg` in the variables `_oraasm_manage_diskgroups_attr_name` and `_oraasm_manage_diskgroups_attr_value`.
+For a disk group without `attributes` they contained the string `None`, which was passed to `oracle_asmdg` as attribute (link:https://github.com/oravirt/ansible-oracle/issues/491[#491]).
+The variables are removed, the role passes `attributes` of `asm_diskgroups` directly to `oracle_asmdg`, a disk group without `attributes` gets no attributes.
+
+NOTE: No action is needed for inventories with `asm_diskgroups`, `attributes` works as before.
+
+.Attributes of a disk group
+[source,yaml]
+----
+asm_diskgroups:
+  - diskgroup: data
+    state: present
+    attributes:
+      - {name: compatible.asm, value: 19.0.0.0.0}
+      - {name: compatible.rdbms, value: 19.0.0.0.0}
+    disk:
+      - {device: /dev/sdb, asmlabel: data01}
+----
 
 === Adding new breaking changes
 

@@ -9,8 +9,8 @@
     name: "{{ ad_loop.diskgroup }}"
     disks: "{{ _oraasm_manage_diskgroups_asmdevice_list }}"
     redundancy: "{{ ad_loop.properties | map(attribute='redundancy') | first | default(omit) }}"
-    attribute_name: "{{ _oraasm_manage_diskgroups_attr_name | default(omit) }}"
-    attribute_value: "{{ _oraasm_manage_diskgroups_attr_value | default(omit) }}"
+    attribute_name: "{{ ad_loop.attributes | map(attribute='name') | list if ad_loop.attributes is defined else omit }}"
+    attribute_value: "{{ ad_loop.attributes | map(attribute='value') | list if ad_loop.attributes is defined else omit }}"
     state: "{{ ad_loop.state }}"
   environment: "{{ _grid_env }}"
   become: true
