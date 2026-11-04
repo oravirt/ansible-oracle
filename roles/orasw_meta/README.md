@@ -907,6 +907,20 @@ oracle_pdbs:
       - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
       - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
       - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+    users:
+      # quotas: list of tablespace/size, size in bytes with optional K, M, G, T or unlimited.
+      # With quotas, the default_tablespace gets no automatic quota unlimited.
+      # quotas_mode: append (default) keeps other quotas, enforce removes them.
+      # size 0 removes the quota on a tablespace.
+      - schema: app
+        state: present
+        default_tablespace: users
+        quotas_mode: enforce
+        quotas:
+          - tablespace: users
+            size: unlimited
+          - tablespace: sysaux
+            size: 100M
 ```
 
 ### oracle_profile_template

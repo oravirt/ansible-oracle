@@ -70,6 +70,10 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<oracle_db uses hostname for the database connection>>
 |The listener does not listen on `oracle_hostname` (default: `ansible_fqdn`), *or* own playbooks use `oracle_db` with `hostname` / `host`
 |Set `oracle_hostname` to an address of the listener, this is also the way to use another listener address
+
+|<<Quotas for users in oracle_user and oradb_manage_users>>
+|`quotas` is set for a user (new option, without `quotas` no quota is removed or changed), *or* own playbooks use `quotas` from the old module PR (`'<tablespace>:<size>'`)
+|No action without `quotas`, the quotas of the user are not changed. With `quotas`: add the default tablespace to `quotas`, if the user needs a quota there, and use the format `{tablespace: <name>, size: <size>}`
 |===
 
 ==== Minimum ansible-core 2.16
@@ -681,6 +685,52 @@ NOTE: `oracle_hostname` is also used as host name in the RDBMS installation and 
 IMPORTANT: An explicit `hostname: localhost` for `oracle_db` in own playbooks was ignored before.
 Now the module connects to `localhost`, which works only, if the listener listens on this address.
 Remove `hostname` to keep the old behavior.
+
+==== Quotas for users in oracle_user and oradb_manage_users
+
+This is a new feature (link:https://github.com/oravirt/ansible-oracle/issues/312[#312]), not a breaking change.
+
+NOTE: Without `quotas` no quota is removed or changed, the existing quotas of a user are kept.
+`quotas_mode` has no effect without `quotas`.
+A user with `default_tablespace` gets `QUOTA UNLIMITED` on this tablespace as before.
+
+Quotas are only removed, if the inventory says so: with `size: 0` for a tablespace in `quotas`, or with `quotas_mode: enforce` for all tablespaces not in `quotas`.
+
+`oracle_user` and the `users` of `oracle_databases` / `oracle_pdbs` (role `oradb_manage_users`) have two new options:
+
+* `quotas`: list of `tablespace` and `size`.
+`size` is the number of bytes with an optional unit `K`, `M`, `G`, `T`, `P`, `E` or `unlimited`.
+`size: 0` removes the quota on the tablespace.
+* `quotas_mode`: `append` (default) changes only the tablespaces in `quotas`, `enforce` removes all other quotas of the user.
+
+IMPORTANT: With `quotas`, the default tablespace gets no automatic `QUOTA UNLIMITED`.
+Add the default tablespace to `quotas`, if the user needs a quota there.
+An existing quota on the default tablespace is kept with `quotas_mode: append`, but removed with `quotas_mode: enforce`, if the tablespace is not in `quotas`.
+
+Oracle rounds a quota up to whole blocks of the tablespace, e.g. `size: 1000` is stored as 8192 bytes with a block size of 8K.
+The comparison uses blocks, so the module is idempotent for such sizes.
+
+.User with quotas, all other quotas are removed
+[source,yaml]
+----
+oracle_pdbs:
+  - cdb: orcl
+    pdb_name: ORCLPDB
+    users:
+      - schema: app
+        state: present
+        default_tablespace: app_data
+        quotas_mode: enforce
+        quotas:
+          # without this entry, app has no quota on its default tablespace
+          - tablespace: app_data
+            size: unlimited
+          - tablespace: app_index
+            size: 500M
+----
+
+NOTE: The old pull request for quotas in `ansible-oracle-modules` (link:https://github.com/oravirt/ansible-oracle-modules/pull/158[#158]) used a list of strings `'<tablespace>:<size>'`.
+This format is not supported, use `{tablespace: <name>, size: <size>}`.
 
 === Adding new breaking changes
 

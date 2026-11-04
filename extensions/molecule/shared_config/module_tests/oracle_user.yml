@@ -4,6 +4,7 @@
 # - create, idempotence, states locked/unlocked/expired/expired & locked/present,
 #   change default tablespace, update_password on_create, password hash, external user,
 #   drop, error cases (missing schema, missing password, wrong password)
+# - quotas, quotas_mode (oracle_user_quota.yml)
 # CDB$ROOT (common users C##MOLTEST_USER, C##MOLTEST_CD):
 # - create with container=all, container_data, drop
 # - connection variants: system (default), sys as sysdba (PDB and CDB), system in CDB, wallet
@@ -473,6 +474,9 @@
       where username in ('{{ _usr_name }}', '{{ _usr_name2 }}', '{{ _usr_ext }}');
     mt_sql_expect: "0"
     mt_sql_id: oracle_user.pdb.drop_sql
+
+- name: oracle_user | quota tests
+  ansible.builtin.include_tasks: oracle_user_quota.yml
 
 # error handling
 - name: oracle_user | create without password
