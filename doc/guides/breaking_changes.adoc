@@ -66,6 +66,10 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<oracle_profile, oracle_job, oracle_directory, oracle_grants and oracle_privs: names in double quotes are case sensitive>>
 |A name of a profile, user, role, object or directory is enclosed in `"` by mistake (`profiles` and `grants`, `object_privs`, `directory_privs` of `users` in `oracle_databases` / `oracle_pdbs`, or the modules in own playbooks), *or* an existing profile, user, role or object has a name in lower or mixed case
 |Remove the `"` from the name, or write the name exactly as stored in the data dictionary in `"`
+
+|<<oracle_db uses hostname for the database connection>>
+|`oracle_hostname` is set in inventory to an address, on which the listener does not listen, *or* own playbooks use `oracle_db` with `hostname` / `host`, *or* the listener does not listen on the address of `ansible_fqdn`
+|Set `oracle_hostname` to an address of the listener. This is also the way to use another listener address than the host name
 |===
 
 ==== Minimum ansible-core 2.16
@@ -651,6 +655,50 @@ oracle_pdbs:
         attributes:
           - {name: password_life_time, value: unlimited}
 ----
+
+==== oracle_db uses hostname for the database connection
+
+This is a bugfix (link:https://github.com/oravirt/ansible-oracle/issues/542[#542]), but it changes the address used for the database connection.
+
+`oracle_db` ignored the option `hostname` (alias `host`) and always connected to the local host name (`os.uname()[1]`).
+This forced a listener on that address, which is not allowed in all environments.
+Now `oracle_db` connects to `hostname`.
+Without `hostname` the module uses `os.uname()[1]` as before.
+
+The roles `oradb_manage_db`, `oradb_manage_parameters` and `oradb_datapatch` pass `hostname: "{{ oracle_hostname }}"` to `oracle_db`, like all other `oradb_manage_*` roles already do.
+`oracle_hostname` defaults to `ansible_fqdn`.
+
+[options="header",cols="1,2,2"]
+|===
+|Used by |Before |Now
+
+|Roles `oradb_manage_db`, `oradb_manage_parameters`, `oradb_datapatch`
+|Connection to `os.uname()[1]`
+|Connection to `oracle_hostname`
+
+|`oracle_db` in own playbooks with `hostname` / `host`
+|`hostname` was ignored, connection to `os.uname()[1]`
+|Connection to `hostname`
+
+|`oracle_db` in own playbooks without `hostname`
+|Connection to `os.uname()[1]`
+|No change
+|===
+
+For most inventories nothing changes, because `ansible_fqdn` and `os.uname()[1]` point to the same address and the other `oradb_manage_*` roles already connect to `oracle_hostname`.
+
+IMPORTANT: An explicit `hostname: localhost` in own playbooks was ignored before.
+Now the module connects to `localhost`, which works only, if the listener listens on this address.
+Remove `hostname` to keep the old behavior.
+
+.Use another listener address than the host name
+[source,yaml]
+----
+# the listener listens only on this address
+oracle_hostname: dbhost-lsnr.example.com
+----
+
+NOTE: `oracle_hostname` is also used as host name in the RDBMS installation and as node name for Grid Infrastructure.
 
 === Adding new breaking changes
 
