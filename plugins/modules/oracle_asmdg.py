@@ -3,6 +3,7 @@
 
 import os
 from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.parsing.convert_bool import boolean
 from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.oracledb_connect import (  # noqa: E501
     oracledb,
     oracledb_connect,
@@ -18,12 +19,15 @@ description:
     - The existence of a disk group is checked in C(GV$ASM_DISKGROUP)
       (case-insensitive).
     - A new disk group is created with C(CREATE DISKGROUP <name> <redundancy>
-      REDUNDANCY DISK ... [ATTRIBUTE ...]).
+      REDUNDANCY [[QUORUM] FAILGROUP <failgroup>] DISK ... [ATTRIBUTE ...]).
     - For an existing disk group with O(state=present), the disks and attributes
       are compared with the wanted state. Missing disks are added and disks not
-      listed in O(disks) are dropped with C(ALTER DISKGROUP ... ADD DISK ... DROP
-      DISK ...), differing attributes are set with C(ALTER DISKGROUP ... SET
-      ATTRIBUTE). Read-only attributes are ignored. O(redundancy) is not changed.
+      listed in O(disks) are dropped with C(ALTER DISKGROUP ... ADD [[QUORUM]
+      FAILGROUP ...] DISK ... DROP DISK ...), differing attributes are set with
+      C(ALTER DISKGROUP ... SET ATTRIBUTE). Read-only attributes are ignored.
+      O(redundancy) is not changed.
+    - The failure group of an existing disk can't be changed. If it differs from
+      O(disks), the module returns a warning and does not change the disk.
     - In a RAC environment (C(V$INSTANCE.PARALLEL=YES)), a new disk group is
       started on all nodes with C(srvctl start diskgroup), and before dropping a
       disk group it is stopped with C(srvctl stop diskgroup) and mounted locally.
@@ -40,7 +44,16 @@ options:
         aliases: ['diskgroup', 'dg']
     disks:
         description:
-            - The list of disks (paths) that should be part of the disk group.
+            - The list of disks that should be part of the disk group.
+            - An entry is the path of the disk, or a dictionary with the keys
+              C(disk) (path, required), C(failure_group) (name of the failure
+              group) and C(quorum) (V(true) for a quorum failure group, default
+              V(false)).
+            - Disks with the same C(failure_group) are put into the same failure
+              group. C(quorum) must be the same for all disks of a failure group.
+              Disks without C(failure_group) get their own failure group from ASM.
+            - The failure group is used when a disk is added (create of the disk
+              group or new disk).
             - Only the listed disks will be part of the disk group. Disks of an
               existing disk group that are not in the list are dropped.
             - Disk names containing C(:) (ASMLib, for example V(ORCL:DISK1)) are
@@ -49,13 +62,13 @@ options:
             - Required with O(state=present), although not enforced by the
               argument spec.
         type: list
-        elements: str
+        elements: raw
         required: false
     redundancy:
         description:
             - The redundancy of the disk group.
-            - Used only when the disk group is created. Disks cannot be placed in
-              specific failure groups.
+            - Used only when the disk group is created. Use C(failure_group) in
+              O(disks) to place disks in specific failure groups.
         type: str
         required: false
         default: external
@@ -185,6 +198,18 @@ EXAMPLES = '''
     password: "{{ asm_password }}"
     oracle_home: /u01/app/19.0.0/grid
 
+- name: Create disk group CRS with failure groups and a quorum failure group
+  opitzconsulting.ansible_oracle.oracle_asmdg:
+    name: CRS
+    disks:
+      - {disk: /dev/oracle/crs01, failure_group: storage01}
+      - {disk: /dev/oracle/crs02, failure_group: storage02}
+      - {disk: /nfs/vote/crs03, failure_group: nfs, quorum: true}
+    redundancy: normal
+    state: present
+    user: sys
+    password: "{{ asm_password }}"
+
 - name: Show the disks of disk group DATA (connection with Oracle wallet)
   opitzconsulting.ansible_oracle.oracle_asmdg:
     name: DATA
@@ -244,10 +269,9 @@ def create_diskgroup(
             ]
         )
 
-    disklist = "','".join(disks)
     sql = 'create diskgroup %s ' % (name)
     sql += '%s redundancy ' % (redundancy)
-    sql += 'disk \'%s\' ' % (disklist)
+    sql += '%s ' % get_disk_clause(disks)
     if add_attr:
         sql += ' attribute %s' % (attributes.lower())
 
@@ -371,7 +395,7 @@ def ensure_diskgroup_state(
 
     list_current_name = []
     list_current_path = []
-    list_wanted = [x.upper() if ':' in x else x for x in disks]
+    list_wanted = [d['disk'] for d in disks]
     list_current = get_current_disks(cursor, module, msg, name)
 
     for p, n in list_current:
@@ -385,7 +409,8 @@ def ensure_diskgroup_state(
     # Pick out the v$asm_disk.name from the diskgroup
     remove_disks = [a[1] for a in list_current if a[0] in list_remove]
 
-    add_disk = "','".join(list_add)
+    warn_failgroup_changes(cursor, module, msg, name, disks)
+
     remove_disk = "','".join(remove_disks)
     if sorted(list_current_path) == sorted(list_wanted) and change_attr is False:
         msg = "Diskgroup %s is in the intended state" % (name)
@@ -393,8 +418,9 @@ def ensure_diskgroup_state(
 
     if len(list_add) >= 1:
         change_disk = True
-        disk_sql += ' add disk '
-        disk_sql += "'%s'" % add_disk
+        disk_sql += ' add %s' % get_disk_clause(
+            [d for d in disks if d['disk'] in list_add]
+        )
 
     if len(list_remove) >= 1:
         # disk_sql    = 'alter diskgroup %s ' % (name.upper())
@@ -415,6 +441,82 @@ def ensure_diskgroup_state_sql(module, msg, cursor, total_sql):
     for a in total_sql:
         execute_sql(module, msg, cursor, a)
     return True
+
+
+# disks as list of dict with disk, failure_group and quorum
+def normalize_disks(module, disks):
+    result = []
+    quorum_of_failgroup = {}
+    for d in disks:
+        if isinstance(d, dict):
+            unknown = set(d) - set(['disk', 'failure_group', 'quorum'])
+            if unknown or not d.get('disk'):
+                module.fail_json(
+                    msg='Invalid entry in disks: %s. Use a path or a dictionary '
+                    'with the keys disk, failure_group and quorum' % d,
+                    changed=False,
+                )
+            disk = str(d['disk'])
+            failgroup = d.get('failure_group')
+            failgroup = str(failgroup).upper() if failgroup else None
+            quorum = boolean(d.get('quorum', False))
+        else:
+            disk, failgroup, quorum = str(d), None, False
+
+        if failgroup:
+            if quorum_of_failgroup.setdefault(failgroup, quorum) != quorum:
+                module.fail_json(
+                    msg='quorum must be the same for all disks of failure group %s'
+                    % failgroup,
+                    changed=False,
+                )
+
+        result.append(
+            {
+                'disk': disk.upper() if ':' in disk else disk,
+                'failure_group': failgroup,
+                'quorum': quorum,
+            }
+        )
+    return result
+
+
+# [QUORUM] [FAILGROUP <failgroup>] DISK '<path>',... for create and add disk
+def get_disk_clause(disks):
+    # disks without failure group are grouped by quorum
+    groups = []
+    for d in disks:
+        for g in groups:
+            if (g['failure_group'], g['quorum']) == (d['failure_group'], d['quorum']):
+                g['disks'].append(d['disk'])
+                break
+        else:
+            groups.append(dict(d, disks=[d['disk']]))
+
+    clause = []
+    for g in groups:
+        sql = 'quorum ' if g['quorum'] else ''
+        if g['failure_group']:
+            sql += 'failgroup %s ' % g['failure_group']
+        sql += 'disk ' + ','.join("'%s'" % p for p in g['disks'])
+        clause.append(sql)
+    return ' '.join(clause)
+
+
+# the failure group of an existing disk can't be changed
+def warn_failgroup_changes(cursor, module, msg, name, disks):
+    wanted = dict((d['disk'], d['failure_group']) for d in disks if d['failure_group'])
+    if not wanted:
+        return
+    sql = 'select d.path, d.failgroup from v$asm_disk d, v$asm_diskgroup dg '
+    sql += 'where dg.group_number = d.group_number '
+    sql += 'and upper(dg.name) = \'%s\'' % (name.upper())
+    for path, failgroup in execute_sql_get(module, msg, cursor, sql):
+        if path in wanted and wanted[path] != failgroup:
+            module.warn(
+                'Disk %s is in failure group %s, not %s. The failure group of an '
+                'existing disk is not changed.' % (path, failgroup, wanted[path])
+            )
 
 
 def get_current_disks(cursor, module, msg, name):
@@ -477,7 +579,7 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             name=dict(required=True, aliases=['diskgroup', 'dg']),
-            disks=dict(required=False, type='list'),
+            disks=dict(required=False, type='list', elements='raw'),
             redundancy=dict(
                 default="external", choices=["external", "normal", "high", "flex"]
             ),
@@ -505,6 +607,9 @@ def main():
     port = module.params["port"]
     service_name = module.params["service_name"]
     oracle_home = module.params["oracle_home"]
+
+    if disks:
+        disks = normalize_disks(module, disks)
 
     if len(attribute_name or []) != len(attribute_value or []):
         module.fail_json(

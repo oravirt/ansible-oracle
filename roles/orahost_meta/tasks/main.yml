@@ -6,10 +6,13 @@
 # kdump state cannot savely be retrieved from service_facts
 - name: Determine kernel.panic setting
   block:
+    # as root: the meta roles are also used in plays without become (e.g. as oracle)
     - name: Get kdump state
       ansible.builtin.systemd:
         name: kdump
       register: __orahost_kdump_state
+      become: true
+      become_user: root
 
     - name: Set/unset kernel.panic according to kdump state
       ansible.builtin.set_fact:

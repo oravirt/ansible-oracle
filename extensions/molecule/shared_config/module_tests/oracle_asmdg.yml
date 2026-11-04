@@ -5,6 +5,8 @@
 # - own disk group MOLTEST_DG2 on the third spare disk:
 #   create without attributes, attributes of an existing disk group (oravirt#491):
 #   compatible.rdbms before compatible.asm in the list, read-only attributes in a row
+# - own disk group MOLTEST_FG on the spare disks (oravirt#444): failure groups, quorum
+#   failure group, add disk to a failure group, failure group of an existing disk
 # - connection variants: sys (sysasm, the module always connects as SYSASM), wrong password
 # Check mode is not supported by the module and is not tested.
 # Variables of the scenario: mt_asm_oracle_home, mt_asm_sid, mt_asm_spare_disks, mt_conn_asm
@@ -22,6 +24,11 @@
       select listagg(a.name || '=' || a.value, ',') within group (order by a.name)
       from v$asm_attribute a join v$asm_diskgroup g on g.group_number = a.group_number
       where g.name = 'MOLTEST_DG' and a.name in ('compatible.asm', 'compatible.rdbms');
+    _fg_name: MOLTEST_FG
+    _fg_sql: >-
+      select listagg(d.failgroup || ':' || d.failgroup_type, ',') within group (order by d.failgroup)
+      from v$asm_disk d join v$asm_diskgroup g on g.group_number = d.group_number
+      where g.name = 'MOLTEST_FG';
     _dg2_attr_sql: >-
       select listagg(a.name || '=' || a.value, ',') within group (order by a.name)
       from v$asm_attribute a join v$asm_diskgroup g on g.group_number = a.group_number
@@ -36,6 +43,8 @@
       drop diskgroup moltest_dg force including contents;
       drop diskgroup moltest_dg2 including contents;
       drop diskgroup moltest_dg2 force including contents;
+      drop diskgroup moltest_fg including contents;
+      drop diskgroup moltest_fg force including contents;
       exit
   environment:
     ORACLE_HOME: "{{ mt_asm_oracle_home }}"
@@ -408,6 +417,140 @@
     - name: oracle_asmdg | check drop disk group with attributes
       ansible.builtin.include_tasks: _check.yml
       vars: {mt_id: oracle_asmdg.asm.drop_existing_attributes, mt_res: "{{ _res }}", mt_expect: changed}
+
+    # oravirt#444: failure groups, disks as dictionary
+    - name: oracle_asmdg | create with failure groups
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _fg_name }}"
+        disks:
+          - {disk: "{{ _dg_disk1 }}", failure_group: fg1}
+          - {disk: "{{ _dg_disk2 }}", failure_group: fg2}
+        redundancy: normal
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check create with failure groups
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.failgroup_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_asmdg | create with failure groups again
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _fg_name }}"
+        disks:
+          - {disk: "{{ _dg_disk1 }}", failure_group: fg1}
+          - {disk: "{{ _dg_disk2 }}", failure_group: fg2}
+        redundancy: normal
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check create with failure groups again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.failgroup_create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_asmdg | verify create with failure groups
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: "{{ _fg_sql }}"
+        mt_sql_expect: "FG1:REGULAR,FG2:REGULAR"
+        mt_sql_id: oracle_asmdg.asm.failgroup_create_sql
+
+    - name: oracle_asmdg | add disk in quorum failure group
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _fg_name }}"
+        disks:
+          - {disk: "{{ _dg_disk1 }}", failure_group: fg1}
+          - {disk: "{{ _dg_disk2 }}", failure_group: fg2}
+          - {disk: "{{ _dg2_disk }}", failure_group: fg3, quorum: true}
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check add disk in quorum failure group
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.failgroup_add_quorum, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_asmdg | add disk in quorum failure group again
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _fg_name }}"
+        disks:
+          - {disk: "{{ _dg_disk1 }}", failure_group: fg1}
+          - {disk: "{{ _dg_disk2 }}", failure_group: fg2}
+          - {disk: "{{ _dg2_disk }}", failure_group: fg3, quorum: true}
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check add disk in quorum failure group again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.failgroup_add_quorum_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_asmdg | verify add disk in quorum failure group
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: "{{ _fg_sql }}"
+        mt_sql_expect: "FG1:REGULAR,FG2:REGULAR,FG3:QUORUM"
+        mt_sql_id: oracle_asmdg.asm.failgroup_add_quorum_sql
+
+    # the failure group of an existing disk is not changed => ok with warning
+    - name: oracle_asmdg | other failure group for existing disk
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _fg_name }}"
+        disks:
+          - {disk: "{{ _dg_disk1 }}", failure_group: fgother}
+          - {disk: "{{ _dg_disk2 }}", failure_group: fg2}
+          - {disk: "{{ _dg2_disk }}", failure_group: fg3, quorum: true}
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check other failure group for existing disk
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.failgroup_change, mt_res: "{{ _res }}", mt_expect: ok}
+    - name: oracle_asmdg | check warning for other failure group
+      ansible.builtin.include_tasks: _check.yml
+      vars:
+        mt_id: oracle_asmdg.asm.failgroup_change_warning
+        mt_res:
+          failed: "{{ _res.warnings | default([]) | select('search', 'is not changed') | list | length == 0 }}"
+          msg: "{{ _res.warnings | default([]) | join(' ') }}"
+        mt_expect: ok
+
+    - name: oracle_asmdg | verify failure groups unchanged
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: "{{ _fg_sql }}"
+        mt_sql_expect: "FG1:REGULAR,FG2:REGULAR,FG3:QUORUM"
+        mt_sql_id: oracle_asmdg.asm.failgroup_change_sql
+
+    - name: oracle_asmdg | quorum differs in failure group
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _fg_name }}"
+        disks:
+          - {disk: "{{ _dg_disk1 }}", failure_group: fg1}
+          - {disk: "{{ _dg_disk2 }}", failure_group: fg1, quorum: true}
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check quorum differs in failure group
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.failgroup_quorum_mismatch, mt_res: "{{ _res }}", mt_expect: failed}
+
+    - name: oracle_asmdg | invalid entry in disks
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _fg_name }}"
+        disks:
+          - {path: "{{ _dg_disk1 }}", failure_group: fg1}
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check invalid entry in disks
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.failgroup_invalid_disk, mt_res: "{{ _res }}", mt_expect: failed}
+
+    - name: oracle_asmdg | drop disk group with failure groups
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _fg_name }}"
+        state: absent
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check drop disk group with failure groups
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.failgroup_drop, mt_res: "{{ _res }}", mt_expect: changed}
 
 # error handling
 - name: oracle_asmdg | wrong password

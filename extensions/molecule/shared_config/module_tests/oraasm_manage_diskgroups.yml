@@ -1,0 +1,172 @@
+---
+# Tests for the role oraasm_manage_diskgroups in the ASM instance of Oracle Restart (scenario has-ol9)
+# The role is called with asm_diskgroups of the inventory (DATA, FRA, needed by the assert of
+# oraswgi_meta, not changed) and disk group MOLTEST_FGR on the spare disks
+# (mt_asm_spare_disks, created in converge):
+# - failure groups and attributes (oravirt#444, oravirt#491), 2nd run (idempotence)
+# - add a disk in a quorum failure group
+# - disk group without failure groups and without attributes (oravirt#491)
+# - state absent
+# include_role returns no result => a failed role run is recorded by _role_run.yml,
+# the state is verified with SQL.
+- name: oraasm_manage_diskgroups | variables
+  ansible.builtin.set_fact:
+    _fgr_name: moltest_fgr
+    _fgr_inventory_dgs: "{{ asm_diskgroups }}"
+    _fgr_disk1: "{{ mt_asm_spare_disks[0] }}"
+    _fgr_disk2: "{{ mt_asm_spare_disks[1] }}"
+    _fgr_disk3: "{{ mt_asm_spare_disks[2] }}"
+    _fgr_sql: >-
+      select nvl(listagg(d.failgroup || ':' || d.failgroup_type, ',')
+             within group (order by d.failgroup), 'none')
+      from v$asm_disk d join v$asm_diskgroup g on g.group_number = d.group_number
+      where g.name = 'MOLTEST_FGR';
+    _fgr_attr_sql: >-
+      select g.type || ',' || listagg(a.name || '=' || a.value, ',') within group (order by a.name)
+      from v$asm_attribute a join v$asm_diskgroup g on g.group_number = a.group_number
+      where g.name = 'MOLTEST_FGR' and a.name in ('compatible.asm', 'compatible.rdbms')
+      group by g.type;
+
+# ASM does not support PL/SQL => single statements, errors are ignored
+- name: oraasm_manage_diskgroups | cleanup disk group
+  ansible.builtin.command:
+    cmd: "{{ mt_asm_oracle_home }}/bin/sqlplus -S -L / as sysasm"
+    stdin: |
+      drop diskgroup moltest_fgr including contents;
+      drop diskgroup moltest_fgr force including contents;
+      exit
+  environment:
+    ORACLE_HOME: "{{ mt_asm_oracle_home }}"
+    ORACLE_SID: "{{ mt_asm_sid }}"
+    LD_LIBRARY_PATH: "{{ mt_asm_oracle_home }}/lib"
+  changed_when: false
+  failed_when: false
+
+- name: oraasm_manage_diskgroups | tests with connection to ASM
+  vars:
+    mt_conn: "{{ mt_conn_asm }}"
+    _fgr_dg_plain:
+      diskgroup: "{{ _fgr_name }}"
+      state: present
+      properties:
+        - {redundancy: external}
+      disk:
+        - {device: "{{ _fgr_disk1 }}", asmlabel: spare01}
+    _fgr_dg_failgroups:
+      diskgroup: "{{ _fgr_name }}"
+      state: present
+      properties:
+        - {redundancy: normal}
+      attributes:
+        - {name: compatible.rdbms, value: 19.0.0.0.0}
+        - {name: compatible.asm, value: 23.0.0.0.0}
+      disk:
+        - {device: "{{ _fgr_disk1 }}", asmlabel: spare01, failure_group: fg1}
+        - {device: "{{ _fgr_disk2 }}", asmlabel: spare02, failure_group: fg2}
+  block:
+    - name: oraasm_manage_diskgroups | create with failure groups
+      ansible.builtin.include_tasks: _role_run.yml
+      vars:
+        mt_id: oraasm_manage_diskgroups.asm.failgroup_create
+        mt_role: oraasm_manage_diskgroups
+        asm_diskgroups: "{{ _fgr_inventory_dgs + [_fgr_dg_failgroups] }}"
+
+    - name: oraasm_manage_diskgroups | create with failure groups again
+      ansible.builtin.include_tasks: _role_run.yml
+      vars:
+        mt_id: oraasm_manage_diskgroups.asm.failgroup_create_idempotent
+        mt_role: oraasm_manage_diskgroups
+        asm_diskgroups: "{{ _fgr_inventory_dgs + [_fgr_dg_failgroups] }}"
+
+    - name: oraasm_manage_diskgroups | verify failure groups
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: "{{ _fgr_sql }}"
+        mt_sql_expect: "FG1:REGULAR,FG2:REGULAR"
+        mt_sql_id: oraasm_manage_diskgroups.asm.failgroup_create_sql
+
+    - name: oraasm_manage_diskgroups | verify redundancy and attributes
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: "{{ _fgr_attr_sql }}"
+        mt_sql_expect: "NORMAL,compatible.asm=23.0.0.0.0,compatible.rdbms=19.0.0.0.0"
+        mt_sql_id: oraasm_manage_diskgroups.asm.failgroup_create_attr_sql
+
+    - name: oraasm_manage_diskgroups | add disk in quorum failure group
+      ansible.builtin.include_tasks: _role_run.yml
+      vars:
+        mt_id: oraasm_manage_diskgroups.asm.failgroup_add_quorum
+        mt_role: oraasm_manage_diskgroups
+        asm_diskgroups: >-
+          {{ _fgr_inventory_dgs
+             + [_fgr_dg_failgroups | combine({'disk': _fgr_dg_failgroups.disk + [_quorum_disk]})] }}
+        _quorum_disk: {device: "{{ _fgr_disk3 }}", asmlabel: spare03, failure_group: fg3, quorum: true}
+
+    - name: oraasm_manage_diskgroups | verify quorum failure group
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: "{{ _fgr_sql }}"
+        mt_sql_expect: "FG1:REGULAR,FG2:REGULAR,FG3:QUORUM"
+        mt_sql_id: oraasm_manage_diskgroups.asm.failgroup_add_quorum_sql
+
+    - name: oraasm_manage_diskgroups | drop disk group with failure groups
+      ansible.builtin.include_tasks: _role_run.yml
+      vars:
+        mt_id: oraasm_manage_diskgroups.asm.failgroup_drop
+        mt_role: oraasm_manage_diskgroups
+        asm_diskgroups: "{{ _fgr_inventory_dgs + [_fgr_dg_failgroups | combine({'state': 'absent'})] }}"
+
+    - name: oraasm_manage_diskgroups | verify drop
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: "select count(*) from v$asm_diskgroup where name = 'MOLTEST_FGR';"
+        mt_sql_expect: "0"
+        mt_sql_id: oraasm_manage_diskgroups.asm.failgroup_drop_sql
+
+    # disk group without failure groups and attributes (oravirt#491: no string None as attribute)
+    - name: oraasm_manage_diskgroups | create without failure groups and attributes
+      ansible.builtin.include_tasks: _role_run.yml
+      vars:
+        mt_id: oraasm_manage_diskgroups.asm.plain_create
+        mt_role: oraasm_manage_diskgroups
+        asm_diskgroups: "{{ _fgr_inventory_dgs + [_fgr_dg_plain] }}"
+
+    - name: oraasm_manage_diskgroups | verify without failure groups
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: >-
+          select g.type || ',' || count(*) from v$asm_disk d
+          join v$asm_diskgroup g on g.group_number = d.group_number
+          where g.name = 'MOLTEST_FGR' group by g.type;
+        mt_sql_expect: "EXTERN,1"
+        mt_sql_id: oraasm_manage_diskgroups.asm.plain_create_sql
+
+    - name: oraasm_manage_diskgroups | drop disk group without failure groups
+      ansible.builtin.include_tasks: _role_run.yml
+      vars:
+        mt_id: oraasm_manage_diskgroups.asm.plain_drop
+        mt_role: oraasm_manage_diskgroups
+        asm_diskgroups: "{{ _fgr_inventory_dgs + [_fgr_dg_plain | combine({'state': 'absent'})] }}"
+
+    - name: oraasm_manage_diskgroups | verify drop without failure groups
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: "select count(*) from v$asm_diskgroup where name = 'MOLTEST_FGR';"
+        mt_sql_expect: "0"
+        mt_sql_id: oraasm_manage_diskgroups.asm.plain_drop_sql
+
+    - name: oraasm_manage_diskgroups | verify disk groups of the inventory
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: >-
+          select listagg(name || ':' || state, ',') within group (order by name)
+          from v$asm_diskgroup where name in ('DATA', 'FRA');
+        mt_sql_expect: "DATA:MOUNTED,FRA:MOUNTED"
+        mt_sql_id: oraasm_manage_diskgroups.asm.inventory_diskgroups_sql

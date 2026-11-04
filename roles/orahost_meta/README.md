@@ -54,6 +54,15 @@ Meta role used by other roles to share variable defaults.
 
 ASM Diskgroupdefinition for Oracle Restart/Grid-Infrastructure
 
+Failure groups (optional) per disk in `disk`:
+
+- `failure_group`: name of the failure group. Disks with the same name are in the same failure group.
+- `quorum`: `true` for a quorum failure group (only voting files), must be the same for all disks of a failure group.
+
+Without `failure_group`, ASM creates a failure group for every disk.
+The failure group of an existing disk is not changed.
+For the initial disk group (`oracle_asm_init_dg`, created by gridSetup), set `failure_group` for all disks or for none.
+
 #### Default value
 
 ```YAML
@@ -72,9 +81,9 @@ asm_diskgroups:
      - {name: compatible.rdbms, value: 11.2.0.4.0}
      - {name: au_size, value: 4m}
    disk:
-     - {device: /dev/sdc, asmlabel: crs01}
-     - {device: /dev/sdd, asmlabel: crs02}
-     - {device: /dev/sde, asmlabel: crs03}
+     - {device: /dev/sdc, asmlabel: crs01, failure_group: storage01}
+     - {device: /dev/sdd, asmlabel: crs02, failure_group: storage02}
+     - {device: /dev/sde, asmlabel: crs03, failure_group: nfs, quorum: true}
  - diskgroup: data
    properties:
      - {redundancy: external}

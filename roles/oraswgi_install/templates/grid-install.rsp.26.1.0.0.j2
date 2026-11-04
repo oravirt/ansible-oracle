@@ -456,7 +456,18 @@ auSize={%- if item.properties is defined
 #
 # Deprecated: oracle.install.asm.diskGroup.FailureGroups
 #-------------------------------------------------------------------------------
-failureGroups=
+{# disk path for the failure group settings, same as in the disk list #}
+{% macro asm_disk_path(disk) -%}
+  {%- if device_persistence=='' -%}{{ disk.device }}
+  {%- elif device_persistence=='udev' -%}{{ oracle_asm_disk_string }}{{ disk.asmlabel }}
+  {%- elif device_persistence=='asmfd' -%}AFD:{{ disk.asmlabel | upper }}
+  {%- else -%}
+    {%- if oracle_asm_disk_string.endswith('*') %}{{ oracle_asm_disk_string[:-1] }}
+    {%- else -%}{{ oracle_asm_disk_string }}
+    {%- endif -%}{{ disk.asmlabel | upper }}
+  {%- endif -%}
+{%- endmacro %}
+failureGroups={{ item.disk | selectattr('failure_group', 'defined') | map(attribute='failure_group') | unique | join(',') }}
 
 #-------------------------------------------------------------------------------
 # List of disks and their failure groups to create a ASM DiskGroup
@@ -470,7 +481,9 @@ failureGroups=
 #
 # Deprecated: oracle.install.asm.diskGroup.disksWithFailureGroupNames
 #-------------------------------------------------------------------------------
-disksWithFailureGroupNames=
+disksWithFailureGroupNames={%- for disk in item.disk | selectattr('failure_group', 'defined') -%}
+  {{ asm_disk_path(disk) }},{{ disk.failure_group }}{%- if not loop.last %},{% endif %}
+{%- endfor +%}
 
 #-------------------------------------------------------------------------------
 # List of disks to create a ASM DiskGroup
@@ -501,7 +514,10 @@ diskList={%- for disk in  item.disk %}
 #
 # Deprecated: oracle.install.asm.diskGroup.quorumFailureGroupNames
 #-------------------------------------------------------------------------------
-quorumFailureGroupNames=
+quorumFailureGroupNames={%- set _quorum = [] %}
+{%- for disk in item.disk | selectattr('failure_group', 'defined') %}
+  {%- if disk.quorum | default(false) | bool and disk.failure_group not in _quorum %}{% set _ = _quorum.append(disk.failure_group) %}{% endif %}
+{%- endfor %}{{ _quorum | join(',') }}
 
 #-------------------------------------------------------------------------------
 # The disk discovery string to be used to discover the disks used create a ASM DiskGroup
