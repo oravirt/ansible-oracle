@@ -19,6 +19,7 @@
 - name: oradb_datapatch | Start database
   opitzconsulting.ansible_oracle.oracle_db:
     oracle_home: "{{ _oracle_home_db }}"
+    hostname: "{{ oracle_hostname }}"
     db_name: "{{ odb.oracle_db_name }}"
     db_unique_name: "{{ odb.oracle_db_unique_name | default(omit) }}"
     sid: "{{ odb.oracle_db_instance_name | default(omit) }}"
@@ -49,7 +50,7 @@
     fail_on_db_not_exist: "{{ oradb_datapatch_fail_on_db_not_exist }}"
     user: sys
     password: "{{ _db_password_cdb }}"
-    hostname: "{{ ansible_fqdn }}"
+    hostname: "{{ oracle_hostname }}"
     service_name: "{{ _db_service_name }}"
     port: "{{ _listener_port_cdb }}"
     script_env:
