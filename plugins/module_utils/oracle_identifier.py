@@ -42,3 +42,22 @@ def split_qualified_identifier(name, convert_to_upper=True):
     if not match:
         return None
     return [normalize_identifier(part, convert_to_upper) for part in match.groups()]
+
+
+def split_object_identifier(name, default_owner):
+    """Split [OWNER.]NAME into the normalized parts [owner, name].
+
+    Each part can be in double quotes (case sensitive).
+    Without OWNER, default_owner (already normalized) is used.
+    Returns None, if name is no valid object name.
+    """
+    match = re.match(
+        r'^(?:(%s)\.)?(%s)$' % (IDENTIFIER_PART, IDENTIFIER_PART), name.strip()
+    )
+    if not match:
+        return None
+    owner, object_name = match.groups()
+    return [
+        normalize_identifier(owner) if owner else default_owner,
+        normalize_identifier(object_name),
+    ]

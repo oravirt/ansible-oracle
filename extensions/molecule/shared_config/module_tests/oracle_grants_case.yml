@@ -1,0 +1,243 @@
+---
+# Tests for oracle_grants with case sensitive names in double quotes (included by oracle_grants.yml)
+# - grantee user "MolTest_Grantee" and grantee role "MolTest_Role"
+# - role "MolTest_Role" in grants next to CONNECT and a system privilege
+# - objects: case sensitive owner and object, case sensitive owner with upper case object,
+#   upper case owner with case sensitive object, object in the current schema without owner
+# - directory "MolTest_Dir" without sys.
+# - grants_mode enforce revokes a case sensitive object and role, state absent in uppercase
+- name: oracle_grants case | variables
+  ansible.builtin.set_fact:
+    _grc_user: '"MolTest_Grantee"'
+    _grc_role: '"MolTest_Role"'
+    _grc_obj_case: '"MolTest_Owner"."MolTest_Tab"'
+    _grc_obj_upper: '"MolTest_Owner".moltest_tab'
+    _grc_obj_owner_upper: '{{ _gr_owner | lower }}."MolTest_Tab"'
+    _grc_obj_current: '"MolTest_Sys_Tab"'
+    _grc_dir: '"MolTest_Dir"'
+    _grc_tab_privs_sql: >-
+      select listagg(owner || '.' || table_name || ':' || privilege, ',')
+      within group (order by nlssort(owner || '.' || table_name || ':' || privilege, 'NLS_SORT=BINARY'))
+      from dba_tab_privs where grantee = 'MolTest_Grantee';
+    _grc_role_privs_sql: >-
+      select listagg(granted_role, ',')
+      within group (order by nlssort(granted_role, 'NLS_SORT=BINARY'))
+      from dba_role_privs where grantee = 'MolTest_Grantee';
+    _grc_cleanup_sql: |-
+      begin
+        for r in (select 'drop user "' || username || '" cascade' s from dba_users
+                  where username in ('MolTest_Grantee', 'MolTest_Owner')
+                  union all
+                  select 'drop role "' || role || '"' from dba_roles
+                  where role = 'MolTest_Role'
+                  union all
+                  select 'drop directory "' || directory_name || '"' from dba_directories
+                  where directory_name = 'MolTest_Dir'
+                  union all
+                  select 'drop table "' || owner || '"."' || table_name || '"' from dba_tables
+                  where (owner = 'SYSTEM' and table_name = 'MolTest_Sys_Tab')
+                     or (owner = '{{ _gr_owner }}' and table_name = 'MolTest_Tab')) loop
+          execute immediate r.s;
+        end loop;
+      end;
+      /
+
+- name: oracle_grants case | cleanup and setup in PDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: |-
+      {{ _grc_cleanup_sql }}
+      create user "MolTest_Grantee" identified by "{{ _gr_password }}";
+      create user "MolTest_Owner" no authentication;
+      create table "MolTest_Owner"."MolTest_Tab" (id number);
+      create table "MolTest_Owner".MOLTEST_TAB (id number);
+      create table {{ _gr_owner }}."MolTest_Tab" (id number);
+      create table SYSTEM."MolTest_Sys_Tab" (id number);
+      create role "MolTest_Role";
+      create directory "MolTest_Dir" as '/tmp/moltest_grants_case';
+      grant read, write on directory "MolTest_Dir" to system with grant option;
+
+- name: oracle_grants case | grant privileges
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _grc_user }}"
+    grants:
+      - create session
+      - connect
+      - "{{ _grc_role }}"
+    object_privs:
+      - select:{{ _grc_obj_case }}
+      - select,insert:{{ _grc_obj_upper }}
+      - select:{{ _grc_obj_owner_upper }}
+      - select:{{ _grc_obj_current }}
+    directory_privs:
+      - read:{{ _grc_dir }}
+  register: _res
+  ignore_errors: true
+- name: oracle_grants case | check grant privileges
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.case_grant, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_grants case | grant privileges again
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _grc_user }}"
+    grants:
+      - create session
+      - connect
+      - "{{ _grc_role }}"
+    object_privs:
+      - select:{{ _grc_obj_case }}
+      - select,insert:{{ _grc_obj_upper }}
+      - select:{{ _grc_obj_owner_upper }}
+      - select:{{ _grc_obj_current }}
+    directory_privs:
+      - read:{{ _grc_dir }}
+  register: _res
+  ignore_errors: true
+- name: oracle_grants case | check grant privileges again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.case_grant_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_grants case | verify object and directory privileges
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _grc_tab_privs_sql }}"
+    mt_sql_expect: >-
+      {{ _gr_owner }}.MolTest_Tab:SELECT,MolTest_Owner.MOLTEST_TAB:INSERT,MolTest_Owner.MOLTEST_TAB:SELECT,MolTest_Owner.MolTest_Tab:SELECT,SYS.MolTest_Dir:READ,SYSTEM.MolTest_Sys_Tab:SELECT
+    mt_sql_id: oracle_grants.pdb.case_grant_tab_sql
+
+- name: oracle_grants case | verify roles
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _grc_role_privs_sql }}"
+    mt_sql_expect: "CONNECT,MolTest_Role"
+    mt_sql_id: oracle_grants.pdb.case_grant_role_sql
+
+# enforce: the case sensitive object of the upper case owner, the object in the current
+# schema and the case sensitive role are revoked
+- name: oracle_grants case | enforce
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _grc_user }}"
+    grants:
+      - create session
+      - connect
+    object_privs:
+      - select:{{ _grc_obj_case }}
+      - select,insert:{{ _grc_obj_upper }}
+    directory_privs:
+      - read:sys.{{ _grc_dir }}
+    grants_mode: enforce
+  register: _res
+  ignore_errors: true
+- name: oracle_grants case | check enforce
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.case_enforce, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_grants case | enforce again
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _grc_user }}"
+    grants:
+      - create session
+      - connect
+    object_privs:
+      - select:{{ _grc_obj_case }}
+      - select,insert:{{ _grc_obj_upper }}
+    directory_privs:
+      - read:sys.{{ _grc_dir }}
+    grants_mode: enforce
+  register: _res
+  ignore_errors: true
+- name: oracle_grants case | check enforce again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.case_enforce_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_grants case | verify enforce object and directory privileges
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _grc_tab_privs_sql }}"
+    mt_sql_expect: >-
+      MolTest_Owner.MOLTEST_TAB:INSERT,MolTest_Owner.MOLTEST_TAB:SELECT,MolTest_Owner.MolTest_Tab:SELECT,SYS.MolTest_Dir:READ
+    mt_sql_id: oracle_grants.pdb.case_enforce_tab_sql
+
+- name: oracle_grants case | verify enforce roles
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _grc_role_privs_sql }}"
+    mt_sql_expect: "CONNECT"
+    mt_sql_id: oracle_grants.pdb.case_enforce_role_sql
+
+# documented: state absent compares in any case (before: lower case only)
+- name: oracle_grants case | absent in upper case
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _grc_user }}"
+    grants:
+      - CREATE SESSION
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_grants case | check absent in upper case
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.case_absent, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_grants case | absent in upper case again
+  opitzconsulting.ansible_oracle.oracle_grants:
+    schema: "{{ _grc_user }}"
+    grants:
+      - CREATE SESSION
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_grants case | check absent in upper case again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.case_absent_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+# case sensitive role as grantee
+- name: oracle_grants case | grant to case sensitive role
+  opitzconsulting.ansible_oracle.oracle_grants:
+    role: "{{ _grc_role }}"
+    grants:
+      - create session
+    object_privs:
+      - select:{{ _grc_obj_case }}
+  register: _res
+  ignore_errors: true
+- name: oracle_grants case | check grant to case sensitive role
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.case_role_grant, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_grants case | grant to case sensitive role again
+  opitzconsulting.ansible_oracle.oracle_grants:
+    role: "{{ _grc_role }}"
+    grants:
+      - create session
+    object_privs:
+      - select:{{ _grc_obj_case }}
+  register: _res
+  ignore_errors: true
+- name: oracle_grants case | check grant to case sensitive role again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_grants.pdb.case_role_grant_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_grants case | verify grant to case sensitive role
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select (select listagg(privilege, ',') within group (order by privilege)
+              from dba_sys_privs where grantee = 'MolTest_Role')
+             || ',' || (select listagg(owner || '.' || table_name || ':' || privilege, ',')
+                        within group (order by table_name)
+                        from dba_tab_privs where grantee = 'MolTest_Role')
+      from dual;
+    mt_sql_expect: "CREATE SESSION,MolTest_Owner.MolTest_Tab:SELECT"
+    mt_sql_id: oracle_grants.pdb.case_role_grant_sql
+
+- name: oracle_grants case | final cleanup
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _grc_cleanup_sql }}"

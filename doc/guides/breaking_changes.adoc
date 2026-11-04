@@ -63,9 +63,9 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |Always: the modules require python-oracledb instead of cx_Oracle on the target hosts. Action needed if the target hosts have no access to the Python package index, a proxy is needed (`use_proxy`, `http_proxy`), `install_cx_oracle` / `cx_oracle_source` / `cx_oracle3_source` / `cx_oracle_umask` are set in inventory or the role `cxoracle` is used in own playbooks
 |Set the new variables `pyoracledb_wheel_dir`, `pyoracledb_use_proxy` and `pyoracledb_http_proxy`, replace the role `cxoracle` by `pyoracledb`
 
-|<<oracle_profile, oracle_job and oracle_directory: names in double quotes are case sensitive>>
-|A profile name (`oracle_profile`, `profiles` in `oracle_databases` / `oracle_pdbs`) or a directory name in own playbooks (`oracle_directory`) is enclosed in `"` by mistake, *or* an existing profile has a name in lower or mixed case
-|Remove the `"` from the name, or write the name exactly as stored in `DBA_PROFILES` / `DBA_DIRECTORIES` in `"`
+|<<oracle_profile, oracle_job, oracle_directory and oracle_grants: names in double quotes are case sensitive>>
+|A name of a profile, user, role, object or directory is enclosed in `"` by mistake (`profiles` and `grants`, `object_privs`, `directory_privs` of `users` in `oracle_databases` / `oracle_pdbs`, or the modules in own playbooks), *or* an existing profile, user, role or object has a name in lower or mixed case
+|Remove the `"` from the name, or write the name exactly as stored in the data dictionary in `"`
 |===
 
 ==== Minimum ansible-core 2.16
@@ -561,9 +561,9 @@ Skip the installation of python-oracledb:
 pyoracledb_install: false
 ----
 
-==== oracle_profile, oracle_job and oracle_directory: names in double quotes are case sensitive
+==== oracle_profile, oracle_job, oracle_directory and oracle_grants: names in double quotes are case sensitive
 
-The modules `oracle_profile`, `oracle_job` and `oracle_directory` handle names like SQL (ANSI): a name in double quotes (`"`) is case sensitive, a name without quotes is converted to uppercase.
+The modules `oracle_profile`, `oracle_job`, `oracle_directory` and `oracle_grants` handle names like SQL (ANSI): a name in double quotes (`"`) is case sensitive, a name without quotes is converted to uppercase.
 All other modules are not changed.
 The functions for this are in `plugins/module_utils/oracle_identifier.py` and can be used by more modules in the future.
 Such a change will be listed here.
@@ -589,6 +589,17 @@ A name in `"` was created case sensitive, but not found in the next run (ORA-009
 |A name in `"` is used case sensitive, e.g. `directory_name: '"MyDir"'`.
 `"MyDir"` and `MYDIR` are two different directories.
 A name without `"` is used in uppercase as before.
+
+|`oracle_grants`
+|The grantee (`schema`, `role`) was compared in uppercase, roles and objects in `grants` and `object_privs` were compared case insensitive, but not quoted in the SQL statements.
+A grantee or object in `"` was not found.
+Granting or revoking a privilege on an object with a lower or mixed case name failed (ORA-00942).
+With `state: absent` the names in `grants` had to be in lowercase.
+`directory_privs` needed `sys.<directory>`.
+|Grantee, roles in `grants`, owner and object in `object_privs` and the directory in `directory_privs` can be in `"` (case sensitive), e.g. `schema: '"MyUser"'`, `grants: ['"MyRole"']`, `object_privs: ['select:"MyOwner"."MyTable"']`.
+Names without `"` are used in uppercase and compared exactly.
+`state: absent` compares in any case.
+An object without owner is in the current schema of the connection, `sys.` is optional for directories.
 |===
 
 PDB names are not affected: Oracle stores them always in uppercase, `oracle_pdb` converts the name to uppercase as before.
@@ -596,11 +607,21 @@ PDB names are not affected: Oracle stores them always in uppercase, `oracle_pdb`
 For most inventories nothing changes, because names without `"` are stored in uppercase as before.
 
 IMPORTANT: Check names which are enclosed in `"` by mistake, e.g. from a copied SQL statement.
-They are case sensitive now and refer to a different object than before, so the module creates a new profile or directory with the exact name.
+They are case sensitive now and refer to a different object than before, so the module creates a new profile or directory with the exact name, or grants a privilege on a different object or role.
 The roles of `ansible-oracle` do not use `oracle_directory`, so only own playbooks are affected for directories.
 
 An existing profile with a name in lower or mixed case (created outside of `ansible-oracle`) was found before with a name in any case.
 Now the name must be given exactly in `"`, otherwise the module creates a new profile in uppercase.
+
+The same applies to `oracle_grants`: a grant on an existing object or role with a lower or mixed case name, which was found before with a name in any case, must be given exactly in `"`.
+Otherwise the module tries to grant the privilege on the uppercase name (ORA-00942 or ORA-01919) and, with `grants_mode: enforce`, revokes the existing grant.
+
+.Find objects and roles with a name in lower or mixed case
+[source,sql]
+----
+select owner, object_name, object_type from dba_objects where object_name <> upper(object_name) or owner <> upper(owner);
+select role from dba_roles where role <> upper(role);
+----
 
 .Find profiles with a name in lower or mixed case
 [source,sql]

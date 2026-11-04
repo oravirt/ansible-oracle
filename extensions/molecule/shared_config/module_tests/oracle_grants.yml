@@ -5,6 +5,7 @@
 # - PDB role: present/absent
 # - CDB common user: system privilege with container=all
 # - error cases: user does not exist, schema and role, wrong password
+# - case sensitive names in double quotes (oracle_grants_case.yml)
 # - connection variants: system (default), sys as sysdba, system in CDB, wallet,
 #   wrong password
 - name: oracle_grants | variables
@@ -430,6 +431,10 @@
 - name: oracle_grants | check wrong password
   ansible.builtin.include_tasks: _check.yml
   vars: {mt_id: oracle_grants.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+# case sensitive names in double quotes (uses _gr_owner)
+- name: oracle_grants | case sensitive names
+  ansible.builtin.include_tasks: oracle_grants_case.yml
 
 - name: oracle_grants | cleanup in PDB
   ansible.builtin.include_tasks: _sql.yml
