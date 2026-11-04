@@ -1,22 +1,27 @@
 ---
+# list of dict with disk, failure_group and quorum for oracle_asmdg (as JSON)
 _oraasm_manage_diskgroups_asmdevice_list: |-
-  {% if device_persistence == 'asmlib' %}
-  {%- for disk in ad_loop.disk %}{{ _oracle_asm_disk_prefix }}{{ disk.asmlabel | upper }}
-  {%- if not loop.last -%},{%- endif %}
-  {%- endfor %}
+  {%- set ns = namespace(disks=[]) %}
+  {%- for disk in ad_loop.disk %}
+  {%- if device_persistence == 'asmlib' %}
+  {%- set _path = _oracle_asm_disk_prefix ~ disk.asmlabel | upper %}
   {%- elif device_persistence == 'asmfd' %}
-  {%- for disk in ad_loop.disk -%}AFD:{{ disk.asmlabel | upper }}
-  {%- if not loop.last -%},{%- endif -%}
-  {%- endfor %}
+  {%- set _path = 'AFD:' ~ disk.asmlabel | upper %}
   {%- elif device_persistence == 'udev' %}
-  {%- for disk in ad_loop.disk -%}{{ _oracle_asm_disk_prefix }}{{ disk.asmlabel }}
-  {%- if not loop.last -%},{%- endif -%}
-  {%- endfor %}
-  {%- elif device_persistence == '' %}
-  {%- for disk in ad_loop.disk -%}{{ disk.device }}
-  {%- if not loop.last -%},{%- endif -%}
-  {%- endfor %}
+  {%- set _path = _oracle_asm_disk_prefix ~ disk.asmlabel %}
+  {%- else %}
+  {%- set _path = disk.device %}
   {%- endif %}
+  {%- set _disk = {'disk': _path} %}
+  {%- if disk.failure_group is defined %}
+  {%- set _disk = _disk | combine({'failure_group': disk.failure_group}) %}
+  {%- endif %}
+  {%- if disk.quorum is defined %}
+  {%- set _disk = _disk | combine({'quorum': disk.quorum | bool}) %}
+  {%- endif %}
+  {%- set ns.disks = ns.disks + [_disk] %}
+  {%- endfor %}
+  {{- ns.disks | to_json }}
 
 _oracle_asm_disk_prefix: |-
   {%- if device_persistence == 'asmlib' %}

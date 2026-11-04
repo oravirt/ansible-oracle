@@ -7,7 +7,7 @@
     host: "{{ oracle_hostname }}"
     oh: "{{ oracle_home_gi }}"
     name: "{{ ad_loop.diskgroup }}"
-    disks: "{{ _oraasm_manage_diskgroups_asmdevice_list }}"
+    disks: "{{ _oraasm_manage_diskgroups_asmdevice_list | from_json }}"
     redundancy: "{{ ad_loop.properties | map(attribute='redundancy') | first | default(omit) }}"
     attribute_name: "{{ ad_loop.attributes | map(attribute='name') | list if ad_loop.attributes is defined else omit }}"
     attribute_value: "{{ ad_loop.attributes | map(attribute='value') | list if ad_loop.attributes is defined else omit }}"
