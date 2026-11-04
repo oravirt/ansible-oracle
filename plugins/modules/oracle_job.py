@@ -7,6 +7,10 @@ from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.ora
     oracledb,
     oracledb_connect,
 )
+from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.oracle_identifier import (  # noqa: E501
+    quote_identifier,
+    split_qualified_identifier,
+)
 
 DOCUMENTATION = '''
 ---
@@ -88,6 +92,9 @@ options:
             - The name of the job, including the owner schema in the form
               V(OWNER.JOB_NAME).
             - Allowed characters are letters, digits, V(_), V($) and V(#).
+            - Like in SQL, a part in double quotes is case sensitive, e.g.
+              V(SYSTEM."My_Job"). A part without quotes is converted to uppercase,
+              unless O(convert_to_upper=false).
         type: str
         required: true
         aliases: ['name']
@@ -163,7 +170,8 @@ options:
     logging_level:
         description:
             - The logging level of the job.
-            - If not set, the default logging level of the job class is used.
+            - If not set, the default logging level of the job class is used for a new
+              job, and the logging level of an existing job is not compared.
         type: str
         required: false
         choices: ['off', 'runs', 'failed runs', 'full']
@@ -194,8 +202,10 @@ options:
         default: false
     convert_to_upper:
         description:
-            - Whether O(job_name) is converted to uppercase.
+            - Whether the parts of O(job_name) without double quotes are converted to
+              uppercase.
             - With V(false), the job name is used case sensitive (quoted).
+            - Prefer double quotes in O(job_name) for case sensitive names.
         type: bool
         required: false
         default: true
@@ -271,7 +281,7 @@ def query_existing(job_owner, job_name):
            FROM all_scheduler_jobs j
            WHERE owner = :owner
            AND job_name = :name""",
-        {"owner": job_owner.upper(), "name": job_name.upper()},
+        {"owner": job_owner, "name": job_name},
     )
     result = c.fetchone()
     if c.rowcount > 0:
@@ -282,7 +292,7 @@ def query_existing(job_owner, job_name):
                 "FROM all_scheduler_job_args "
                 "WHERE owner = :owner AND job_name = :name "
                 "ORDER BY argument_position",
-                {"owner": job_owner.upper(), "name": job_name.upper()},
+                {"owner": job_owner, "name": job_name},
             )
             res = c.fetchall()
             for row in res:
@@ -497,17 +507,13 @@ def main():
     )
     # Check input parameters
     re_name = re.compile(r"^[A-Za-z0-9_\$#]+\.[A-Za-z0-9_\$#]+$")
-    if not re_name.match(module.params['job_name']):
-        module.fail_json(msg="Invalid job name")
-    job_fullname = (
-        module.params['job_name'].upper()
-        if module.params['convert_to_upper']
-        else module.params['job_name']
+    job_parts = split_qualified_identifier(
+        module.params['job_name'], module.params['convert_to_upper']
     )
-    job_parts = job_fullname.split(".")
-    job_owner = job_parts[0]
-    job_name = job_parts[1]
-    job_fullname = "\"%s\".\"%s\"" % (job_owner, job_name)
+    if not job_parts:
+        module.fail_json(msg="Invalid job name")
+    job_owner, job_name = job_parts
+    job_fullname = "%s.%s" % (quote_identifier(job_owner), quote_identifier(job_name))
     if module.params['lightweight'] and not module.params['program_name']:
         module.fail_json(msg="Lightweight jobs can only be created with program_name")
     if module.params['lightweight'] and module.params['restartable']:
@@ -559,7 +565,10 @@ def main():
             or result['job_action'] != module.params['job_action']
             or result['repeat_interval'] != module.params['repeat_interval']
             or result['restartable'] != module.params['restartable']
-            or result['logging_level'] != module.params['logging_level'].upper()
+            or (
+                module.params['logging_level'] is not None
+                and result['logging_level'] != module.params['logging_level'].upper()
+            )
             or result['comments'] != module.params['comments']
             or result['auto_drop'] != module.params['auto_drop']
             or result['job_arguments'] != (module.params['job_arguments'] or [])
