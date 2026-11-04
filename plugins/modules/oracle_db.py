@@ -349,11 +349,10 @@ options:
         choices: ['present', 'absent', 'started', 'restarted']
     hostname:
         description:
-            - Currently not used. The connection always uses the local host name of
-              the database server.
+            - The host name or address of the listener used to connect to the database.
+            - Defaults to the local host name of the database server (C(os.uname()[1])).
         required: false
         type: str
-        default: localhost
         aliases: ['host']
     port:
         description:
@@ -1301,7 +1300,6 @@ def execute_sql(module, cursor, sql):
 
 
 def getconn(module):
-    hostname = os.uname()[1]
     # oracle_db connects always as SYSDBA
     conn = oracledb_connect(
         module, hostname, port, service_name, user, password, 'sysdba'
@@ -1375,7 +1373,7 @@ def main():
             timezone            = dict(required=False), # noqa E231
             output              = dict(default="short", choices = ["short", "verbose"]), # noqa E231
             state               = dict(default="present", choices = ["present", "absent", "started", "restarted"]), # noqa E231
-            hostname            = dict(required=False, default = 'localhost', aliases = ['host']), # noqa E231
+            hostname            = dict(required=False, aliases = ['host']), # noqa E231
             port                = dict(required=False, default = 1521), # noqa E231
             omf                 = dict(required=False, type='bool', default=False), # noqa E231
             script_env          = dict(required=False, type='dict', default={}), # noqa E231
@@ -1422,7 +1420,7 @@ def main():
     timezone            = module.params["timezone"] # noqa E221
     output              = module.params["output"] # noqa E221
     state               = module.params["state"] # noqa E221
-    hostname            = module.params["hostname"] # noqa E221
+    hostname            = module.params["hostname"] or os.uname()[1] # noqa E221
     port                = module.params["port"] # noqa E221
     omf                 = module.params["omf"] # noqa E221
     script_env          = module.params["script_env"] # noqa E221
