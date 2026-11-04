@@ -7,6 +7,10 @@ from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.ora
     oracledb,
     oracledb_connect,
 )
+from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.oracle_identifier import (  # noqa: E501
+    normalize_identifier,
+    quote_identifier,
+)
 
 DOCUMENTATION = '''
 ---
@@ -168,18 +172,6 @@ msg:
 '''
 
 
-def profile_name(name):
-    # like an identifier in SQL: case-sensitive in double quotes, otherwise uppercase
-    if len(name) > 1 and name.startswith('"') and name.endswith('"'):
-        return name[1:-1]
-    return name.upper()
-
-
-def quote_name(name):
-    # always quoted, so names with special characters like '/' are possible
-    return '"%s"' % name
-
-
 # Check if the profile exists
 def check_profile_exists(cursor, module, msg, name):
     sql = 'select count(*) from dba_profiles where profile = :name'
@@ -208,7 +200,7 @@ def create_profile(
             ]
         )
 
-    sql = 'create profile %s limit ' % (quote_name(name))
+    sql = 'create profile %s limit ' % (quote_identifier(name))
     if add_attr:
         sql += ' %s' % (attributes.lower())
 
@@ -219,7 +211,7 @@ def create_profile(
 
 
 def remove_profile(cursor, module, msg, oracle_home, name):
-    dropsql = 'drop profile %s' % (quote_name(name))
+    dropsql = 'drop profile %s' % (quote_identifier(name))
     if execute_sql(module, msg, cursor, dropsql):
         return True
     else:
@@ -251,7 +243,7 @@ def ensure_profile_state(
             if dict(current_attributes) != dict(wanted_attributes):
                 for i, v in zip(attribute_name, attribute_value):
                     total_sql.append(
-                        "alter profile %s limit %s %s " % (quote_name(name), i, v)
+                        "alter profile %s limit %s %s " % (quote_identifier(name), i, v)
                     )
 
     # module.exit_json(msg=total_sql, changed=True)
@@ -333,7 +325,7 @@ def main():
         ),
     )
 
-    name = profile_name(module.params["name"])
+    name = normalize_identifier(module.params["name"])
     attribute_name = module.params["attribute_name"]
     attribute_value = module.params["attribute_value"]
     state = module.params["state"]
