@@ -63,7 +63,7 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |Always: the modules require python-oracledb instead of cx_Oracle on the target hosts. Action needed if the target hosts have no access to the Python package index, a proxy is needed (`use_proxy`, `http_proxy`), `install_cx_oracle` / `cx_oracle_source` / `cx_oracle3_source` / `cx_oracle_umask` are set in inventory or the role `cxoracle` is used in own playbooks
 |Set the new variables `pyoracledb_wheel_dir`, `pyoracledb_use_proxy` and `pyoracledb_http_proxy`, replace the role `cxoracle` by `pyoracledb`
 
-|<<oracle_profile, oracle_job, oracle_directory and oracle_grants: names in double quotes are case sensitive>>
+|<<oracle_profile, oracle_job, oracle_directory, oracle_grants and oracle_privs: names in double quotes are case sensitive>>
 |A name of a profile, user, role, object or directory is enclosed in `"` by mistake (`profiles` and `grants`, `object_privs`, `directory_privs` of `users` in `oracle_databases` / `oracle_pdbs`, or the modules in own playbooks), *or* an existing profile, user, role or object has a name in lower or mixed case
 |Remove the `"` from the name, or write the name exactly as stored in the data dictionary in `"`
 |===
@@ -561,9 +561,9 @@ Skip the installation of python-oracledb:
 pyoracledb_install: false
 ----
 
-==== oracle_profile, oracle_job, oracle_directory and oracle_grants: names in double quotes are case sensitive
+==== oracle_profile, oracle_job, oracle_directory, oracle_grants and oracle_privs: names in double quotes are case sensitive
 
-The modules `oracle_profile`, `oracle_job`, `oracle_directory` and `oracle_grants` handle names like SQL (ANSI): a name in double quotes (`"`) is case sensitive, a name without quotes is converted to uppercase.
+The modules `oracle_profile`, `oracle_job`, `oracle_directory`, `oracle_grants` and `oracle_privs` handle names like SQL (ANSI): a name in double quotes (`"`) is case sensitive, a name without quotes is converted to uppercase.
 All other modules are not changed.
 The functions for this are in `plugins/module_utils/oracle_identifier.py` and can be used by more modules in the future.
 Such a change will be listed here.
@@ -600,6 +600,14 @@ With `state: absent` the names in `grants` had to be in lowercase.
 Names without `"` are used in uppercase and compared exactly.
 `state: absent` compares in any case.
 An object without owner is in the current schema of the connection, `sys.` is optional for directories.
+
+|`oracle_privs`
+|Names with `"` failed with `Invalid privilege`, `Invalid user/role` or `Invalid object`.
+`convert_to_upper` was valid for all names in `roles` and `objs`.
+A role in `privs` was always converted to uppercase.
+|A name in `"` is case sensitive in `roles`, `objs` (owner and object, also with the wildcard `%`) and for a role in `privs`, e.g. `roles: ['"MyUser"']`, `objs: ['"MyOwner".%']`, `privs: ['"MyRole"']`.
+`convert_to_upper` works as before for names without `"`.
+No action needed, names without `"` are handled as before.
 |===
 
 PDB names are not affected: Oracle stores them always in uppercase, `oracle_pdb` converts the name to uppercase as before.
