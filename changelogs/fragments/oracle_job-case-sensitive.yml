@@ -1,0 +1,7 @@
+---
+minor_changes:
+  - "oracle_job: a part of job_name in double quotes is case sensitive like in SQL (e.g. SYSTEM.\"My_Job\"), parts without quotes are converted to uppercase unless convert_to_upper=false"
+  - "module_utils: new oracle_identifier with the handling of identifiers in double quotes, used by oracle_job and oracle_profile"
+bugfixes:
+  - "oracle_job: an existing job without logging_level failed with an AttributeError, the logging level is only compared when logging_level is set now"
+  - "oracle_job: with convert_to_upper=false an existing job with a mixed case name was not found, so state=present failed with ORA-27477 and state=absent did nothing"
