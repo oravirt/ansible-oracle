@@ -1,17 +1,22 @@
 ---
 # Tests for oracle_directory in PDB ORCLPDB
 # - create, idempotence, change path (enforce), directory_mode normal, drop
+# - case sensitive name in double quotes ("MolTest_Dir_Case") next to the upper case
+#   directory MOLTEST_DIR_CASE: two different directories
 # - connection variants: system (default), sys as sysdba, wallet, wrong password
 - name: oracle_directory | variables
   ansible.builtin.set_fact:
     _dir_name: MOLTEST_DIR
     _dir_path1: /tmp/moltest_dir1
     _dir_path2: /tmp/moltest_dir2
+    _dir_name_case: '"MolTest_Dir_Case"'
+    _dir_name_upper: moltest_dir_case
 
 - name: oracle_directory | cleanup
   opitzconsulting.ansible_oracle.oracle_directory:
-    directory_name: "{{ _dir_name }}"
+    directory_name: "{{ item }}"
     state: absent
+  loop: ["{{ _dir_name }}", "{{ _dir_name_case }}", "{{ _dir_name_upper }}"]
   register: _res
   ignore_errors: true
 
@@ -124,6 +129,87 @@
     mt_sql: "select count(*) from dba_directories where directory_name = '{{ _dir_name }}';"
     mt_sql_expect: "0"
     mt_sql_id: oracle_directory.pdb.drop_sql
+
+# documented: a name in double quotes is case sensitive, otherwise uppercase
+- name: oracle_directory | create case sensitive directory
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name_case }}"
+    directory_path: "{{ _dir_path1 }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check create case sensitive directory
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.case_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_directory | create case sensitive directory again
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name_case }}"
+    directory_path: "{{ _dir_path1 }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check create case sensitive directory again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.case_create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+# without double quotes: another directory in uppercase
+- name: oracle_directory | create upper case directory with the same name
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name_upper }}"
+    directory_path: "{{ _dir_path2 }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check create upper case directory with the same name
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.case_create_upper, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_directory | verify both directories
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: >-
+      select listagg(directory_name || '=' || directory_path, ',')
+      within group (order by directory_name)
+      from dba_directories where upper(directory_name) = 'MOLTEST_DIR_CASE';
+    mt_sql_expect: "MOLTEST_DIR_CASE={{ _dir_path2 }},MolTest_Dir_Case={{ _dir_path1 }}"
+    mt_sql_id: oracle_directory.pdb.case_sql
+
+- name: oracle_directory | drop case sensitive directory
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name_case }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check drop case sensitive directory
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.case_drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_directory | drop case sensitive directory again
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name_case }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check drop case sensitive directory again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.case_drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_directory | drop upper case directory
+  opitzconsulting.ansible_oracle.oracle_directory:
+    directory_name: "{{ _dir_name_upper }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_directory | check drop upper case directory
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_directory.pdb.case_drop_upper, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_directory | verify drop case sensitive and upper case directory
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from dba_directories where upper(directory_name) = 'MOLTEST_DIR_CASE';"
+    mt_sql_expect: "0"
+    mt_sql_id: oracle_directory.pdb.case_drop_sql
 
 # Oracle wallet: create and drop with ORCLPDB_SYSTEM
 - name: oracle_directory | create with wallet
