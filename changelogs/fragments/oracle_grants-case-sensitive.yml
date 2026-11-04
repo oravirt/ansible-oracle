@@ -1,0 +1,8 @@
+---
+minor_changes:
+  - "oracle_grants: the grantee (schema, role), roles in grants, owner and object in object_privs and the directory in directory_privs can be in double quotes (case sensitive). An object without owner is in the current schema of the connection, sys. is optional for directory_privs."
+bugfixes:
+  - "oracle_grants: granting or revoking privileges on an object with a lower or mixed case name failed (ORA-00942), because the names were not quoted in the SQL statements"
+  - "oracle_grants: with state=absent the roles and system privileges in grants had to be in lowercase to be revoked"
+breaking_changes:
+  - "oracle_grants: names in double quotes are case sensitive like in SQL, names without quotes are used in uppercase. Grants on existing objects or roles with a lower or mixed case name must be given in double quotes now, they were compared case insensitive before (see doc/guides/breaking_changes.adoc)"

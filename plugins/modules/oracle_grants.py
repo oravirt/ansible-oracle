@@ -6,6 +6,11 @@ from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.ora
     oracledb,
     oracledb_connect,
 )
+from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.oracle_identifier import (  # noqa: E501
+    normalize_identifier,
+    quote_identifier,
+    split_object_identifier,
+)
 
 DOCUMENTATION = '''
 ---
@@ -22,6 +27,11 @@ description:
       statement was executed.
     - With O(state=absent) or O(state=REMOVEALL) only roles and system privileges are
       revoked. Object and directory privileges are not touched.
+    - Names (users, roles, owners, objects, directories) are handled like
+      identifiers in SQL. A name in double quotes is case sensitive, e.g.
+      V("MyUser") or V(select:APP."MyTable"). A name without quotes is converted to
+      uppercase. Names are always quoted in the SQL statements, system privileges
+      are never quoted.
     - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
       (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "1.9.1"
@@ -68,6 +78,7 @@ options:
     schema:
         description:
             - The user (schema) whose privileges are managed.
+            - Converted to uppercase unless it is enclosed in double quotes.
             - With O(state=present) the module fails if the user does not exist, with
               O(state=absent) or O(state=REMOVEALL) it returns C(changed=false).
             - Mutually exclusive with O(role). One of O(schema) or O(role) is required.
@@ -76,6 +87,7 @@ options:
     role:
         description:
             - The role whose privileges are managed.
+            - Converted to uppercase unless it is enclosed in double quotes.
             - Mutually exclusive with O(schema).
         type: str
         required: false
@@ -83,9 +95,9 @@ options:
         description:
             - List of roles and system privileges, for example V(connect) or
               V(create session).
-            - The names are compared case-insensitively with O(state=present).
-              With O(state=absent) they must be given in lowercase to match.
-            - Quotes and square brackets in the elements are removed.
+            - A role in double quotes is case sensitive, e.g. V("MyRole"). Other
+              names (roles and system privileges) are converted to uppercase.
+            - Single quotes and square brackets in the elements are removed.
             - With O(state=present) and O(grants_mode=enforce), all roles and system
               privileges not in this list are revoked, so omitting O(grants) revokes
               all of them. If V(dba) is in the list, C(UNLIMITED TABLESPACE) is never
@@ -100,8 +112,10 @@ options:
             - List of object privileges in the format
               C(<priv>[,<priv>...]:<owner>.<object_name>), for example
               V(select,update:app.orders) or V(select:sys.v_$session).
-            - The object must be given as C(<owner>.<object_name>), otherwise it is
-              not recognized as already granted.
+            - Owner and object name can be in double quotes (case sensitive), e.g.
+              V(select:APP."MyTable") or V(select:"MyOwner"."MyTable").
+            - Without C(<owner>.), the object is in the current schema of the
+              connection, like in C(GRANT).
             - Missing privileges are granted. With O(grants_mode=enforce), privileges
               not in the list are revoked, and all privileges on objects not in the
               list are revoked with C(REVOKE ALL), so omitting O(object_privs)
@@ -116,9 +130,9 @@ options:
             - List of directory privileges in the format
               C(<priv>[,<priv>...]:<directory_object>), for example
               V(read,write:sys.data_pump_dir).
-            - Current privileges are read as C(<owner>.<directory_name>), and
-              directories are owned by C(SYS). The directory must therefore be given
-              as C(sys.<directory_name>) to be recognized as already granted.
+            - The directory can be given with or without C(sys.), directories are
+              owned by C(SYS). The name can be in double quotes (case sensitive),
+              e.g. V(read:"MyDir").
             - Missing privileges are granted. With O(grants_mode=enforce), privileges
               not in the list are revoked, and all privileges on directories not in
               the list are revoked with C(REVOKE ALL), so omitting
@@ -256,234 +270,160 @@ def clean_list(item):
     return item
 
 
-# Check if the user/schema exists
-def check_user_exists(module, msg, cursor, schema):
-    if not (schema):
+# Check if the user/schema exists (grantee is normalized)
+def check_user_exists(module, msg, cursor, grantee):
+    if not (grantee):
         module.fail_json(msg='Error: Missing schema name (User)', changed=False)
         return False
 
-    schema = clean_string(schema)
-    sql = 'select count(*) from dba_users where username = upper(\'%s\')' % schema
-
-    try:
-        cursor.execute(sql)
-        result = cursor.fetchone()[0]
-    except oracledb.DatabaseError as exc:
-        (error,) = exc.args
-        msg = error.message + 'sql: ' + sql
-        return False
-
-    if result > 0:
-        return True
-    else:
-        msg = 'User doesn\'t exist'  # noqa F841
-        return False
+    sql = 'select count(*) from dba_users where username = :name'
+    return execute_sql_get(module, msg, cursor, sql, {'name': grantee})[0][0] > 0
 
 
-# Check if the user/role exists
-def check_role_exists(module, msg, cursor, role):
-    if not (role):
+# Check if the role exists (grantee is normalized)
+def check_role_exists(module, msg, cursor, grantee):
+    if not (grantee):
         module.fail_json(msg='Error: Missing role name', changed=False)
         return False
 
-    role = clean_string(role)
-    sql = 'select role from dba_roles where role = upper(\'%s\')' % role
+    sql = 'select count(*) from dba_roles where role = :name'
+    return execute_sql_get(module, msg, cursor, sql, {'name': grantee})[0][0] > 0
 
-    try:
-        cursor.execute(sql)
-        result = cursor.fetchone()
-    except oracledb.DatabaseError as exc:
-        (error,) = exc.args
-        msg = error.message + 'sql: ' + sql
-        return False
 
-    if result:
-        # module.exit_json(msg='(role) sql %s'% sql, changed=False)
-        return True
+def parse_tab_privs(module, privs_list, default_owner, kind):
+    """Parse the wanted object or directory privileges.
+
+    <priv>[,<priv>...]:[<owner>.]<name>, owner and name can be in double quotes.
+    Returns {(owner, name): set of privileges in uppercase}.
+    """
+    wanted = {}
+    for entry in privs_list:
+        if ':' not in entry:
+            module.fail_json(
+                msg='Invalid %s privilege %s, format: <priv>[,<priv>...]:<name>'
+                % (kind, entry),
+                changed=False,
+            )
+        privs, name = entry.split(':', 1)
+        parts = split_object_identifier(name, default_owner)
+        if not parts:
+            module.fail_json(
+                msg='Invalid %s name %s in %s' % (kind, name, entry), changed=False
+            )
+        key = tuple(parts)
+        wanted.setdefault(key, set()).update(
+            p.strip().upper() for p in privs.split(',') if p.strip()
+        )
+    return wanted
+
+
+def get_current_tab_privs(module, msg, cursor, grantee, directory):
+    """Current object or directory privileges of grantee.
+
+    Returns {(owner, name): set of privileges} as stored in DBA_TAB_PRIVS.
+    """
+    if directory:
+        type_filter = "o.object_type = 'DIRECTORY'"
     else:
-        msg = 'Role doesn\'t exist'  # noqa F841
-        return False
-
-
-def get_dir_privs(module, msg, cursor, schema, directory_privs, grants_mode):
-    total_sql_dir = []
-    # Directory Privs
-
-    # module.exit_json(msg=directory_privs)
-    wanted_dirprivs_list = directory_privs
-    w_object_name_l = [w.split(':')[1].lower() for w in wanted_dirprivs_list]
-    # w_object_priv_l = [w.split(':')[0].lower() for w in wanted_dirprivs_list]
-    currdsql_all = """
-    select lower(listagg(p.privilege,',') within group (order by p.privilege)
-           || ':' || p.owner || '.' || p.table_name)
-    from dba_tab_privs p, dba_objects o
-    where p.grantee = upper(\'%s\')
-    and p.table_name = o.object_name
-    and p.owner = o.owner
-    and o.object_type = 'DIRECTORY'
-    group by p.owner,p.table_name
-    """ % (
-        schema
+        type_filter = (
+            "o.object_type not in ('DIRECTORY','TABLE PARTITION','TABLE SUBPARTITION')"
+        )
+    sql = (
+        'select p.owner, p.table_name, p.privilege '
+        'from dba_tab_privs p, dba_objects o '
+        'where p.grantee = :grantee '
+        'and p.table_name = o.object_name '
+        'and p.owner = o.owner '
+        'and %s' % type_filter
     )
+    current = {}
+    for owner, name, priv in execute_sql_get(
+        module, msg, cursor, sql, {'grantee': grantee}
+    ):
+        current.setdefault((owner, name), set()).add(priv)
+    return current
 
-    result = execute_sql_get(module, msg, cursor, currdsql_all)
 
-    grant_list_dir = []
-    revoke_list_dir = []
-    current_privs_l = [
-        a[0] for a in result
-    ]  # Turn list of tuples into list from resultset
-    c_dir_name_l = [o.split(':')[1].lower() for o in current_privs_l]
-    # c_dir_priv_l = [o.split(':')[0].lower() for o in current_privs_l]
-    remove_completely_dir = set(c_dir_name_l).difference(w_object_name_l)
-    if len(list(remove_completely_dir)) > 0:
-        for remove in list(remove_completely_dir):
-            rdsql = 'revoke all on directory %s from %s' % (remove, schema)
-            revoke_list_dir.append(rdsql)
-
-    newstuff = set(w_object_name_l).difference(c_dir_name_l)
-    if len(list(newstuff)) > 0:
-        for index, value in enumerate(w_object_name_l):
-            if value in list(newstuff):
-                nsql = "grant %s on directory %s to %s" % (
-                    wanted_dirprivs_list[index].split(':')[0],
-                    value,
-                    schema,
-                )
-                grant_list_dir.append(nsql)
-
-    if len(current_privs_l) > 0 and len(wanted_dirprivs_list) > 0:
-        for cp in current_privs_l:
-            # object_owner not used anymore
-            # object_owner = cp.split(':').pop().split('.')[0]
-            # object_name not used anymore
-            # object_name = cp.split(':').pop().split('.')[1]
-            cp_privs = cp.split(':')[0].lower()
-            for wp in wanted_dirprivs_list:
-                wp_object = wp.split(':')[1].lower()
-                if wp.split(':')[1].lower() == cp.split(':')[1].lower():
-                    # Compare object_names
-                    cp_privs = cp.split(':')[0].lower().split(',')
-                    wp_privs = wp.split(':')[0].lower().split(',')
-                    priv_add = set(wp_privs).difference(cp_privs)
-                    priv_revoke = set(cp_privs).difference(wp_privs)
-                    if len(list(priv_add)) > 0:
-                        adsql = "grant %s on directory %s to %s" % (
-                            ','.join(a for a in priv_add),
-                            wp_object,
-                            schema,
-                        )
-                        grant_list_dir.append(adsql)
-                    if len(list(priv_revoke)) > 0:
-                        rdsql = "revoke %s on directory %s from %s" % (
-                            ','.join(a for a in priv_revoke),
-                            wp_object,
-                            schema,
-                        )
-                        revoke_list_dir.append(rdsql)
-
-    if len(grant_list_dir) > 0:
-        for a in grant_list_dir:
-            total_sql_dir.append(a)
-
-    if grants_mode.lower() == 'enforce':
-        if len(revoke_list_dir) > 0:
-            for a in revoke_list_dir:
-                total_sql_dir.append(a)
+def get_tab_privs_sql(module, msg, cursor, grantee, privs_list, grants_mode, kind):
+    """GRANT/REVOKE statements for object (kind='object') or directory privileges."""
+    directory = kind == 'directory'
+    if directory:
+        # directories are owned by SYS, given as sys.<dir> or <dir>
+        default_owner = 'SYS'
     else:
-        pass
+        # like in GRANT: an object without owner is in the current schema
+        default_owner = execute_sql_get(
+            module,
+            msg,
+            cursor,
+            "select sys_context('userenv', 'current_schema') from dual",
+        )[0][0]
 
-    return total_sql_dir
+    wanted = parse_tab_privs(module, privs_list, default_owner, kind)
+    current = get_current_tab_privs(module, msg, cursor, grantee, directory)
 
-
-def get_obj_privs(module, msg, cursor, schema, object_privs, grants_mode):
-    total_sql_obj = []
-    # OBJECT PRIVS
-    wanted_privs_list = object_privs
-    w_object_name_l = [w.split(':')[1].lower() for w in wanted_privs_list]
-    # w_object_priv_l = [w.split(':')[0].lower() for w in wanted_privs_list]
-    currsql_all = """
-    select lower(listagg(p.privilege, ',') within group (order by p.privilege)
-                    || ':' || p.owner || '.' || p.table_name
-                )
-    from dba_tab_privs p, dba_objects o
-    where p.grantee = upper(\'%s\')
-    and p.table_name = o.object_name
-    and p.owner = o.owner
-    and o.object_type not in ('DIRECTORY','TABLE PARTITION','TABLE SUBPARTITION')
-    group by p.owner,p.table_name
-    """ % (
-        schema
-    )
-
-    result = execute_sql_get(module, msg, cursor, currsql_all)
+    def on_object(key):
+        if directory:
+            return 'directory %s' % quote_identifier(key[1])
+        return '%s.%s' % (quote_identifier(key[0]), quote_identifier(key[1]))
 
     grant_list = []
     revoke_list = []
-    # Turn list of tuples into list from resultset
-    current_privs_l = [a[0] for a in result]
-    c_object_name_l = [o.split(':')[1].lower() for o in current_privs_l]
-    # c_object_priv_l = [o.split(':')[0].lower() for o in current_privs_l]
-    remove_completely = set(c_object_name_l).difference(w_object_name_l)
-    if len(list(remove_completely)) > 0:
-        for remove in list(remove_completely):
-            rsql = 'revoke all on %s from %s' % (remove, schema)
-            revoke_list.append(rsql)
-
-    newstuff = set(w_object_name_l).difference(c_object_name_l)
-    if len(list(newstuff)) > 0:
-        for index, value in enumerate(w_object_name_l):
-            if value in list(newstuff):
-                nsql = "grant %s on %s to %s" % (
-                    wanted_privs_list[index].split(':')[0],
-                    value,
-                    schema,
+    for key, privs in wanted.items():
+        priv_add = privs.difference(current.get(key, set()))
+        if priv_add:
+            grant_list.append(
+                'grant %s on %s to %s'
+                % (
+                    ','.join(sorted(priv_add)),
+                    on_object(key),
+                    quote_identifier(grantee),
                 )
-                grant_list.append(nsql)
-
-    if len(current_privs_l) > 0 and len(wanted_privs_list) > 0:
-        for cp in current_privs_l:
-            # object_owner not used anymore
-            # object_owner = cp.split(':').pop().split('.')[0]
-            # object_name not used anymore
-            # object_name = cp.split(':').pop().split('.')[1]
-            cp_privs = cp.split(':')[0].lower()
-            for wp in wanted_privs_list:
-                wp_object = wp.split(':')[1].lower()
-                if (
-                    wp.split(':')[1].lower() == cp.split(':')[1].lower()
-                ):  # Compare object_names
-                    cp_privs = cp.split(':')[0].lower().split(',')
-                    wp_privs = wp.split(':')[0].lower().split(',')
-                    priv_add = set(wp_privs).difference(cp_privs)
-                    priv_revoke = set(cp_privs).difference(wp_privs)
-                    if len(list(priv_add)) > 0:
-                        asql = "grant %s on %s to %s" % (
-                            ','.join(a for a in priv_add),
-                            wp_object,
-                            schema,
-                        )
-                        grant_list.append(asql)
-                    if len(list(priv_revoke)) > 0:
-                        rsql = "revoke %s on %s from %s" % (
-                            ','.join(a for a in priv_revoke),
-                            wp_object,
-                            schema,
-                        )
-                        revoke_list.append(rsql)
-
-    if len(grant_list) > 0:
-        for a in grant_list:
-            total_sql_obj.append(a)
+            )
+        priv_revoke = current.get(key, set()).difference(privs)
+        if priv_revoke:
+            revoke_list.append(
+                'revoke %s on %s from %s'
+                % (
+                    ','.join(sorted(priv_revoke)),
+                    on_object(key),
+                    quote_identifier(grantee),
+                )
+            )
+    for key in sorted(set(current).difference(wanted)):
+        revoke_list.append(
+            'revoke all on %s from %s' % (on_object(key), quote_identifier(grantee))
+        )
 
     if grants_mode.lower() == 'enforce':
-        if len(revoke_list) > 0:
-            for a in revoke_list:
-                total_sql_obj.append(a)
-    else:
-        pass
+        return grant_list + revoke_list
+    return grant_list
 
-    return total_sql_obj
+
+def parse_grants(grants_list):
+    """Normalize roles and system privileges.
+
+    Returns (set of names as stored in the data dictionary, set of names in double
+    quotes). A name in double quotes is a role and case sensitive, a name without
+    quotes (role or system privilege) is converted to uppercase.
+    """
+    names = set()
+    quoted = set()
+    for item in clean_list(grants_list):
+        item = item.strip()
+        if not item:
+            continue
+        name = normalize_identifier(item)
+        names.add(name)
+        if item != name and item.startswith('"'):
+            quoted.add(name)
+    return names, quoted
+
+
+def grants_to_sql(names, roles):
+    """Comma separated list for GRANT/REVOKE: roles are quoted, system privileges
+    (keywords like CREATE SESSION) not."""
+    return ','.join(quote_identifier(n) if n in roles else n for n in sorted(names))
 
 
 # Add grants to the schema/role
@@ -491,16 +431,13 @@ def ensure_grants(
     module,
     msg,
     cursor,
-    schema,
+    grantee,
     wanted_grants_list,
     object_privs,
     directory_privs,
     grants_mode,
     container,
 ):
-    add_sql = ''
-    remove_sql = ''
-
     # If no privs are added, we set the 'wanted' lists to be empty.
     if wanted_grants_list is None or wanted_grants_list == ['']:
         wanted_grants_list = []
@@ -509,98 +446,61 @@ def ensure_grants(
     if directory_privs is None or directory_privs == ['']:
         directory_privs = []
 
-    # This list will hold all grants the user currently has
-    dir_privs = []
-    obj_privs = []
-    total_sql = []
-    total_current = []
-
-    dir_privs = get_dir_privs(module, msg, cursor, schema, directory_privs, grants_mode)
-    if len(dir_privs) > 0:
-        for d in dir_privs:
-            total_sql.append(d)
-
-    obj_privs = get_obj_privs(module, msg, cursor, schema, object_privs, grants_mode)
-    if len(obj_privs) > 0:
-        for o in obj_privs:
-            objpriv_sql = o
-            if container:
-                objpriv_sql += ' container=%s' % (container)
-            total_sql.append(objpriv_sql)
-
-    # module.exit_json(msg=total_sql)
-    exceptions_list = ['DBA']
-    exceptions_priv = ['UNLIMITED TABLESPACE']
-
-    if not (schema):  # or not(wanted_grants_list):
+    if not (grantee):
         module.fail_json(msg='Error: Missing schema/role name or grants', changed=False)
         return False
 
-    # Strip the list of unnecessary quotes etc
-    wanted_grants_list = clean_list(wanted_grants_list)
-    wanted_grants_list = [x.lower() for x in wanted_grants_list]
-    wanted_grants_list_upper = [x.upper() for x in wanted_grants_list]
-    schema = clean_string(schema)
+    total_sql = []
+    total_sql.extend(
+        get_tab_privs_sql(
+            module, msg, cursor, grantee, directory_privs, grants_mode, 'directory'
+        )
+    )
+    for objpriv_sql in get_tab_privs_sql(
+        module, msg, cursor, grantee, object_privs, grants_mode, 'object'
+    ):
+        if container:
+            objpriv_sql += ' container=%s' % (container)
+        total_sql.append(objpriv_sql)
 
-    # Get the current role grants for the schema.
-    # If any are present, add them to the total
-    curr_role_grants = get_current_role_grants(module, msg, cursor, schema)
-    if any(curr_role_grants):
-        total_current.extend(curr_role_grants)
-
-    # Get the current sys privs for the schema.
-    # If any are present, add them to the total
-    curr_sys_grants = get_current_sys_grants(module, msg, cursor, schema)
-    if any(curr_sys_grants):
-        total_current.extend(curr_sys_grants)
+    wanted, wanted_quoted = parse_grants(wanted_grants_list)
+    curr_roles = get_current_role_grants(module, msg, cursor, grantee)
+    curr_sys = get_current_sys_grants(module, msg, cursor, grantee)
+    total_current = curr_roles | curr_sys
 
     # Get the difference between current grants and wanted grants
-    grants_to_add = set(wanted_grants_list).difference(total_current)
-    grants_to_remove = set(total_current).difference(wanted_grants_list)
+    grants_to_add = wanted.difference(total_current)
+    grants_to_remove = total_current.difference(wanted)
 
     # Special case: If DBA is granted to a user, unlimited tablespace is also implicitly
     # granted -> on the next run, unlimited tablespace is removed from the user
     # since it is not part of the wanted grants.
     # The following removes 'unlimited tablespace' privilege from the
     # grants_to_remove list, if DBA is also granted
+    if 'DBA' in wanted:
+        grants_to_remove.discard('UNLIMITED TABLESPACE')
 
-    if any(x in exceptions_list for x in wanted_grants_list_upper):
-        grants_to_remove = [
-            x for x in grants_to_remove if x.upper() not in exceptions_priv
-        ]
+    if grants_to_add:
+        add_sql = 'grant %s to %s' % (
+            grants_to_sql(grants_to_add, wanted_quoted),
+            quote_identifier(grantee),
+        )
+        if container:
+            add_sql += ' container=%s' % (container)
+        total_sql.append(add_sql)
 
-    # if there are differences, they will be added.
-    if not any(grants_to_add) and not any(grants_to_remove):
-        pass
-        # module.exit_json(msg="Nothing to do", changed=False)
-    else:
-        # Convert the list of grants to a string
-        if any(grants_to_add):
-            grants_to_add = ','.join(grants_to_add)
-            grants_to_add = clean_string(grants_to_add)
-            add_sql += 'grant %s to %s' % (grants_to_add, schema)
-            if container:
-                add_sql += ' container=%s' % (container)
-            total_sql.append(add_sql)
+    if grants_mode.lower() == 'enforce' and grants_to_remove:
+        total_sql.append(
+            'revoke %s from %s'
+            % (grants_to_sql(grants_to_remove, curr_roles), quote_identifier(grantee))
+        )
 
-        if grants_mode.lower() == 'enforce':
-            if any(grants_to_remove):
-                grants_to_remove = ','.join(grants_to_remove)
-                grants_to_remove = clean_string(grants_to_remove)
-                remove_sql += 'revoke %s from %s' % (grants_to_remove, schema)
-                total_sql.append(remove_sql)
-        else:
-            pass
-
-    # module.exit_json(msg=total_sql)
     if len(total_sql) > 0:
         if ensure_grants_state_sql(module, msg, cursor, total_sql):
             module.exit_json(msg=total_sql, changed=True)
     else:
         msg = 'Nothing to do'
         module.exit_json(msg=msg, changed=False)
-    #     return False
-    # return True
 
 
 def ensure_grants_state_sql(module, msg, cursor, total_sql):
@@ -623,132 +523,61 @@ def execute_sql(module, msg, cursor, sql):
     return True
 
 
-# Remove grants to the schema
-def remove_grants(module, msg, cursor, schema, remove_grants_list, object_privs, state):
-    sql = ''
-
-    # This list will hold all grants/privs the user currently has
-    total_current = []
-
-    if not (schema) or not (remove_grants_list):
+# Remove grants from the schema/role (grantee is normalized)
+def remove_grants(module, msg, cursor, grantee, remove_grants_list, state):
+    if not (grantee) or not (remove_grants_list):
         module.fail_json(msg='Error: Missing schema name or grants', changed=False)
         return False
 
-    # Strip the list of unnecessary quotes etc
-    remove_grants_list = clean_list(remove_grants_list)
-    schema = clean_string(schema)
-
-    # Get the current role grants for the schema.
-    # If any are present, add them to the total
-    curr_role_grants = get_current_role_grants(module, msg, cursor, schema)
-    if any(curr_role_grants):
-        total_current.extend(curr_role_grants)
-
-    # Get the current sys privs for the schema
-    # If any are present, add them to the total
-    curr_sys_grants = get_current_sys_grants(module, msg, cursor, schema)
-    if any(curr_sys_grants):
-        total_current.extend(curr_sys_grants)
-
-    # Get the difference between current grants and wanted grants
-    grants_to_remove = set(remove_grants_list).intersection(total_current)
+    curr_roles = get_current_role_grants(module, msg, cursor, grantee)
+    total_current = curr_roles | get_current_sys_grants(module, msg, cursor, grantee)
 
     # If state=REMOVEALL is used, all grants/privs will be removed
-    if state == 'REMOVEALL' and any(total_current):
-        remove_all = ','.join(total_current)
-        sql += 'revoke %s from %s' % (remove_all, schema)
-        msg = 'All privileges/grants (%s) are removed from schema/role %s' % (
-            remove_all,
-            schema,
+    if state == 'REMOVEALL':
+        grants_to_remove = total_current
+    else:
+        grants_to_remove = parse_grants(remove_grants_list)[0].intersection(
+            total_current
         )
 
-        try:
-            cursor.execute(sql)
-        except oracledb.DatabaseError as exc:
-            (error,) = exc.args
-            msg = (
-                'Something went wrong while removing all grants from the schema/role '
-                '- %s sql: %s' % (error.message, sql)
-            )
-            return False
-
-    # if there are differences, they will be removed.
-    elif not any(grants_to_remove):
+    if not grants_to_remove:
         module.exit_json(
             msg="The schema/role (%s) doesn\'t have the grant(s) you want to remove"
-            % schema,
+            % grantee,
             changed=False,
         )
 
-    else:
-        # Convert the list of grants to a string & clean it
-        grants_to_remove = ','.join(grants_to_remove)
-        grants_to_remove = clean_string(grants_to_remove)
-        sql += 'revoke %s from %s' % (grants_to_remove, schema)
-        msg = 'The grant(s) (%s) successfully removed from the schema/role %s' % (
-            grants_to_remove,
-            schema,
-        )
-
-        try:
-            cursor.execute(sql)
-        except oracledb.DatabaseError as exc:
-            (error,) = exc.args
-            msg = (
-                'Blergh, something went wrong while removing grants from the '
-                'schema/role - %s sql: %s' % (error.message, sql)
-            )
-            return False
-
-    return True
-
-
-# Get the current role/sys grants
-def get_current_role_grants(module, msg, cursor, schema):
-    curr_role_grants = []
-
-    sql = (
-        'select granted_role from dba_role_privs where grantee = upper(\'%s\') '
-        % schema
+    revoke = grants_to_sql(grants_to_remove, curr_roles)
+    sql = 'revoke %s from %s' % (revoke, quote_identifier(grantee))
+    execute_sql(module, msg, cursor, sql)
+    module.exit_json(
+        msg='The grant(s) (%s) successfully removed from the schema/role %s'
+        % (revoke, grantee),
+        changed=True,
     )
 
+
+# Get the current role grants (as stored in DBA_ROLE_PRIVS)
+def get_current_role_grants(module, msg, cursor, grantee):
+    sql = 'select granted_role from dba_role_privs where grantee = :grantee'
+    return set(
+        row[0]
+        for row in execute_sql_get(module, msg, cursor, sql, {'grantee': grantee})
+    )
+
+
+# Get the current sys grants (as stored in DBA_SYS_PRIVS)
+def get_current_sys_grants(module, msg, cursor, grantee):
+    sql = 'select privilege from dba_sys_privs where grantee = :grantee'
+    return set(
+        row[0]
+        for row in execute_sql_get(module, msg, cursor, sql, {'grantee': grantee})
+    )
+
+
+def execute_sql_get(module, msg, cursor, sql, binds=None):
     try:
-        cursor.execute(sql)
-        result = cursor.fetchall()
-    except oracledb.DatabaseError as exc:
-        (error,) = exc.args
-        msg = error.message + 'sql: ' + sql  # noqa F841
-        return False
-    # if result > 0:
-    for item in result:
-        curr_role_grants.append(item[0].lower())
-
-    return curr_role_grants
-
-
-# Get the current sys grants
-def get_current_sys_grants(module, msg, cursor, schema):
-    curr_sys_grants = []
-
-    sql = 'select privilege from dba_sys_privs where grantee = upper(\'%s\') ' % schema
-
-    try:
-        cursor.execute(sql)
-        result = cursor.fetchall()
-    except oracledb.DatabaseError as exc:
-        (error,) = exc.args
-        msg = error.message + 'sql: ' + sql  # noqa F841
-        return False
-    # if result > 0:
-    for item in result:
-        curr_sys_grants.append(item[0].lower())
-
-    return curr_sys_grants
-
-
-def execute_sql_get(module, msg, cursor, sql):
-    try:
-        cursor.execute(sql)
+        cursor.execute(sql, binds or {})
         result = cursor.fetchall()
     except oracledb.DatabaseError as exc:
         (error,) = exc.args
@@ -793,8 +622,13 @@ def main():
     user = module.params["user"]
     password = module.params["password"]
     mode = module.params["mode"]
+    # grantee as stored in the data dictionary (case sensitive in double quotes)
     schema = module.params["schema"]
+    if schema:
+        schema = normalize_identifier(clean_string(schema))
     role = module.params["role"]
+    if role:
+        role = normalize_identifier(clean_string(role))
     grants = module.params["grants"]
     object_privs = module.params["object_privs"]
     directory_privs = module.params["directory_privs"]
@@ -852,7 +686,7 @@ def main():
     elif (state == 'absent' or state == 'REMOVEALL') and schema:
         # module.exit_json(msg='absent & schema', changed=False)
         if check_user_exists(module, msg, cursor, schema):
-            if remove_grants(module, msg, cursor, schema, grants, object_privs, state):
+            if remove_grants(module, msg, cursor, schema, grants, state):
                 # msg = 'The schema %s has been dropped successfully' % schema
                 module.exit_json(msg=msg, changed=True)
         else:
@@ -863,7 +697,7 @@ def main():
     elif (state == 'absent' or state == 'REMOVEALL') and role:
         # module.exit_json(msg='absent & role', changed=False)
         if check_role_exists(module, msg, cursor, role):
-            if remove_grants(module, msg, cursor, role, grants, object_privs, state):
+            if remove_grants(module, msg, cursor, role, grants, state):
                 # msg = 'The schema %s has been dropped successfully' % schema
                 module.exit_json(msg=msg, changed=True)
         else:
