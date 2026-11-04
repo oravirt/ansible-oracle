@@ -103,6 +103,11 @@
       "groupName": "ansible-lint"
     },
     {
+      "description": "black: same version in pre-commit and workflow python-lint.yml",
+      "matchPackageNames": ["black", "python/black"],
+      "groupName": "black"
+    },
+    {
       "description": "antsibull-changelog: same version in requirements, pre-commit and workflow",
       "matchPackageNames": ["antsibull-changelog", "ansible-community/antsibull-changelog"],
       "groupName": "antsibull-changelog"
@@ -162,6 +167,14 @@
       "managerFilePatterns": ["/(^|/)roles/[^/]+/defaults/main\\.ya?ml$/"],
       "matchStrings": [
         "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*[a-z0-9_]+:\\s*['\"]?(?<currentValue>[\\w.-]+)"
+      ]
+    },
+    {
+      "description": "Versions in github workflows with a '# renovate: datasource=... depName=...' comment above (e.g. 'version:' of psf/black), more comment lines between are allowed",
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n(?:\\s*#.*\\n)*\\s*[A-Za-z0-9_-]+:\\s*['\"]?(?<currentValue>[\\w.-]+)"
       ]
     },
     {
