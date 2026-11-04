@@ -1,3 +1,5 @@
 ---
 bugfixes:
   - "oracle_profile: profile names with special characters like '/' failed with ORA-02000, a name in double quotes was not found and created again (ORA-02379). The name is now always quoted in the SQL statements, a name in double quotes is used case-sensitive, otherwise in uppercase (oravirt#566)"
+breaking_changes:
+  - "oracle_profile, oracle_job: a name in double quotes is case sensitive like in SQL, a name without quotes is used in uppercase. oracle_profile compares the name exactly with DBA_PROFILES now, an existing profile with a lower or mixed case name must be given in double quotes (see doc/guides/breaking_changes.adoc)"
