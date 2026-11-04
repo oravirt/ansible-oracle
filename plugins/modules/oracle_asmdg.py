@@ -259,7 +259,7 @@ def create_diskgroup(
                 oracle_home,
                 name.lower(),
             )
-            (rc, stdout, stderr) = module.run_command(command)
+            rc, stdout, stderr = module.run_command(command)
             if rc != 0:
                 if 'CRS-5702' in stdout:
                     # 'Edge-case', where there is only one instance in the
@@ -289,7 +289,7 @@ def remove_diskgroup(cursor, module, msg, oracle_home, name):
     # If in a rac config, we need to unmount the dg on all nodes, then mount
     if rac:
         command = '%s/bin/srvctl stop diskgroup -g %s' % (oracle_home, name.lower())
-        (rc, stdout, stderr) = module.run_command(command)
+        rc, stdout, stderr = module.run_command(command)
         if rc != 0:
             msg = (
                 'Error, couldn\'t unmount the dg. stdout: %s, stderr: %s, command is %s'

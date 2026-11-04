@@ -245,7 +245,7 @@ def check_service_exists(cursor, module, msg, oracle_home, name, database_name):
             database_name,
             name,
         )
-        (rc, stdout, stderr) = module.run_command(command)
+        rc, stdout, stderr = module.run_command(command)
         if rc != 0:
             if 'PRCR-1001' in stdout:  # <-- service doesn't exist
                 return False
@@ -312,7 +312,7 @@ def create_service(
             command += ' -rlbgoal %s' % (rlbgoal)
 
         # module.fail_json(msg=command)
-        (rc, stdout, stderr) = module.run_command(command)
+        rc, stdout, stderr = module.run_command(command)
         if rc != 0:
             if 'PRKO-3117' in stdout:  # <-- service already exist
                 msg = 'Service %s already exists in database %s' % (name, database_name)
@@ -418,7 +418,7 @@ def ensure_service_state(
         #   % (total_mod, _wanted_config, _curr_config))
         if len(total_mod) > 0:
             for cmd in total_mod:
-                (rc, stdout, stderr) = module.run_command(cmd)
+                rc, stdout, stderr = module.run_command(cmd)
                 if rc != 0:
                     if rc != 0:
                         msg = (
@@ -481,7 +481,7 @@ def remove_service(cursor, module, msg, oracle_home, name, database_name, force)
         if force:
             command += ' -f'
 
-        (rc, stdout, stderr) = module.run_command(command)
+        rc, stdout, stderr = module.run_command(command)
         if rc != 0:
             if 'PRCR-1001' in stdout:  # <-- service doesn' exist
                 return False
@@ -515,7 +515,7 @@ def _get_service_config(cursor, module, msg, oracle_home, name, database_name):
         database_name,
         name,
     )
-    (rc, stdout, stderr) = module.run_command(command)
+    rc, stdout, stderr = module.run_command(command)
     if rc != 0:
         msg = (  # noqa
             "Error getting service configuration. Command: %s, stdout: %s, stderr: %s"
@@ -543,7 +543,7 @@ def check_service_status(cursor, module, msg, oracle_home, name, database_name, 
             database_name,
             name,
         )
-        (rc, stdout, stderr) = module.run_command(command)
+        rc, stdout, stderr = module.run_command(command)
 
         if rc != 0:
             msg = 'Checking status of service %s in database %s failed: %s' % (
@@ -566,9 +566,7 @@ def check_service_status(cursor, module, msg, oracle_home, name, database_name, 
             select lower(s.name)
             from v$active_services s
             where lower(s.name) = \'%s\'
-              ''' % (
-            name.lower()
-        )
+              ''' % (name.lower())
         # if execute_sql_get(module, msg, cursor, sql):
         if execute_sql_get(module, msg, cursor, sql):
             return True
@@ -583,7 +581,7 @@ def start_service(cursor, module, msg, oracle_home, name, database_name, configc
             database_name,
             name,
         )
-        (rc, stdout, stderr) = module.run_command(command)
+        rc, stdout, stderr = module.run_command(command)
         if rc != 0:
             if 'PRCR-1001' in stdout:
                 msg = 'Service %s doesn\'t exist in database %s' % (name, database_name)
@@ -635,7 +633,7 @@ def stop_service(cursor, module, msg, oracle_home, name, database_name):
             database_name,
             name,
         )
-        (rc, stdout, stderr) = module.run_command(command)
+        rc, stdout, stderr = module.run_command(command)
 
         if rc != 0:
             if (

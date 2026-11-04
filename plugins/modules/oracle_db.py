@@ -454,7 +454,7 @@ restart_reason:
 
 def get_version(module, oracle_home, script_env):
     command = '%s/bin/sqlplus -V' % (oracle_home)
-    (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
+    rc, stdout, stderr = module.run_command(command, environ_update=script_env)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
         module.fail_json(msg=msg, changed=False)
@@ -476,7 +476,7 @@ def check_db_exists(module, oracle_home, db_name, sid, db_unique_name, script_en
             checkdb = db_name
 
         command = "%s/bin/srvctl config database -d %s " % (oracle_home, checkdb)
-        (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
+        rc, stdout, stderr = module.run_command(command, environ_update=script_env)
         if rc != 0:
             if 'PRCD-1229' in stdout:
                 # DB created, with different ORACLE_HOME
@@ -720,7 +720,7 @@ def create_db(
 
     # msg = "command: %s" % (command)
     # module.fail_json(msg=msg, changed=False)
-    (rc, stdout, stderr) = module.run_command(command)
+    rc, stdout, stderr = module.run_command(command)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
         module.fail_json(msg=msg, changed=False)
@@ -766,7 +766,7 @@ def remove_db(module, oracle_home, db_name, sid, db_unique_name, sys_password):
         "%s/bin/dbca -deleteDatabase -silent -sourceDB %s -sysDBAUserName sys "
         "-sysDBAPassword %s" % (oracle_home, remove_db, sys_password)
     )
-    (rc, stdout, stderr) = module.run_command(command)
+    rc, stdout, stderr = module.run_command(command)
     if rc != 0:
         msg = 'Removal of database %s failed: %s' % (db_name, stdout)
         module.fail_json(msg=msg, changed=False)
@@ -1072,7 +1072,7 @@ def stop_db(module, oracle_home, db_name, db_unique_name, sid):
             oracle_home,
             db_name,
         )
-        (rc, stdout, stderr) = module.run_command(command)
+        rc, stdout, stderr = module.run_command(command)
         if rc != 0:
             msg = 'Error(stop_db) - STDOUT: %s, STDERR: %s, COMMAND: %s' % (
                 stdout,
@@ -1113,7 +1113,7 @@ def stop_db(module, oracle_home, db_name, db_unique_name, sid):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        (stdout, stderr) = p.communicate(shutdown_sql.encode('utf-8'))
+        stdout, stderr = p.communicate(shutdown_sql.encode('utf-8'))
         rc = p.returncode
         # debug.append('stop_db: rc=%d, STDOUT: %s, STDERR: %s, COMMAND: %s' %
         #              (rc, stdout, stderr, shutdown_sql))
@@ -1172,7 +1172,7 @@ def start_instance(
         else:
             command = '%s/bin/srvctl status database -d %s ' % (oracle_home, db_name)
 
-        (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
+        rc, stdout, stderr = module.run_command(command, environ_update=script_env)
         if rc != 0:
             msg = 'Error(start_instance) - STDOUT: %s, STDERR: %s, COMMAND: %s' % (
                 stdout,
@@ -1205,9 +1205,7 @@ def start_instance(
                     )
             if open_mode is not None:
                 command += ' -o %s ' % (open_mode)
-            (rc, stdout, stderr) = module.run_command(
-                command, environ_update=script_env
-            )
+            rc, stdout, stderr = module.run_command(command, environ_update=script_env)
 
             # To allow the DB to register with the listener,
             # as following tasks may want to connect to it immediately and fail
@@ -1239,9 +1237,7 @@ def start_instance(
         connect / as sysdba
         startup %s;
         exit
-        ''' % (
-            open_mode or ""
-        )
+        ''' % (open_mode or "")
         sqlplus_bin = '%s/bin/sqlplus' % (oracle_home)
         p = subprocess.Popen(
             [sqlplus_bin, '/nolog'],
@@ -1249,7 +1245,7 @@ def start_instance(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        (stdout, stderr) = p.communicate(startup_sql.encode('utf-8'))
+        stdout, stderr = p.communicate(startup_sql.encode('utf-8'))
         rc = p.returncode
 
         # To allow the DB to register with the listener,

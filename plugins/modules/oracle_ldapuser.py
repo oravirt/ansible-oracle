@@ -366,7 +366,7 @@ def main():
             deleted_user_mode=dict(default='lock', choices=['lock', 'drop']),
             group_role_map=dict(default=None, type='list'),
         ),
-        supports_check_mode=True
+        supports_check_mode=True,
         # , mutually_exclusive=[['schema_password', 'schema_password_hash']]
     )
     # Check input variables

@@ -289,11 +289,12 @@ def modify_role(module, msg, cursor, role, auth, auth_conf):
             cursor.execute(sql)
         except oracledb.DatabaseError as exc:
             (error,) = exc.args
-            msg[
-                0
-            ] = 'Blergh, something went wrong while altering the role - %s sql: %s' % (
-                error.message,
-                sql,
+            msg[0] = (
+                'Blergh, something went wrong while altering the role - %s sql: %s'
+                % (
+                    error.message,
+                    sql,
+                )
             )
             return False
 

@@ -327,9 +327,11 @@ def create_job():
     c = conn.cursor()
     var_args = c.arrayvar(
         oracledb.STRING,
-        []
-        if module.params['job_arguments'] is None
-        else module.params['job_arguments'],
+        (
+            []
+            if module.params['job_arguments'] is None
+            else module.params['job_arguments']
+        ),
     )
     # Bild the right CREATE_JOB command
     job_sql = "job_name=>v_name,comments=>v_comments,auto_drop=>v_auto_drop"
@@ -418,15 +420,14 @@ def create_job():
             IF v_enabled THEN
                 DBMS_SCHEDULER.ENABLE(v_name);
             END IF;
-        END;"""
-        % job_sql,
+        END;""" % job_sql,
         {
             "var_name": job_fullname,
             "var_job_type": module.params['job_type'],
             "var_job_action": module.params['job_action'],
-            "var_job_style": 'LIGHTWEIGHT'
-            if module.params['lightweight']
-            else 'REGULAR',
+            "var_job_style": (
+                'LIGHTWEIGHT' if module.params['lightweight'] else 'REGULAR'
+            ),
             "var_job_class": module.params['job_class'],
             "var_credential": module.params['credential'],
             "var_destination": module.params['destination'],
