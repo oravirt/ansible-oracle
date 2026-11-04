@@ -1,0 +1,29 @@
+---
+# Run the tests of one module (included by module_tests.yml for every entry of mt_modules).
+#
+# An error outside of a check (e.g. a failed setup/cleanup in _sql.yml or a template error)
+# aborts only the tests of this module. It is recorded as failed check <mt_module>.aborted,
+# the other modules are tested anyway. Test objects left behind are removed by the cleanup
+# at the beginning of the next run.
+- name: "module | {{ mt_module }}"
+  block:
+    - name: "module | run tests | {{ mt_module }}"
+      ansible.builtin.include_tasks: "{{ mt_module }}.yml"
+
+  rescue:
+    - name: "module | record abort | {{ mt_module }}"
+      vars:
+        _id: "{{ mt_module }}.aborted"
+        _msg: >-
+          aborted in task '{{ ansible_failed_task.name | default('') }}':
+          {{ ansible_failed_result.msg | default('') }}
+          {{ (ansible_failed_result.stdout | default('') | string)[-300:] }}
+      ansible.builtin.set_fact:
+        mt_results: >-
+          {{ mt_results + [{'id': _id, 'module': mt_module, 'expect': 'ok', 'actual': 'aborted',
+                            'status': 'failed', 'msg': (_msg | trim)[:500]}] }}
+        mt_failures: "{{ mt_failures + [_id ~ ': ' ~ (_msg | trim)[:500]] }}"
+
+    - name: "module | show abort | {{ mt_module }}"
+      ansible.builtin.debug:
+        msg: "ABORTED: {{ mt_failures | last }}"

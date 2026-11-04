@@ -861,6 +861,7 @@ The playbook loads `vars.yml`, `known_bugs.yml` and `<scenario>/module_tests.yml
 |`module_tests.yml` |playbook, imported by `<scenario>/side_effect.yml`
 |`vars.yml` |connection variants, environment, module selection
 |`known_bugs.yml` |known bugs in all scenarios (`<check id>: <description>`)
+|`_module.yml` |run the tests of one module, record an abort as failed check `<module>.aborted`
 |`_check.yml` |compare a registered module result with the expectation and record it
 |`_sql.yml` |independent verification with `sqlplus / as sysdba` (or `/ as sysasm`)
 |`<module>.yml` |tests of one module
@@ -869,9 +870,31 @@ The playbook loads `vars.yml`, `known_bugs.yml` and `<scenario>/module_tests.yml
 |`oracle_asmdg.yml` |`oracle_asmdg` with an own disk group on the spare ASM disks (`has-ol9`)
 |===
 
-==== Result file
+==== Result of a test run
 
-Every check writes `id`, `expect`, `actual` (`changed`, `ok`, `failed`) and `msg` into `<scenario>/module_tests_results/<label>.json` on the controller (ignored by git).
+A failed check does not stop the test run, the play fails at the end (`Assert that all checks passed`).
+
+An error outside of a check (e.g. a failed setup or cleanup in `_sql.yml`, a template error in a test) aborts only the tests of this module.
+It is recorded as failed check `<module>.aborted` with the failed task and the error message, the other modules are tested anyway.
+Test objects left behind are removed by the cleanup at the beginning of the next run.
+
+At the end the play shows
+
+* `Summary per module`: a table with the number of checks per module and in total: `passed`, `failed`, `known` (known bug) and `not repr.` (known bug not reproduced)
+* `Summary of module tests`: the result file and the lists of the failed checks, the known bugs and the known bugs not reproduced
+
+Every check is written into `<scenario>/module_tests_results/<label>.json` on the controller (ignored by git), also after an abort:
+
+[options="header" cols="1,3"]
+|===
+|Key |Content
+|`id` |id of the check
+|`module` |test file of the module (entry of `mt_modules`)
+|`expect` |`changed`, `ok` or `failed`
+|`actual` |`changed`, `ok`, `failed` or `aborted`
+|`status` |`passed`, `failed`, `known` (known bug) or `fixed` (known bug not reproduced)
+|`msg` |message of the module (max. 500 characters)
+|===
 
 .Comparison before/after a change
 ----
