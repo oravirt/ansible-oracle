@@ -3,6 +3,7 @@
 # Only low-risk checks: no dbca, no shutdown/restart.
 # - state=started on the running database (startup returns ORA-01081 => ok)
 # - state=present with the current settings of DB1 (no restart because archivelog is unchanged)
+# - state=present with hostname as ip address and with a host name that does not resolve
 # - state=started/absent for a database that does not exist (only checks /etc/oratab)
 # Connection: the module always connects as sys as sysdba (sys_password) to the service
 # db_name; there is no wallet entry for DB1, so the wallet variant is not tested.
@@ -94,6 +95,49 @@
         mt_sql: "{{ _db_settings_sql }}"
         mt_sql_expect: "{{ _db_settings }}"
         mt_sql_id: oracle_db.cdb.present_idempotent_sql
+
+    # hostname is used for the connection (oravirt#542), default is os.uname()[1]
+    - name: oracle_db | present with hostname as ip address
+      opitzconsulting.ansible_oracle.oracle_db:
+        oracle_home: "{{ _db_args.oracle_home }}"
+        db_name: "{{ _db_args.db_name }}"
+        sid: "{{ _db_args.sid }}"
+        sys_password: "{{ _db_args.sys_password }}"
+        hostname: "{{ ansible_facts['default_ipv4']['address'] }}"
+        port: "{{ _db_args.port }}"
+        archivelog: "{{ _db_log_mode == 'ARCHIVELOG' }}"
+        force_logging: "{{ _db_force_logging == 'YES' }}"
+        flashback: "{{ _db_flashback == 'YES' }}"
+        supplemental_logging: "{{ _db_supplemental == 'YES' }}"
+        default_tablespace_type: "{{ _db_tbs_type }}"
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_db | check present with hostname as ip address
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_db.cdb.hostname_address, mt_res: "{{ _res }}", mt_expect: ok}
+
+    # the listener listens on all addresses (*:1521) => use a host name that does
+    # not resolve (RFC 2606), fails only if hostname is used
+    - name: oracle_db | present with hostname that does not resolve
+      opitzconsulting.ansible_oracle.oracle_db:
+        oracle_home: "{{ _db_args.oracle_home }}"
+        db_name: "{{ _db_args.db_name }}"
+        sid: "{{ _db_args.sid }}"
+        sys_password: "{{ _db_args.sys_password }}"
+        hostname: moltest-nohost.invalid
+        port: "{{ _db_args.port }}"
+        archivelog: "{{ _db_log_mode == 'ARCHIVELOG' }}"
+        force_logging: "{{ _db_force_logging == 'YES' }}"
+        flashback: "{{ _db_flashback == 'YES' }}"
+        supplemental_logging: "{{ _db_supplemental == 'YES' }}"
+        default_tablespace_type: "{{ _db_tbs_type }}"
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_db | check present with hostname that does not resolve
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_db.cdb.hostname_unresolved, mt_res: "{{ _res }}", mt_expect: failed}
 
     # switch minimal supplemental logging (online, no restart) and back
     - name: oracle_db | switch supplemental logging
