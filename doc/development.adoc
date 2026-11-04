@@ -694,6 +694,7 @@ The following scenarios are existing in the `ansible-oracle profect.
 |Stage |Description
 | dbfs | Full stage for installation of RDBMS 19c + Patching and create database. Requires installation media in /vagrant on local host.
 | dbfs-ol9 | Full stage for installation of RDBMS 19c + Patching on OL9 and create database. Requires installation media in /vagrant on local host.
+| dbfs-ol10 | Same as `dbfs` on OL10: Oracle AI Database 26ai with module tests. Requires installation media in /vagrant on local host.
 | default | Stage for testing common and orahost roles with different Distributions.
 | download | Download Patches from support.oracle.com for dbfs stage.
 | golden | Create Golden-Image for installation from dbfs.
@@ -701,7 +702,7 @@ The following scenarios are existing in the `ansible-oracle profect.
 
 === Directory for installation media and patches
 
-The scenarios `dbfs`, `dbfs-ol9`, `download` and `golden` mount a local directory as `/vagrant` into the container.
+The scenarios `dbfs`, `dbfs-ol9`, `dbfs-ol10`, `download` and `golden` mount a local directory as `/vagrant` into the container.
 The local directory must be defined by `MOLECULE_SW_DIR`, there is no default. The path inside the container is always `/vagrant`.
 
 .Set the directory as environment variable
@@ -803,13 +804,14 @@ molecule test -s golden
 [[module-tests]]
 === Module tests
 
-The side-effect of the scenarios `dbfs` and `has-ol9` tests the modules of `opitzconsulting.ansible_oracle` against an existing database.
+The side-effect of the scenarios `dbfs`, `dbfs-ol10` and `has-ol9` tests the modules of `opitzconsulting.ansible_oracle` against an existing database.
 The tests are shared by the scenarios in `extensions/molecule/shared_config/module_tests`, only the scenario specific variables are in `<scenario>/module_tests.yml`.
 
 [options="header" cols="1,4"]
 |===
 |Scenario |Environment
 |`dbfs` |Oracle AI Database 26ai on filesystem without Grid Infrastructure (CDB `DB1`, PDB `ORCLPDB`)
+|`dbfs-ol10` |Same as `dbfs` on Oracle Linux 10
 |`has-ol9` |Oracle Restart 26ai with ASM, Oracle Database 19c in `+DATA` (CDB `DBHAS`, PDB `ORCLPDB1`)
 |===
 
@@ -824,6 +826,7 @@ task module-test                                        # all module tests in db
 task module-test M=oracle_user,oracle_role              # selected modules
 task module-test L=cx_oracle                            # result file dbfs/module_tests_results/cx_oracle.json
 task module-test M=oracle_user C=false                  # without reinstalling the collection
+task module-test S=dbfs-ol10                            # all module tests in dbfs-ol10
 task module-test S=has-ol9                              # all module tests in has-ol9
 task module-test S=has-ol9 M=oracle_asmdg               # selected modules in has-ol9
 ----

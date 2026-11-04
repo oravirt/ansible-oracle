@@ -1,29 +1,57 @@
 ---
-# oracle_sw_copy is true in this scenario
-# => installation media and patches are copied from the Ansible controller
-# => /vagrant only exists inside the container
-oracle_sw_source_local: "{{ lookup('ansible.builtin.env', 'MOLECULE_SW_DIR') }}"
+# Scenario dbfs-ol10: same as dbfs on Oracle Linux 10
+#
+# converge:    ORACLE_HOME 26ai, CDB DB1 with PDB ORCLPDB, wallet with ORCLPDB_SYSTEM
+# side_effect: module tests (extensions/molecule/shared_config/module_tests)
+#
+# Only one CDB with one PDB to keep the converge as short as possible.
 
-oraords_db_pools:
-  - db_pool: default
-    pdb_name: ORCLPDB1
-    admin_user: sys
-    service: ORCLPDB1
-    port: 1521
-    host: dbfs-ol10
-    feature_db_api: true
-    feature_rest_enabled_sql: true
-    feature_sdw: true
+db_homes_installed:
+  - home: db26-si-ee
+    state: present
+    apply_patches: false
 
-oraords_db_pools_password:
-  default:
-    admin_password: Oracle_123
-    ords_password: Oracle_456
+listener_installed:
+  - home: db26-si-ee
+    listener_name: LISTENER
+    state: present
+
+# alias for the wallet credential (items2dict in group_vars drops 'alias')
+oracle_tnsnames_config:
+  ORCLPDB:
+    alias:
+      - ORCLPDB_SYSTEM
+    connect:
+      service_name: ORCLPDB
+    address:
+      - host: "{{ ansible_hostname }}"
+
+tnsnames_installed:
+  - tnsname: "{{ oracle_pdbs[0]['pdb_name'] }}"
+    home: db26-si-ee
+    state: present
+
+sqlnet_installed:
+  - home: db26-si-ee
+    sqlnet: sqlnetalias1
+    state: present
+
+# wallet from group_vars uses home db19-si-ee
+oracle_wallet_config:
+  - name: wallet1
+    home: db26-si-ee
+    path: /u01/app/oracle/wallet
+    state: present
+    dbcredentials:
+      - tns_name: "{{ oracle_pdbs[0]['pdb_name'] }}_SYSTEM"
+        db_name: "{{ oracle_pdbs[0]['pdb_name'] }}"
+        db_user: system
+        state: present
 
 oracle_databases:
-  - home: db19-si-ee
+  - home: db26-si-ee
     oradb_facts_ignore_unreachable: true
-    oracle_db_name: &oracle_db_name2 DB2
+    oracle_db_name: DB1
     oracle_db_type: SI
     is_container: true
     storage_type: FS
@@ -31,21 +59,13 @@ oracle_databases:
     redolog_size: 50M
     redolog_groups: 3
     datafile_dest: /u01/app/oracle/oradata
-    recoveryfile_dest: /u01/app/oracle//fra
+    recoveryfile_dest: /u01/app/oracle/fra
     listener_name: LISTENER
     listener_port: 1521
     archivelog: false
     flashback: false
-    force_logging: false
+    force_logging: true
     state: present
-    tablespaces:
-      - name: TEST
-        size: 10M
-        autoextend: true
-        next: 50M
-        maxsize: 4G
-        content: permanent
-        state: present
     init_parameters:
       - {name: db_create_file_dest, value: '/u01/app/oracle/oradata', scope: both, state: present}
       - {name: db_create_online_log_dest_1, value: '/u01/app/oracle/oradata', scope: both, state: present}
@@ -54,24 +74,10 @@ oracle_databases:
       - {name: sga_target, value: '1808M', scope: spfile, state: present}
 
 oracle_pdbs:
-  - cdb: DB2
-    home: db19-si-ee
-    pdb_name: ORCLPDB1
-    listener_port: 1521
-    state: present
-    datafile_dest: /u01/app/oracle/oradata
-    apex_state: present
-    apex_version: 24.1
-    apex_patch: 36695709
-  - cdb: DB2
-    home: db19-si-ee
-    pdb_name: ORCLPDB2
-    listener_port: 1521
-    state: present
-    datafile_dest: /u01/app/oracle/oradata
-  - cdb: DB2
-    home: db19-si-ee
-    pdb_name: ORCLPDB3
+  - cdb: DB1
+    home: db26-si-ee
+    pdb_name: ORCLPDB
+    pdbadmin_user: PDBROOT
     listener_port: 1521
     state: present
     datafile_dest: /u01/app/oracle/oradata
