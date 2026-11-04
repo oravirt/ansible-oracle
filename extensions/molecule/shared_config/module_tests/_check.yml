@@ -5,16 +5,21 @@
 # mt_res:    registered result of the module call (task with ignore_errors: true)
 # mt_expect: changed | ok | failed
 #
-# A failed check does not stop the test run. side_effect.yml fails at the end.
+# A failed check does not stop the test run. module_tests.yml fails at the end.
 - name: "check | {{ mt_id }} | expect {{ mt_expect }}"
   vars:
     _actual: >-
       {{ 'failed' if (mt_res.failed | default(false) | bool)
          else ('changed' if (mt_res.changed | default(false) | bool) else 'ok') }}
     _msg: "{{ (mt_res.msg | default('') | string)[:500] }}"
+    # passed | failed | known (known bug) | fixed (known bug not reproduced)
+    _status: >-
+      {{ ('fixed' if mt_id in mt_known_bugs else 'passed') if _actual == mt_expect
+         else ('known' if mt_id in mt_known_bugs else 'failed') }}
   ansible.builtin.set_fact:
     mt_results: >-
-      {{ mt_results + [{'id': mt_id, 'expect': mt_expect, 'actual': _actual, 'msg': _msg}] }}
+      {{ mt_results + [{'id': mt_id, 'module': mt_module, 'expect': mt_expect, 'actual': _actual,
+                        'status': _status, 'msg': _msg}] }}
     mt_failures: >-
       {{ mt_failures
          + ([mt_id ~ ': expected ' ~ mt_expect ~ ', got ' ~ _actual ~ ' - ' ~ _msg]

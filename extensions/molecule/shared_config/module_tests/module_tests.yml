@@ -62,7 +62,7 @@
         msg: "Module tests: {{ mt_modules | join(', ') }}"
 
     - name: Run module tests
-      ansible.builtin.include_tasks: "{{ mt_module }}.yml"
+      ansible.builtin.include_tasks: _module.yml
       loop: "{{ mt_modules }}"
       loop_control:
         loop_var: mt_module
@@ -82,6 +82,22 @@
         mode: '0644'
       delegate_to: localhost
       become: false
+
+    - name: Summary per module
+      ansible.builtin.debug:
+        msg: "{{ _table | trim | split('\n') }}"
+      vars:
+        _fmt: '%-24s %7s %7s %7s %7s %9s'
+        _table: |-
+          {{ _fmt | format('module', 'checks', 'passed', 'failed', 'known', 'not repr.') }}
+          {% for m in mt_modules + ['total'] %}
+          {% set r = mt_results if m == 'total' else mt_results | selectattr('module', 'equalto', m) | list %}
+          {{ _fmt | format(m, r | length,
+                           r | selectattr('status', 'equalto', 'passed') | list | length,
+                           r | selectattr('status', 'equalto', 'failed') | list | length,
+                           r | selectattr('status', 'equalto', 'known') | list | length,
+                           r | selectattr('status', 'equalto', 'fixed') | list | length) }}
+          {% endfor %}
 
     - name: Summary of module tests
       ansible.builtin.debug:

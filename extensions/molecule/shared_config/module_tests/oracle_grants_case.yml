@@ -104,7 +104,8 @@
     mt_sql_container: "{{ mt_pdb }}"
     mt_sql: "{{ _grc_tab_privs_sql }}"
     mt_sql_expect: >-
-      {{ _gr_owner }}.MolTest_Tab:SELECT,MolTest_Owner.MOLTEST_TAB:INSERT,MolTest_Owner.MOLTEST_TAB:SELECT,MolTest_Owner.MolTest_Tab:SELECT,SYS.MolTest_Dir:READ,SYSTEM.MolTest_Sys_Tab:SELECT
+      {{ _gr_owner ~ '.MolTest_Tab:SELECT,MolTest_Owner.MOLTEST_TAB:INSERT,MolTest_Owner.MOLTEST_TAB:SELECT,'
+         ~ 'MolTest_Owner.MolTest_Tab:SELECT,SYS.MolTest_Dir:READ,SYSTEM.MolTest_Sys_Tab:SELECT' }}
     mt_sql_id: oracle_grants.pdb.case_grant_tab_sql
 
 - name: oracle_grants case | verify roles
