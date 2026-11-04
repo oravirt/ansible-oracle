@@ -32,7 +32,29 @@
   "pip_requirements": {
     "managerFilePatterns": ["/(^|/)requirements[\\w.-]*\\.txt$/"]
   },
+  "constraintsFiltering": "strict",
   "packageRules": [
+    {
+      "description": "python of the venvs in shell.nix (python313)",
+      "matchManagers": ["pip_requirements"],
+      "matchFileNames": [
+        "tools/dev/requirements_dev_2.*.txt",
+        "tools/dev/requirements_doctor.txt",
+        "tools/dev/requirements_antsibull.txt"
+      ],
+      "constraints": { "python": "3.13" }
+    },
+    {
+      "description": "python of the execution environment (python3.11) and shell.nix (python313) - lowest version",
+      "matchManagers": ["pip_requirements"],
+      "matchFileNames": [
+        "tools/dev/requirements_dev.txt",
+        "tools/ansible/requirements_ansible.txt",
+        "requirements.txt",
+        "example/*/ansible/requirements.txt"
+      ],
+      "constraints": { "python": "3.11" }
+    },
     {
       "description": "SLES15SP* and OL versions are intentionally pinned",
       "matchFileNames": [
@@ -51,6 +73,12 @@
       "matchManagers": ["ansible-galaxy"],
       "matchPackageNames": ["community.general", "community.crypto"],
       "enabled": false
+    },
+    {
+      "description": "ibre5041.ansible_oracle_modules >= 3.4.1 depends on community.crypto >=3.0.0 (requires ansible-core >=2.17), galaxy.yml allows community.crypto <3.0.0",
+      "matchManagers": ["ansible-galaxy"],
+      "matchPackageNames": ["ibre5041.ansible_oracle_modules"],
+      "allowedVersions": "<3.4.0"
     },
     {
       "description": "version of the own collection in requirements.yml is set by tools/release/galaxy_version.sh",
