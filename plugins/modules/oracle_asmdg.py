@@ -76,7 +76,9 @@ options:
             - Must have the same number of entries as O(attribute_name).
             - Attributes are only compared for an existing disk group when both
               O(attribute_name) and O(attribute_value) are set. If any attribute
-              differs, all listed attributes are set again.
+              differs, all listed attributes are set again. C(compatible.asm) is
+              set first, because C(compatible.rdbms) and C(compatible.advm) can't
+              be higher than C(compatible.asm).
         type: list
         elements: str
         required: false
@@ -232,11 +234,7 @@ def create_diskgroup(
     attribute_name,
     attribute_value,
 ):
-    add_attr = False
-    if not any(x is None for x in attribute_name):
-        add_attr = True
-    if not any(x is None for x in attribute_name):
-        add_attr = True
+    add_attr = bool(attribute_name) and bool(attribute_value)
 
     if add_attr:
         attributes = ','.join(
@@ -331,9 +329,9 @@ def ensure_diskgroup_state(
         for a in get_ro_attr:
             read_only_attributes.append(a[0])
 
-        # Make sure properties are lower case
-        attribute_name = [x.lower() for x in attribute_name]
-        attribute_value = [y.lower() for y in attribute_value]
+        # Make sure properties are lower case, values can be numbers in YAML
+        attribute_name = [str(x).lower() for x in attribute_name]
+        attribute_value = [str(y).lower() for y in attribute_value]
         wanted_attributes = zip(attribute_name, attribute_value)
 
         # Zip object type apparently changed from list (python2) to iterator (python3)
@@ -343,10 +341,11 @@ def ensure_diskgroup_state(
             wanted_attributes = list(wanted_attributes)
 
         # Make sure we don't try to modify read only attributes. Removing them
-        # from the wanted_attributes list
-        for a in wanted_attributes:
-            if a[0] in read_only_attributes:
-                wanted_attributes.remove(a)
+        # from the wanted_attributes list (a new list, removing elements while
+        # iterating over the list skips the next element)
+        wanted_attributes = [
+            a for a in wanted_attributes if a[0] not in read_only_attributes
+        ]
 
         # Check the current attributes
         attribute_names_ = ','.join(
@@ -360,7 +359,11 @@ def ensure_diskgroup_state(
             # Convert to dict and compare current with wanted
             if sorted(current_properties) != sorted(wanted_attributes):
                 change_attr = True
-                for i in wanted_attributes:
+                # compatible.rdbms and compatible.advm can't be higher than
+                # compatible.asm => set compatible.asm first
+                for i in sorted(
+                    wanted_attributes, key=lambda a: a[0] != 'compatible.asm'
+                ):
                     total_sql.append(
                         "alter diskgroup %s set attribute '%s'='%s'"
                         % (name, i[0], i[1])
@@ -502,6 +505,13 @@ def main():
     port = module.params["port"]
     service_name = module.params["service_name"]
     oracle_home = module.params["oracle_home"]
+
+    if len(attribute_name or []) != len(attribute_value or []):
+        module.fail_json(
+            msg='attribute_name and attribute_value must have the same number '
+            'of entries',
+            changed=False,
+        )
 
     # connects always as SYSASM
     conn = oracledb_connect(

@@ -2,6 +2,9 @@
 # Tests for oracle_asmdg in the ASM instance of Oracle Restart (scenario has-ol9)
 # - own disk group MOLTEST_DG on the first two spare disks (mt_asm_spare_disks, created in converge)
 # - create with attributes, idempotence, add disk, drop disk, change attribute, status, drop
+# - own disk group MOLTEST_DG2 on the third spare disk:
+#   create without attributes, attributes of an existing disk group (oravirt#491):
+#   compatible.rdbms before compatible.asm in the list, read-only attributes in a row
 # - connection variants: sys (sysasm, the module always connects as SYSASM), wrong password
 # Check mode is not supported by the module and is not tested.
 # Variables of the scenario: mt_asm_oracle_home, mt_asm_sid, mt_asm_spare_disks, mt_conn_asm
@@ -10,6 +13,8 @@
     _dg_name: MOLTEST_DG
     _dg_disk1: "{{ mt_asm_spare_disks[0] }}"
     _dg_disk2: "{{ mt_asm_spare_disks[1] }}"
+    _dg2_name: MOLTEST_DG2
+    _dg2_disk: "{{ mt_asm_spare_disks[2] }}"
     _dg_disks_sql: >-
       select count(*) from v$asm_disk d join v$asm_diskgroup g on g.group_number = d.group_number
       where g.name = 'MOLTEST_DG' and d.state = 'NORMAL';
@@ -17,6 +22,10 @@
       select listagg(a.name || '=' || a.value, ',') within group (order by a.name)
       from v$asm_attribute a join v$asm_diskgroup g on g.group_number = a.group_number
       where g.name = 'MOLTEST_DG' and a.name in ('compatible.asm', 'compatible.rdbms');
+    _dg2_attr_sql: >-
+      select listagg(a.name || '=' || a.value, ',') within group (order by a.name)
+      from v$asm_attribute a join v$asm_diskgroup g on g.group_number = a.group_number
+      where g.name = 'MOLTEST_DG2' and a.name in ('compatible.asm', 'compatible.rdbms');
 
 # ASM does not support PL/SQL => single statements, errors are ignored
 - name: oracle_asmdg | cleanup disk group
@@ -25,6 +34,8 @@
     stdin: |
       drop diskgroup moltest_dg including contents;
       drop diskgroup moltest_dg force including contents;
+      drop diskgroup moltest_dg2 including contents;
+      drop diskgroup moltest_dg2 force including contents;
       exit
   environment:
     ORACLE_HOME: "{{ mt_asm_oracle_home }}"
@@ -263,6 +274,140 @@
         mt_sql: "select count(*) from v$asm_diskgroup where name = 'MOLTEST_DG';"
         mt_sql_expect: "0"
         mt_sql_id: oracle_asmdg.asm.drop_sql
+
+    # without attribute_name/attribute_value (role: disk group without attributes)
+    - name: oracle_asmdg | create without attributes
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg2_name }}"
+        disks:
+          - "{{ _dg2_disk }}"
+        redundancy: external
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check create without attributes
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.create_no_attributes, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_asmdg | create without attributes again
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg2_name }}"
+        disks:
+          - "{{ _dg2_disk }}"
+        redundancy: external
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check create without attributes again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.create_no_attributes_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_asmdg | drop disk group without attributes
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg2_name }}"
+        state: absent
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check drop disk group without attributes
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.drop_no_attributes, mt_res: "{{ _res }}", mt_expect: changed}
+
+    # oravirt#491: the disk group exists (like the first disk group created by gridSetup)
+    # with compatible.rdbms from the default, the attributes must be set afterwards
+    - name: oracle_asmdg | create with compatible.asm only
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg2_name }}"
+        disks:
+          - "{{ _dg2_disk }}"
+        redundancy: external
+        attribute_name:
+          - compatible.asm
+        attribute_value:
+          - 19.0.0.0.0
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check create with compatible.asm only
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.create_compatible_asm, mt_res: "{{ _res }}", mt_expect: changed}
+
+    # compatible.rdbms before compatible.asm (the module sets compatible.asm first),
+    # au_size and sector_size are read-only and in a row, au_size as number
+    - name: oracle_asmdg | set attributes of existing disk group
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg2_name }}"
+        disks:
+          - "{{ _dg2_disk }}"
+        attribute_name:
+          - compatible.rdbms
+          - au_size
+          - sector_size
+          - compatible.asm
+        attribute_value:
+          - 23.0.0.0.0
+          - 4
+          - 512
+          - 23.0.0.0.0
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check set attributes of existing disk group
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.existing_attributes, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_asmdg | set attributes of existing disk group again
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg2_name }}"
+        disks:
+          - "{{ _dg2_disk }}"
+        attribute_name:
+          - compatible.rdbms
+          - au_size
+          - sector_size
+          - compatible.asm
+        attribute_value:
+          - 23.0.0.0.0
+          - 4
+          - 512
+          - 23.0.0.0.0
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check set attributes of existing disk group again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.existing_attributes_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_asmdg | verify attributes of existing disk group
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_asm: true
+        mt_sql: "{{ _dg2_attr_sql }}"
+        mt_sql_expect: "compatible.asm=23.0.0.0.0,compatible.rdbms=23.0.0.0.0"
+        mt_sql_id: oracle_asmdg.asm.existing_attributes_sql
+
+    - name: oracle_asmdg | attribute_name and attribute_value with different length
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg2_name }}"
+        disks:
+          - "{{ _dg2_disk }}"
+        attribute_name:
+          - compatible.rdbms
+          - compatible.asm
+        attribute_value:
+          - 23.0.0.0.0
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check attribute_name and attribute_value with different length
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.attributes_length, mt_res: "{{ _res }}", mt_expect: failed}
+
+    - name: oracle_asmdg | drop disk group with attributes
+      opitzconsulting.ansible_oracle.oracle_asmdg:
+        name: "{{ _dg2_name }}"
+        state: absent
+      register: _res
+      ignore_errors: true
+    - name: oracle_asmdg | check drop disk group with attributes
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_asmdg.asm.drop_existing_attributes, mt_res: "{{ _res }}", mt_expect: changed}
 
 # error handling
 - name: oracle_asmdg | wrong password

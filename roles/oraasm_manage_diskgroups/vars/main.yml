@@ -18,16 +18,6 @@ _oraasm_manage_diskgroups_asmdevice_list: |-
   {%- endfor %}
   {%- endif %}
 
-_oraasm_manage_diskgroups_attr_name: |-
-  {% if ad_loop.attributes is defined %}
-  {{- ad_loop.attributes | default(omit) | map(attribute='name') | list }}
-  {%- else %}None{% endif %}
-
-_oraasm_manage_diskgroups_attr_value: |-
-  {% if ad_loop.attributes is defined %}
-  {{- ad_loop.attributes | default(omit) | map(attribute='value') | list }}
-  {%- else %}None{% endif %}
-
 _oracle_asm_disk_prefix: |-
   {%- if device_persistence == 'asmlib' %}
   {%- if oracle_asm_disk_string.endswith('*') %}{{ oracle_asm_disk_string[:-1] }}
