@@ -1,0 +1,269 @@
+---
+# Tests for oracle_user with quotas (oravirt#312), included by oracle_user.yml
+# PDB ORCLPDB, local user MOLTEST_QUOTA, tablespaces MOLTEST_USERS and SYSAUX (block size 8K):
+# - create with quotas: no automatic quota unlimited on the default tablespace
+# - quotas_mode append keeps other quotas, enforce removes them, size 0 removes a quota
+# - Oracle rounds a quota up to whole blocks, idempotence with sizes not a multiple of blocks
+# - without quotas, existing quotas are not changed
+# - error cases: invalid size, missing tablespace, duplicate tablespace
+- name: oracle_user quota | variables
+  ansible.builtin.set_fact:
+    _quota_user: MOLTEST_QUOTA
+    _quota_sql: >-
+      select nvl(listagg(tablespace_name || ':' || max_bytes, ',')
+             within group (order by tablespace_name), 'none')
+      from dba_ts_quotas where username = 'MOLTEST_QUOTA';
+
+- name: oracle_user quota | cleanup
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+
+- name: oracle_user quota | create with quotas
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    schema_password: "{{ _usr_password }}"
+    default_tablespace: MOLTEST_USERS
+    quotas:
+      - tablespace: moltest_users
+        size: 10M
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check create with quotas
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user quota | verify create with quotas
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _quota_sql }}"
+    mt_sql_expect: "MOLTEST_USERS:10485760"
+    mt_sql_id: oracle_user.pdb.quota_create_sql
+
+- name: oracle_user quota | create with quotas again
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    schema_password: "{{ _usr_password }}"
+    default_tablespace: MOLTEST_USERS
+    quotas:
+      - tablespace: MOLTEST_USERS
+        size: 10m
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check create with quotas again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+# 1000 bytes => 1 block (8192 bytes)
+- name: oracle_user quota | append quota with rounding
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    quotas:
+      - tablespace: SYSAUX
+        size: 1000
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check append quota with rounding
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_append, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user quota | append quota with rounding again
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    quotas:
+      - tablespace: SYSAUX
+        size: 1000
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check append quota with rounding again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_append_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user quota | verify append quota
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _quota_sql }}"
+    mt_sql_expect: "MOLTEST_USERS:10485760,SYSAUX:8192"
+    mt_sql_id: oracle_user.pdb.quota_append_sql
+
+- name: oracle_user quota | change to unlimited (append)
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    quotas:
+      - tablespace: MOLTEST_USERS
+        size: unlimited
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check change to unlimited
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_unlimited, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user quota | verify change to unlimited, SYSAUX is kept
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _quota_sql }}"
+    mt_sql_expect: "MOLTEST_USERS:-1,SYSAUX:8192"
+    mt_sql_id: oracle_user.pdb.quota_unlimited_sql
+
+- name: oracle_user quota | enforce
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    quotas:
+      - tablespace: MOLTEST_USERS
+        size: UNLIMITED
+    quotas_mode: enforce
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check enforce
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_enforce, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user quota | enforce again
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    quotas:
+      - tablespace: MOLTEST_USERS
+        size: unlimited
+    quotas_mode: enforce
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check enforce again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_enforce_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user quota | verify enforce
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _quota_sql }}"
+    mt_sql_expect: "MOLTEST_USERS:-1"
+    mt_sql_id: oracle_user.pdb.quota_enforce_sql
+
+# without quotas the quotas are not changed, also with default_tablespace
+- name: oracle_user quota | without quotas
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    default_tablespace: MOLTEST_USERS
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check without quotas
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_omitted, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user quota | remove quota with size 0
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    quotas:
+      - tablespace: MOLTEST_USERS
+        size: 0
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check remove quota with size 0
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_remove, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user quota | remove quota with size 0 again
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    quotas:
+      - tablespace: MOLTEST_USERS
+        size: 0
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check remove quota with size 0 again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_remove_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_user quota | verify remove quota
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _quota_sql }}"
+    mt_sql_expect: "none"
+    mt_sql_id: oracle_user.pdb.quota_remove_sql
+
+# size as integer (bytes)
+- name: oracle_user quota | quota with size as integer
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    quotas:
+      - tablespace: SYSAUX
+        size: 1048576
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check quota with size as integer
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_integer, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user quota | enforce with empty list
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    quotas: []
+    quotas_mode: enforce
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check enforce with empty list
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_enforce_empty, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_user quota | verify enforce with empty list
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _quota_sql }}"
+    mt_sql_expect: "none"
+    mt_sql_id: oracle_user.pdb.quota_enforce_empty_sql
+
+# error handling
+- name: oracle_user quota | invalid size
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    quotas:
+      - tablespace: MOLTEST_USERS
+        size: 10X
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check invalid size
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_invalid_size, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_user quota | missing tablespace
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    quotas:
+      - tablespace: MOLTEST_NOTBS
+        size: 10M
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check missing tablespace
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_missing_tablespace, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_user quota | duplicate tablespace
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    quotas:
+      - tablespace: MOLTEST_USERS
+        size: 10M
+      - tablespace: moltest_users
+        size: 20M
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check duplicate tablespace
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_duplicate_tablespace, mt_res: "{{ _res }}", mt_expect: failed}
+
+- name: oracle_user quota | drop
+  opitzconsulting.ansible_oracle.oracle_user:
+    schema: "{{ _quota_user }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_user quota | check drop
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_user.pdb.quota_drop, mt_res: "{{ _res }}", mt_expect: changed}

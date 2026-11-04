@@ -3,6 +3,7 @@
 
 import hashlib
 import os
+import re
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.oracledb_connect import (  # noqa: E501
     oracledb,
@@ -23,6 +24,8 @@ description:
     - Existing users are compared with C(DBA_USERS) (account status, authentication
       type, default and temporary tablespace, profile). If any of these differs,
       one C(ALTER USER) statement with all given attributes is executed.
+    - Tablespace quotas (O(quotas)) are compared with C(DBA_TS_QUOTAS) and changed
+      with one C(ALTER USER ... QUOTA) statement per tablespace.
     - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
       (C(/@<service_name>)) is used. Otherwise both must be set.
 version_added: "1.9.1"
@@ -100,7 +103,8 @@ options:
     default_tablespace:
         description:
             - The default tablespace of the user. The tablespace must exist.
-            - The user always gets C(QUOTA UNLIMITED) on this tablespace.
+            - Without O(quotas), the user always gets C(QUOTA UNLIMITED) on this
+              tablespace. With O(quotas), only the quotas from O(quotas) are set.
         type: str
         required: false
     default_temp_tablespace:
@@ -159,6 +163,43 @@ options:
         type: list
         elements: str
         required: false
+    quotas:
+        description:
+            - The tablespace quotas of the user.
+            - If set, the default tablespace gets no automatic C(QUOTA UNLIMITED),
+              add it to the list if needed.
+            - A quota of V(0) removes the quota on the tablespace.
+            - Quotas on tablespaces not in the list are kept with
+              O(quotas_mode=append) and removed with O(quotas_mode=enforce).
+            - Oracle rounds a quota up to whole blocks of the tablespace, the
+              comparison uses blocks as well.
+            - Tablespace names are not quoted, so they are always used in uppercase.
+            - Not used with O(state=absent).
+        type: list
+        elements: dict
+        required: false
+        suboptions:
+            tablespace:
+                description:
+                    - The name of the tablespace. The tablespace must exist.
+                type: str
+                required: true
+            size:
+                description:
+                    - The quota as number of bytes with an optional unit V(K), V(M),
+                      V(G), V(T), V(P) or V(E), e.g. V(500M), or V(unlimited).
+                type: raw
+                required: true
+    quotas_mode:
+        description:
+            - V(append) - only the tablespaces in O(quotas) are changed.
+            - V(enforce) - quotas on all other tablespaces are removed
+              (C(QUOTA 0)). An empty list O(quotas=[]) removes all quotas.
+            - Used only when O(quotas) is set.
+        type: str
+        required: false
+        default: append
+        choices: ['append', 'enforce']
     state:
         description:
             - V(present) - the user is created if missing. An existing locked user is
@@ -224,6 +265,21 @@ EXAMPLES = '''
     schema_password: "{{ monitor_password }}"
     container: all
 
+- name: Create a schema with quotas, remove all other quotas
+  opitzconsulting.ansible_oracle.oracle_user:
+    service_name: orclpdb
+    user: system
+    password: "{{ system_password }}"
+    schema: myschema
+    schema_password: "{{ myschema_password }}"
+    default_tablespace: app_data
+    quotas:
+      - tablespace: app_data
+        size: unlimited
+      - tablespace: app_index
+        size: 500M
+    quotas_mode: enforce
+
 - name: Lock a schema
   opitzconsulting.ansible_oracle.oracle_user:
     service_name: orclpdb
@@ -247,7 +303,7 @@ msg:
     description:
         - Message describing the action that was executed.
         - When an existing user has been altered, the message contains the executed
-          C(ALTER USER) statement.
+          C(ALTER USER) statements.
     returned: always
     type: str
     sample: "The schema myschema has been created successfully"
@@ -313,6 +369,7 @@ def create_user(
     container,
     container_data,
     grants,
+    quotas,
 ):
     # grants_list = []
     total_sql = []
@@ -340,7 +397,8 @@ def create_user(
 
     if default_tablespace:
         sql += 'default tablespace %s ' % default_tablespace
-        sql += 'quota unlimited on %s ' % default_tablespace
+        if quotas is None:
+            sql += 'quota unlimited on %s ' % default_tablespace
 
     if default_temp_tablespace:
         sql += 'temporary tablespace %s ' % default_temp_tablespace
@@ -368,6 +426,10 @@ def create_user(
             container,
         )
         total_sql.append(altersql)
+
+    # the user has no quotas after create user => quota statements afterwards
+    if quotas is not None:
+        total_sql += get_quota_statements(module, cursor, schema, quotas, 'append')
 
     # module.exit_json(msg=total_sql, changed=True)
     for a in total_sql:
@@ -425,6 +487,8 @@ def modify_user(
     authentication_type,
     state,
     container_data,
+    quotas,
+    quotas_mode,
 ):
     sql_get_curr_def = 'select lower(account_status)'
     sql = 'alter user %s' % schema
@@ -450,7 +514,8 @@ def modify_user(
 
     if default_tablespace:
         sql += ' default tablespace %s' % default_tablespace
-        sql += ' quota unlimited on %s ' % default_tablespace
+        if quotas is None:
+            sql += ' quota unlimited on %s ' % default_tablespace
         sql_get_curr_def += ' ,lower(default_tablespace)'
 
     if default_temp_tablespace:
@@ -493,6 +558,10 @@ def modify_user(
     curr_defaults = execute_sql_get(module, cursor, sql_get_curr_def)
     curr_defaults = [list(t) for t in curr_defaults]
 
+    quota_sql = []
+    if quotas is not None:
+        quota_sql = get_quota_statements(module, cursor, schema, quotas, quotas_mode)
+
     # the first column is the account status, it is compared separately
     if (
         curr_defaults
@@ -501,8 +570,18 @@ def modify_user(
     ):
         if update_password == 'always' and pw_change_needed:
             execute_sql(module, cursor, sql)
+            for a in quota_sql:
+                execute_sql(module, cursor, a)
             module.exit_json(
                 msg='Successfully altered the user password (%s)' % (schema),
+                changed=True,
+            )
+        elif quota_sql:
+            for a in quota_sql:
+                execute_sql(module, cursor, a)
+            module.exit_json(
+                msg='Successfully altered the user (%s, %s)'
+                % (schema, '; '.join(quota_sql)),
                 changed=True,
             )
         else:
@@ -513,8 +592,12 @@ def modify_user(
         # do the complete change -> exit with change=True
         # module.exit_json(msg=sql)
         execute_sql(module, cursor, sql)
+        for a in quota_sql:
+            execute_sql(module, cursor, a)
         module.exit_json(
-            msg='Successfully altered the user (%s, %s)' % (schema, sql), changed=True
+            msg='Successfully altered the user (%s, %s)'
+            % (schema, '; '.join([sql] + quota_sql)),
+            changed=True,
         )
 
     return True
@@ -537,6 +620,72 @@ def account_status_matches(state, account_status):
     if state == 'expired & locked':
         return expired and locked
     return True
+
+
+# Quota as number of bytes, -1 for unlimited
+def quota_bytes(module, size):
+    size = str(size).strip().upper()
+    if size == 'UNLIMITED':
+        return -1
+    m = re.match(r'^(\d+)([KMGTPE]?)$', size)
+    if not m:
+        module.fail_json(
+            msg='Invalid quota size %s, use bytes with an optional unit '
+            'K, M, G, T, P, E or unlimited' % size,
+            changed=False,
+        )
+    factor = 1024 ** ' KMGTPE'.index(m.group(2) or ' ')
+    return int(m.group(1)) * factor
+
+
+# ALTER USER statements for the quotas which differ from DBA_TS_QUOTAS
+def get_quota_statements(module, cursor, schema, quotas, quotas_mode):
+    wanted = {}
+    for q in quotas:
+        tablespace = q['tablespace'].upper()
+        if tablespace in wanted:
+            module.fail_json(
+                msg='Tablespace %s is defined more than once in quotas' % tablespace,
+                changed=False,
+            )
+        wanted[tablespace] = (q['size'], quota_bytes(module, q['size']))
+
+    # max_blocks: -1 = unlimited, quota 0 removes the row
+    sql = (
+        'select tablespace_name, max_blocks from dba_ts_quotas'
+        ' where username = upper(\'%s\') and max_blocks <> 0' % schema
+    )
+    current = dict(execute_sql_get(module, cursor, sql))
+
+    block_sizes = {}
+    if wanted:
+        sql = 'select tablespace_name, block_size from dba_tablespaces'
+        block_sizes = dict(execute_sql_get(module, cursor, sql))
+
+    statements = []
+    for tablespace, (size, wanted_bytes) in wanted.items():
+        if tablespace not in block_sizes:
+            module.fail_json(
+                msg='Tablespace %s in quotas does not exist' % tablespace,
+                changed=False,
+            )
+        if wanted_bytes == -1:
+            wanted_blocks = -1
+        else:
+            # Oracle rounds up to whole blocks
+            wanted_blocks = -(-wanted_bytes // block_sizes[tablespace])
+        if current.get(tablespace, 0) != wanted_blocks:
+            statements.append(
+                'alter user %s quota %s on %s'
+                % (schema, str(size).strip().lower(), tablespace)
+            )
+
+    if quotas_mode == 'enforce':
+        for tablespace in sorted(current):
+            if tablespace not in wanted:
+                statements.append('alter user %s quota 0 on %s' % (schema, tablespace))
+
+    return statements
 
 
 # Run the actual modification
@@ -626,6 +775,16 @@ def main():
             container=dict(default=None),
             container_data=dict(default=None),
             grants=dict(default=None, type="list"),
+            quotas=dict(
+                default=None,
+                type='list',
+                elements='dict',
+                options=dict(
+                    tablespace=dict(type='str', required=True),
+                    size=dict(type='raw', required=True),
+                ),
+            ),
+            quotas_mode=dict(default='append', choices=['append', 'enforce']),
         ),
         mutually_exclusive=[['schema_password', 'schema_password_hash']],
     )
@@ -649,6 +808,8 @@ def main():
     container = module.params["container"]
     container_data = module.params["container_data"]
     grants = module.params["grants"]
+    quotas = module.params["quotas"]
+    quotas_mode = module.params["quotas_mode"]
 
     if oracle_home is not None:
         os.environ['ORACLE_HOME'] = oracle_home.rstrip('/')
@@ -675,6 +836,7 @@ def main():
                 container,
                 container_data,
                 grants,
+                quotas,
             ):
                 msg = 'The schema %s has been created successfully' % (schema)
                 module.exit_json(msg=msg, changed=True)
@@ -692,20 +854,9 @@ def main():
                 authentication_type,
                 state,
                 container_data,
+                quotas,
+                quotas_mode,
             )
-
-    # elif state in ('unlocked','locked', ''):
-    # 	if not check_user_exists(module, msg, cursor, schema):
-    # 		# if create_user(module, cursor, schema, schema_password, schema_password_hash,
-    #       # default_tablespace, default_temp_tablespace, profile,
-    #       # authentication_type, state, container, grants):
-    # 		msg = 'The schema %s doesn\'t exist' % schema
-    # 		module.fail_json(msg=msg, changed=False)
-    # 	else:
-    # 		modify_user(
-    #           module, cursor, schema, schema_password, schema_password_hash,
-    #           default_tablespace, default_temp_tablespace, update_password, profile,
-    #           authentication_type, state)
 
     elif state == 'absent':
         if check_user_exists(module, msg, cursor, schema):
