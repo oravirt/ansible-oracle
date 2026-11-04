@@ -111,7 +111,7 @@ tasks:
       - renovate{{if .DRY_RUN}} --dry-run={{.DRY_RUN}}{{end}}
 
   report:
-    desc: Show updates from the last renovate run
+    desc: Show updates from the last renovate run (ONLY_UPDATES=false shows all dependencies)
     preconditions:
       - test -f {{.RENOVATE_REPORT}}
     cmds:
@@ -121,6 +121,7 @@ tasks:
           | to_entries[] | .key as $mgr | .value[]
           | .packageFile as $file | .deps[]
           | ([ .updates[]? | "\(.newValue // .newDigest[0:12]) (\(.updateType))" ] | join(", ")) as $upd
+          {{if ne (.ONLY_UPDATES | default "true") "false"}}| select($upd != ""){{end}}
           | [ $mgr, $file, .depName, (.currentValue // "-"),
               (if $upd != "" then $upd else (.skipReason // "up-to-date") end) ]
           | @tsv' {{.RENOVATE_REPORT}} \

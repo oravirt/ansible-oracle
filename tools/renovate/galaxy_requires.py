@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check requires_ansible of the collection dependencies in galaxy.yml.
+"""Check requires_ansible and dependencies of the collections in galaxy.yml.
 
 Renovate does not know about requires_ansible of a collection, so it
 proposes versions which need a newer ansible-core than ansible-oracle
@@ -7,19 +7,28 @@ supports. This script asks Ansible Galaxy for every dependency in
 galaxy.yml and compares requires_ansible of each version with the minimum
 version from requires_ansible in meta/runtime.yml.
 
+Renovate does not check the dependencies of a collection either, e.g.
+ibre5041.ansible_oracle_modules 3.4.1 needs community.crypto >=3.0.0, while
+galaxy.yml allows only community.crypto <3.0.0. The dependencies of a version
+must be installable with the version ranges in galaxy.yml and the minimum
+ansible-core version (only one level, dependencies of dependencies are not
+checked).
+
 For every dependency the following is shown:
 - CURRENT:    the newest version matching the version in galaxy.yml
 - REQUIRES:   requires_ansible of CURRENT
 - COMPATIBLE: the newest version which can be installed with the minimum
-              ansible-core version
+              ansible-core version and the version ranges in galaxy.yml
 - LATEST:     the newest version on Galaxy with its requires_ansible
 
-Exit code 1, when CURRENT needs a newer ansible-core than the minimum.
+Exit code 1, when CURRENT needs a newer ansible-core than the minimum or
+a dependency of CURRENT conflicts with galaxy.yml.
 """
 
 import json
 import sys
 import urllib.request
+from functools import cache
 from pathlib import Path
 
 import yaml
@@ -32,6 +41,10 @@ VERSIONS_PATH = (
     "/api/v3/plugin/ansible/content/published/collections/index/"
     "{namespace}/{name}/versions/?limit=100"
 )
+VERSION_PATH = (
+    "/api/v3/plugin/ansible/content/published/collections/index/"
+    "{namespace}/{name}/versions/{version}/"
+)
 
 
 def min_ansible_version():
@@ -42,6 +55,7 @@ def min_ansible_version():
     sys.exit("No minimum version in requires_ansible of meta/runtime.yml")
 
 
+@cache
 def galaxy_versions(collection):
     """Return [(Version, requires_ansible)] of all releases, newest first."""
     namespace, name = collection.split(".", 1)
@@ -60,6 +74,18 @@ def galaxy_versions(collection):
         next_link = data["links"]["next"]
         url = GALAXY_URL + next_link if next_link else None
     return sorted(versions, reverse=True)
+
+
+@cache
+def galaxy_dependencies(collection, version):
+    """Return the dependencies {collection: version range} of one release."""
+    namespace, name = collection.split(".", 1)
+    url = GALAXY_URL + VERSION_PATH.format(
+        namespace=namespace, name=name, version=version
+    )
+    with urllib.request.urlopen(url, timeout=30) as response:
+        data = json.load(response)
+    return data["metadata"].get("dependencies") or {}
 
 
 def to_specifier(value):
@@ -81,25 +107,53 @@ def is_compatible(requires_ansible, ansible_version):
         return True
 
 
+def conflicts(collection, version, requires_ansible, ansible_version, ranges):
+    """Return the reasons, why a release is not installable (empty: installable)."""
+    reasons = []
+    if not is_compatible(requires_ansible, ansible_version):
+        reasons.append(f"requires_ansible {requires_ansible}")
+    for dependency, value in galaxy_dependencies(collection, str(version)).items():
+        specifier = to_specifier(value) & ranges.get(dependency, SpecifierSet())
+        if not any(
+            v in specifier and is_compatible(r, ansible_version)
+            for v, r in galaxy_versions(dependency)
+        ):
+            reason = f"{dependency}{to_specifier(value)}"
+            if dependency in ranges:
+                reason += f" (galaxy.yml: {ranges[dependency]})"
+            reasons.append(reason)
+    return reasons
+
+
 def main():
     ansible_version = min_ansible_version()
     galaxy = yaml.safe_load((ROOT / "galaxy.yml").read_text())
     dependencies = galaxy.get("dependencies") or {}
+    ranges = {c: to_specifier(v) for c, v in dependencies.items()}
 
     print(f"Minimum ansible-core from meta/runtime.yml: {ansible_version}\n")
     rows = [("COLLECTION", "GALAXY.YML", "CURRENT", "REQUIRES", "COMPATIBLE", "LATEST")]
     failed = []
     for collection, value in dependencies.items():
         versions = galaxy_versions(collection)
-        specifier = to_specifier(value)
+        specifier = ranges[collection]
         current = next(((v, r) for v, r in versions if v in specifier), None)
         compatible = next(
-            (v for v, r in versions if is_compatible(r, ansible_version)), None
+            (
+                v
+                for v, r in versions
+                if not conflicts(collection, v, r, ansible_version, ranges)
+            ),
+            None,
         )
         latest = versions[0] if versions else None
 
-        if current and not is_compatible(current[1], ansible_version):
-            failed.append(collection)
+        if current:
+            reasons = conflicts(
+                collection, current[0], current[1], ansible_version, ranges
+            )
+            if reasons:
+                failed.append(f"{collection} {current[0]}: {', '.join(reasons)}")
         rows.append(
             (
                 collection,
@@ -116,10 +170,9 @@ def main():
         print("  ".join(col.ljust(widths[i]) for i, col in enumerate(row)).rstrip())
 
     if failed:
-        print(
-            f"\nNot installable with ansible-core {ansible_version}: "
-            f"{', '.join(failed)}"
-        )
+        print(f"\nNot installable with ansible-core {ansible_version}:")
+        for line in failed:
+            print(f"  {line}")
         return 1
     return 0
 
