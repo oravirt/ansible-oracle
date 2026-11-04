@@ -7,6 +7,9 @@ from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.ora
     oracledb,
     oracledb_connect,
 )
+from ansible_collections.opitzconsulting.ansible_oracle.plugins.module_utils.oracle_identifier import (  # noqa: E501
+    normalize_identifier,
+)
 
 DOCUMENTATION = '''
 ---
@@ -86,7 +89,8 @@ options:
         choices: ['present', 'absent']
     privs:
         description:
-            - Privileges to grant or revoke. Always converted to uppercase.
+            - Privileges to grant or revoke. Converted to uppercase, except a role in
+              double quotes, which is case sensitive, e.g. V("MyRole").
             - Without O(objs), system privileges or roles, for example
               V(CREATE SESSION) or V(SELECT_CATALOG_ROLE).
             - With O(objs), object privileges, for example V(SELECT) or V(UPDATE).
@@ -104,7 +108,9 @@ options:
               used in the object name part, for example V(HR.%) to set privileges
               for all objects (of the types in O(objtypes)) in schema C(HR).
               C(_) is matched literally.
-            - Object names are case-sensitive, see O(convert_to_upper).
+            - Owner and object name can be in double quotes (case sensitive), e.g.
+              V("MyOwner"."MyTable") or V(HR."My%"). Parts without quotes are
+              converted to uppercase, see O(convert_to_upper).
         type: list
         elements: str
         required: false
@@ -122,15 +128,17 @@ options:
         description:
             - List of user names and role names (grantees) to grant the privileges
               to or revoke them from.
-            - Names are case-sensitive, see O(convert_to_upper).
+            - A name in double quotes is case sensitive, e.g. V("MyUser"). Names
+              without quotes are converted to uppercase, see O(convert_to_upper).
         type: list
         elements: str
         required: true
         aliases: ['role']
     convert_to_upper:
         description:
-            - Converts all entries of O(roles) and O(objs) to uppercase to simulate
-              case insensitivity.
+            - Converts the entries of O(roles) and O(objs) without double quotes to
+              uppercase to simulate case insensitivity.
+            - Names in double quotes are always case sensitive.
         type: bool
         required: false
         default: true
@@ -259,19 +267,42 @@ def main():
         supports_check_mode=True,
     )
     # Check input parameters
+    # names in double quotes are case sensitive, see oracle_identifier
+    convert_to_upper = module.params['convert_to_upper']
     re_priv = re.compile('^[A-Za-z0-9_]+[A-Za-z0-9_ ]*[A-Za-z0-9_]+$')
+    re_quoted = re.compile('^"[^"]+"$')
     re_role = re.compile('^[A-Za-z0-9_\$#\- ]+$')  # noqa W605
-    re_obj = re.compile('^[A-Za-z0-9_\$#\- ]*\.[A-Za-z0-9_\$#\%\- ]+$')  # noqa W605
+    re_obj_part = '("[^"]+"|[A-Za-z0-9_\\$#\\%\\- ]*)'
+    re_obj = re.compile('^%s\\.%s$' % (re_obj_part, re_obj_part))
+    privs = []
     for p in module.params['privs']:
-        if not re_priv.match(p):
+        if re_quoted.match(p):
+            # case sensitive role
+            privs.append(normalize_identifier(p))
+        elif re_priv.match(p):
+            privs.append(p.upper())
+        else:
             module.fail_json(msg="Invalid privilege '%s'" % p)
+    roles = []
     for p in module.params['roles']:
-        if not re_role.match(p) or p.upper() in ['SYS', 'SYSTEM']:
+        if not (re_quoted.match(p) or re_role.match(p)):
             module.fail_json(msg="Invalid user/role '%s'" % p)
-    if module.params['objs'] is not None:
-        for p in module.params['objs']:
-            if not re_obj.match(p):
-                module.fail_json(msg="Invalid object '%s'" % p)
+        role = normalize_identifier(p, convert_to_upper)
+        if role.upper() in ['SYS', 'SYSTEM']:
+            module.fail_json(msg="Invalid user/role '%s'" % p)
+        roles.append(role)
+    objectslist = []
+    for p in module.params['objs'] or []:
+        match = re_obj.match(p)
+        if not match:
+            module.fail_json(msg="Invalid object '%s'" % p)
+        # _ is matched literally, % is the wildcard
+        objectslist.append(
+            '.'.join(
+                normalize_identifier(part, convert_to_upper).replace('_', '\\_')
+                for part in match.groups()
+            )
+        )
     for p in module.params['objtypes']:
         if not re_priv.match(p):
             module.fail_json(msg="Invalid object type '%s'" % p)
@@ -294,26 +325,9 @@ def main():
     var_changes = c.var(oracledb.NUMBER)
     var_error = c.var(oracledb.NUMBER)
     var_errstr = c.var(oracledb.STRING)
-    var_privs = c.arrayvar(oracledb.STRING, [p.upper() for p in module.params['privs']])
-    objectslist = (
-        [p.replace("_", "\_") for p in module.params['objs']]  # noqa W605
-        if module.params['objs'] is not None
-        else []
-    )
-    var_objs = c.arrayvar(
-        oracledb.STRING,
-        objectslist
-        if not module.params['convert_to_upper']
-        else [p.upper() for p in objectslist],
-        100,
-    )
-    var_roles = c.arrayvar(
-        oracledb.STRING,
-        module.params['roles']
-        if not module.params['convert_to_upper']
-        else [p.upper() for p in module.params['roles']],
-        50,
-    )
+    var_privs = c.arrayvar(oracledb.STRING, privs)
+    var_objs = c.arrayvar(oracledb.STRING, objectslist, 100)
+    var_roles = c.arrayvar(oracledb.STRING, roles, 50)
     #
     rs_subquery = (
         "SELECT username role "
@@ -334,8 +348,13 @@ def main():
         "  ON o.owner||'.'||o.object_name LIKE s.column_value ESCAPE '\\' "
         "AND v_objtype LIKE '%,'||o.object_type||',%'"
     )
+    # priv_sql: roles are quoted (case sensitive), system privileges not
     rp_subquery = (
-        "SELECT rs.role, p.column_value priv "
+        "SELECT rs.role, p.column_value priv, "
+        "       CASE WHEN EXISTS (SELECT 1 FROM dba_roles r "
+        "                         WHERE r.role = p.column_value) "
+        "            THEN '\"' || p.column_value || '\"' "
+        "            ELSE p.column_value END priv_sql "
         "FROM rs "
         "CROSS JOIN table(v_privs_sql) p"
     )
@@ -451,14 +470,14 @@ def main():
                     FOR rec IN (
                         WITH rs AS (%s),
                              rp AS (%s)
-                        SELECT role, LISTAGG(priv, ',')
+                        SELECT role, LISTAGG(priv_sql, ',')
                                 WITHIN GROUP (ORDER BY priv) privs
                         FROM (
-                            SELECT rp.role, rp.priv FROM rp
-                            MINUS
-                            SELECT grantee, privilege FROM dba_sys_privs
-                            MINUS
-                            SELECT grantee, granted_role FROM dba_role_privs)
+                            SELECT rp.role, rp.priv, rp.priv_sql FROM rp
+                            WHERE (rp.role, rp.priv) NOT IN (
+                                SELECT grantee, privilege FROM dba_sys_privs
+                                UNION ALL
+                                SELECT grantee, granted_role FROM dba_role_privs))
                         GROUP BY role
                     ) LOOP
                         execsql('GRANT '||rec.privs||' TO "'||rec.role||'"');
@@ -467,7 +486,7 @@ def main():
                     FOR rec IN (
                         WITH rs AS (%s),
                              rp AS (%s)
-                        SELECT s.role, LISTAGG(s.priv, ',')
+                        SELECT s.role, LISTAGG(rp.priv_sql, ',')
                                 WITHIN GROUP (ORDER BY s.priv) privs
                         FROM
                             (SELECT grantee role, privilege priv FROM dba_sys_privs

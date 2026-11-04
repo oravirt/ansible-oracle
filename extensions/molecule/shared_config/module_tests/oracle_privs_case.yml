@@ -1,0 +1,230 @@
+---
+# Tests for oracle_privs with case sensitive names in double quotes (included by oracle_privs.yml)
+# - grantees: case sensitive user "MolTest_Privs_User" next to the upper case user MOLTEST_PRIVG
+# - privs: case sensitive role "MolTest_Privs_Role" next to a system privilege
+# - objs: case sensitive owner and object, upper case owner with case sensitive object,
+#   wildcard % in a case sensitive owner; "MolTest_Privs_Owner".MOLTEST_TAB is a different
+#   table than "MolTest_Privs_Owner"."MolTest_Tab"
+- name: oracle_privs case | variables
+  ansible.builtin.set_fact:
+    _prc_user: '"MolTest_Privs_User"'
+    _prc_role: '"MolTest_Privs_Role"'
+    _prc_obj_case: '"MolTest_Privs_Owner"."MolTest_Tab"'
+    _prc_obj_owner_upper: '{{ _priv_owner | lower }}."MolTest_Tab"'
+    _prc_obj_wildcard: '"MolTest_Privs_Owner".%'
+    _prc_sys_sql: >-
+      select listagg(grantee || ':' || p, ',')
+      within group (order by nlssort(grantee || ':' || p, 'NLS_SORT=BINARY'))
+      from (select grantee, privilege p from dba_sys_privs
+            union all select grantee, granted_role from dba_role_privs)
+      where grantee in ('MolTest_Privs_User', '{{ _priv_user }}');
+    _prc_tab_sql: >-
+      select listagg(owner || '.' || table_name || ':' || privilege, ',')
+      within group (order by nlssort(owner || '.' || table_name || ':' || privilege, 'NLS_SORT=BINARY'))
+      from dba_tab_privs where grantee = 'MolTest_Privs_User';
+    _prc_cleanup_sql: |-
+      begin
+        for r in (select 'drop user "' || username || '" cascade' s from dba_users
+                  where username in ('MolTest_Privs_User', 'MolTest_Privs_Owner')
+                  union all
+                  select 'drop role "' || role || '"' from dba_roles
+                  where role = 'MolTest_Privs_Role'
+                  union all
+                  select 'drop table "' || owner || '"."' || table_name || '"' from dba_tables
+                  where owner = '{{ _priv_owner }}' and table_name = 'MolTest_Tab') loop
+          execute immediate r.s;
+        end loop;
+      end;
+      /
+
+- name: oracle_privs case | cleanup and setup in PDB
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: |-
+      {{ _prc_cleanup_sql }}
+      create user "MolTest_Privs_User" no authentication;
+      create user "MolTest_Privs_Owner" no authentication;
+      grant unlimited tablespace to "MolTest_Privs_Owner";
+      create table "MolTest_Privs_Owner"."MolTest_Tab" (id number);
+      create table "MolTest_Privs_Owner".MOLTEST_TAB (id number);
+      create table {{ _priv_owner }}."MolTest_Tab" (id number);
+      create role "MolTest_Privs_Role";
+
+# system privilege and case sensitive role for a case sensitive and an upper case grantee
+- name: oracle_privs case | grant system privilege and role
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs:
+      - create session
+      - "{{ _prc_role }}"
+    roles:
+      - "{{ _prc_user }}"
+      - "{{ _priv_user | lower }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_privs case | check grant system privilege and role
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.case_sys_grant, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_privs case | grant system privilege and role again
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs:
+      - create session
+      - "{{ _prc_role }}"
+    roles:
+      - "{{ _prc_user }}"
+      - "{{ _priv_user | lower }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_privs case | check grant system privilege and role again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.case_sys_grant_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_privs case | verify grant system privilege and role
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _prc_sys_sql }}"
+    mt_sql_expect: >-
+      {{ _priv_user }}:CREATE SESSION,{{ _priv_user }}:MolTest_Privs_Role,MolTest_Privs_User:CREATE SESSION,MolTest_Privs_User:MolTest_Privs_Role
+    mt_sql_id: oracle_privs.pdb.case_sys_grant_sql
+
+- name: oracle_privs case | revoke system privilege and role
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs:
+      - create session
+      - "{{ _prc_role }}"
+    roles:
+      - "{{ _prc_user }}"
+      - "{{ _priv_user | lower }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_privs case | check revoke system privilege and role
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.case_sys_revoke, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_privs case | revoke system privilege and role again
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs:
+      - create session
+      - "{{ _prc_role }}"
+    roles:
+      - "{{ _prc_user }}"
+      - "{{ _priv_user | lower }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_privs case | check revoke system privilege and role again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.case_sys_revoke_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_privs case | verify revoke system privilege and role
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _prc_sys_sql }}"
+    mt_sql_expect: ""
+    mt_sql_id: oracle_privs.pdb.case_sys_revoke_sql
+
+# object privileges: only the case sensitive tables, not "MolTest_Privs_Owner".MOLTEST_TAB
+- name: oracle_privs case | grant object privilege
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs: SELECT
+    objs:
+      - "{{ _prc_obj_case }}"
+      - "{{ _prc_obj_owner_upper }}"
+    roles: "{{ _prc_user }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_privs case | check grant object privilege
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.case_obj_grant, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_privs case | grant object privilege again
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs: SELECT
+    objs:
+      - "{{ _prc_obj_case }}"
+      - "{{ _prc_obj_owner_upper }}"
+    roles: "{{ _prc_user }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_privs case | check grant object privilege again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.case_obj_grant_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_privs case | verify grant object privilege
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _prc_tab_sql }}"
+    mt_sql_expect: "{{ _priv_owner }}.MolTest_Tab:SELECT,MolTest_Privs_Owner.MolTest_Tab:SELECT"
+    mt_sql_id: oracle_privs.pdb.case_obj_grant_sql
+
+# wildcard in a case sensitive owner: both tables of "MolTest_Privs_Owner"
+- name: oracle_privs case | grant object privilege with wildcard
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs: INSERT
+    objs: "{{ _prc_obj_wildcard }}"
+    roles: "{{ _prc_user }}"
+  register: _res
+  ignore_errors: true
+- name: oracle_privs case | check grant object privilege with wildcard
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.case_obj_wildcard, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_privs case | verify grant object privilege with wildcard
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _prc_tab_sql }}"
+    mt_sql_expect: >-
+      {{ _priv_owner }}.MolTest_Tab:SELECT,MolTest_Privs_Owner.MOLTEST_TAB:INSERT,MolTest_Privs_Owner.MolTest_Tab:INSERT,MolTest_Privs_Owner.MolTest_Tab:SELECT
+    mt_sql_id: oracle_privs.pdb.case_obj_wildcard_sql
+
+- name: oracle_privs case | revoke object privileges
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs:
+      - SELECT
+      - INSERT
+    objs:
+      - "{{ _prc_obj_wildcard }}"
+      - "{{ _prc_obj_owner_upper }}"
+    roles: "{{ _prc_user }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_privs case | check revoke object privileges
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.case_obj_revoke, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_privs case | revoke object privileges again
+  opitzconsulting.ansible_oracle.oracle_privs:
+    privs:
+      - SELECT
+      - INSERT
+    objs:
+      - "{{ _prc_obj_wildcard }}"
+      - "{{ _prc_obj_owner_upper }}"
+    roles: "{{ _prc_user }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_privs case | check revoke object privileges again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_privs.pdb.case_obj_revoke_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_privs case | verify revoke object privileges
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _prc_tab_sql }}"
+    mt_sql_expect: ""
+    mt_sql_id: oracle_privs.pdb.case_obj_revoke_sql
+
+- name: oracle_privs case | final cleanup
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _prc_cleanup_sql }}"

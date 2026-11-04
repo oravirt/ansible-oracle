@@ -3,6 +3,7 @@
 # - PDB ORCLPDB: system privileges and roles (grant, idempotence, check mode, revoke),
 #   object privileges with wildcard, objtypes and convert_to_upper, error cases
 # - CDB: system privilege for a common role
+# - case sensitive names in double quotes (oracle_privs_case.yml)
 # - connection variants: system (default), sys as sysdba, wallet, wrong password
 # Test objects are created and dropped with sqlplus (independent of the module).
 - name: oracle_privs | variables
@@ -412,6 +413,10 @@
 - name: oracle_privs | check wrong password
   ansible.builtin.include_tasks: _check.yml
   vars: {mt_id: oracle_privs.pdb.wrong_password, mt_res: "{{ _res }}", mt_expect: failed}
+
+# case sensitive names in double quotes (uses MOLTEST_PRIVO and MOLTEST_PRIVG)
+- name: oracle_privs | case sensitive names
+  ansible.builtin.include_tasks: oracle_privs_case.yml
 
 # cleanup
 - name: oracle_privs | drop test objects in PDB
