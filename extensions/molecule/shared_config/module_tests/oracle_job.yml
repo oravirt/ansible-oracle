@@ -2,13 +2,14 @@
 # Tests for oracle_job in PDB ORCLPDB (jobs in schema SYSTEM)
 # - create PL/SQL block job, idempotence, check mode, change comments, enable,
 #   job without logging_level, stored procedure job with arguments,
-#   convert_to_upper=false, drop, error cases
+#   convert_to_upper=false, case sensitive name in double quotes, drop, error cases
 # - connection variants: system (default), sys as sysdba, wallet, wrong password
 - name: oracle_job | variables
   ansible.builtin.set_fact:
     _job_name: SYSTEM.MOLTEST_JOB
     _job_name_args: SYSTEM.MOLTEST_JOB_ARGS
     _job_name_mixed: SYSTEM.MolTest_Job_Mixed
+    _job_name_quoted: 'SYSTEM."MolTest_Job_Quoted"'
     _job_action: "begin null; end;"
     _job_interval: "FREQ=HOURLY;INTERVAL=3"
     _job_cleanup_sql: |
@@ -165,6 +166,23 @@
   ansible.builtin.include_tasks: _check.yml
   vars: {mt_id: oracle_job.pdb.no_logging_level, mt_res: "{{ _res }}", mt_expect: changed}
 
+# documented: without logging_level the logging level of an existing job is not compared
+- name: oracle_job | without logging_level again
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name }}"
+    job_type: plsql_block
+    job_action: "{{ _job_action }}"
+    repeat_interval: "{{ _job_interval }}"
+    comments: moltest job changed
+    restartable: true
+    enabled: false
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check without logging_level again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.no_logging_level_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
 # stored procedure job with positional arguments
 - name: oracle_job | create job with arguments
   opitzconsulting.ansible_oracle.oracle_job:
@@ -288,6 +306,63 @@
 - name: oracle_job | check drop mixed case job
   ansible.builtin.include_tasks: _check.yml
   vars: {mt_id: oracle_job.pdb.mixed_case_drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+# documented: a part of job_name in double quotes is case sensitive (convert_to_upper=true)
+- name: oracle_job | create quoted job
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name_quoted }}"
+    job_action: "{{ _job_action }}"
+    repeat_interval: "{{ _job_interval }}"
+    logging_level: runs
+    enabled: false
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check create quoted job
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.quoted_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_job | create quoted job again
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name_quoted }}"
+    job_action: "{{ _job_action }}"
+    repeat_interval: "{{ _job_interval }}"
+    logging_level: runs
+    enabled: false
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check create quoted job again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.quoted_create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_job | verify quoted job
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "select count(*) from dba_scheduler_jobs where owner = 'SYSTEM' and job_name = 'MolTest_Job_Quoted';"
+    mt_sql_expect: "1"
+    mt_sql_id: oracle_job.pdb.quoted_sql
+
+- name: oracle_job | drop quoted job
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name_quoted }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check drop quoted job
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.quoted_drop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_job | drop quoted job again
+  opitzconsulting.ansible_oracle.oracle_job:
+    job_name: "{{ _job_name_quoted }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_job | check drop quoted job again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_job.pdb.quoted_drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
 
 - name: oracle_job | drop
   opitzconsulting.ansible_oracle.oracle_job:
