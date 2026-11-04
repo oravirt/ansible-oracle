@@ -3,6 +3,9 @@
 # - create from seed (OMF), idempotence, saved state, states closed/read_only/restricted/open,
 #   status, unplug into XML file, plug in again, drop of an open and a closed PDB,
 #   create with save_state=false
+# - PDB name in lower case (moltest_pdb_lc): PDB names are case insensitive,
+#   Oracle stores them in uppercase => MOLTEST_PDB_LC
+#   create, status, close, drop
 # - connection variants: sys as sysdba in CDB$ROOT (PDB management),
 #   wallet (status of ORCLPDB, read only), wrong password
 # - oracle_pdb does not support check mode
@@ -10,19 +13,21 @@
   ansible.builtin.set_fact:
     _pdb_name: MOLTEST_PDB
     _pdb_xml: /tmp/moltest_pdb.xml
+    # PDB name in lower case (old inventories), Oracle stores it in uppercase
+    _pdb_name_lc: moltest_pdb_lc
+    # all test PDBs (MOLTEST_PDB, MOLTEST_PDB_LC)
     _pdb_cleanup_sql: |
       whenever sqlerror exit failure
-      declare
-        n number;
       begin
-        select count(*) into n from v$pdbs where name = 'MOLTEST_PDB';
-        if n > 0 then
+        for p in (select name from v$pdbs
+                  where upper(name) like 'MOLTEST\_PDB%' escape '\') loop
           begin
-            execute immediate 'alter pluggable database MOLTEST_PDB close immediate instances=all';
+            execute immediate 'alter pluggable database "' || p.name
+              || '" close immediate instances=all';
           exception when others then null;
           end;
-          execute immediate 'drop pluggable database MOLTEST_PDB including datafiles';
-        end if;
+          execute immediate 'drop pluggable database "' || p.name || '" including datafiles';
+        end loop;
       end;
       /
       exit
@@ -408,6 +413,119 @@
         mt_sql: "select count(*) from v$pdbs where name = '{{ _pdb_name }}';"
         mt_sql_expect: "0"
         mt_sql_id: oracle_pdb.cdb.drop_open_sql
+
+# documented: PDB names are converted to uppercase (lower case names in old inventories)
+- name: oracle_pdb | PDB name in lower case in CDB$ROOT as sysdba
+  vars:
+    mt_conn: "{{ mt_conn_cdb_sysdba }}"
+  block:
+    - name: oracle_pdb | create lower case PDB
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name_lc }}"
+        sourcedb: "{{ mt_cdb }}"
+        pdb_admin_username: moltest_pdbadmin
+        pdb_admin_password: "{{ mt_system_password }}"
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check create lower case PDB
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.lc_create, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_pdb | create lower case PDB again
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name_lc }}"
+        sourcedb: "{{ mt_cdb }}"
+        pdb_admin_username: moltest_pdbadmin
+        pdb_admin_password: "{{ mt_system_password }}"
+        state: present
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check create lower case PDB again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.lc_create_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_pdb | verify lower case PDB
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "select name || ',' || open_mode from v$pdbs where upper(name) = 'MOLTEST_PDB_LC';"
+        mt_sql_expect: "MOLTEST_PDB_LC,READ WRITE"
+        mt_sql_id: oracle_pdb.cdb.lc_create_sql
+
+    # upper case name: the same PDB
+    - name: oracle_pdb | status with the upper case name
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: MOLTEST_PDB_LC
+        sourcedb: "{{ mt_cdb }}"
+        state: status
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check status with the upper case name
+      ansible.builtin.include_tasks: _check.yml
+      vars:
+        mt_id: oracle_pdb.cdb.lc_uppercase_same_pdb
+        mt_res:
+          changed: "{{ _res.changed | default(false) }}"
+          failed: "{{ 'pdb name: MOLTEST_PDB_LC' not in (_res.msg | default('') | string) }}"
+          msg: "{{ _res.msg | default('') | string }}"
+        mt_expect: ok
+
+    - name: oracle_pdb | status of lower case PDB
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name_lc }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: status
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check status message of lower case PDB
+      ansible.builtin.include_tasks: _check.yml
+      vars:
+        mt_id: oracle_pdb.cdb.lc_status_msg
+        mt_res:
+          changed: "{{ _res.changed | default(false) }}"
+          failed: "{{ 'pdb name: MOLTEST_PDB_LC' not in (_res.msg | default('') | string) }}"
+          msg: "{{ _res.msg | default('') | string }}"
+        mt_expect: ok
+
+    - name: oracle_pdb | close lower case PDB
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name_lc }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: closed
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check close lower case PDB
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.lc_closed, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_pdb | drop closed lower case PDB
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name_lc }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: absent
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check drop closed lower case PDB
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.lc_drop_closed, mt_res: "{{ _res }}", mt_expect: changed}
+
+    - name: oracle_pdb | drop lower case PDB again
+      opitzconsulting.ansible_oracle.oracle_pdb:
+        name: "{{ _pdb_name_lc }}"
+        sourcedb: "{{ mt_cdb }}"
+        state: absent
+      register: _res
+      ignore_errors: true
+    - name: oracle_pdb | check drop lower case PDB again
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_pdb.cdb.lc_drop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+    - name: oracle_pdb | verify drop lower case PDB
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "select count(*) from v$pdbs where upper(name) = 'MOLTEST_PDB_LC';"
+        mt_sql_expect: "0"
+        mt_sql_id: oracle_pdb.cdb.lc_drop_sql
 
 # Oracle wallet (ORCLPDB_SYSTEM): read only status of ORCLPDB, nothing is changed
 - name: oracle_pdb | status of ORCLPDB with wallet

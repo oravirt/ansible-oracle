@@ -17,8 +17,8 @@ description:
       in an Oracle container database (CDB).
     - The module must connect to the root container of the CDB.
     - The existence of a PDB is checked in C(DBA_PDBS), its open mode in C(V$PDBS).
-    - The PDB name is not quoted in the SQL statements, so it is always stored in
-      uppercase.
+    - Oracle stores PDB names always in uppercase. The module converts O(name) to
+      uppercase, so V(orclpdb) and V(ORCLPDB) are the same PDB.
     - A new PDB is created with C(CREATE PLUGGABLE DATABASE), opened on all
       instances (C(OPEN INSTANCES=ALL)) and, with O(save_state=true), its state is
       saved (C(SAVE STATE INSTANCES=ALL)). Afterwards O(state) is enforced.
@@ -29,6 +29,9 @@ options:
     name:
         description:
             - The name of the PDB.
+            - The name is always converted to uppercase internally, because Oracle
+              ignores lowercase for PDB names and stores them in uppercase, even
+              when the name is quoted. V(orclpdb) and V(ORCLPDB) are the same PDB.
         type: str
         required: true
         aliases: ['pdb', 'pdb_name']
@@ -281,13 +284,9 @@ msg:
 # Check if the pdb exists
 def check_pdb_exists(cursor, module, msg, name):
     global newpdb
-    sql = (
-        'select lower(pdb_name) '
-        'from dba_pdbs '
-        'where lower (pdb_name) = \'%s\'' % (name.lower())
-    )
+    sql = 'select pdb_name from dba_pdbs where pdb_name = :name'
 
-    result = execute_sql_get(module, msg, cursor, sql)
+    result = execute_sql_get(module, msg, cursor, sql, {'name': name})
     if len(result) > 0:
         newpdb = False
         return True
@@ -350,16 +349,27 @@ def create_pdb(
     if save_state:
         sql = 'alter pluggable database %s save state instances=all' % (name)
         execute_sql(module, msg, cursor, sql)
-        return True  # <-- all is well
+    return True  # <-- all is well
+
+
+def close_pdb(module, msg, cursor, name):
+    # close only when the PDB is open on at least one instance (GV$PDBS),
+    # CLOSE IMMEDIATE on a closed PDB would fail with ORA-65020
+    sql = "select count(*) from gv$pdbs where name = :name and open_mode <> 'MOUNTED'"
+    if execute_sql_get(module, msg, cursor, sql, {'name': name})[0][0] > 0:
+        close_sql = 'alter pluggable database %s close immediate instances=all' % (name)
+        execute_sql(module, msg, cursor, close_sql)
 
 
 def unplug_pdb(cursor, module, msg, oracle_home, name, unplug_dest):
     run_sql = []
-    close_sql = 'alter pluggable database %s close immediate instances=all' % (name)
-    unplug_sql = 'alter pluggable database %s unplug into \'%s\'' % (name, unplug_dest)
+    unplug_sql = 'alter pluggable database %s unplug into \'%s\'' % (
+        name,
+        unplug_dest,
+    )
     drop_sql = 'drop pluggable database %s keep datafiles ' % (name)
 
-    run_sql.append(close_sql)
+    close_pdb(module, msg, cursor, name)
     run_sql.append(unplug_sql)
     run_sql.append(drop_sql)
     for a in run_sql:
@@ -369,10 +379,9 @@ def unplug_pdb(cursor, module, msg, oracle_home, name, unplug_dest):
 
 def remove_pdb(cursor, module, msg, oracle_home, name, sourcedb):
     run_sql = []
-    close_sql = 'alter pluggable database %s close immediate instances=all' % (name)
     dropsql = 'drop pluggable database %s including datafiles' % (name)
 
-    run_sql.append(close_sql)
+    close_pdb(module, msg, cursor, name)
     run_sql.append(dropsql)
     for a in run_sql:
         execute_sql(module, msg, cursor, a)
@@ -385,15 +394,15 @@ def check_pdb_status(cursor, module, msg, name):
         'open_mode, restricted, to_char(open_time,\'HH24:MI:SS YYYY-MM-DD\'), '
         'recovery_status '
         'from v$pdbs '
-        'where lower(name) = \'%s\'' % (name)
+        'where name = :name'
     )
-    result = execute_sql_get(module, msg, cursor, sql)
-    if len(result) > 0:
-        for a in result:
-            msg = (
-                'pdb name: %s, con_id: %s, con_uid: %s, open_mode: %s, restricted: %s, '
-                'open_time: %s' % (a[0].lower(), a[1], a[2], a[3], a[4], a[5])
-            )
+    result = execute_sql_get(module, msg, cursor, sql, {'name': name})
+    for a in result:
+        msg = (
+            'pdb name: %s, con_id: %s, con_uid: %s, open_mode: %s, restricted: %s, '
+            'open_time: %s' % (a[0], a[1], a[2], a[3], a[4], a[5])
+        )
+    return msg
 
 
 def ensure_pdb_state(
@@ -412,7 +421,7 @@ def ensure_pdb_state(
     sql = (
         'select lower(open_mode), lower(restricted) '
         'from v$pdbs '
-        'where lower(name) = \'%s\'' % (name.lower())
+        'where name = :name'
     )
     propsql = (
         "select lower(property_value) "
@@ -427,7 +436,7 @@ def ensure_pdb_state(
         "where property_name = 'DBTIMEZONE'"
     )
 
-    state_now = execute_sql_get(module, msg, cursor, sql)
+    state_now = execute_sql_get(module, msg, cursor, sql, {'name': name})
     curr_time_zone = execute_sql_get(module, msg, cursor, tzsql)  # noqa F841
     def_tbs_type, def_tbs, def_temp_tbs = execute_sql_get(module, msg, cursor, propsql)
 
@@ -501,9 +510,9 @@ def ensure_pdb_state(
         # return False
 
 
-def execute_sql_get(module, msg, cursor, sql):
+def execute_sql_get(module, msg, cursor, sql, binds=None):
     try:
-        cursor.execute(sql)
+        cursor.execute(sql, binds or {})
         result = cursor.fetchall()
     except oracledb.DatabaseError as exc:
         (error,) = exc.args
@@ -580,7 +589,8 @@ def main():
         mutually_exclusive=[['datafile_dest', 'file_name_convert']],
     )
 
-    name = module.params["name"]
+    # PDB names are case insensitive, Oracle stores them in uppercase
+    name = module.params["name"].upper()
     oracle_home = module.params["oracle_home"]
     sourcedb = module.params["sourcedb"]
     state = module.params["state"]
@@ -688,7 +698,7 @@ def main():
 
     elif state == 'status':
         if check_pdb_exists(cursor, module, msg, name):
-            check_pdb_status(cursor, module, msg, name)
+            msg = check_pdb_status(cursor, module, msg, name)
             module.exit_json(msg=msg, changed=False)
         else:
             msg = 'Pluggable database %s doesn\'t exist' % (name)
