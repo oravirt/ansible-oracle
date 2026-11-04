@@ -150,7 +150,7 @@ def main():
             password=dict(required=False, no_log=True),
             mode=dict(default='normal', choices=["normal", "sysdba"]),
             size=dict(required=True),
-            groups=dict(required=True)
+            groups=dict(required=True),
             #     threads       = dict(default=1)
         ),
     )

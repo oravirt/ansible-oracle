@@ -14,7 +14,6 @@ from ansible.module_utils._text import to_native
 import xml.etree.ElementTree as ET
 from copy import copy
 
-
 DOCUMENTATION = '''
 ---
 module: oracle_sqldba

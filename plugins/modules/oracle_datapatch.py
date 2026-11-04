@@ -162,7 +162,7 @@ msg:
 
 def get_version(module, msg, oracle_home, script_env):
     command = '%s/bin/sqlplus -V' % (oracle_home)
-    (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
+    rc, stdout, stderr = module.run_command(command, environ_update=script_env)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
         module.fail_json(msg=msg, changed=False)
@@ -194,7 +194,7 @@ def check_db_exists(module, msg, oracle_home, db_name, sid, db_unique_name):
             command = "%s/bin/srvctl config database -d %s" % (oracle_home, checkdb)
 
         # cluster check command needs a shell, because we run multiple commands and pipe
-        (rc, stdout, stderr) = module.run_command(command, use_unsafe_shell=is_cluster)
+        rc, stdout, stderr = module.run_command(command, use_unsafe_shell=is_cluster)
 
         if rc != 0:
             if '%s' % (db_name) in stdout:  # <-- db doesn't exist
@@ -259,7 +259,7 @@ def run_datapatch(module, msg, hostname, oracle_home, db_name, sid, script_env):
             os.environ['ORACLE_SID'] = db_name
 
         command = '%s/OPatch/datapatch -verbose' % (oracle_home)
-        (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
+        rc, stdout, stderr = module.run_command(command, environ_update=script_env)
         if rc != 0:
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (
                 stdout,
@@ -292,7 +292,7 @@ def run_datapatch(module, msg, hostname, oracle_home, db_name, sid, script_env):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        (stdout, stderr) = p.communicate(datapatch_sql.encode('utf-8'))
+        stdout, stderr = p.communicate(datapatch_sql.encode('utf-8'))
         rc = p.returncode
         if rc != 0:
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (

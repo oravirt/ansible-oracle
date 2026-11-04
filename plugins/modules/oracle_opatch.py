@@ -129,7 +129,7 @@ def get_version(module, msg, oracle_home, script_env):
     '''
 
     def loc_exec_command(command):
-        (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
+        rc, stdout, stderr = module.run_command(command, environ_update=script_env)
         if rc != 0:
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (
                 stdout,
@@ -144,12 +144,12 @@ def get_version(module, msg, oracle_home, script_env):
     # is not executable at this stage!
     oscommand = '%s/bin/oraversion' % (oracle_home)
     if os.path.exists(oscommand):
-        (rc, stdout) = loc_exec_command('%s -baseVersion' % (oscommand))
+        rc, stdout = loc_exec_command('%s -baseVersion' % (oscommand))
         if rc == 0:
             return stdout[0:4]
     else:
         # Oracle < 18c do not have oraversion command!
-        (rc, stdout) = loc_exec_command('%s/bin/sqlplus -V' % (oracle_home))
+        rc, stdout = loc_exec_command('%s/bin/sqlplus -V' % (oracle_home))
         if rc == 0:
             return stdout.split(' ')[2][0:4]
 
@@ -160,7 +160,7 @@ def get_opatch_version(module, msg, oracle_home, script_env):
     '''
 
     command = '%s/OPatch/opatch version' % (oracle_home)
-    (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
+    rc, stdout, stderr = module.run_command(command, environ_update=script_env)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
         module.fail_json(msg=msg, changed=False)
@@ -207,7 +207,7 @@ def check_patch_applied(
         oh_owner = get_file_owner(module, msg, oracle_home)
         command += 'sudo -u %s ' % (oh_owner)
     command += '%s/OPatch/opatch lspatches ' % (oracle_home)
-    (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
+    rc, stdout, stderr = module.run_command(command, environ_update=script_env)
     # module.exit_json(msg=stdout, changed=False)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
@@ -225,7 +225,7 @@ def check_patch_applied(
                 return True
             else:
                 command += ' -id %s' % patch_id
-                (rc, stdout, stderr) = module.run_command(
+                rc, stdout, stderr = module.run_command(
                     command, environ_update=script_env
                 )
                 if rc != 0:
@@ -285,7 +285,7 @@ def analyze_patch(module, msg, oracle_home, patch_base, opatchauto, script_env):
         checks.append(spacecommand)
 
     for cmd in checks:
-        (rc, stdout, stderr) = module.run_command(cmd, environ_update=script_env)
+        rc, stdout, stderr = module.run_command(cmd, environ_update=script_env)
         # module.exit_json(msg=stdout, changed=False)
         if rc != 0:
             msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, cmd)
@@ -365,7 +365,7 @@ def apply_patch(
     ):
         command += ' -ocmrf %s' % (ocm_response_file)
 
-    (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
+    rc, stdout, stderr = module.run_command(command, environ_update=script_env)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
         module.fail_json(msg=msg, changed=False)
@@ -457,7 +457,7 @@ def stop_process(module, oracle_home):
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                         )
-                        (stdout, stderr) = p.communicate(shutdown_sql.encode('utf-8'))
+                        stdout, stderr = p.communicate(shutdown_sql.encode('utf-8'))
                         p_status = p.wait()  # noqa F841
                         # module.fail_json(msg=stdout, changed=False)
 
@@ -510,7 +510,7 @@ def remove_patch(
         command += ' -ocmrf %s' % (ocm_response_file)
 
     # module.exit_json(msg=command, changed=False)
-    (rc, stdout, stderr) = module.run_command(command, environ_update=script_env)
+    rc, stdout, stderr = module.run_command(command, environ_update=script_env)
     if rc != 0:
         msg = 'Error - STDOUT: %s, STDERR: %s, COMMAND: %s' % (stdout, stderr, command)
         module.fail_json(msg=msg, changed=False)
