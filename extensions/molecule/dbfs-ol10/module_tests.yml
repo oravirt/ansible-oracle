@@ -1,0 +1,52 @@
+---
+# Scenario variables for the module tests (shared_config/module_tests)
+# Oracle AI Database 26ai on filesystem without Grid Infrastructure on OL10: CDB DB1 with PDB ORCLPDB
+mt_all_modules:
+  - oracle_directory
+  - oracle_user
+  - oracle_role
+  - oracle_profile
+  - oracle_grants
+  - oracle_privs
+  - oracle_tablespace
+  - oracle_sql
+  - oracle_parameter
+  - oracle_job
+  - oracle_jobclass
+  - oracle_jobschedule
+  - oracle_jobwindow
+  - oracle_rsrc_consgroup
+  - oracle_stats_prefs
+  - oracle_awr
+  - oracle_facts
+  # slower tests
+  - oracle_services
+  - oracle_redo
+  - oracle_datapatch
+  - oracle_db
+  - oracle_pdb
+
+mt_oracle_home: /u01/app/oracle/product/26/db_26.1
+mt_oracle_sid: DB1
+# read-only ORACLE_HOME: tnsnames.ora, sqlnet.ora are in ORACLE_BASE_HOME
+mt_tns_admin: /u01/app/oracle/homes/db261siee/network/admin
+mt_cdb: DB1
+mt_pdb: ORCLPDB
+mt_datafile_dir: /u01/app/oracle/oradata
+
+# known bugs without Grid Infrastructure
+mt_known_bugs_scenario:
+  oracle_services.pdb.create_idempotent: >-
+    without GI ensure_service_state runs srvctl config/modify and fails
+  oracle_services.pdb.start: >-
+    without GI ensure_service_state runs srvctl config/modify and fails
+  oracle_services.pdb.start_idempotent: >-
+    without GI ensure_service_state runs srvctl config/modify and fails
+  oracle_services.pdb.start_sql: >-
+    service is not started/stopped, because the module fails before (srvctl without GI)
+  oracle_services.pdb.stop: >-
+    without GI ensure_service_state runs srvctl config/modify and fails
+  oracle_services.pdb.stop_idempotent: >-
+    without GI ensure_service_state runs srvctl config/modify and fails
+  oracle_services.pdb.stop_sql: >-
+    service is not started/stopped, because the module fails before (srvctl without GI)
