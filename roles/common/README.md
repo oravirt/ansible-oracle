@@ -88,6 +88,7 @@ common_packages_el10:
   - smartmontools
   - sysstat
   - xz-devel
+  - acl
   - autofs
   - bind-utils
   - ethtool
