@@ -1,0 +1,16 @@
+---
+# Run a command as root and record the result (included by oradb_manage_db_systemd.yml)
+# mt_id: id of the check, _sd_cmd: command, _sd_expect_cmd: ok (default) | failed
+- name: "oradb_manage_db_systemd | {{ mt_id }} | {{ _sd_cmd }}"
+  ansible.builtin.command: "{{ _sd_cmd }}"
+  register: _sd_cmd_res
+  changed_when: false
+  ignore_errors: true
+  become: true
+  become_user: root
+
+- name: "oradb_manage_db_systemd | check {{ mt_id }}"
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_res: "{{ _sd_cmd_res }}"
+    mt_expect: "{{ _sd_expect_cmd | default('ok') }}"

@@ -1,0 +1,437 @@
+---
+# Role test for the autostart with systemd units (oravirt#265, autostartup_service_mode: units)
+# in oradb_manage_db (tasks_from systemd_units.yml / systemd_units_remove.yml).
+# Database mt_oracle_sid with listener LISTENER of the scenario:
+# - migration from a legacy oracle-rdbms.service (inactive => unit file removed)
+# - units for a running database and listener (attached, not restarted), 2nd run
+# - stop/start of the database and listener units and the targets
+# - shutdown (immediate/abort) outside of systemd => unit inactive (no restart), start outside of systemd =>
+#   oracle-adopt.service starts the unit again
+# - crash (kill -9 of PMON) => restart after autostartup_service_restart_sec (default)
+# - crash with autostartup_service_restart: false for the database => unit failed (exit code 3)
+# - ORACLE_HOME from /etc/oratab: stop with a wrong ORACLE_HOME uses the running instance,
+#   start with a wrong ORACLE_HOME fails
+# - switch to autostartup_service_mode: legacy: active units are kept, inactive units removed
+# At the end the units are created again like in converge (autostartup_service: true).
+# Note: systemd in the containers does not manage cgroups => the attach of processes
+# (AttachProcessesToUnit) can't be tested here, oracle-systemd only logs a warning.
+- name: oradb_manage_db_systemd | variables
+  ansible.builtin.set_fact:
+    _sd_sid: "{{ mt_oracle_sid }}"
+    _sd_lsnr: LISTENER
+    _sd_unit: "oracle-db@{{ mt_oracle_sid }}.service"
+    _sd_inventory_dbs: "{{ oracle_databases }}"
+    # state of the database unit: active state, result, restarts, main process (monitor)
+    _sd_unit_state: |
+      echo "db=$(systemctl show -p ActiveState --value oracle-db@{{ mt_oracle_sid }}.service)"
+      echo "result=$(systemctl show -p Result --value oracle-db@{{ mt_oracle_sid }}.service)"
+      echo "pmon=$(pgrep -cf '^ora_pmon_{{ mt_oracle_sid }}$')"
+    # wait until PMON and all background processes are gone, then for the monitor (max. 3 min)
+    _sd_wait_crash: |
+      for i in $(seq 180) ; do
+        pgrep -f '^ora_[a-z0-9]+_{{ mt_oracle_sid }}$' > /dev/null || break
+        sleep 1
+      done
+      for i in $(seq 60) ; do
+        [ "$(systemctl show -p ActiveState --value oracle-db@{{ mt_oracle_sid }}.service)" = active ] || break
+        sleep 1
+      done
+
+# ---------------------------------------------------------------- cleanup of a previous run
+- name: oradb_manage_db_systemd | stop units of a previous run
+  ansible.builtin.command: systemctl stop oracle-databases.target oracle-listeners.target
+  changed_when: false
+  failed_when: false
+  become: true
+  become_user: root
+
+# reset the start limit (StartLimitBurst) of a previous run
+- name: oradb_manage_db_systemd | reset failed units of a previous run
+  ansible.builtin.command: systemctl reset-failed oracle-db@*.service oracle-listener@*.service
+  changed_when: false
+  failed_when: false
+  become: true
+  become_user: root
+
+- name: oradb_manage_db_systemd | remove units of a previous run
+  ansible.builtin.include_tasks: _role_run.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.cleanup
+    mt_role: oradb_manage_db
+    mt_role_tasks_from: systemd_units_remove.yml
+    autostartup_service_mode: legacy
+
+- name: oradb_manage_db_systemd | start database and listener outside of systemd
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_manual_start.yml
+
+# ---------------------------------------------------------------- create units
+# legacy oracle-rdbms.service: inactive => the unit file is removed
+- name: oradb_manage_db_systemd | create inactive legacy oracle-rdbms.service
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+      Description=moltest legacy oracle-rdbms.service
+      [Service]
+      Type=oneshot
+      ExecStart=/bin/true
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/oracle-rdbms.service
+    mode: "0644"
+  become: true
+  become_user: root
+
+- name: oradb_manage_db_systemd | enable legacy oracle-rdbms.service
+  ansible.builtin.systemd:
+    name: oracle-rdbms.service
+    enabled: true
+    daemon_reload: true
+  become: true
+  become_user: root
+
+- name: oradb_manage_db_systemd | create units
+  ansible.builtin.include_tasks: _role_run.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.units_create
+    mt_role: oradb_manage_db
+    mt_role_tasks_from: systemd_units.yml
+    autostartup_service: true
+
+- name: oradb_manage_db_systemd | create units again
+  ansible.builtin.include_tasks: _role_run.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.units_create_idempotent
+    mt_role: oradb_manage_db
+    mt_role_tasks_from: systemd_units.yml
+    autostartup_service: true
+
+- name: oradb_manage_db_systemd | state of units and legacy unit file
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.units_state
+    _sd_script: |
+      echo "db=$(systemctl is-active {{ _sd_unit }})"
+      echo "db_enabled=$(systemctl is-enabled {{ _sd_unit }})"
+      echo "monitor=$(systemctl show -p MainPID --value {{ _sd_unit }} | grep -vc '^0$')"
+      echo "restart=$(systemctl show -p Restart --value {{ _sd_unit }})"
+      echo "requires=$(systemctl show -p Requires --value {{ _sd_unit }} | grep -cw network.target)"
+      echo "listener=$(systemctl is-active oracle-listener@{{ _sd_lsnr }}.service)"
+      echo "targets=$(systemctl is-active oracle-databases.target oracle-listeners.target | xargs)"
+      echo "timer=$(systemctl is-enabled oracle-adopt.timer)"
+      echo "legacy=$(test -f /etc/systemd/system/oracle-rdbms.service && echo exists || echo removed)"
+      echo "env=$(grep -c '^ORACLE_HOME=' /etc/sysconfig/oracledb/db-{{ _sd_sid }})"
+      echo "oratab=$(awk -F: '$1 == "{{ _sd_sid }}" {print $2}' /etc/oratab)"
+      echo "pmon=$(pgrep -cf '^ora_pmon_{{ _sd_sid }}$')"
+    _sd_expect: ['db=active', 'db_enabled=enabled', 'monitor=1', 'restart=on-failure', 'requires=1',
+                 'listener=active', 'targets=active active', 'timer=enabled', 'legacy=removed', 'env=0',
+                 'oratab={{ mt_oracle_home }}', 'pmon=1']
+
+# ---------------------------------------------------------------- stop/start of the database unit
+- name: oradb_manage_db_systemd | stop database unit
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_cmd.yml
+  vars: {mt_id: oradb_manage_db_systemd.db_stop, _sd_cmd: "systemctl stop {{ _sd_unit }}"}
+
+- name: oradb_manage_db_systemd | state after stop of database unit
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.db_stop_state
+    _sd_script: "{{ _sd_unit_state }}"
+    _sd_expect: ['db=inactive', 'result=success', 'pmon=0']
+
+- name: oradb_manage_db_systemd | start database unit
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_cmd.yml
+  vars: {mt_id: oradb_manage_db_systemd.db_start, _sd_cmd: "systemctl start {{ _sd_unit }}"}
+
+- name: oradb_manage_db_systemd | verify database is open
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "select status from v$instance;"
+    mt_sql_expect: "OPEN"
+    mt_sql_id: oradb_manage_db_systemd.db_start_sql
+
+# ---------------------------------------------------------------- targets (PartOf=)
+- name: oradb_manage_db_systemd | stop targets
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_cmd.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.targets_stop
+    _sd_cmd: systemctl stop oracle-databases.target oracle-listeners.target
+
+- name: oradb_manage_db_systemd | state after stop of targets
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.targets_stop_state
+    _sd_script: |
+      echo "pmon=$(pgrep -cf '^ora_pmon_{{ _sd_sid }}$')"
+      echo "tnslsnr=$(pgrep -cf '^[^ ]*/tnslsnr {{ _sd_lsnr }}( |$)')"
+      echo "db=$(systemctl is-active {{ _sd_unit }})"
+      echo "listener=$(systemctl is-active oracle-listener@{{ _sd_lsnr }}.service)"
+    _sd_expect: ['pmon=0', 'tnslsnr=0', 'db=inactive', 'listener=inactive']
+
+# oracle-databases.target wants oracle-listeners.target => listener is started as well
+- name: oradb_manage_db_systemd | start database target
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_cmd.yml
+  vars: {mt_id: oradb_manage_db_systemd.targets_start, _sd_cmd: systemctl start oracle-databases.target}
+
+- name: oradb_manage_db_systemd | state after start of database target
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.targets_start_state
+    _sd_script: |
+      echo "pmon=$(pgrep -cf '^ora_pmon_{{ _sd_sid }}$')"
+      echo "tnslsnr=$(pgrep -cf '^[^ ]*/tnslsnr {{ _sd_lsnr }}( |$)')"
+      echo "db=$(systemctl is-active {{ _sd_unit }})"
+      echo "listener=$(systemctl is-active oracle-listener@{{ _sd_lsnr }}.service)"
+    _sd_expect: ['pmon=1', 'tnslsnr=1', 'db=active', 'listener=active']
+
+# ---------------------------------------------------------------- shutdown/start outside of systemd
+# shutdown in sqlplus => the monitor ends with exit 0, unit inactive, no restart
+- name: oradb_manage_db_systemd | shutdown database outside of systemd
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "shutdown immediate"
+
+- name: oradb_manage_db_systemd | state after shutdown outside of systemd
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.shutdown_outside_state
+    _sd_script: "{{ _sd_wait_crash }}{{ _sd_unit_state }}"
+    _sd_expect: ['db=inactive', 'result=success', 'pmon=0']
+
+# start in sqlplus => oracle-adopt.service starts the enabled, inactive unit
+- name: oradb_manage_db_systemd | start database outside of systemd
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_manual_start.yml
+
+- name: oradb_manage_db_systemd | run oracle-adopt.service
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_cmd.yml
+  vars: {mt_id: oradb_manage_db_systemd.adopt, _sd_cmd: systemctl start oracle-adopt.service}
+
+- name: oradb_manage_db_systemd | state after oracle-adopt.service
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.adopt_state
+    _sd_script: "{{ _sd_unit_state }}"
+    _sd_expect: ['db=active', 'result=success', 'pmon=1']
+
+# shutdown abort in sqlplus: "Instance terminated by USER" before "Instance shutdown (abort)
+# complete" in the alert log => no crash, unit inactive
+- name: oradb_manage_db_systemd | shutdown abort outside of systemd
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "shutdown abort"
+
+- name: oradb_manage_db_systemd | state after shutdown abort outside of systemd
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.shutdown_abort_state
+    _sd_script: "{{ _sd_wait_crash }}{{ _sd_unit_state }}"
+    _sd_expect: ['db=inactive', 'result=success', 'pmon=0']
+
+- name: oradb_manage_db_systemd | start database outside of systemd after shutdown abort
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_manual_start.yml
+
+- name: oradb_manage_db_systemd | run oracle-adopt.service after shutdown abort
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_cmd.yml
+  vars: {mt_id: oradb_manage_db_systemd.adopt_abort, _sd_cmd: systemctl start oracle-adopt.service}
+
+- name: oradb_manage_db_systemd | state after oracle-adopt.service after shutdown abort
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.adopt_abort_state
+    _sd_script: "{{ _sd_unit_state }}"
+    _sd_expect: ['db=active', 'result=success', 'pmon=1']
+
+# ---------------------------------------------------------------- crash with restart (default)
+- name: oradb_manage_db_systemd | restart settings of database unit
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.restart_settings
+    _sd_script: |
+      echo "restart=$(systemctl show -p Restart --value {{ _sd_unit }})"
+      echo "restartsec=$(systemctl show -p RestartUSec --value {{ _sd_unit }})"
+      echo "prevent=$(systemctl show -p RestartPreventExitStatus --value {{ _sd_unit }})"
+      echo "env=$(grep -c '^ORACLE_RESTART=yes$' /etc/sysconfig/oracledb/db-{{ _sd_sid }})"
+      echo "db=$(systemctl is-active {{ _sd_unit }})"
+    _sd_expect: ['restart=on-failure', 'restartsec=2min', 'prevent=3', 'env=1', 'db=active']
+
+- name: oradb_manage_db_systemd | crash with restart (kill -9 PMON)
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_cmd.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.restart_kill
+    _sd_cmd: "pkill -9 -f '^ora_pmon_{{ _sd_sid }}$'"
+
+- name: oradb_manage_db_systemd | state after crash, before the restart
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.restart_waiting
+    _sd_script: |
+      {{ _sd_wait_crash }}
+      echo "db=$(systemctl show -p ActiveState --value {{ _sd_unit }})"
+      echo "sub=$(systemctl show -p SubState --value {{ _sd_unit }})"
+      echo "pmon=$(pgrep -cf '^ora_pmon_{{ _sd_sid }}$')"
+    _sd_expect: ['db=activating', 'sub=auto-restart', 'pmon=0']
+
+# RestartSec=2min => wait max. 5 minutes for the restart
+- name: oradb_manage_db_systemd | state after the restart
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.restart_state
+    _sd_script: |
+      for i in $(seq 300) ; do
+        [ "$(systemctl show -p SubState --value {{ _sd_unit }})" = running ] && break
+        sleep 1
+      done
+      echo "db=$(systemctl is-active {{ _sd_unit }})"
+      echo "restarts=$(systemctl show -p NRestarts --value {{ _sd_unit }})"
+      echo "pmon=$(pgrep -cf '^ora_pmon_{{ _sd_sid }}$')"
+    _sd_expect: ['db=active', 'restarts=1', 'pmon=1']
+
+- name: oradb_manage_db_systemd | verify database is open after the restart
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "select status from v$instance;"
+    mt_sql_expect: "OPEN"
+    mt_sql_id: oradb_manage_db_systemd.restart_sql
+
+# ---------------------------------------------------------------- crash without restart (per database)
+# autostartup_service_restart: false only for this database, the running monitor reads the
+# change from the environment file => no restart of the database needed
+- name: oradb_manage_db_systemd | units without restart for the database
+  ansible.builtin.include_tasks: _role_run.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.norestart_units
+    mt_role: oradb_manage_db
+    mt_role_tasks_from: systemd_units.yml
+    oracle_databases: >-
+      {{ _sd_inventory_dbs | map('combine', {'autostartup_service_restart': false}) | list }}
+
+- name: oradb_manage_db_systemd | crash without restart (kill -9 PMON)
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_cmd.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.crash_kill
+    _sd_cmd: "pkill -9 -f '^ora_pmon_{{ _sd_sid }}$'"
+
+- name: oradb_manage_db_systemd | state after crash without restart
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.crash_state
+    _sd_script: |
+      {{ _sd_wait_crash }}
+      {{ _sd_unit_state }}
+      echo "status=$(systemctl show -p ExecMainStatus --value {{ _sd_unit }})"
+      echo "sub=$(systemctl show -p SubState --value {{ _sd_unit }})"
+    _sd_expect: ['db=failed', 'result=exit-code', 'pmon=0', 'status=3', 'sub=failed']
+
+# ---------------------------------------------------------------- ORACLE_HOME from /etc/oratab
+# the start reads the ORACLE_HOME from /etc/oratab, the stop uses the ORACLE_HOME of the running
+# instance (/proc/<pmon>/exe), e.g. after a switch of the ORACLE_HOME before /etc/oratab is changed
+- name: oradb_manage_db_systemd | units with restart (inventory) and start of database
+  ansible.builtin.include_tasks: _role_run.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.oratab_start
+    mt_role: oradb_manage_db
+    mt_role_tasks_from: systemd_units.yml
+
+- name: oradb_manage_db_systemd | wrong ORACLE_HOME in /etc/oratab
+  ansible.builtin.shell: |
+    cp -p /etc/oratab /etc/oratab.moltest
+    sed -i 's|^{{ _sd_sid }}:[^:]*:|{{ _sd_sid }}:/u01/app/oracle/product/moltest/wrong_home:|' /etc/oratab
+  changed_when: true
+  become: true
+  become_user: root
+
+- name: oradb_manage_db_systemd | stop database unit with wrong ORACLE_HOME in /etc/oratab
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_cmd.yml
+  vars: {mt_id: oradb_manage_db_systemd.wrong_home_stop, _sd_cmd: "systemctl stop {{ _sd_unit }}"}
+
+- name: oradb_manage_db_systemd | state after stop with wrong ORACLE_HOME
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.wrong_home_stop_state
+    _sd_script: "{{ _sd_unit_state }}"
+    _sd_expect: ['db=inactive', 'result=success', 'pmon=0']
+
+# the start with a wrong ORACLE_HOME in /etc/oratab fails
+- name: oradb_manage_db_systemd | start database unit with wrong ORACLE_HOME in /etc/oratab
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_cmd.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.wrong_home_start
+    _sd_cmd: "systemctl start {{ _sd_unit }}"
+    _sd_expect_cmd: failed
+
+- name: oradb_manage_db_systemd | restore /etc/oratab
+  ansible.builtin.shell: |
+    mv /etc/oratab.moltest /etc/oratab
+    systemctl reset-failed {{ _sd_unit }}
+  changed_when: true
+  become: true
+  become_user: root
+
+- name: oradb_manage_db_systemd | start database unit with /etc/oratab
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_cmd.yml
+  vars: {mt_id: oradb_manage_db_systemd.oratab_start_again, _sd_cmd: "systemctl start {{ _sd_unit }}"}
+
+# ---------------------------------------------------------------- switch to legacy
+# active units => units disabled, unit files kept
+- name: oradb_manage_db_systemd | switch to legacy with active units
+  ansible.builtin.include_tasks: _role_run.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.legacy_active
+    mt_role: oradb_manage_db
+    mt_role_tasks_from: systemd_units_remove.yml
+    autostartup_service_mode: legacy
+
+- name: oradb_manage_db_systemd | state after switch with active units
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.legacy_active_state
+    _sd_script: |
+      echo "db=$(systemctl is-active {{ _sd_unit }})"
+      echo "db_enabled=$(systemctl is-enabled {{ _sd_unit }} 2>&1)"
+      echo "timer=$(systemctl is-enabled oracle-adopt.timer)"
+      echo "unitfile=$(test -f /etc/systemd/system/oracle-db@.service && echo exists || echo removed)"
+      echo "pmon=$(pgrep -cf '^ora_pmon_{{ _sd_sid }}$')"
+    _sd_expect: ['db=active', 'db_enabled=disabled', 'timer=disabled', 'unitfile=exists', 'pmon=1']
+
+# inactive units => unit files removed
+- name: oradb_manage_db_systemd | stop units
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_cmd.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.legacy_stop
+    _sd_cmd: systemctl stop oracle-databases.target oracle-listeners.target
+
+- name: oradb_manage_db_systemd | switch to legacy with inactive units
+  ansible.builtin.include_tasks: _role_run.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.legacy_inactive
+    mt_role: oradb_manage_db
+    mt_role_tasks_from: systemd_units_remove.yml
+    autostartup_service_mode: legacy
+
+- name: oradb_manage_db_systemd | state after switch with inactive units
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.legacy_inactive_state
+    _sd_script: |
+      echo "unitfiles=$(ls /etc/systemd/system | grep -c '^oracle-')"
+      echo "script=$(test -f /usr/local/bin/oracle-systemd && echo exists || echo removed)"
+      echo "envdir=$(test -d /etc/sysconfig/oracledb && echo exists || echo removed)"
+    _sd_expect: ['unitfiles=0', 'script=removed', 'envdir=removed']
+
+# ---------------------------------------------------------------- restore
+# state of converge (autostartup_service: true in the inventory of the scenarios)
+- name: oradb_manage_db_systemd | start database and listener outside of systemd
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_manual_start.yml
+
+- name: oradb_manage_db_systemd | restore units
+  ansible.builtin.include_tasks: _role_run.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.restore
+    mt_role: oradb_manage_db
+    mt_role_tasks_from: systemd_units.yml
+
+- name: oradb_manage_db_systemd | state after restore
+  ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
+  vars:
+    mt_id: oradb_manage_db_systemd.restore_state
+    _sd_script: "{{ _sd_unit_state }}"
+    _sd_expect: ['db=active', 'result=success', 'pmon=1']

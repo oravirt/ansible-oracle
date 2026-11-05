@@ -7,7 +7,6 @@ Install Oracle Database Software
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [autostartup_service](#autostartup_service)
-  - [autostartup_service_dependency](#autostartup_service_dependency)
   - [configure_oracle_profile](#configure_oracle_profile)
   - [glogin_default_cdb](#glogin_default_cdb)
   - [glogin_default_nocdb](#glogin_default_nocdb)
@@ -19,7 +18,6 @@ Install Oracle Database Software
   - [oracle_sw_image_db](#oracle_sw_image_db)
   - [oraswdb_install_forcechopt](#oraswdb_install_forcechopt)
   - [oraswdb_install_remove_install_images](#oraswdb_install_remove_install_images)
-  - [ulimit_systemd_mapping](#ulimit_systemd_mapping)
 - [Discovered Tags](#discovered-tags)
 - [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
@@ -41,31 +39,14 @@ Force a chopt operation in ORACLE_HOME.
 This is needed, when an existing ORACLE_HOME had multiple
 switches between on/off for an option.
 
-#### Default value
-
-```YAML
-autostartup_service: false
-```
-
-### autostartup_service_dependency
-
-Configure autostartup service to require and be started after this service.
-
-Only used when autostartup_service is true.
-
-#### Default value
-
-```YAML
-autostartup_service_dependency: network.target
-```
-
 ### configure_oracle_profile
 
 Create .profile_-environment scripts for databases
 in `oracle_databases`.
 
-Mandatory when `listener_installed` is defined and
-`autostartup_service: true`. Otherwise the listener will not start!
+Mandatory when `listener_installed` is defined,
+`autostartup_service: true` and `autostartup_service_mode: legacy`.
+Otherwise the listener will not start!
 
 #### Default value
 
@@ -213,20 +194,6 @@ Remove installation media from staging after installation when `oracle_sw_copy: 
 
 ```YAML
 oraswdb_install_remove_install_images: true
-```
-
-### ulimit_systemd_mapping
-
-Addional limits for systemd.
-
-#### Default value
-
-```YAML
-ulimit_systemd_mapping:
-  hard nproc: {name: LimitNPROC}
-  hard nofile: {name: LimitNOFILE}
-  hard stack: {name: LimitSTACK, sysctlfactor: 1024}
-  hard memlock: {name: LimitMEMLOCK, sysctlfactor: 1024}
 ```
 
 ## Discovered Tags

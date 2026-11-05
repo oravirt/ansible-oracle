@@ -1,0 +1,78 @@
+---
+# Remove the units of autostartup_service_mode: units (switch to autostartup_service_mode: legacy)
+# The databases and listeners are not stopped. The units are disabled, the unit files are
+# removed only when no unit is active, otherwise after the next reboot (systemd would kill the
+# processes in the cgroup of an active unit without unit file during a shutdown).
+- name: systemd_units_remove | check unit files
+  ansible.builtin.stat:
+    path: /etc/systemd/system/oracle-db@.service
+  register: _oradb_manage_db_systemd_units_exist
+
+- name: systemd_units_remove | remove units
+  when: _oradb_manage_db_systemd_units_exist.stat.exists
+  become: true
+  become_user: root
+  block:
+    - name: systemd_units_remove | stop and disable adopt timer
+      ansible.builtin.systemd:
+        name: oracle-adopt.timer
+        enabled: false
+        state: stopped
+
+    # disables all oracle-db@/oracle-listener@ units, which are wanted by the targets
+    - name: systemd_units_remove | disable targets
+      ansible.builtin.systemd:
+        name: "{{ _unit }}"
+        enabled: false
+      loop:
+        - oracle-databases.target
+        - oracle-listeners.target
+      loop_control:
+        loop_var: _unit
+
+    - name: systemd_units_remove | remove links of the database and listener units
+      ansible.builtin.file:
+        path: "/etc/systemd/system/{{ _unit }}.wants"
+        state: absent
+      loop:
+        - oracle-databases.target
+        - oracle-listeners.target
+      loop_control:
+        loop_var: _unit
+
+    # the systemd module does not support patterns
+    - name: systemd_units_remove | active database and listener units  # noqa command-instead-of-module
+      ansible.builtin.command: >-
+        systemctl list-units --state=active --plain --no-legend
+        oracle-db@*.service oracle-listener@*.service
+      register: _oradb_manage_db_systemd_units_active
+      changed_when: false
+
+    - name: systemd_units_remove | remove unit files, script and environment files
+      ansible.builtin.file:
+        path: "{{ _file }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/oracle-db@.service
+        - /etc/systemd/system/oracle-listener@.service
+        - /etc/systemd/system/oracle-databases.target
+        - /etc/systemd/system/oracle-listeners.target
+        - /etc/systemd/system/oracle-adopt.service
+        - /etc/systemd/system/oracle-adopt.timer
+        - /etc/sysconfig/oracledb
+        - /usr/local/bin/oracle-systemd
+      loop_control:
+        loop_var: _file
+      when: _oradb_manage_db_systemd_units_active.stdout | trim | length == 0
+
+    - name: systemd_units_remove | reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: systemd_units_remove | units are still active
+      ansible.builtin.debug:
+        msg: >-
+          The units of autostartup_service_mode 'units' are disabled, but still active:
+          {{ _oradb_manage_db_systemd_units_active.stdout_lines | map('split') | map('first') | join(', ') }}.
+          The unit files are removed in the next run after a reboot of the server.
+      when: _oradb_manage_db_systemd_units_active.stdout | trim | length > 0

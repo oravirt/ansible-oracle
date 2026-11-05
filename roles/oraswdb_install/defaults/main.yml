@@ -13,24 +13,11 @@ hostgroup_leaf: "{{ hostgroup }}-leaf"
 # Create .profile_-environment scripts for databases
 # in `oracle_databases`.
 #
-# Mandatory when `listener_installed` is defined and
-# `autostartup_service: true`. Otherwise the listener will not start!
+# Mandatory when `listener_installed` is defined,
+# `autostartup_service: true` and `autostartup_service_mode: legacy`.
+# Otherwise the listener will not start!
 # @end
 configure_oracle_profile: true
-
-# @var autostartup_service:description: >
-# Configure systemd service for autostart of database and listener.
-#
-# Only used when Grid-Infrastructure or Oracle Restart are not installed.
-# @end
-autostartup_service: false  # automatic startup/stop databases service
-
-# @var autostartup_service_dependency:description: >
-# Configure autostartup service to require and be started after this service.
-#
-# Only used when autostartup_service is true.
-# @end
-autostartup_service_dependency: "network.target"
 
 # @var hostinitdaemon:description: >
 # The start daemon of the OS.
@@ -47,14 +34,6 @@ hostinitdaemon: "{{ ansible_service_mgr }}"
 # @end
 oraswdb_install_forcechopt: false
 
-# @var ulimit_systemd_mapping:description: >
-# Addional limits for systemd.
-# @end
-ulimit_systemd_mapping:
-  'hard nproc': {name: LimitNPROC}
-  'hard nofile': {name: LimitNOFILE}
-  'hard stack': {name: LimitSTACK, sysctlfactor: 1024}
-  'hard memlock': {name: LimitMEMLOCK, sysctlfactor: 1024}
 
 # @var oracle_ee_options:description: >
 #

@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+# Attach databases and listeners, which were started outside of systemd, to their unit
+[Unit]
+Description=Attach Oracle databases and listeners to their systemd unit
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/oracle-systemd adopt

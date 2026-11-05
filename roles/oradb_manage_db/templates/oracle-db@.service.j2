@@ -1,0 +1,49 @@
+# {{ ansible_managed }}
+# Oracle Database <ORACLE_SID> (instance name of the unit)
+# ORACLE_HOME: /etc/oratab, settings: /etc/sysconfig/oracledb/db-<ORACLE_SID>
+[Unit]
+Description=Oracle Database %i
+After=network-online.target remote-fs.target local-fs.target {{ autostartup_service_dependency }} oracle-listeners.target
+Wants=network-online.target oracle-listeners.target
+{% if autostartup_service_dependency | trim | length > 0 %}
+Requires={{ autostartup_service_dependency }}
+{% endif %}
+PartOf=oracle-databases.target
+# max. 10 starts within 1 hour (stops a restart loop after crashes), manual starts are counted
+# as well, systemctl reset-failed resets the counter
+StartLimitIntervalSec=1h
+StartLimitBurst=10
+
+[Service]
+# ExecStartPre starts the database (systemctl start fails, when the database does not start),
+# ExecStart monitors the database as main process: exit 0 after a shutdown outside of systemd,
+# exit 1 after a crash (no "Instance shutdown [(abort)] complete" in the alert log)
+Type=simple
+User={{ oracle_user }}
+Group={{ oracle_group }}
+EnvironmentFile=/etc/sysconfig/oracledb/db-%i
+ExecStartPre=/usr/local/bin/oracle-systemd db-start %i
+ExecStart=/usr/local/bin/oracle-systemd db-monitor %i
+# as root: attach a database, which was started outside of systemd
+ExecStartPost=+/usr/local/bin/oracle-systemd attach %n
+ExecStop=/usr/local/bin/oracle-systemd db-stop %i
+# restart after a crash of the database, exit code 3 of the monitor: crash with ORACLE_RESTART=no
+# in /etc/sysconfig/oracledb/db-<ORACLE_SID> (autostartup_service_restart of the database)
+Restart=on-failure
+RestartSec={{ autostartup_service_restart_sec }}
+RestartPreventExitStatus=3
+# Delegate=yes is needed for AttachProcessesToUnit,
+# KillMode=process: systemd only stops the monitor and never kills a database
+Delegate=yes
+KillMode=process
+TimeoutStartSec={{ autostartup_service_start_timeout }}
+TimeoutStopSec={{ autostartup_service_stop_timeout }}
+Slice=oracle_database.slice
+{% for item in oracle_seclimits %}
+{%   if ulimit_systemd_mapping[item.name] is defined %}
+{{ ulimit_systemd_mapping[item.name].name }}={{ (item.value | int * ulimit_systemd_mapping[item.name].sysctlfactor | default(1)) }}
+{%   endif %}
+{% endfor %}
+
+[Install]
+WantedBy=oracle-databases.target

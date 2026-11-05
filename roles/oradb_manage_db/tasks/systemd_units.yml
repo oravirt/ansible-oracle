@@ -1,0 +1,220 @@
+---
+# Autostart with one systemd unit per database and listener (autostartup_service_mode: units)
+# - oracle-listener@<LISTENER_NAME>.service from listener_installed
+#   (without listener_installed: listener_name in oracle_databases, old listener logic)
+# - oracle-db@<ORACLE_SID>.service from oracle_databases
+# - oracle-adopt.timer attaches databases/listeners started outside of systemd to their unit
+# The legacy oracle-rdbms.service (oraswdb_install) is disabled. Its unit file is removed,
+# when it is inactive, otherwise after the next reboot (systemd would kill the processes in
+# the cgroup of an active unit without unit file during a shutdown).
+- name: systemd_units | start/stop script
+  ansible.builtin.copy:
+    src: oracle-systemd
+    dest: /usr/local/bin/oracle-systemd
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+  become_user: root
+
+- name: systemd_units | directory for environment files
+  ansible.builtin.file:
+    path: /etc/sysconfig/oracledb
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+  become_user: root
+
+- name: systemd_units | unit files
+  ansible.builtin.template:
+    src: "{{ _unit }}.j2"
+    dest: "/etc/systemd/system/{{ _unit }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - oracle-db@.service
+    - oracle-listener@.service
+    - oracle-databases.target
+    - oracle-listeners.target
+    - oracle-adopt.service
+    - oracle-adopt.timer
+  loop_control:
+    loop_var: _unit
+  register: _oradb_manage_db_systemd_unitfiles
+  become: true
+  become_user: root
+
+- name: systemd_units | initialize list of listeners
+  ansible.builtin.set_fact:
+    _oradb_manage_db_systemd_listeners: []
+
+- name: systemd_units | listeners from listener_installed
+  ansible.builtin.set_fact:
+    _oradb_manage_db_systemd_listeners: >-
+      {{ _oradb_manage_db_systemd_listeners + [{'name': lsnrinst.listener_name, 'home': listener_home}] }}
+  loop: "{{ listener_installed | default([]) | selectattr('state', 'equalto', 'present') | list }}"
+  loop_control:
+    loop_var: lsnrinst
+    label: "{{ lsnrinst.listener_name }}"
+
+# old listener logic: listener_name of the database in the ORACLE_HOME of the database
+- name: systemd_units | listeners from oracle_databases
+  ansible.builtin.set_fact:
+    _oradb_manage_db_systemd_listeners: >-
+      {{ _oradb_manage_db_systemd_listeners + [{'name': odb.listener_name, 'home': _oracle_home_db}] }}
+  loop: "{{ oracle_databases | selectattr('state', 'equalto', 'present') | selectattr('listener_name', 'defined') | list }}"
+  loop_control:
+    loop_var: odb
+    label: "{{ odb.listener_name }}"
+  when: listener_installed is not defined
+
+- name: systemd_units | environment files for listeners
+  ansible.builtin.copy:
+    content: |
+      # Managed by ansible-oracle (oradb_manage_db)
+      ORACLE_HOME={{ _lsnr.home }}
+    dest: "/etc/sysconfig/oracledb/listener-{{ _lsnr.name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ _oradb_manage_db_systemd_listeners | unique(attribute='name') }}"
+  loop_control:
+    loop_var: _lsnr
+    label: "{{ _lsnr.name }}: {{ _lsnr.home }}"
+  become: true
+  become_user: root
+
+# ORACLE_HOME of the database is read from /etc/oratab
+- name: systemd_units | environment files for databases
+  ansible.builtin.copy:
+    content: |
+      # Managed by ansible-oracle (oradb_manage_db)
+      ORACLE_SHUTDOWN_MODE={{ autostartup_service_shutdown_mode }}
+      ORACLE_RESTART={{ (odb.autostartup_service_restart | default(autostartup_service_restart)) | bool | ternary('yes', 'no') }}
+    dest: "/etc/sysconfig/oracledb/db-{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ oracle_databases | selectattr('state', 'equalto', 'present') | list }}"
+  loop_control:
+    loop_var: odb
+    label: >-
+      {{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}:
+      restart={{ odb.autostartup_service_restart | default(autostartup_service_restart) }}
+  become: true
+  become_user: root
+
+# a handler would be too late: the units are enabled in the next tasks
+- name: systemd_units | reload systemd  # noqa no-handler
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: _oradb_manage_db_systemd_unitfiles is changed
+  become: true
+  become_user: root
+
+# A running listener/database is not restarted, the unit attaches its processes.
+- name: systemd_units | enable and start listener units
+  ansible.builtin.systemd:
+    name: "oracle-listener@{{ _lsnr.name }}.service"
+    enabled: true
+    state: started
+  loop: "{{ _oradb_manage_db_systemd_listeners | unique(attribute='name') }}"
+  loop_control:
+    loop_var: _lsnr
+    label: "oracle-listener@{{ _lsnr.name }}.service"
+  become: true
+  become_user: root
+
+- name: systemd_units | enable and start database units
+  ansible.builtin.systemd:
+    name: "oracle-db@{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}.service"
+    enabled: true
+    state: started
+  loop: "{{ oracle_databases | selectattr('state', 'equalto', 'present') | list }}"
+  loop_control:
+    loop_var: odb
+    label: "oracle-db@{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}.service"
+  become: true
+  become_user: root
+
+# The database is already dropped by manage-db.yml => only disable the unit
+- name: systemd_units | disable units of removed databases
+  ansible.builtin.systemd:
+    name: "oracle-db@{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}.service"
+    enabled: false
+  loop: "{{ oracle_databases | selectattr('state', 'equalto', 'absent') | list }}"
+  loop_control:
+    loop_var: odb
+    label: "oracle-db@{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}.service"
+  failed_when: false
+  become: true
+  become_user: root
+
+- name: systemd_units | disable units of removed listeners
+  ansible.builtin.systemd:
+    name: "oracle-listener@{{ lsnrinst.listener_name }}.service"
+    enabled: false
+  loop: "{{ listener_installed | default([]) | selectattr('state', 'equalto', 'absent') | list }}"
+  loop_control:
+    loop_var: lsnrinst
+    label: "oracle-listener@{{ lsnrinst.listener_name }}.service"
+  failed_when: false
+  become: true
+  become_user: root
+
+- name: systemd_units | enable targets and adopt timer
+  ansible.builtin.systemd:
+    name: "{{ _unit }}"
+    enabled: true
+    state: started
+  loop:
+    - oracle-listeners.target
+    - oracle-databases.target
+    - oracle-adopt.timer
+  loop_control:
+    loop_var: _unit
+  become: true
+  become_user: root
+
+# migration from autostartup_service_mode: legacy
+- name: systemd_units | check legacy oracle-rdbms.service
+  ansible.builtin.stat:
+    path: /etc/systemd/system/oracle-rdbms.service
+  register: _oradb_manage_db_systemd_legacy
+
+- name: systemd_units | remove legacy oracle-rdbms.service
+  when: _oradb_manage_db_systemd_legacy.stat.exists
+  become: true
+  become_user: root
+  block:
+    - name: systemd_units | disable legacy oracle-rdbms.service
+      ansible.builtin.systemd:
+        name: oracle-rdbms.service
+        enabled: false
+
+    - name: systemd_units | state of legacy oracle-rdbms.service
+      ansible.builtin.systemd:
+        name: oracle-rdbms.service
+      register: _oradb_manage_db_systemd_legacy_state
+
+    - name: systemd_units | remove unit file of inactive oracle-rdbms.service
+      ansible.builtin.file:
+        path: /etc/systemd/system/oracle-rdbms.service
+        state: absent
+      when: _oradb_manage_db_systemd_legacy_state.status.ActiveState != 'active'
+      register: _oradb_manage_db_systemd_legacy_removed
+
+    - name: systemd_units | reload systemd after removal of oracle-rdbms.service  # noqa no-handler
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: _oradb_manage_db_systemd_legacy_removed is changed
+
+    - name: systemd_units | oracle-rdbms.service is still active
+      ansible.builtin.debug:
+        msg: >-
+          oracle-rdbms.service is disabled, but still active. The unit file is removed in the
+          next run after a reboot of the server.
+      when: _oradb_manage_db_systemd_legacy_state.status.ActiveState == 'active'

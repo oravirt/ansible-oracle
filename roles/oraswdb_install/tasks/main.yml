@@ -209,15 +209,20 @@
   tags:
     - nfsumountdb
 
+# legacy autostart (oracle-rdbms.service or dbora for init).
+# autostartup_service_mode: units is configured in oradb_manage_db.
 - name: install_home_db | copy start/stop script for autostart
   ansible.builtin.copy:
     dest: /usr/local/bin
     src: manage_oracle_rdbms_procs.sh
     mode: 0755
+  when: autostartup_service_mode == 'legacy' or hostinitdaemon != 'systemd'
   tags: autostartup_service
 
 - ansible.builtin.include_tasks: "{{ hostinitdaemon }}.yml"  # noqa name[missing]
-  when: autostartup_service | bool
+  when:
+    - autostartup_service | bool
+    - autostartup_service_mode == 'legacy' or hostinitdaemon != 'systemd'
   tags:
     - autostartup_service
     - always

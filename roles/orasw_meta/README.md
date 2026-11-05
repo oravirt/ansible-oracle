@@ -19,6 +19,14 @@ There are a lot of variables who are used by `orasw_meta`
   - [apply_patches_db](#apply_patches_db)
   - [assert_db_homes_config](#assert_db_homes_config)
   - [autostartup_service](#autostartup_service)
+  - [autostartup_service_adopt_interval](#autostartup_service_adopt_interval)
+  - [autostartup_service_dependency](#autostartup_service_dependency)
+  - [autostartup_service_mode](#autostartup_service_mode)
+  - [autostartup_service_restart](#autostartup_service_restart)
+  - [autostartup_service_restart_sec](#autostartup_service_restart_sec)
+  - [autostartup_service_shutdown_mode](#autostartup_service_shutdown_mode)
+  - [autostartup_service_start_timeout](#autostartup_service_start_timeout)
+  - [autostartup_service_stop_timeout](#autostartup_service_stop_timeout)
   - [db_homes_config](#db_homes_config)
   - [db_homes_installed](#db_homes_installed)
   - [dbenvdir](#dbenvdir)
@@ -75,6 +83,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [set_oracle_all_editions_options_state](#set_oracle_all_editions_options_state)
   - [shell_aliases](#shell_aliases)
   - [shell_ps1](#shell_ps1)
+  - [ulimit_systemd_mapping](#ulimit_systemd_mapping)
   - [use_proxy](#use_proxy)
 - [Discovered Tags](#discovered-tags)
 - [Open Tasks](#open-tasks)
@@ -134,10 +143,136 @@ Enable autostart of database during system startup.
 
 This switch is only used, when Single Instance without Grid Infrastructure / Restart is installed.
 
+The solution is selected with `autostartup_service_mode`.
+
+Default `true` since 5.0.0 (4.x: `false`).
+
 #### Default value
 
 ```YAML
-autostartup_service: false
+autostartup_service: true
+```
+
+### autostartup_service_adopt_interval
+
+Interval of `oracle-adopt.timer` (`autostartup_service_mode: units`), which attaches databases
+and listeners started outside of systemd to their unit. An inactive unit of a database, which
+was started outside of systemd, is started.
+
+#### Default value
+
+```YAML
+autostartup_service_adopt_interval: 2min
+```
+
+### autostartup_service_dependency
+
+Units which are required by the autostart and started before the databases and listeners
+(`Requires=` and `After=`), e.g. a service which mounts the file systems of the databases.
+Several units are separated by a blank.
+
+Used by both values of `autostartup_service_mode`. With `units`, the units
+`network-online.target`, `remote-fs.target` and `local-fs.target` are always used in `After=`.
+
+#### Default value
+
+```YAML
+autostartup_service_dependency: network.target
+```
+
+### autostartup_service_mode
+
+Solution for the autostart of databases and listeners with `autostartup_service: true`.
+
+- `units` (default since 5.0.0): one systemd unit per database (`oracle-db@<ORACLE_SID>.service`)
+and listener (`oracle-listener@<LISTENER_NAME>.service`) from `oracle_databases` and
+`listener_installed`, grouped by `oracle-databases.target` and `oracle-listeners.target`.
+Created by `oradb_manage_db`.
+Databases and listeners started outside of systemd are attached to their unit by the timer
+`oracle-adopt.timer`, so they are stopped cleanly during a shutdown of the server.
+- `legacy`: the solution before 5.0.0 with one service `oracle-rdbms.service` for all
+databases in `/etc/oratab`. Created by `oraswdb_install`.
+
+Switching the mode removes the units of the other solution without stopping the databases.
+See the Breaking Changes guide for the migration.
+
+#### Default value
+
+```YAML
+autostartup_service_mode: units
+```
+
+### autostartup_service_restart
+
+Restart a database after a crash (`autostartup_service_mode: units`).
+
+The unit `oracle-db@<ORACLE_SID>.service` monitors PMON of the database. When PMON is gone and
+the last entry in the alert log is not `Instance shutdown complete` (or
+`Instance shutdown (abort) complete`), the database crashed.
+With `true`, systemd restarts the unit after `autostartup_service_restart_sec`
+(max. 10 starts of the unit within 1 hour), with `false` the unit fails.
+
+A shutdown outside of systemd (e.g. `shutdown immediate` or `shutdown abort` in sqlplus) is not restarted.
+
+Can be set per database with `autostartup_service_restart` in `oracle_databases`.
+A change is used without a restart of the database.
+
+#### Default value
+
+```YAML
+autostartup_service_restart: true
+```
+
+#### Example usage
+
+```YAML
+oracle_databases:
+  - oracle_db_name: DB1
+    autostartup_service_restart: false
+```
+
+### autostartup_service_restart_sec
+
+`RestartSec` of the database units after a crash (`autostartup_service_restart: true`), for all databases.
+
+#### Default value
+
+```YAML
+autostartup_service_restart_sec: 2min
+```
+
+### autostartup_service_shutdown_mode
+
+Shutdown mode of the databases (`autostartup_service_mode: units`): `immediate`, `transactional`, `normal` or `abort`.
+
+#### Default value
+
+```YAML
+autostartup_service_shutdown_mode: immediate
+```
+
+### autostartup_service_start_timeout
+
+`TimeoutStartSec` of the database units (`autostartup_service_mode: units`).
+
+The start of a database with crash recovery can take a long time.
+
+#### Default value
+
+```YAML
+autostartup_service_start_timeout: 15min
+```
+
+### autostartup_service_stop_timeout
+
+`TimeoutStopSec` of the database units (`autostartup_service_mode: units`).
+
+systemd does not kill a database after the timeout (`KillMode=process`).
+
+#### Default value
+
+```YAML
+autostartup_service_stop_timeout: 15min
 ```
 
 ### db_homes_config
@@ -1119,6 +1254,20 @@ Configure shell prompt for OS-User oracle
 shell_ps1: "'[$LOGNAME'@'$ORACLE_SID `basename $PWD`]$'"
 ```
 
+### ulimit_systemd_mapping
+
+Mapping of `oracle_seclimits` to the limits of the systemd units for the autostart.
+
+#### Default value
+
+```YAML
+ulimit_systemd_mapping:
+  hard nproc: {name: LimitNPROC}
+  hard nofile: {name: LimitNOFILE}
+  hard stack: {name: LimitSTACK, sysctlfactor: 1024}
+  hard memlock: {name: LimitMEMLOCK, sysctlfactor: 1024}
+```
+
 ### use_proxy
 
 Enable Proxy for Download
@@ -1150,7 +1299,6 @@ use_proxy: false
 - (bug): is_sw_source_local really needed with default or as dependency from other vars?
 - (bug): Open Issue with changed behavior for `_oraswgi_meta_configure_cluster`
 - (bug): Variable hosgroup needs a refactoring
-- (bug): Change default from autostartup_service for Single Instance
 - (bug): Check if shell_ps1 is used for oracle and grid
 - (bug): Check when shell_aliases is used in ansible-oracle and change description
 - (bug): check if assert for deploy_ocenv + ocenv_bashrc_init is existing

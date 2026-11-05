@@ -1,0 +1,30 @@
+# {{ ansible_managed }}
+# Oracle Listener <LISTENER_NAME> (instance name of the unit)
+# Environment: /etc/sysconfig/oracledb/listener-<LISTENER_NAME>
+[Unit]
+Description=Oracle Listener %i
+After=network-online.target remote-fs.target local-fs.target {{ autostartup_service_dependency }}
+Wants=network-online.target
+{% if autostartup_service_dependency | trim | length > 0 %}
+Requires={{ autostartup_service_dependency }}
+{% endif %}
+PartOf=oracle-listeners.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User={{ oracle_user }}
+Group={{ oracle_group }}
+EnvironmentFile=/etc/sysconfig/oracledb/listener-%i
+ExecStart=/usr/local/bin/oracle-systemd listener-start %i
+# as root: attach a listener, which was started outside of systemd
+ExecStartPost=+/usr/local/bin/oracle-systemd attach %n
+ExecStop=/usr/local/bin/oracle-systemd listener-stop %i
+Delegate=yes
+KillMode=process
+TimeoutStartSec=5min
+TimeoutStopSec=5min
+Slice=oracle_database.slice
+
+[Install]
+WantedBy=oracle-listeners.target
