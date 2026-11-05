@@ -294,6 +294,72 @@ If multiple PRs are open, the upper rule makes sure that no duplicate files are 
 
 IMPORTANT: Each Pull-Requests needs a fragment from Release 3.0.0 onwards!
 
+[[claude-pr]]
+=== Create Pull-Requests with Claude Code
+
+`tools/claude/skills/pr` contains the skill `/pr` for https://claude.com/claude-code[Claude Code].
+It creates a Pull-Request from the current state of the local working copy: create a branch, commit, add a changelog fragment, push into the fork and run `gh pr create`.
+
+==== Setup
+
+`gh` is part of `shell.nix` and must be logged in once (see <<setup-gh>>).
+Without a `gh` in the `PATH` the skill uses `nix-shell -p gh`.
+
+Install the skill as personal skill for Claude Code:
+
+----
+mkdir -p ~/.claude/skills
+ln -sfn "$(pwd)/tools/claude/skills/pr" ~/.claude/skills/pr
+----
+
+NOTE: The symlink points into the working copy.
+`/pr` is missing on branches without `tools/claude`.
+Use `cp -r` instead of `ln -sfn` for an independent copy.
+
+==== Usage
+
+----
+/pr [draft] [base=<branch>] [milestone=<name>] [label=<l1,l2,...>] [notes on content]
+----
+
+[cols="1,3"]
+|===
+|Argument |Description
+
+|`draft`
+|Create the Pull-Request as draft.
+
+|`base=<branch>`
+|Target branch. Default: default branch of the target repository.
+
+|`milestone=<name>`
+|Milestone in the target repository, name or number (e.g. `milestone=4.17`).
+
+|`label=<l1,l2,...>`
+|Comma-separated labels in the target repository (e.g. `label=bug`).
+
+|any text
+|Hints for title and description of the Pull-Request.
+|===
+
+.Examples
+----
+/pr milestone=4.17 label=bug
+/pr draft milestone="5.0.0 alpha" label=enhancement,breaking_change
+----
+
+==== Behavior
+
+* The target is the remote `upstream`, if it exists (Pull-Request from `<fork-owner>:<branch>` into `oravirt/ansible-oracle`), otherwise `origin`.
+* On the default branch a new branch is created.
+* A missing fragment in `changelogs/fragments` is created. The PR reference is added later with `tools/release/fix_fragments.py`.
+* Labels and milestones are checked against the target repository before pushing. Unknown values stop the skill, nothing is created.
+  Setting labels or milestones in `oravirt/ansible-oracle` needs the `triage` permission.
+* An existing Pull-Request for the branch is updated (push, labels, milestone) instead of creating a new one.
+* The skill asks before a force push, a push into the default branch, unrelated uncommitted changes or merge conflicts.
+
+IMPORTANT: Invoking `/pr` allows Claude to push the branch and to create the Pull-Request without further confirmation.
+
 == Create new Releases in `ansible-oracle`
 
 IMPORTANT: This is only needed for creating new Releases in `ansible-oracle` - not for development!
@@ -624,9 +690,10 @@ The versions of github actions (e.g. `ansible/ansible-lint`) and of `pip install
 The pre-commit hooks are looked up with GitHub tags, which needs a token.
 The local checks use the token from `gh auth token`, if `gh` is logged in.
 
+[[setup-gh]]
 === Setup gh for renovate
 
-IMPORTANT: The GitHub CLI `gh` is only needed for running renovate against your fork on GitHub (`task renovate:fork`). +
+IMPORTANT: The GitHub CLI `gh` is only needed for running renovate against your fork on GitHub (`task renovate:fork`) and for the Claude Code skill `/pr` (see <<claude-pr>>). +
 The local checks work without it.
 
 `gh` is part of `shell.nix`. Login once with your GitHub account:
