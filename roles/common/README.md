@@ -112,6 +112,7 @@ common_packages_el10:
   - psmisc
   - python3
   - python3-pip
+  - python3-packaging
   - rlwrap
   - tar
   - unzip
@@ -306,6 +307,7 @@ common_packages_el9:
   - psmisc
   - python3
   - python3-pip
+  - python3-packaging
   - rlwrap
   - smartmontools
   - sysstat
