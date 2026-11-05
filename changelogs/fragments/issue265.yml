@@ -1,0 +1,11 @@
+breaking_changes:
+  - "orasw_meta: new variable autostartup_service_mode with default units. The autostart with autostartup_service: true replaces oracle-rdbms.service and /usr/local/bin/manage_oracle_rdbms_procs.sh by one systemd unit per database and listener. Set autostartup_service_mode: legacy before the upgrade to keep the solution of 4.x, see doc/guides/breaking_changes.adoc (oravirt#265)"
+  - "oradb_manage_db: autostart with one systemd unit per database (oracle-db@<ORACLE_SID>.service) and listener (oracle-listener@<LISTENER_NAME>.service), environment in /etc/sysconfig/oracledb. oracle-rdbms.service is disabled and removed without stopping the databases, see doc/guides/breaking_changes.adoc (oravirt#265)"
+  - "orasw_meta: the default of autostartup_service is true (4.x: false), a Single Instance without Grid Infrastructure / Oracle Restart gets the autostart of the databases. Set autostartup_service: false to keep the behavior of 4.x, see doc/guides/breaking_changes.adoc (oravirt#265)"
+  - "oradb_manage_db: the database unit monitors PMON and restarts a crashed database after autostartup_service_restart_sec (2min). autostartup_service_restart (default true) disables the restart for all databases or per database in oracle_databases. A shutdown outside of systemd is detected by the alert log and not restarted, see doc/guides/breaking_changes.adoc (oravirt#265)"
+minor_changes:
+  - "oradb_manage_db: the systemd units read the ORACLE_HOME of a database from /etc/oratab, the stop uses the ORACLE_HOME of the running instance (oravirt#265)"
+  - "orasw_meta: autostartup_service_dependency moved from oraswdb_install to orasw_meta and used by the new systemd units as well (oravirt#265)"
+  - "orasw_meta: new variables autostartup_service_start_timeout, autostartup_service_stop_timeout, autostartup_service_shutdown_mode, autostartup_service_restart, autostartup_service_restart_sec and autostartup_service_adopt_interval for the systemd units (oravirt#265)"
+  - "oradb_manage_db: databases and listeners started outside of systemd are attached to their unit by oracle-adopt.timer, so they are stopped cleanly during a shutdown of the server (oravirt#265)"
+  - "oraswdb_install: oracle-rdbms.service is only created with autostartup_service_mode: legacy, ulimit_systemd_mapping moved to orasw_meta (oravirt#265)"

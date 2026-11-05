@@ -3,6 +3,7 @@
 #
 # mt_id:        unique id of the check: <role>.<container>.<step>
 # mt_role:      name of the role in opitzconsulting.ansible_oracle
+# mt_role_tasks_from: (optional) task file of the role, default main
 # The variables for the role (e.g. asm_diskgroups) are set as vars of include_tasks.
 #
 # The check expects that the role does not fail (mt_expect: ok). Changes of the role
@@ -12,6 +13,7 @@
     - name: "role | run | {{ mt_role }}"
       ansible.builtin.include_role:
         name: "opitzconsulting.ansible_oracle.{{ mt_role }}"
+        tasks_from: "{{ mt_role_tasks_from | default('main') }}"
 
     - name: "role | record ok | {{ mt_id }}"
       ansible.builtin.include_tasks: _check.yml

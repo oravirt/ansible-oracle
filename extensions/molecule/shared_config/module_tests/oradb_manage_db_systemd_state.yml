@@ -1,0 +1,19 @@
+---
+# Check a state as root (included by oradb_manage_db_systemd.yml)
+# mt_id: id of the check, _sd_script: shell script with one "key=value" per line,
+# _sd_expect: expected lines
+- name: "oradb_manage_db_systemd | state | {{ mt_id }}"
+  ansible.builtin.shell: "{{ _sd_script }}"
+  register: _sd_state_res
+  changed_when: false
+  failed_when: false
+  become: true
+  become_user: root
+
+- name: "oradb_manage_db_systemd | check state {{ mt_id }}"
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_res:
+      failed: "{{ _sd_state_res.stdout_lines != _sd_expect }}"
+      msg: "{{ _sd_state_res.stdout_lines | join(' ') }}"
+    mt_expect: ok

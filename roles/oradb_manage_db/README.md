@@ -64,6 +64,8 @@ oracle_gi_cluster_type: STANDARD
 
 **_always_**
 
+**_autostartup_service_**
+
 **_create_cdb,dotprofile_db_**
 
 **_create_db_**

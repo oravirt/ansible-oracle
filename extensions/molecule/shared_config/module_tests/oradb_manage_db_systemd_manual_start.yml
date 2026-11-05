@@ -1,0 +1,15 @@
+---
+# Start listener LISTENER and database mt_oracle_sid outside of systemd (like a DBA in a session)
+# Included by oradb_manage_db_systemd.yml
+- name: oradb_manage_db_systemd | start listener outside of systemd
+  ansible.builtin.shell: |
+    lsnrctl status {{ _sd_lsnr }} > /dev/null 2>&1 || lsnrctl start {{ _sd_lsnr }}
+  environment:
+    PATH: "{{ mt_oracle_home }}/bin:/usr/bin:/bin"
+  changed_when: false
+
+- name: oradb_manage_db_systemd | start database outside of systemd
+  ansible.builtin.shell: |
+    pgrep -f '^ora_pmon_{{ _sd_sid }}$' > /dev/null && exit 0
+    echo startup | {{ mt_oracle_home }}/bin/sqlplus -S -L / as sysdba
+  changed_when: false

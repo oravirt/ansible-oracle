@@ -101,6 +101,26 @@
   when: oracle_databases is defined
   tags: create_db,dbca,customdbcatemplate,dotprofile_db,listener2
 
+# Autostart: one systemd unit per database and listener.
+# autostartup_service_mode: legacy is configured in oraswdb_install.
+- name: manage_db | Autostart with systemd units
+  ansible.builtin.include_tasks: systemd_units.yml
+  when:
+    - autostartup_service | bool
+    - autostartup_service_mode == 'units'
+    - ansible_service_mgr == 'systemd'
+    - oracle_install_option_gi | default('') | length == 0
+    - oracle_databases is defined
+  tags: autostartup_service
+
+- name: manage_db | Remove systemd units for autostartup_service_mode legacy
+  ansible.builtin.include_tasks: systemd_units_remove.yml
+  when:
+    - autostartup_service_mode == 'legacy'
+    - ansible_service_mgr == 'systemd'
+    - oracle_install_option_gi | default('') | length == 0
+  tags: autostartup_service
+
 - name: manage_db | Check if database is running
   ansible.builtin.shell: ps -ef |grep pmon |grep -v grep
   tags:

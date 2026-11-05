@@ -168,13 +168,104 @@ oracle_sw_source_local: /tmp
 # @end
 hostgroup: "{{ group_names[0] }}"
 
-# @todo bug: Change default from autostartup_service for Single Instance
 # @var autostartup_service:description: >
 # Enable autostart of database during system startup.
 #
 # This switch is only used, when Single Instance without Grid Infrastructure / Restart is installed.
+#
+# The solution is selected with `autostartup_service_mode`.
+#
+# Default `true` since 5.0.0 (4.x: `false`).
 # @end
-autostartup_service: false
+autostartup_service: true
+
+# @var autostartup_service_dependency:description: >
+# Units which are required by the autostart and started before the databases and listeners
+# (`Requires=` and `After=`), e.g. a service which mounts the file systems of the databases.
+# Several units are separated by a blank.
+#
+# Used by both values of `autostartup_service_mode`. With `units`, the units
+# `network-online.target`, `remote-fs.target` and `local-fs.target` are always used in `After=`.
+# @end
+autostartup_service_dependency: "network.target"
+
+# @var autostartup_service_mode:description: >
+# Solution for the autostart of databases and listeners with `autostartup_service: true`.
+#
+# - `units` (default since 5.0.0): one systemd unit per database (`oracle-db@<ORACLE_SID>.service`)
+#   and listener (`oracle-listener@<LISTENER_NAME>.service`) from `oracle_databases` and
+#   `listener_installed`, grouped by `oracle-databases.target` and `oracle-listeners.target`.
+#   Created by `oradb_manage_db`.
+#   Databases and listeners started outside of systemd are attached to their unit by the timer
+#   `oracle-adopt.timer`, so they are stopped cleanly during a shutdown of the server.
+# - `legacy`: the solution before 5.0.0 with one service `oracle-rdbms.service` for all
+#   databases in `/etc/oratab`. Created by `oraswdb_install`.
+#
+# Switching the mode removes the units of the other solution without stopping the databases.
+# See the Breaking Changes guide for the migration.
+# @end
+autostartup_service_mode: units
+
+# @var autostartup_service_start_timeout:description: >
+# `TimeoutStartSec` of the database units (`autostartup_service_mode: units`).
+#
+# The start of a database with crash recovery can take a long time.
+# @end
+autostartup_service_start_timeout: 15min
+
+# @var autostartup_service_stop_timeout:description: >
+# `TimeoutStopSec` of the database units (`autostartup_service_mode: units`).
+#
+# systemd does not kill a database after the timeout (`KillMode=process`).
+# @end
+autostartup_service_stop_timeout: 15min
+
+# @var autostartup_service_shutdown_mode:description: >
+# Shutdown mode of the databases (`autostartup_service_mode: units`): `immediate`, `transactional`, `normal` or `abort`.
+# @end
+autostartup_service_shutdown_mode: immediate
+
+# @var autostartup_service_restart:description: >
+# Restart a database after a crash (`autostartup_service_mode: units`).
+#
+# The unit `oracle-db@<ORACLE_SID>.service` monitors PMON of the database. When PMON is gone and
+# the last entry in the alert log is not `Instance shutdown complete` (or
+# `Instance shutdown (abort) complete`), the database crashed.
+# With `true`, systemd restarts the unit after `autostartup_service_restart_sec`
+# (max. 10 starts of the unit within 1 hour), with `false` the unit fails.
+#
+# A shutdown outside of systemd (e.g. `shutdown immediate` or `shutdown abort` in sqlplus) is not restarted.
+#
+# Can be set per database with `autostartup_service_restart` in `oracle_databases`.
+# A change is used without a restart of the database.
+# @end
+# @var autostartup_service_restart:example: >
+# oracle_databases:
+#   - oracle_db_name: DB1
+#     autostartup_service_restart: false
+# @end
+autostartup_service_restart: true
+
+# @var autostartup_service_restart_sec:description: >
+# `RestartSec` of the database units after a crash (`autostartup_service_restart: true`), for all databases.
+# @end
+autostartup_service_restart_sec: 2min
+
+# @var autostartup_service_adopt_interval:description: >
+# Interval of `oracle-adopt.timer` (`autostartup_service_mode: units`), which attaches databases
+# and listeners started outside of systemd to their unit. An inactive unit of a database, which
+# was started outside of systemd, is started.
+# @end
+autostartup_service_adopt_interval: 2min
+
+# @var ulimit_systemd_mapping:description: >
+# Mapping of `oracle_seclimits` to the limits of the systemd units for the autostart.
+# @end
+ulimit_systemd_mapping:
+  'hard nproc': {name: LimitNPROC}
+  'hard nofile': {name: LimitNOFILE}
+  'hard stack': {name: LimitSTACK, sysctlfactor: 1024}
+  'hard memlock': {name: LimitMEMLOCK, sysctlfactor: 1024}
 
 # @todo bug: Check if shell_ps1 is used for oracle and grid
 # @var shell_ps1:description: >

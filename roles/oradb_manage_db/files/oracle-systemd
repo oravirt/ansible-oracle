@@ -1,0 +1,355 @@
+#!/usr/bin/env bash
+#
+# Start/stop of Oracle databases and listeners with systemd (bundled with ansible-oracle)
+#
+# Used by the units oracle-db@<ORACLE_SID>.service and oracle-listener@<LISTENER_NAME>.service.
+# The ORACLE_HOME of a database is read from /etc/oratab, the ORACLE_HOME of a listener and the
+# settings of a database (ORACLE_SHUTDOWN_MODE, ORACLE_RESTART) from
+# /etc/sysconfig/oracledb/<db|listener>-<name> (EnvironmentFile= of the unit).
+#
+# Usage:
+#   oracle-systemd db-start <ORACLE_SID>          start the database (as oracle owner)
+#   oracle-systemd db-monitor <ORACLE_SID>        monitor the database (as oracle owner, main process)
+#   oracle-systemd db-stop <ORACLE_SID>           shutdown the database (as oracle owner)
+#   oracle-systemd listener-start <LISTENER_NAME> start the listener (as oracle owner)
+#   oracle-systemd listener-stop <LISTENER_NAME>  stop the listener (as oracle owner)
+#   oracle-systemd attach <unit>                  attach processes of a database/listener which are
+#                                                 running outside of the unit to the unit (as root)
+#   oracle-systemd adopt                          attach for all active units and start inactive
+#                                                 units of running databases (as root, timer)
+#
+# Databases started outside of systemd (e.g. sqlplus in a ssh session) are in the cgroup of the
+# session. They are attached to their unit with the systemd API AttachProcessesToUnit (needs
+# Delegate=yes), otherwise systemd stops them with the session during a shutdown of the server.
+#
+# db-monitor is the main process of oracle-db@<ORACLE_SID>.service. When PMON is gone, the last
+# entry in the alert log decides:
+# - "Instance shutdown complete" or "Instance shutdown (abort)  complete": shutdown outside of
+#   systemd => exit 0, no restart
+# - otherwise the instance crashed => exit 1, systemd restarts the unit with Restart=on-failure,
+#   exit 3 with ORACLE_RESTART=no (RestartPreventExitStatus=3 => unit failed, no restart)
+
+set -u
+
+PROGNAME=$(basename "$0")
+SYSTEMD_PRIVATE_SOCKET=/run/systemd/private
+# seconds between 2 checks of PMON
+MONITOR_INTERVAL=10
+ORATAB=/etc/oratab
+SYSCONFIG_DIR=/etc/sysconfig/oracledb
+# exit code of db-monitor after a crash without restart (RestartPreventExitStatus= of the unit)
+EXIT_NO_RESTART=3
+
+log() {
+    echo "${PROGNAME}: $*"
+}
+
+die() {
+    echo "${PROGNAME}: ERROR: $*" >&2
+    exit 1
+}
+
+usage() {
+    echo "Usage: ${PROGNAME} {db-start|db-monitor|db-stop} <ORACLE_SID>"
+    echo "       ${PROGNAME} {listener-start|listener-stop} <LISTENER_NAME>"
+    echo "       ${PROGNAME} attach <unit>"
+    echo "       ${PROGNAME} adopt"
+    exit 2
+}
+
+# PID of ora_pmon_<SID>, empty when the instance is not running
+pmon_pid() {
+    local sid=${1}
+    local pid
+    for pid in $(pgrep -x "ora_pmon_${sid}" 2>/dev/null) ; do
+        echo "${pid}"
+        return
+    done
+    # comm is limited to 15 characters => compare argv[0] for long SIDs
+    for pid in $(pgrep -f "^ora_pmon_${sid}$" 2>/dev/null) ; do
+        echo "${pid}"
+        return
+    done
+}
+
+# ORACLE_HOME of an ORACLE_SID in /etc/oratab
+oratab_home() {
+    local sid=${1}
+    awk -F: -v sid="${sid}" '$1 == sid { print $2 ; exit }' "${ORATAB}" 2>/dev/null
+}
+
+set_db_oracle_home() {
+    local sid=${1}
+    ORACLE_HOME=$(oratab_home "${sid}")
+    [ -n "${ORACLE_HOME}" ] || die "No entry for ${sid} in ${ORATAB}"
+}
+
+set_oracle_env() {
+    [ -n "${ORACLE_HOME:-}" ] || die "ORACLE_HOME is not set"
+    [ -x "${ORACLE_HOME}/bin/sqlplus" ] || die "${ORACLE_HOME}/bin/sqlplus not found"
+    export ORACLE_HOME
+    export PATH="${ORACLE_HOME}/bin:/usr/bin:/bin"
+    export LD_LIBRARY_PATH="${ORACLE_HOME}/lib"
+    ORACLE_BASE=$("${ORACLE_HOME}/bin/orabase" 2>/dev/null)
+    export ORACLE_BASE
+    # no login.sql from SQLPATH/ORACLE_PATH or the current directory
+    unset SQLPATH ORACLE_PATH
+    cd / || die "cd / failed"
+}
+
+# run sqlplus as sysdba, exit code != 0 on ORA-/SP2- errors
+# glogin.sql/login.sql run during connect and may fail on an idle instance (e.g. a query in
+# the prompt) => whenever sqlerror after the connect, only the output after the marker is checked
+run_sqlplus() {
+    local sql=${1}
+    local marker="ORACLE_SYSTEMD_BEGIN"
+    local output rc
+    output=$(sqlplus -S -L /nolog <<EOF
+connect / as sysdba
+whenever sqlerror exit failure
+set termout on feedback on echo off
+prompt ${marker}
+${sql}
+exit
+EOF
+)
+    rc=$?
+    output=$(echo "${output}" | sed -n "/^${marker}\$/,\$p" | sed 1d)
+    echo "${output}"
+    if [ ${rc} -ne 0 ] || echo "${output}" | grep -Eq '^(ORA|SP2)-[0-9]+' ; then
+        return 1
+    fi
+    return 0
+}
+
+db_start() {
+    local sid=${1}
+    export ORACLE_SID=${sid}
+
+    if [ -n "$(pmon_pid "${sid}")" ] ; then
+        log "Database ${sid} is already running"
+        return 0
+    fi
+
+    set_db_oracle_home "${sid}"
+    set_oracle_env
+
+    # parameter file in ORACLE_HOME/dbs or ORACLE_BASE_CONFIG/dbs (read-only ORACLE_HOME)
+    local pfiledir="${ORACLE_HOME}/dbs"
+    if [ -x "${ORACLE_HOME}/bin/orabaseconfig" ] ; then
+        pfiledir="$("${ORACLE_HOME}/bin/orabaseconfig" 2>/dev/null)/dbs"
+    fi
+    if [ ! -f "${pfiledir}/spfile${sid}.ora" ] && [ ! -f "${pfiledir}/init${sid}.ora" ] ; then
+        die "No parameter file for ${sid} in ${pfiledir}"
+    fi
+
+    local startup="startup"
+    if [ "${ORACLE_START_MODE:-open}" = "mount" ] ; then
+        startup="startup mount"
+    fi
+    log "Starting database ${sid} (${startup}) from ${ORACLE_HOME}"
+    run_sqlplus "${startup}" || die "Start of database ${sid} failed"
+    log "Database ${sid} started"
+}
+
+# path of the alert log from V$DIAG_INFO
+alert_log() {
+    local sid=${1}
+    local dir
+    dir=$(run_sqlplus "set heading off feedback off pagesize 0
+select value from v\$diag_info where name = 'Diag Trace';" | tail -1)
+    echo "${dir}/alert_${sid}.log"
+}
+
+db_monitor() {
+    local sid=${1}
+    local alertlog last i restart
+    export ORACLE_SID=${sid}
+    set_db_oracle_home "${sid}"
+    set_oracle_env
+    trap 'log "Monitoring of database ${sid} stopped" ; exit 0' TERM
+
+    [ -n "$(pmon_pid "${sid}")" ] || die "Database ${sid} is not running"
+    alertlog=$(alert_log "${sid}")
+    log "Monitoring database ${sid}, alert log ${alertlog}"
+
+    while [ -n "$(pmon_pid "${sid}")" ] ; do
+        # sleep in background => the trap for TERM is executed immediately
+        sleep "${MONITOR_INTERVAL}" &
+        wait $!
+    done
+
+    # the last background processes write the reason into the alert log
+    i=0
+    while pgrep -f "^ora_[a-z0-9]+_${sid}$" > /dev/null && [ ${i} -lt 300 ] ; do
+        sleep 1
+        i=$((i + 1))
+    done
+
+    # shutdown abort writes "Instance terminated by USER" before "Instance shutdown (abort)  complete"
+    last=$(grep -E 'Instance shutdown .*complete|Instance terminated by|terminating the instance' \
+           "${alertlog}" 2>/dev/null | tail -1)
+    if [[ "${last}" =~ ^Instance\ shutdown\ .*complete ]] ; then
+        log "Database ${sid} was shut down outside of systemd"
+        exit 0
+    fi
+    log "ERROR: Database ${sid} crashed: ${last:-no entry found in ${alertlog}}"
+
+    # read ORACLE_RESTART from the file => a change by ansible-oracle is used without a restart
+    restart=$(sed -n 's/^ORACLE_RESTART=//p' "${SYSCONFIG_DIR}/db-${sid}" 2>/dev/null | tail -1)
+    if [ "${restart:-${ORACLE_RESTART:-yes}}" = "no" ] ; then
+        log "No restart of database ${sid} (ORACLE_RESTART=no)"
+        exit ${EXIT_NO_RESTART}
+    fi
+    exit 1
+}
+
+db_stop() {
+    local sid=${1}
+    local pid
+    export ORACLE_SID=${sid}
+
+    pid=$(pmon_pid "${sid}")
+    if [ -z "${pid}" ] ; then
+        log "Database ${sid} is not running"
+        return 0
+    fi
+
+    # Use the ORACLE_HOME of the running instance, it could differ from /etc/oratab
+    # after a switch of the ORACLE_HOME (out-of-place patching).
+    local exe
+    exe=$(readlink -f "/proc/${pid}/exe" 2>/dev/null)
+    if [ -n "${exe}" ] ; then
+        ORACLE_HOME=$(dirname "$(dirname "${exe}")")
+    else
+        set_db_oracle_home "${sid}"
+    fi
+    set_oracle_env
+
+    local mode=${ORACLE_SHUTDOWN_MODE:-immediate}
+    log "Stopping database ${sid} (shutdown ${mode}) from ${ORACLE_HOME}"
+    run_sqlplus "shutdown ${mode}" || die "Shutdown of database ${sid} failed"
+
+    # wait until all background processes are gone
+    while [ -n "$(pmon_pid "${sid}")" ] ; do
+        sleep 1
+    done
+    log "Database ${sid} stopped"
+}
+
+listener_start() {
+    local name=${1}
+    set_oracle_env
+    if lsnrctl status "${name}" > /dev/null 2>&1 ; then
+        log "Listener ${name} is already running"
+        return 0
+    fi
+    log "Starting listener ${name} from ${ORACLE_HOME}"
+    lsnrctl start "${name}" || die "Start of listener ${name} failed"
+}
+
+listener_stop() {
+    local name=${1}
+    set_oracle_env
+    if ! lsnrctl status "${name}" > /dev/null 2>&1 ; then
+        log "Listener ${name} is not running"
+        return 0
+    fi
+    log "Stopping listener ${name}"
+    lsnrctl stop "${name}" || die "Stop of listener ${name} failed"
+}
+
+# PIDs of the background processes of a database or of a listener for a unit
+unit_pids() {
+    local unit=${1}
+    local instance=${unit#*@}
+    instance=${instance%.service}
+    local procdir pid argv0 argv1
+
+    for procdir in /proc/[0-9]* ; do
+        pid=${procdir#/proc/}
+        argv0=$( { tr '\0' '\n' < "/proc/${pid}/cmdline" ; } 2>/dev/null | sed -n 1p)
+        case "${unit}" in
+            oracle-db@*)
+                if [[ "${argv0}" =~ ^ora_[a-z0-9]+_${instance}$ ]] ; then
+                    echo "${pid}"
+                fi
+                ;;
+            oracle-listener@*)
+                argv1=$( { tr '\0' '\n' < "/proc/${pid}/cmdline" ; } 2>/dev/null | sed -n 2p)
+                if [[ "${argv0}" == */tnslsnr ]] && [ "${argv1^^}" = "${instance^^}" ] ; then
+                    echo "${pid}"
+                fi
+                ;;
+        esac
+    done
+}
+
+attach() {
+    local unit=${1}
+    local cgroup pid pids=()
+
+    cgroup=$(systemctl show -p ControlGroup --value "${unit}" 2>/dev/null)
+    for pid in $(unit_pids "${unit}") ; do
+        # only processes outside of the cgroup of the unit
+        if [ -n "${cgroup}" ] && grep -q ":${cgroup}$" "/proc/${pid}/cgroup" 2>/dev/null ; then
+            continue
+        fi
+        pids+=("${pid}")
+    done
+
+    if [ ${#pids[@]} -eq 0 ] ; then
+        return 0
+    fi
+
+    log "Attaching ${#pids[@]} processes to ${unit}: ${pids[*]}"
+    local call=(call org.freedesktop.systemd1 /org/freedesktop/systemd1
+                org.freedesktop.systemd1.Manager AttachProcessesToUnit
+                ssau "${unit}" "" "${#pids[@]}" "${pids[@]}")
+    # system bus (dbus), otherwise the private socket of systemd (no dbus, e.g. in containers)
+    if busctl "${call[@]}" > /dev/null 2>&1 ; then
+        return 0
+    fi
+    if busctl --address="unix:path=${SYSTEMD_PRIVATE_SOCKET}" "${call[@]}" ; then
+        return 0
+    fi
+    # never fail a unit because of the attach
+    log "WARNING: Could not attach processes to ${unit}"
+    return 0
+}
+
+adopt() {
+    local unit envfile sid
+    # database started outside of systemd after a shutdown outside of systemd: the unit is
+    # inactive => start the enabled unit, it monitors the running database
+    for envfile in "${SYSCONFIG_DIR}"/db-* ; do
+        [ -f "${envfile}" ] || continue
+        sid=${envfile##*/db-}
+        unit="oracle-db@${sid}.service"
+        if [ -n "$(pmon_pid "${sid}")" ] && systemctl -q is-enabled "${unit}" \
+           && ! systemctl -q is-active "${unit}" ; then
+            log "Database ${sid} is running, starting ${unit}"
+            systemctl start "${unit}" || log "WARNING: Start of ${unit} failed"
+        fi
+    done
+
+    for unit in $(systemctl list-units --state=active --plain --no-legend \
+                  'oracle-db@*.service' 'oracle-listener@*.service' | awk '{print $1}') ; do
+        attach "${unit}"
+    done
+}
+
+[ $# -ge 1 ] || usage
+action=${1}
+shift
+
+case "${action}" in
+    db-start)       [ $# -eq 1 ] || usage ; db_start "${1}" ;;
+    db-monitor)     [ $# -eq 1 ] || usage ; db_monitor "${1}" ;;
+    db-stop)        [ $# -eq 1 ] || usage ; db_stop "${1}" ;;
+    listener-start) [ $# -eq 1 ] || usage ; listener_start "${1}" ;;
+    listener-stop)  [ $# -eq 1 ] || usage ; listener_stop "${1}" ;;
+    attach)         [ $# -eq 1 ] || usage ; attach "${1}" ;;
+    adopt)          [ $# -eq 0 ] || usage ; adopt ;;
+    *)              usage ;;
+esac

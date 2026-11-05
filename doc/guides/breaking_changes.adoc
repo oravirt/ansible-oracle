@@ -78,6 +78,14 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<Internal variables of oraasm_manage_diskgroups removed>>
 |Own playbooks or inventories use the internal variables `_oraasm_manage_diskgroups_attr_name` or `_oraasm_manage_diskgroups_attr_value`
 |No action for inventories with `asm_diskgroups`. Otherwise use `attributes` of `asm_diskgroups`
+
+|<<Autostart of databases with one systemd unit per database and listener>>
+|`autostartup_service: true` on a Single Instance without Grid Infrastructure / Oracle Restart with systemd
+|No action for the new solution, it replaces `oracle-rdbms.service` with the next run of `oradb_manage_db`. A crashed database is restarted after 2 minutes, set `autostartup_service_restart: false` to disable it. Set `autostartup_service_mode: legacy` *before* the upgrade to keep the solution of 4.x
+
+|<<Autostart of databases is enabled by default>>
+|Single Instance without Grid Infrastructure / Oracle Restart *and* `autostartup_service` is not set in the inventory
+|No action, if the databases should start with the server. Otherwise set `autostartup_service: false`
 |===
 
 ==== Minimum ansible-core 2.16
@@ -758,6 +766,132 @@ asm_diskgroups:
       - {name: compatible.rdbms, value: 19.0.0.0.0}
     disk:
       - {device: /dev/sdb, asmlabel: data01}
+----
+
+==== Autostart of databases with one systemd unit per database and listener
+
+The autostart with `autostartup_service: true` (Single Instance without Grid Infrastructure / Oracle Restart) uses new systemd units (link:https://github.com/oravirt/ansible-oracle/issues/265[#265]).
+The solution of 4.x is still available with `autostartup_service_mode: legacy`.
+
+The service `oracle-rdbms.service` of 4.x had some problems:
+
+* systemd killed a database after 90 seconds, when `shutdown immediate` took longer (default timeout, `KillMode=control-group`).
+* A database without `~/.profile_<ORACLE_SID>` was not shut down, but killed by systemd.
+* A database started outside of systemd (e.g. with `sqlplus` in a ssh session) was killed with the session during a shutdown of the server.
+* Remote file systems (e.g. NFS) could be unmounted before the database was stopped.
+* A failed start of a database was not reported, the service was active.
+
+[options="header",cols="1,2,2"]
+|===
+| |4.x (`autostartup_service_mode: legacy`) |5.x (`autostartup_service_mode: units`, default)
+
+|Units
+|`oracle-rdbms.service` for all databases in `/etc/oratab`, created by `oraswdb_install`
+|`oracle-db@<ORACLE_SID>.service` per database from `oracle_databases` and `oracle-listener@<LISTENER_NAME>.service` per listener from `listener_installed` (or `listener_name` of `oracle_databases`), grouped by `oracle-databases.target` and `oracle-listeners.target`, created by `oradb_manage_db`
+
+|Start/stop script
+|`/usr/local/bin/manage_oracle_rdbms_procs.sh`, listener from `~/.profile_<ORACLE_SID>`
+|`/usr/local/bin/oracle-systemd`, environment in `/etc/sysconfig/oracledb/db-<ORACLE_SID>` and `/etc/sysconfig/oracledb/listener-<LISTENER_NAME>`
+
+|Timeouts
+|systemd default (90 seconds), then the database is killed
+|`autostartup_service_start_timeout` / `autostartup_service_stop_timeout` (default `15min`), systemd never kills a database (`KillMode=process`)
+
+|Databases started outside of systemd
+|killed during a shutdown of the server
+|attached to their unit by `oracle-adopt.timer` (`autostartup_service_adopt_interval`, systemd API `AttachProcessesToUnit`) and at the start of the unit
+
+|Dependencies
+|`autostartup_service_dependency` (default `network.target`) in `Requires=` and `After=`
+|`autostartup_service_dependency` in `Requires=` and `After=` of all units, `After=network-online.target remote-fs.target local-fs.target` is always set
+
+|Start of a single database
+|not possible
+|`systemctl start oracle-db@<ORACLE_SID>`
+
+|Crash of a database
+|not detected, the service stays active
+|The unit monitors PMON. After a crash (no `Instance shutdown complete` / `Instance shutdown (abort) complete` in the alert log) systemd restarts the database after `autostartup_service_restart_sec` (default `2min`), see <<Restart of a database after a crash>>.
+A shutdown in sqlplus is not restarted, the unit is inactive.
+
+|ORACLE_HOME of a database
+|from `/etc/oratab`
+|from `/etc/oratab` (start), from the running instance (stop)
+|===
+
+The migration is done by the next run of `oradb_manage_db` (playbook `manage_db.yml`).
+The databases and listeners are not restarted: the new units are started and attach the running databases and listeners.
+`oracle-rdbms.service` is disabled.
+Its unit file is removed, when the service is inactive, otherwise in the first run after the next reboot.
+An active service without unit file would be stopped without its stop script during a shutdown.
+
+===== Restart of a database after a crash
+
+This is new behavior compared to 4.x: `oracle-rdbms.service` did not detect a crash, a crashed database stayed down until it was started manually.
+
+The unit `oracle-db@<ORACLE_SID>.service` monitors PMON of the database every 10 seconds.
+When PMON is gone, the last entry in the alert log decides:
+
+[options="header",cols="2,3"]
+|===
+|Last entry in the alert log |Unit
+
+|`Instance shutdown complete` or `Instance shutdown (abort) complete` (shutdown in sqlplus, also `shutdown abort`)
+|inactive, no restart.
+The unit is started again by `oracle-adopt.timer`, when the database is started in sqlplus.
+
+|other entry, e.g. `Instance terminated by ...` (crash)
+|`autostartup_service_restart: true` (default): restart after `autostartup_service_restart_sec` (default `2min`), max. 10 starts of the unit within 1 hour.
+`autostartup_service_restart: false`: failed, no restart.
+|===
+
+`autostartup_service_restart` can be set for all databases or per database in `oracle_databases`.
+A change is used by the next run of `oradb_manage_db` without a restart of the database.
+
+.Restart after a crash only for DB1
+[source,yaml]
+----
+autostartup_service_restart: false
+
+oracle_databases:
+  - oracle_db_name: DB1
+    autostartup_service_restart: true
+    ...
+----
+
+IMPORTANT: Check the restart, when a database must not start automatically after a crash, e.g. because a crash is analyzed before the restart or another tool restarts the database.
+
+IMPORTANT: Set `autostartup_service_mode: legacy` in the inventory *before* the upgrade to 5.x to keep the solution of 4.x.
+`oraswdb_install` creates `oracle-rdbms.service` as before and `oradb_manage_db` does not create the new units.
+
+.Keep the autostart of 4.x
+[source,yaml]
+----
+autostartup_service: true
+autostartup_service_mode: legacy
+----
+
+A switch from `units` back to `legacy` removes the new units in the next run of `oradb_manage_db` (the databases are not stopped).
+Active units are disabled and their unit files are removed in the first run after the next reboot.
+Run `oraswdb_install` (playbook `swdb.yml`) to create `oracle-rdbms.service` again.
+
+NOTE: `dbora` for init (EL6) is not changed.
+Restart the databases with `systemctl restart oracle-db@<ORACLE_SID>` instead of `sqlplus`, then the database is always in its unit.
+
+==== Autostart of databases is enabled by default
+
+The default of `autostartup_service` is `true` since 5.0.0 (4.x: `false`).
+A Single Instance without Grid Infrastructure / Oracle Restart gets the autostart of the databases and listeners with the next run of `oraswdb_install` and `oradb_manage_db`, when `autostartup_service` is not set in the inventory.
+The solution is selected with `autostartup_service_mode`, see <<Autostart of databases with one systemd unit per database and listener>>.
+
+`autostartup_service` is not used with Grid Infrastructure / Oracle Restart, the databases are started by the Clusterware.
+
+The databases are written with the flag `Y` into `/etc/oratab` (as before with `autostartup_service: true`).
+
+.Keep the behavior of 4.x without autostart
+[source,yaml]
+----
+autostartup_service: false
 ----
 
 === Adding new breaking changes
