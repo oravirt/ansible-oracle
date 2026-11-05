@@ -134,7 +134,11 @@ A new version in the Dockerfile builds a new image automatically with the next `
 Steps for an update of Docsy:
 
 . Read the release notes of Docsy (minimum version of hugo, breaking changes).
+  Docsy 0.16 and later is a different Hugo module (`github.com/docsy/docsy/theme`) with Bootstrap and Font Awesome from npm.
+  `renovate.json` allows only versions below 0.16.
 . Update `website/go.mod` and `website/go.sum`.
+  Run `task clean:all` afterwards: an old module in `website/.cache/modules` can remain as empty directories
+  and is not downloaded again (error `File to import not found` or `unknown output format`).
 . `task docsy:diff` shows the differences between the copied templates in `website/layouts/` and the new Docsy version.
   Apply the changes of Docsy to the copies.
 . Check `website/assets/scss/_styles_project.scss`: it uses the Docsy classes `.td-navbar`, `.td-footer`, `.td-box` and `.td-content`.
