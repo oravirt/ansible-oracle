@@ -18,6 +18,8 @@
 
     # 2nd execution of oracle_facts will overwrite data of last execution.
     # => Store facts from oracle_facts in structure
+    # state: present for a PRIMARY database only, standby for all other roles (e.g. PHYSICAL STANDBY)
+    # => roles with oracledb_facts[...]['state'] == 'present' skip a standby database
     - name: Write facts to oracledb.db_unique_name
       ansible.builtin.set_fact:
         cacheable: true
@@ -28,7 +30,10 @@
         _db_facts:
           - key: "{{ odb['oracle_db_unique_name'] | default(odb['oracle_db_name']) }}"
             value:
-              state: present
+              state: >-
+                {{ 'present' if ansible_facts['database']['DATABASE_ROLE'] | default('PRIMARY') == 'PRIMARY'
+                   else 'standby' }}
+              database_role: "{{ ansible_facts['database']['DATABASE_ROLE'] | default('PRIMARY') }}"
               version: "{{ ansible_facts['version'] }}"
               database: "{{ ansible_facts['database'] }}"
               instance: "{{ ansible_facts['instance'] }}"
@@ -44,6 +49,8 @@
   rescue:
     # default is
     # => Fail execution of Playbook
+    # A database of a standby configuration (db_standby_config) may not exist yet
+    # (created by oradb_standby) => no fail, state unreachable
     - name: Fail execution of oradb_facts
       ansible.builtin.fail:
         msg: >-
@@ -51,6 +58,7 @@
           to disable this fail task.
       when:
         - not _odb_loop_helper.oradb_facts_ignore_unreachable | default(false) | bool
+        - _odb_standby_config | length == 0
 
     - name: Write empty facts to oracledb.db_unique_name (rescue from failure above)
       ansible.builtin.set_fact:
