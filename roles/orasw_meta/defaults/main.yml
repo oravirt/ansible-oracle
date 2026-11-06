@@ -606,6 +606,19 @@ set_oracle_all_editions_options_state: true
 # | numfiles | mutually exclusive with datafile |
 # | datafile | mutually exclusive with numfiles |
 # See examples for allowed values.
+#
+# _init_parameters_
+#
+# Initialization parameters, managed by `oradb_manage_parameters` (also in `oracle_pdbs`).
+#
+# | Attribute | Description |
+# | --- | --- |
+# | name | name of the parameter |
+# | value | value of the parameter |
+# | scope | `both` (default), `spfile` or `memory` |
+# | state | `present`, `absent` or `reset` |
+# | sid | instance name for the `SID` clause, default `*` (all instances). Case-sensitive, e.g. for `local_listener` per RAC instance. The instance does not need to run, then only the spfile is changed. |
+# | dbca | `false`: not used during creation with dbca (only `oracle_databases`). Default `true`, `false` for entries with `sid` other than `*`. `dbca: true` with `sid` other than `*` is not allowed (dbca has no `SID` clause). |
 # @end
 # @var oracle_databases:example: >
 #
@@ -624,6 +637,9 @@ set_oracle_all_editions_options_state: true
 #       - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
 #     init_parameters:
 #       - {name: audit_trail, value: 'NONE', scope: spfile, state: present}
+#       # RAC: one entry per instance
+#       - {name: local_listener, value: 'rac1-vip:1521', scope: both, state: present, sid: orcl1}
+#       - {name: local_listener, value: 'rac2-vip:1521', scope: both, state: present, sid: orcl2}
 #     profiles:
 #       - name: DEFAULT
 #     users:

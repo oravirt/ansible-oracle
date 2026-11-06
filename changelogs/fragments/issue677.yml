@@ -1,0 +1,10 @@
+---
+breaking_changes:
+  - "orasw_meta: init_parameters of oracle_databases with sid other than '*' and dbca=true are not allowed, because dbca has no SID clause - the assert of oracle_databases fails (oravirt/ansible-oracle#677, see doc/guides/breaking_changes.adoc)"
+minor_changes:
+  - "oradb_manage_parameters: new attribute sid in init_parameters of oracle_databases and oracle_pdbs to set a parameter for one instance, e.g. local_listener per RAC instance (oravirt/ansible-oracle#677)"
+  - "oradb_manage_db: init_parameters with sid other than '*' are not passed to dbca by default (oravirt/ansible-oracle#677)"
+  - "oradb_manage_parameters: value is not required for state reset/absent (oravirt/ansible-oracle#677)"
+bugfixes:
+  - "oracle_parameter: the current value is compared for the instance given in sid (memory from GV$PARAMETER of the running instance, spfile entry for sid), not for the connected instance or another spfile entry. Only the spfile is changed for an instance that is not running, scope=memory fails for it (oravirt/ansible-oracle#677)"
+  - "oracle_parameter: the current value with scope=spfile and sid='*' is read from the spfile entry for '*', not from an entry for another instance (oravirt/ansible-oracle#677)"

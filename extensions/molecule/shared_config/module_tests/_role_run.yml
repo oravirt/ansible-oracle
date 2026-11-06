@@ -4,10 +4,11 @@
 # mt_id:        unique id of the check: <role>.<container>.<step>
 # mt_role:      name of the role in opitzconsulting.ansible_oracle
 # mt_role_tasks_from: (optional) task file of the role, default main
+# mt_role_expect: (optional) ok (default) or failed (the role must fail)
 # The variables for the role (e.g. asm_diskgroups) are set as vars of include_tasks.
 #
-# The check expects that the role does not fail (mt_expect: ok). Changes of the role
-# are not reported, verify the result with _sql.yml.
+# The check expects that the role does not fail (mt_role_expect: ok). Changes of the role
+# are not reported, verify the result with _sql.yml or with registered results of the role.
 - name: "role | {{ mt_role }} | {{ mt_id }}"
   block:
     - name: "role | run | {{ mt_role }}"
@@ -17,7 +18,7 @@
 
     - name: "role | record ok | {{ mt_id }}"
       ansible.builtin.include_tasks: _check.yml
-      vars: {mt_res: {failed: false}, mt_expect: ok}
+      vars: {mt_res: {failed: false}, mt_expect: "{{ mt_role_expect | default('ok') }}"}
 
   rescue:
     - name: "role | record failure | {{ mt_id }}"
@@ -28,4 +29,4 @@
           msg: >-
             failed in task '{{ ansible_failed_task.name | default('') }}':
             {{ ansible_failed_result.msg | default('') }}
-        mt_expect: ok
+        mt_expect: "{{ mt_role_expect | default('ok') }}"

@@ -10,9 +10,10 @@
     password: "{{ _db_password_cdb }}"
     mode: "{{ db_mode }}"
     name: "{{ odb.1.name }}"
-    value: "{{ odb.1.value }}"
+    value: "{{ odb.1.value | default(omit) }}"
     state: "{{ odb.1.state }}"
     scope: "{{ odb.1.scope | default ('both') }}"
+    sid: "{{ odb.1.sid | default('*') }}"
   environment: "{{ _oracle_env }}"
   with_subelements:
     - "{{ oracle_databases }}"
@@ -34,8 +35,9 @@
       port: {{ _listener_port_cdb }}
       service: {{ _db_service_name }}
       name: {{ odb.1.name }}
-      value: {{ odb.1.value }}
+      value: {{ odb.1.value | default('') }}
       scope: {{ odb.1.scope | default ('both') }}
+      sid: {{ odb.1.sid | default('*') }}
       state:{{ odb.1.state }}
       db_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
   register: param_change_cdb
@@ -53,9 +55,10 @@
     password: "{{ _db_password_pdb }}"
     mode: "{{ db_mode }}"
     name: "{{ opdb.1.name }}"
-    value: "{{ opdb.1.value }}"
+    value: "{{ opdb.1.value | default(omit) }}"
     state: "{{ opdb.1.state }}"
     scope: "{{ opdb.1.scope | default ('both') }}"
+    sid: "{{ opdb.1.sid | default('*') }}"
   environment: "{{ _oracle_env_pdb }}"
   with_subelements:
     - "{{ oracle_pdbs }}"
@@ -80,8 +83,9 @@
       port: {{ _listener_port_pdb }}
       service: {{ opdb.0.pdb_name }}
       name: {{ opdb.1.name }}
-      value: {{ opdb.1.value }}
+      value: {{ opdb.1.value | default('') }}
       scope: {{ opdb.1.scope | default ('both') }}
+      sid: {{ opdb.1.sid | default('*') }}
       state:{{ opdb.1.state }}"
       cdb_state: {{ oracledb_facts[_oracle_db_unique_name]['state'] | default('') }}
   register: param_change_pdb

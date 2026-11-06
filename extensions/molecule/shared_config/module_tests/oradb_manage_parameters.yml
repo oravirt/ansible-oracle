@@ -1,0 +1,405 @@
+---
+# Role test for oradb_manage_parameters with init_parameters per instance (attribute sid,
+# oravirt#677) in the CDB (oracle_databases) and the PDB (oracle_pdbs).
+# A RAC is not needed: ALTER SYSTEM SET ... SID='<instance>' works in a single instance
+# database for instances that do not exist (spfile entry only, the memory is not changed).
+# - _mp_sid: instance of the database (memory and spfile entry)
+# - _mp_other: instance that does not exist (spfile entry only, scope=memory fails)
+# Every step runs the role twice: changed, then ok (idempotence).
+# The parameter optimizer_index_cost_adj is removed from the spfile (all SIDs) and reset in
+# memory at the beginning and at the end.
+- name: oradb_manage_parameters | variables
+  ansible.builtin.set_fact:
+    _mp_par: optimizer_index_cost_adj
+    _mp_other: MOLTEST2
+    _mp_inventory_dbs: "{{ oracle_databases }}"
+    _mp_inventory_pdbs: "{{ oracle_pdbs }}"
+
+- name: oradb_manage_parameters | instance name
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "select instance_name from v$instance;"
+
+- name: oradb_manage_parameters | variables (sql)
+  ansible.builtin.set_fact:
+    _mp_sid: "{{ mt_sql_value }}"
+    # remove the parameter from the spfile for all SIDs and reset it in memory
+    _mp_cleanup_sql: |
+      begin
+        for r in (select sid from v$spparameter
+                  where name = '{{ _mp_par }}' and isspecified = 'TRUE') loop
+          execute immediate 'alter system reset {{ _mp_par }} scope=spfile sid='''
+                            || r.sid || '''';
+        end loop;
+        for s in (select '*' sid from dual union all select '{{ mt_sql_value }}' from dual) loop
+          begin
+            execute immediate 'alter system reset {{ _mp_par }} scope=memory sid='''
+                              || s.sid || '''';
+          exception
+            when others then null;
+          end;
+        end loop;
+      end;
+      /
+    # spfile entries (sorted by SID) | memory value
+    _mp_state_sql: >-
+      select (select listagg(sid || '=' || value, ',') within group (order by sid)
+              from v$spparameter where name = '{{ _mp_par }}' and isspecified = 'TRUE')
+             || '|' || (select value from v$parameter where name = '{{ _mp_par }}')
+      from dual;
+
+- name: oradb_manage_parameters | cleanup (CDB$ROOT)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "{{ _mp_cleanup_sql }}"
+
+- name: oradb_manage_parameters | cleanup (PDB)
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql_container: "{{ mt_pdb }}"
+    mt_sql: "{{ _mp_cleanup_sql }}"
+
+- name: oradb_manage_parameters | memory value in CDB$ROOT and PDB after cleanup
+  ansible.builtin.include_tasks: _sql.yml
+  vars:
+    mt_sql: "select value from v$parameter where name = '{{ _mp_par }}';"
+
+- name: oradb_manage_parameters | values
+  ansible.builtin.set_fact:
+    # memory value after the cleanup (default), the test values are different
+    _mp_mem: "{{ mt_sql_value }}"
+    _mp_v1: "{{ '91' if mt_sql_value != '91' else '81' }}"
+    _mp_v2: "{{ '92' if mt_sql_value != '92' else '82' }}"
+    _mp_v3: "{{ '93' if mt_sql_value != '93' else '83' }}"
+    _mp_v4: "{{ '94' if mt_sql_value != '94' else '84' }}"
+    _mp_v5: "{{ '95' if mt_sql_value != '95' else '85' }}"
+
+- name: oradb_manage_parameters | tests
+  block:
+    # ------------------------------------------------ scope spfile for an instance that does not exist
+    - name: oradb_manage_parameters | spfile, other instance
+      ansible.builtin.include_tasks: oradb_manage_parameters_run.yml
+      vars:
+        _mp_id: "oradb_manage_parameters.{{ _mp_step.id }}"
+        _mp_expect: "{{ _mp_step.expect }}"
+        _mp_cdb: &mp_spfile_other
+          - {name: "{{ _mp_par }}", value: "{{ _mp_v1 }}", scope: spfile, state: present, sid: "{{ _mp_other }}"}
+        _mp_pdb: *mp_spfile_other
+      loop:
+        - {id: spfile_other, expect: changed}
+        - {id: spfile_other_idempotent, expect: ok}
+      loop_control:
+        loop_var: _mp_step
+
+    - name: oradb_manage_parameters | verify spfile, other instance (CDB$ROOT)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "{{ _mp_state_sql }}"
+        mt_sql_expect: "{{ _mp_other }}={{ _mp_v1 }}|{{ _mp_mem }}"
+        mt_sql_id: oradb_manage_parameters.cdb.spfile_other_sql
+
+    - name: oradb_manage_parameters | verify spfile, other instance (PDB)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_container: "{{ mt_pdb }}"
+        mt_sql: "{{ _mp_state_sql }}"
+        mt_sql_expect: "{{ _mp_other }}={{ _mp_v1 }}|{{ _mp_mem }}"
+        mt_sql_id: oradb_manage_parameters.pdb.spfile_other_sql
+
+    # ------------------------------------------------ scope both for an instance that does not exist
+    # => only the spfile entry is compared and changed, the memory is not changed
+    - name: oradb_manage_parameters | both, other instance
+      ansible.builtin.include_tasks: oradb_manage_parameters_run.yml
+      vars:
+        _mp_id: "oradb_manage_parameters.{{ _mp_step.id }}"
+        _mp_expect: "{{ _mp_step.expect }}"
+        _mp_cdb: &mp_both_other
+          - {name: "{{ _mp_par }}", value: "{{ _mp_v2 }}", scope: both, state: present, sid: "{{ _mp_other }}"}
+        _mp_pdb: *mp_both_other
+      loop:
+        - {id: both_other, expect: changed}
+        - {id: both_other_idempotent, expect: ok}
+      loop_control:
+        loop_var: _mp_step
+
+    - name: oradb_manage_parameters | verify both, other instance (CDB$ROOT)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "{{ _mp_state_sql }}"
+        mt_sql_expect: "{{ _mp_other }}={{ _mp_v2 }}|{{ _mp_mem }}"
+        mt_sql_id: oradb_manage_parameters.cdb.both_other_sql
+
+    - name: oradb_manage_parameters | verify both, other instance (PDB)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_container: "{{ mt_pdb }}"
+        mt_sql: "{{ _mp_state_sql }}"
+        mt_sql_expect: "{{ _mp_other }}={{ _mp_v2 }}|{{ _mp_mem }}"
+        mt_sql_id: oradb_manage_parameters.pdb.both_other_sql
+
+    # ------------------------------------------------ scope memory for an instance that does not exist
+    - name: oradb_manage_parameters | memory, other instance (CDB)
+      ansible.builtin.include_tasks: oradb_manage_parameters_run.yml
+      vars:
+        _mp_id: oradb_manage_parameters.cdb.memory_other
+        _mp_expect: failed
+        _mp_cdb:
+          - {name: "{{ _mp_par }}", value: "{{ _mp_v4 }}", scope: memory, state: present, sid: "{{ _mp_other }}"}
+
+    - name: oradb_manage_parameters | memory, other instance (PDB)
+      ansible.builtin.include_tasks: oradb_manage_parameters_run.yml
+      vars:
+        _mp_id: oradb_manage_parameters.pdb.memory_other
+        _mp_expect: failed
+        _mp_pdb:
+          - {name: "{{ _mp_par }}", value: "{{ _mp_v4 }}", scope: memory, state: present, sid: "{{ _mp_other }}"}
+
+    # ------------------------------------------------ sid and dbca: true => assert in orasw_meta fails
+    - name: oradb_manage_parameters | sid with dbca true
+      ansible.builtin.include_tasks: oradb_manage_parameters_run.yml
+      vars:
+        _mp_id: oradb_manage_parameters.cdb.sid_dbca
+        _mp_expect: failed
+        _mp_cdb:
+          - {name: "{{ _mp_par }}", value: "{{ _mp_v4 }}", scope: spfile, state: present, sid: "{{ _mp_other }}", dbca: true}
+
+    # sid '*' with dbca true is allowed (reset: no entry for '*' in the spfile => ok)
+    - name: oradb_manage_parameters | sid * with dbca true
+      ansible.builtin.include_tasks: oradb_manage_parameters_run.yml
+      vars:
+        _mp_id: oradb_manage_parameters.cdb.sid_all_dbca
+        _mp_expect: ok
+        _mp_cdb:
+          - {name: "{{ _mp_par }}", scope: spfile, state: reset, sid: "*", dbca: true}
+
+    # ------------------------------------------------ scope both for the running instance
+    - name: oradb_manage_parameters | both, own instance
+      ansible.builtin.include_tasks: oradb_manage_parameters_run.yml
+      vars:
+        _mp_id: "oradb_manage_parameters.{{ _mp_step.id }}"
+        _mp_expect: "{{ _mp_step.expect }}"
+        _mp_cdb: &mp_both_own
+          - {name: "{{ _mp_par }}", value: "{{ _mp_v3 }}", scope: both, state: present, sid: "{{ _mp_sid }}"}
+        _mp_pdb: *mp_both_own
+      loop:
+        - {id: both_own, expect: changed}
+        - {id: both_own_idempotent, expect: ok}
+      loop_control:
+        loop_var: _mp_step
+
+    - name: oradb_manage_parameters | verify both, own instance (CDB$ROOT)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "{{ _mp_state_sql }}"
+        mt_sql_expect: "{{ _mp_sid }}={{ _mp_v3 }},{{ _mp_other }}={{ _mp_v2 }}|{{ _mp_v3 }}"
+        mt_sql_id: oradb_manage_parameters.cdb.both_own_sql
+
+    - name: oradb_manage_parameters | verify both, own instance (PDB)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_container: "{{ mt_pdb }}"
+        mt_sql: "{{ _mp_state_sql }}"
+        mt_sql_expect: "{{ _mp_sid }}={{ _mp_v3 }},{{ _mp_other }}={{ _mp_v2 }}|{{ _mp_v3 }}"
+        mt_sql_id: oradb_manage_parameters.pdb.both_own_sql
+
+    # ------------------------------------------------ memory equal, spfile entry different
+    # scope spfile changes only the spfile entry, scope both afterwards only the spfile entry
+    - name: oradb_manage_parameters | spfile, own instance
+      ansible.builtin.include_tasks: oradb_manage_parameters_run.yml
+      vars:
+        _mp_id: oradb_manage_parameters.spfile_own
+        _mp_expect: changed
+        _mp_cdb: &mp_spfile_own
+          - {name: "{{ _mp_par }}", value: "{{ _mp_v5 }}", scope: spfile, state: present, sid: "{{ _mp_sid }}"}
+        _mp_pdb: *mp_spfile_own
+
+    - name: oradb_manage_parameters | verify spfile, own instance (CDB$ROOT)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "{{ _mp_state_sql }}"
+        mt_sql_expect: "{{ _mp_sid }}={{ _mp_v5 }},{{ _mp_other }}={{ _mp_v2 }}|{{ _mp_v3 }}"
+        mt_sql_id: oradb_manage_parameters.cdb.spfile_own_sql
+
+    - name: oradb_manage_parameters | both, own instance, only spfile different
+      ansible.builtin.include_tasks: oradb_manage_parameters_run.yml
+      vars:
+        _mp_id: "oradb_manage_parameters.{{ _mp_step.id }}"
+        _mp_expect: "{{ _mp_step.expect }}"
+        _mp_cdb: *mp_both_own
+        _mp_pdb: *mp_both_own
+      loop:
+        - {id: both_own_spfile_only, expect: changed}
+        - {id: both_own_spfile_only_idempotent, expect: ok}
+      loop_control:
+        loop_var: _mp_step
+
+    - name: oradb_manage_parameters | verify both, own instance, only spfile different (CDB$ROOT)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "{{ _mp_state_sql }}"
+        mt_sql_expect: "{{ _mp_sid }}={{ _mp_v3 }},{{ _mp_other }}={{ _mp_v2 }}|{{ _mp_v3 }}"
+        mt_sql_id: oradb_manage_parameters.cdb.both_own_spfile_only_sql
+
+    - name: oradb_manage_parameters | verify both, own instance, only spfile different (PDB)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_container: "{{ mt_pdb }}"
+        mt_sql: "{{ _mp_state_sql }}"
+        mt_sql_expect: "{{ _mp_sid }}={{ _mp_v3 }},{{ _mp_other }}={{ _mp_v2 }}|{{ _mp_v3 }}"
+        mt_sql_id: oradb_manage_parameters.pdb.both_own_spfile_only_sql
+
+    # ------------------------------------------------ scope memory for the running instance
+    - name: oradb_manage_parameters | memory, own instance
+      ansible.builtin.include_tasks: oradb_manage_parameters_run.yml
+      vars:
+        _mp_id: "oradb_manage_parameters.{{ _mp_step.id }}"
+        _mp_expect: "{{ _mp_step.expect }}"
+        _mp_cdb: &mp_memory_own
+          - {name: "{{ _mp_par }}", value: "{{ _mp_v4 }}", scope: memory, state: present, sid: "{{ _mp_sid }}"}
+        _mp_pdb: *mp_memory_own
+      loop:
+        - {id: memory_own, expect: changed}
+        - {id: memory_own_idempotent, expect: ok}
+      loop_control:
+        loop_var: _mp_step
+
+    - name: oradb_manage_parameters | verify memory, own instance (CDB$ROOT)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "{{ _mp_state_sql }}"
+        mt_sql_expect: "{{ _mp_sid }}={{ _mp_v3 }},{{ _mp_other }}={{ _mp_v2 }}|{{ _mp_v4 }}"
+        mt_sql_id: oradb_manage_parameters.cdb.memory_own_sql
+
+    - name: oradb_manage_parameters | verify memory, own instance (PDB)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_container: "{{ mt_pdb }}"
+        mt_sql: "{{ _mp_state_sql }}"
+        mt_sql_expect: "{{ _mp_sid }}={{ _mp_v3 }},{{ _mp_other }}={{ _mp_v2 }}|{{ _mp_v4 }}"
+        mt_sql_id: oradb_manage_parameters.pdb.memory_own_sql
+
+    # ------------------------------------------------ RAC like: value for all instances (no sid)
+    # and a different value for one instance in the same list
+    - name: oradb_manage_parameters | all instances and other instance
+      ansible.builtin.include_tasks: oradb_manage_parameters_run.yml
+      vars:
+        _mp_id: "oradb_manage_parameters.{{ _mp_step.id }}"
+        _mp_expect: "{{ _mp_step.expect }}"
+        _mp_cdb: &mp_all_other
+          - {name: "{{ _mp_par }}", value: "{{ _mp_v5 }}", scope: spfile, state: present}
+          - {name: "{{ _mp_par }}", value: "{{ _mp_v1 }}", scope: spfile, state: present, sid: "{{ _mp_other }}"}
+        _mp_pdb: *mp_all_other
+      loop:
+        - {id: all_and_other, expect: changed}
+        - {id: all_and_other_idempotent, expect: ok}
+      loop_control:
+        loop_var: _mp_step
+
+    - name: oradb_manage_parameters | verify all instances and other instance (CDB$ROOT)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "{{ _mp_state_sql }}"
+        mt_sql_expect: "*={{ _mp_v5 }},{{ _mp_sid }}={{ _mp_v3 }},{{ _mp_other }}={{ _mp_v1 }}|{{ _mp_v4 }}"
+        mt_sql_id: oradb_manage_parameters.cdb.all_and_other_sql
+
+    - name: oradb_manage_parameters | verify all instances and other instance (PDB)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_container: "{{ mt_pdb }}"
+        mt_sql: "{{ _mp_state_sql }}"
+        mt_sql_expect: "*={{ _mp_v5 }},{{ _mp_sid }}={{ _mp_v3 }},{{ _mp_other }}={{ _mp_v1 }}|{{ _mp_v4 }}"
+        mt_sql_id: oradb_manage_parameters.pdb.all_and_other_sql
+
+    # ------------------------------------------------ reset (without value)
+    - name: oradb_manage_parameters | reset other instance
+      ansible.builtin.include_tasks: oradb_manage_parameters_run.yml
+      vars:
+        _mp_id: "oradb_manage_parameters.{{ _mp_step.id }}"
+        _mp_expect: "{{ _mp_step.expect }}"
+        _mp_cdb: &mp_reset_other
+          - {name: "{{ _mp_par }}", scope: both, state: reset, sid: "{{ _mp_other }}"}
+        _mp_pdb: *mp_reset_other
+      loop:
+        - {id: reset_other, expect: changed}
+        - {id: reset_other_idempotent, expect: ok}
+      loop_control:
+        loop_var: _mp_step
+
+    - name: oradb_manage_parameters | verify reset other instance (CDB$ROOT)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "{{ _mp_state_sql }}"
+        mt_sql_expect: "*={{ _mp_v5 }},{{ _mp_sid }}={{ _mp_v3 }}|{{ _mp_v4 }}"
+        mt_sql_id: oradb_manage_parameters.cdb.reset_other_sql
+
+    - name: oradb_manage_parameters | reset own instance
+      ansible.builtin.include_tasks: oradb_manage_parameters_run.yml
+      vars:
+        _mp_id: "oradb_manage_parameters.{{ _mp_step.id }}"
+        _mp_expect: "{{ _mp_step.expect }}"
+        _mp_cdb: &mp_reset_own
+          - {name: "{{ _mp_par }}", scope: both, state: reset, sid: "{{ _mp_sid }}"}
+        _mp_pdb: *mp_reset_own
+      loop:
+        - {id: reset_own, expect: changed}
+        - {id: reset_own_idempotent, expect: ok}
+      loop_control:
+        loop_var: _mp_step
+
+    - name: oradb_manage_parameters | verify reset own instance (CDB$ROOT)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: >-
+          select (select listagg(sid || '=' || value, ',') within group (order by sid)
+                  from v$spparameter where name = '{{ _mp_par }}' and isspecified = 'TRUE')
+                 || '|' || (select ismodified from v$parameter where name = '{{ _mp_par }}')
+          from dual;
+        mt_sql_expect: "*={{ _mp_v5 }}|FALSE"
+        mt_sql_id: oradb_manage_parameters.cdb.reset_own_sql
+
+    - name: oradb_manage_parameters | verify reset own instance (PDB)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_container: "{{ mt_pdb }}"
+        mt_sql: >-
+          select count(*) from v$spparameter
+          where name = '{{ _mp_par }}' and isspecified = 'TRUE' and sid <> '*';
+        mt_sql_expect: "0"
+        mt_sql_id: oradb_manage_parameters.pdb.reset_own_sql
+
+    # ------------------------------------------------ reset for all instances (without sid)
+    - name: oradb_manage_parameters | reset all instances
+      ansible.builtin.include_tasks: oradb_manage_parameters_run.yml
+      vars:
+        _mp_id: "oradb_manage_parameters.{{ _mp_step.id }}"
+        _mp_expect: "{{ _mp_step.expect }}"
+        _mp_cdb: &mp_reset_all
+          - {name: "{{ _mp_par }}", scope: spfile, state: reset}
+        _mp_pdb: *mp_reset_all
+      loop:
+        - {id: reset_all, expect: changed}
+        - {id: reset_all_idempotent, expect: ok}
+      loop_control:
+        loop_var: _mp_step
+
+    - name: oradb_manage_parameters | verify reset all instances (PDB)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_container: "{{ mt_pdb }}"
+        mt_sql: >-
+          select count(*) from v$spparameter
+          where name = '{{ _mp_par }}' and isspecified = 'TRUE';
+        mt_sql_expect: "0"
+        mt_sql_id: oradb_manage_parameters.pdb.reset_all_sql
+
+  always:
+    - name: oradb_manage_parameters | final cleanup (CDB$ROOT)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql: "{{ _mp_cleanup_sql }}"
+
+    - name: oradb_manage_parameters | final cleanup (PDB)
+      ansible.builtin.include_tasks: _sql.yml
+      vars:
+        mt_sql_container: "{{ mt_pdb }}"
+        mt_sql: "{{ _mp_cleanup_sql }}"

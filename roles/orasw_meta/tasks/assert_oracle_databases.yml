@@ -113,6 +113,12 @@
                     and ass_odb.is_container | bool
                   )
               - ass_odb.init_parameters | default([]) | type_debug == 'list'
+              # dbca has no SID clause => init_parameters for one instance only after dbca
+              - >-
+                ass_odb.init_parameters | default([])
+                | selectattr('sid', 'defined') | rejectattr('sid', 'equalto', '*')
+                | selectattr('dbca', 'defined') | map(attribute='dbca') | map('bool')
+                | select | list | length == 0
               - ass_odb.profiles | default([]) | type_debug == 'list'
               - ass_odb.rman_jobs | default([]) | type_debug == 'list'
               - ass_odb.services | default([]) | type_debug == 'list'
