@@ -1,0 +1,69 @@
+---
+# State of the local database for standby configurations (db_standby_config).
+# Used by oradb_manage_db and oradb_standby. No connection to other hosts.
+#
+# Requires: odb (entry of oracle_databases) as loop_var
+# Result:   _orasw_meta_standby_state
+#             dbs_dir: directory of SPFile and password file (orabaseconfig/dbs)
+#             exists:  SPFile of the instance exists
+#             running: PMON of the instance is running
+#             role:    DATABASE_ROLE from V$DATABASE (PRIMARY, PHYSICAL STANDBY ...),
+#                      '' when the instance is not running or not mounted
+#
+# Why not oradb_facts (oracledb_facts)?
+# - oradb_manage_db needs the role before oracle_db (dbca), oradb_facts is executed after it.
+#   oracledb_facts is cacheable and may be outdated (e.g. before a switchover)
+#   => an outdated PRIMARY could start dbca on a standby host.
+# - oracle_facts connects with listener, service and SYS password and fails in NOMOUNT.
+#   The local bequeath connection (/ as sysdba) needs no listener and no password.
+# - exists (SPFile) and dbs_dir are not part of oradb_facts.
+- name: Standby state | Get location of SPFile and password file
+  ansible.builtin.command: "{{ _oracle_home_db }}/bin/orabaseconfig"
+  environment: "{{ _oracle_env }}"
+  become: true
+  become_user: "{{ oracle_user }}"
+  register: _orasw_meta_standby_orabaseconfig
+  changed_when: false
+  check_mode: false
+
+- name: Standby state | Check SPFile
+  ansible.builtin.stat:
+    path: >-
+      {{ _orasw_meta_standby_orabaseconfig.stdout | trim }}/dbs/spfile{{ _orasw_meta_standby_sid }}.ora
+  register: _orasw_meta_standby_spfile
+
+# role is empty when the instance is not running, in NOMOUNT or the query fails
+- name: Standby state | Get database role
+  ansible.builtin.shell: |
+    set -u
+    pgrep -f "^ora_pmon_${ORACLE_SID}$" > /dev/null || exit 0
+    echo "RUNNING"
+    "${ORACLE_HOME}/bin/sqlplus" -S -L /nolog <<EOF
+    connect / as sysdba
+    set heading off feedback off pagesize 0
+    select 'ROLE=' || database_role from v\$database;
+    EOF
+  environment: "{{ _oracle_env | combine({'ORACLE_SID': _orasw_meta_standby_sid}) }}"
+  become: true
+  become_user: "{{ oracle_user }}"
+  register: _orasw_meta_standby_role
+  changed_when: false
+  check_mode: false
+
+- name: Standby state | Set state of database
+  ansible.builtin.set_fact:
+    _orasw_meta_standby_state:
+      dbs_dir: "{{ _orasw_meta_standby_orabaseconfig.stdout | trim }}/dbs"
+      exists: "{{ _orasw_meta_standby_spfile.stat.exists }}"
+      running: "{{ 'RUNNING' in _orasw_meta_standby_role.stdout_lines }}"
+      role: >-
+        {{ (_orasw_meta_standby_role.stdout_lines | select('match', '^ROLE=') | list + ['ROLE='])
+           | first | regex_replace('^ROLE=', '') | trim }}
+
+- name: Standby state | Show state of database
+  ansible.builtin.debug:
+    msg: >-
+      {{ _orasw_meta_standby_sid }}: exists={{ _orasw_meta_standby_state.exists }}
+      running={{ _orasw_meta_standby_state.running }}
+      role={{ _orasw_meta_standby_state.role }}
+      initial_role={{ _odb_standby_member.initial_role | default('') }}

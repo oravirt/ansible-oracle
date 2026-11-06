@@ -412,3 +412,71 @@ oracle_home_gi: "{% if oracle_install_version_gi is defined -%}\
                  {%- endif %}"
 
 cluster_master: "{{ ansible_play_batch[0] }}"
+
+# @var _odb_standby_config:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+#
+# Entry of `db_standby_config` referenced by `standby_config` of the current database
+# (`_odb_loop_helper`). Empty dictionary for a database without `standby_config`.
+# @end
+# @var _odb_standby_config: $ "_internal_used_"
+_odb_standby_config: >-
+  {{ (db_standby_config | default([]) | selectattr('name', 'defined')
+      | selectattr('name', 'equalto', _odb_loop_helper.standby_config | default(''))
+      | list + [{}]) | first }}
+
+# @var _odb_standby_member:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+#
+# Member of `_odb_standby_config` for the current database and host:
+# member with `inventory_hostname` in `hosts`, `db_unique_name` decides when more than 1 member matches.
+# Empty dictionary when no or more than 1 member matches (checked by the asserts in `orasw_meta`).
+# @end
+# @var _odb_standby_member: $ "_internal_used_"
+_odb_standby_member: >-
+  {%- set __cand = _odb_standby_config.members | default([]) | selectattr('hosts', 'defined')
+                   | selectattr('hosts', 'contains', inventory_hostname) | list -%}
+  {%- if __cand | length > 1 -%}
+  {%-   set __cand = __cand | selectattr('db_unique_name', 'defined')
+                     | selectattr('db_unique_name', 'equalto', _odb_loop_helper.oracle_db_unique_name | default(''))
+                     | list -%}
+  {%- endif -%}
+  {{ __cand[0] if __cand | length == 1 else {} }}
+
+# @var _odb_standby_others:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+#
+# All other members of `_odb_standby_config` (without `_odb_standby_member`).
+# @end
+# @var _odb_standby_others: $ "_internal_used_"
+_odb_standby_others: >-
+  {{ _odb_standby_config.members | default([]) | reject('equalto', _odb_standby_member) | list }}
+
+# @var _odb_standby_create_method:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+#
+# Method for the creation of the standby database of the current member:
+# `create_method` of the member, of the configuration or `rman_duplicate_active`.
+# @end
+# @var _odb_standby_create_method: $ "_internal_used_"
+_odb_standby_create_method: >-
+  {{ _odb_standby_member.dg.create_method
+     | default(_odb_standby_config.dg.create_method | default('rman_duplicate_active')) }}
+
+# @var _orasw_meta_standby_sid:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+#
+# ORACLE_SID of the current database (`_odb_loop_helper`).
+# @end
+# @var _orasw_meta_standby_sid: $ "_internal_used_"
+_orasw_meta_standby_sid: "{{ _odb_loop_helper.oracle_db_instance_name | default(_odb_loop_helper.oracle_db_name) }}"
