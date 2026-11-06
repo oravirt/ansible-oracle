@@ -100,11 +100,46 @@
     - dbcatemplate
     - molecule-idempotence-notest
 
+# Standby configuration (db_standby_config): oracle_db is not executed for a standby database.
+# - the database is running and DATABASE_ROLE is not PRIMARY
+# - the database is not running/mounted and initial_role of the member is physical_standby
+#   => a missing standby database is created by oradb_standby, not by dbca
+- name: manage_db | State of database in standby configuration
+  ansible.builtin.include_role:
+    name: orasw_meta
+    tasks_from: standby_state.yml
+  when:
+    - odb.state == 'present'
+    - _odb_standby_config | length > 0
+    - orasw_meta_primary_node | bool
+
+- name: manage_db | Check for standby database
+  ansible.builtin.set_fact:
+    _oradb_manage_db_standby_skip: >-
+      {{ odb.state == 'present'
+         and _odb_standby_config | length > 0
+         and orasw_meta_primary_node | bool
+         and ((_orasw_meta_standby_state.role | length > 0
+               and _orasw_meta_standby_state.role != 'PRIMARY')
+              or (_orasw_meta_standby_state.role | length == 0
+                  and _odb_standby_member.initial_role | default('') == 'physical_standby')) }}
+
+- name: manage_db | Skip oracle_db for standby database
+  ansible.builtin.debug:
+    msg: >-
+      {{ odb.oracle_db_name }} is a standby database
+      (role: {{ _orasw_meta_standby_state.role or 'not running/mounted' }},
+      initial_role: {{ _odb_standby_member.initial_role | default('') }})
+      => oracle_db is not executed. The standby database is created by oradb_standby.
+  when: _oradb_manage_db_standby_skip | bool
+
 # show debug task for environments with display_skipped_hosts = false
 - name: manage_db | Start create/manage database
   ansible.builtin.debug:
     msg: "Executing ansible_oracle.oracle_db. This takes some time..."
-  when: odb.state == 'present'
+  when:
+    - odb.state == 'present'
+    - not _oradb_manage_db_standby_skip | bool
 
 - name: manage_db | create/manage database
   tags:
@@ -136,6 +171,7 @@
       when:
         - odb.state == 'present'
         - orasw_meta_primary_node | bool
+        - not _oradb_manage_db_standby_skip | bool
       register: dbca_create
 
   rescue:
