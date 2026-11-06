@@ -6,6 +6,9 @@
   roles:
     - opitzconsulting.ansible_oracle.oradb_manage_wallet
     - opitzconsulting.ansible_oracle.oradb_manage_db
+    # standby databases are only relevant for environments with db_standby_config
+    - role: opitzconsulting.ansible_oracle.oradb_standby
+      when: db_standby_config | default([]) | length > 0
     - opitzconsulting.ansible_oracle.oradb_manage_pdb
     - opitzconsulting.ansible_oracle.oradb_manage_parameters
     - opitzconsulting.ansible_oracle.oradb_manage_tablespace
