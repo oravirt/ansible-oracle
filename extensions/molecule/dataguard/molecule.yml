@@ -1,0 +1,57 @@
+---
+# Data Guard on Oracle Linux 10 with Oracle AI Database 26ai
+#
+# dataguard-1: initial primary   (db_unique_name DB1_SITE1)
+# dataguard-2: initial standby   (db_unique_name DB1_SITE2)
+#
+# Both containers are members of the group dg_db1 and of the network molecule-dataguard.
+# A user defined docker network resolves the container names => redo transport between the hosts.
+# Inventory: shared_config/inventory/group_vars/dg_db1 and host_vars/dataguard-*.yml
+dependency:
+  name: galaxy
+  enabled: true
+
+driver:
+  name: docker
+platforms:
+  - name: dataguard-1
+    image: "${MOLECULE_IMAGE:-quay.io/rendanic/docker-ol10-ansible:latest}"
+    pre_build_image: true
+    # The following 4 lines are needed only for making systemd work
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - ${MOLECULE_SW_DIR}:/vagrant:ro
+    cgroupns_mode: host
+    privileged: true
+    groups:
+      - dg_db1
+    docker_networks:
+      - name: molecule-dataguard
+    networks:
+      - name: molecule-dataguard
+
+  - name: dataguard-2
+    image: "${MOLECULE_IMAGE:-quay.io/rendanic/docker-ol10-ansible:latest}"
+    pre_build_image: true
+    # The following 4 lines are needed only for making systemd work
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - ${MOLECULE_SW_DIR}:/vagrant:ro
+    cgroupns_mode: host
+    privileged: true
+    groups:
+      - dg_db1
+    networks:
+      - name: molecule-dataguard
+
+verifier:
+  name: ansible
+
+provisioner:
+  name: ansible
+  inventory:
+    links:
+      group_vars: ../shared_config/inventory/group_vars/
+      host_vars: ../shared_config/inventory/host_vars/

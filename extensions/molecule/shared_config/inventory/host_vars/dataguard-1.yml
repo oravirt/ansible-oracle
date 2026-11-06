@@ -1,0 +1,31 @@
+---
+# Scenario dataguard: initial primary of the Data Guard configuration DG1
+#
+# Common configuration (db_standby_config, tnsnames, listener, pdbs): group_vars/dg_db1/standby.yml
+
+oracle_databases:
+  - home: db26-si-ee
+    oradb_facts_ignore_unreachable: true
+    oracle_db_name: DB1
+    oracle_db_unique_name: DB1_SITE1
+    standby_config: DG1
+    oracle_db_type: SI
+    is_container: true
+    storage_type: FS
+    oracle_database_type: MULTIPURPOSE
+    redolog_size: 50M
+    redolog_groups: 3
+    datafile_dest: /u01/app/oracle/oradata
+    recoveryfile_dest: /u01/app/oracle/fra
+    listener_name: LISTENER
+    listener_port: 1521
+    archivelog: true
+    flashback: false
+    force_logging: true
+    state: present
+    init_parameters:
+      - {name: db_create_file_dest, value: '/u01/app/oracle/oradata', scope: both, state: present}
+      - {name: db_create_online_log_dest_1, value: '/u01/app/oracle/oradata', scope: both, state: present}
+      - {name: recyclebin, value: 'off', scope: spfile, state: present}
+      - {name: pga_aggregate_target, value: '128M', scope: both, state: present}
+      - {name: sga_target, value: '1808M', scope: spfile, state: present}

@@ -15,7 +15,7 @@ version: '3'
 
 vars:
   S: '{{.S | default "default"}}'
-  SW_SCENARIOS: dbfs dbfs-ol9 dbfs-ol10 has-ol9 download golden
+  SW_SCENARIOS: dbfs dbfs-ol9 dbfs-ol10 dataguard has-ol9 download golden
   IMAGES: >-
     quay.io/rendanic/docker-ol8-ansible:latest
     quay.io/rendanic/docker-ol9-ansible:latest
@@ -78,8 +78,11 @@ tasks:
         vars: {CMD: create, S: '{{.S}}'}
 
   converge:
-    desc: "Run converge.yml (S=<scenario>)"
+    desc: "Run converge.yml (S=<scenario>, C=false: do not reinstall the collection)"
+    dir: "{{.TASKFILE_DIR}}"
     cmds:
+      # molecule installs the collection only when the version changed => install the current code
+      - '[ "{{.C}}" = "false" ] || ansible-galaxy collection install --force ..'
       - task: _molecule
         vars: {CMD: converge, S: '{{.S}}'}
 
@@ -100,7 +103,7 @@ tasks:
       MODULE_TESTS: '{{.M}}'
       MODULE_TESTS_LABEL: '{{.L}}'
     cmds:
-      # side-effect does not install the collection (only converge does) => install the current code
+      # side-effect does not install the collection => install the current code
       # C=false skips the installation (go-task 3.45 has no if: for commands)
       - '[ "{{.C}}" = "false" ] || ansible-galaxy collection install --force ..'
       - molecule side-effect -s {{if eq .S "default"}}dbfs{{else}}{{.S}}{{end}} {{.CLI_ARGS}}
@@ -118,8 +121,13 @@ tasks:
         vars: {CMD: verify, S: '{{.S}}'}
 
   test:
-    desc: "Full test: create, converge, idempotence, side-effect, verify, destroy (S=<scenario>)"
+    desc: >-
+      Full test: create, converge, idempotence, side-effect, verify, destroy
+      (S=<scenario>, C=false: do not reinstall the collection)
+    dir: "{{.TASKFILE_DIR}}"
     cmds:
+      # molecule installs the collection only when the version changed => install the current code
+      - '[ "{{.C}}" = "false" ] || ansible-galaxy collection install --force ..'
       - task: _molecule
         vars: {CMD: test, S: '{{.S}}'}
 

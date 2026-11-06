@@ -1,0 +1,52 @@
+---
+- name: Converge
+  hosts: all
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+
+    # install missing cron on rhel10 container
+    - name: Install cron on RHEL/OL10
+      ansible.builtin.package:
+        name: cronie
+      when:
+        - ansible_os_family == 'RedHat'
+        - ansible_distribution_major_version | int == 10
+
+    # the container image is based on an older OL10 release.
+    # Installing packages pulls a newer openssl-libs and the old ssh-keygen
+    # fails with 'OpenSSL version mismatch' => update openssh first
+    - name: Update openssh on RHEL/OL10
+      ansible.builtin.package:
+        name:
+          - openssh
+          - openssh-clients
+        state: latest  # noqa package-latest
+      when:
+        - ansible_os_family == 'RedHat'
+        - ansible_distribution_major_version | int == 10
+
+- name: Converge os
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.os
+
+- name: Converge swdb
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swdb
+  vars:
+    # install it directly from remote in this test
+    # => Do not copy the installation media into container
+    oracle_sw_copy: false
+    is_sw_source_local: true
+    oracle_stage_remote: /vagrant
+    apply_patches_db: false
+    patch_before_rootsh: false
+
+- name: Converge sql_zauberkasten
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.sql_zauberkasten
+
+# TODO Data Guard: The creation of a standby database is not implemented yet.
+# oradb_manage_db would create a 2nd primary with dbca on dataguard-2
+# => manage_db on the initial primary only until the standby creation exists.
+- name: Converge manage_db
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db
+  vars:
+    hostgroup: dataguard-1
