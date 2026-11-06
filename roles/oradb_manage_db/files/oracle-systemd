@@ -4,7 +4,7 @@
 #
 # Used by the units oracle-db@<ORACLE_SID>.service and oracle-listener@<LISTENER_NAME>.service.
 # The ORACLE_HOME of a database is read from /etc/oratab, the ORACLE_HOME of a listener and the
-# settings of a database (ORACLE_SHUTDOWN_MODE, ORACLE_RESTART) from
+# settings of a database (ORACLE_SHUTDOWN_MODE, ORACLE_RESTART, ORACLE_START_MODE) from
 # /etc/sysconfig/oracledb/<db|listener>-<name> (EnvironmentFile= of the unit).
 #
 # Usage:
@@ -143,12 +143,30 @@ db_start() {
         die "No parameter file for ${sid} in ${pfiledir}"
     fi
 
+    # ORACLE_START_MODE (/etc/sysconfig/oracledb/db-<ORACLE_SID>):
+    # open (default): startup
+    # mount:          startup mount
+    # auto:           startup mount, open only a PRIMARY database
+    #                 => a physical standby stays in MOUNT (no Active Data Guard)
+    local mode="${ORACLE_START_MODE:-open}"
     local startup="startup"
-    if [ "${ORACLE_START_MODE:-open}" = "mount" ] ; then
+    if [ "${mode}" = "mount" ] || [ "${mode}" = "auto" ] ; then
         startup="startup mount"
     fi
     log "Starting database ${sid} (${startup}) from ${ORACLE_HOME}"
     run_sqlplus "${startup}" || die "Start of database ${sid} failed"
+
+    if [ "${mode}" = "auto" ] ; then
+        local role
+        role=$(run_sqlplus "set heading off feedback off pagesize 0
+select database_role from v\$database;" | tail -1)
+        if [ "${role}" = "PRIMARY" ] ; then
+            log "Opening database ${sid} (role ${role})"
+            run_sqlplus "alter database open;" || die "Open of database ${sid} failed"
+        else
+            log "Database ${sid} stays in MOUNT (role ${role})"
+        fi
+    fi
     log "Database ${sid} started"
 }
 

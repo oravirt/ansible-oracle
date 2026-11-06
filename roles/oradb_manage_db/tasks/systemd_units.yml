@@ -94,6 +94,10 @@
       # Managed by ansible-oracle (oradb_manage_db)
       ORACLE_SHUTDOWN_MODE={{ autostartup_service_shutdown_mode }}
       ORACLE_RESTART={{ (odb.autostartup_service_restart | default(autostartup_service_restart)) | bool | ternary('yes', 'no') }}
+      {% if odb.standby_config is defined %}
+      # member of a standby configuration => open only a PRIMARY database
+      ORACLE_START_MODE=auto
+      {% endif %}
     dest: "/etc/sysconfig/oracledb/db-{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}"
     owner: root
     group: root
@@ -128,11 +132,34 @@
   become: true
   become_user: root
 
+# A standby database (standby_config) may not exist yet: it is created by oradb_standby.
+# => start the unit only when the SPFile exists, enable it always
+- name: systemd_units | check SPFile of databases in standby configurations
+  ansible.builtin.shell: >-
+    test -f "$("${ORACLE_HOME}/bin/orabaseconfig")/dbs/spfile{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}.ora"
+  environment: "{{ _oracle_env }}"
+  loop: >-
+    {{ oracle_databases | selectattr('state', 'equalto', 'present')
+       | selectattr('standby_config', 'defined') | list }}
+  loop_control:
+    loop_var: odb
+    label: "{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}"
+  register: _oradb_manage_db_standby_spfile
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
 - name: systemd_units | enable and start database units
   ansible.builtin.systemd:
     name: "oracle-db@{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}.service"
     enabled: true
-    state: started
+    state: >-
+      {{ 'started'
+         if odb.standby_config is not defined
+            or _oradb_manage_db_standby_spfile.results
+               | selectattr('odb.oracle_db_name', 'equalto', odb.oracle_db_name)
+               | selectattr('rc', 'equalto', 0) | list | length > 0
+         else omit }}
   loop: "{{ oracle_databases | selectattr('state', 'equalto', 'present') | list }}"
   loop_control:
     loop_var: odb
