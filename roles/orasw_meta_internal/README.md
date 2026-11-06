@@ -19,6 +19,10 @@ This will create issues and problems in `ansible-oracle` and is not supported.
   - [_listener_port_cdb](#_listener_port_cdb)
   - [_listener_port_pdb](#_listener_port_pdb)
   - [_odb_loop_helper](#_odb_loop_helper)
+  - [_odb_standby_config](#_odb_standby_config)
+  - [_odb_standby_create_method](#_odb_standby_create_method)
+  - [_odb_standby_member](#_odb_standby_member)
+  - [_odb_standby_others](#_odb_standby_others)
   - [_opdb_home](#_opdb_home)
   - [_opdb_loop_helper](#_opdb_loop_helper)
   - [_oracle_all_editions_options](#_oracle_all_editions_options)
@@ -29,6 +33,7 @@ This will create issues and problems in `ansible-oracle` and is not supported.
   - [_oracle_env_pdb](#_oracle_env_pdb)
   - [_oracle_home_db](#_oracle_home_db)
   - [_oracle_home_db_pdb](#_oracle_home_db_pdb)
+  - [_orasw_meta_standby_sid](#_orasw_meta_standby_sid)
   - [cluster_master](#cluster_master)
   - [db_mode](#db_mode)
   - [db_password](#db_password)
@@ -181,6 +186,66 @@ Do not set it in inventory!
 _odb_loop_helper: _internal_used_
 ```
 
+### _odb_standby_config
+
+The variable is internal used only.
+
+Do not set it in inventory!
+
+Entry of `db_standby_config` referenced by `standby_config` of the current database
+(`_odb_loop_helper`). Empty dictionary for a database without `standby_config`.
+
+#### Default value
+
+```YAML
+_odb_standby_config: _internal_used_
+```
+
+### _odb_standby_create_method
+
+The variable is internal used only.
+
+Do not set it in inventory!
+
+Method for the creation of the standby database of the current member:
+`create_method` of the member, of the configuration or `rman_duplicate_active`.
+
+#### Default value
+
+```YAML
+_odb_standby_create_method: _internal_used_
+```
+
+### _odb_standby_member
+
+The variable is internal used only.
+
+Do not set it in inventory!
+
+Member of `_odb_standby_config` for the current database and host:
+member with `inventory_hostname` in `hosts`, `db_unique_name` decides when more than 1 member matches.
+Empty dictionary when no or more than 1 member matches (checked by the asserts in `orasw_meta`).
+
+#### Default value
+
+```YAML
+_odb_standby_member: _internal_used_
+```
+
+### _odb_standby_others
+
+The variable is internal used only.
+
+Do not set it in inventory!
+
+All other members of `_odb_standby_config` (without `_odb_standby_member`).
+
+#### Default value
+
+```YAML
+_odb_standby_others: _internal_used_
+```
+
 ### _opdb_home
 
 #### Default value
@@ -296,6 +361,20 @@ _oracle_home_db: _internal_used_
 
 ```YAML
 _oracle_home_db_pdb: "{{ db_homes_config[_opdb_home]['oracle_home'] }}"
+```
+
+### _orasw_meta_standby_sid
+
+The variable is internal used only.
+
+Do not set it in inventory!
+
+ORACLE_SID of the current database (`_odb_loop_helper`).
+
+#### Default value
+
+```YAML
+_orasw_meta_standby_sid: _internal_used_
 ```
 
 ### cluster_master

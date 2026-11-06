@@ -119,9 +119,26 @@
               - >-
                 _members_dg | map(attribute='connect_identifier', default='')
                 | reject('in', oracle_tnsnames_config | default({}) | list) | list | length == 0
+              # creation of the standby database (oradb_standby)
+              - _create_method in _create_methods
+              - >-
+                _members_dg | map(attribute='create_method', default=_create_method)
+                | reject('in', _create_methods) | list | length == 0
+              # custom needs a tasks file in the member or in the configuration
+              - >-
+                _members_dg | selectattr('create_method', 'undefined') | list | length == 0
+                or _create_method != 'custom'
+                or ass_scdg.dg.create_tasks_file is defined
+              - >-
+                _members_dg | selectattr('create_method', 'defined')
+                | selectattr('create_method', 'equalto', 'custom')
+                | selectattr('create_tasks_file', 'undefined') | list | length == 0
+                or ass_scdg.dg.create_tasks_file is defined
           vars:
             _protection_mode: "{{ ass_scdg.dg.protection_mode | default('MaxPerformance') }}"
             _members_dg: "{{ ass_scdg.members | map(attribute='dg', default={}) | list }}"
+            _create_method: "{{ ass_scdg.dg.create_method | default('rman_duplicate_active') }}"
+            _create_methods: ['rman_duplicate_active', 'external', 'custom']
           loop: >-
             {{ db_standby_config | selectattr('type', 'defined')
                | selectattr('type', 'equalto', 'dataguard') | list }}
@@ -162,6 +179,8 @@
               # exactly 1 member: by host, by db_unique_name when ambiguous
               - _member | length == 1
               - _sc.type != 'dataguard' or ass_sdb.oracle_db_unique_name is defined
+              # static listener entry <db_unique_name>_DGMGRL for RMAN DUPLICATE and broker
+              - _sc.type != 'dataguard' or ass_sdb.listener_name is defined
               - >-
                 _member | length != 1
                 or (ass_sdb.oracle_db_unique_name | default(ass_sdb.oracle_db_name) | upper)

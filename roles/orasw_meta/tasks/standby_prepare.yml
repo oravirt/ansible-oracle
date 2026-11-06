@@ -1,0 +1,47 @@
+---
+# Directories of a database in a standby configuration (db_standby_config).
+# Used by oradb_manage_db before dbca and by oradb_standby before RMAN DUPLICATE
+# and the broker configuration.
+#
+# Example: oradb_manage_parameters sets dg_broker_start=TRUE on the new primary
+# before oradb_standby is executed => the directories of dg_broker_config_file1/2 must exist.
+#
+# Only missing directories are created. Existing directories are not changed
+# (owner, group and mode are kept).
+#
+# Requires: odb (entry of oracle_databases) as loop_var
+# Optional: orasw_meta_standby_prepare_dirs: additional directories (e.g. from oradb_standby)
+- name: Standby prepare | Check directories
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ _orasw_meta_standby_prepare_dirs }}"
+  register: _orasw_meta_standby_prepare_stat
+  vars:
+    # file destinations (OMF, FRA), audit_file_dest, diagnostic_dest
+    # and the directories of dg_broker_config_file1/2 from init_parameters (state present)
+    _orasw_meta_standby_prepare_dirs: >-
+      {%- set __d = [odb.datafile_dest | default(''), odb.recoveryfile_dest | default('')]
+                    + orasw_meta_standby_prepare_dirs | default([]) -%}
+      {%- for ip in odb.init_parameters | default([])
+            if ip.name is defined and ip.value is defined
+               and ip.state | default('present') == 'present' -%}
+      {%-   if ip.name | lower is match('^(db_create_file_dest|db_create_online_log_dest_[0-9]+'
+                                         ~ '|db_recovery_file_dest|audit_file_dest|diagnostic_dest)$') -%}
+      {%-     set _ = __d.append(ip.value | string) -%}
+      {%-   elif ip.name | lower in ['dg_broker_config_file1', 'dg_broker_config_file2'] -%}
+      {%-     set _ = __d.append(ip.value | string | trim | dirname) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ __d | map('trim') | select | unique | list }}
+
+- name: Standby prepare | Create missing directories
+  ansible.builtin.file:
+    path: "{{ item.item }}"
+    state: directory
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: "0750"
+  loop: "{{ _orasw_meta_standby_prepare_stat.results | rejectattr('stat.exists') | list }}"
+  loop_control:
+    label: "{{ item.item }}"
+  become: true
