@@ -780,6 +780,7 @@ The following scenarios are existing in the `ansible-oracle profect.
 | dbfs | Full stage for installation of RDBMS 19c + Patching and create database. Requires installation media in /vagrant on local host.
 | dbfs-ol9 | Full stage for installation of RDBMS 19c + Patching on OL9 and create database. Requires installation media in /vagrant on local host.
 | dbfs-ol10 | Same as `dbfs` on OL10: Oracle AI Database 26ai with module tests. Requires installation media in /vagrant on local host.
+| dataguard | Data Guard on OL10 with Oracle AI Database 26ai: 2 containers `dataguard-1` (primary) and `dataguard-2` (standby). Only the primary database is created at the moment. Requires installation media in /vagrant on local host.
 | default | Stage for testing common and orahost roles with different Distributions.
 | download | Download Patches from support.oracle.com for dbfs stage.
 | golden | Create Golden-Image for installation from dbfs.
@@ -787,7 +788,7 @@ The following scenarios are existing in the `ansible-oracle profect.
 
 === Directory for installation media and patches
 
-The scenarios `dbfs`, `dbfs-ol9`, `dbfs-ol10`, `download` and `golden` mount a local directory as `/vagrant` into the container.
+The scenarios `dbfs`, `dbfs-ol9`, `dbfs-ol10`, `dataguard`, `download` and `golden` mount a local directory as `/vagrant` into the container.
 The local directory must be defined by `MOLECULE_SW_DIR`, there is no default. The path inside the container is always `/vagrant`.
 
 .Set the directory as environment variable
@@ -810,10 +811,16 @@ task --list
 task pull                      # pull container images before the 1st run
 task converge S=dbfs-ol9
 task converge S=dbfs-ol9 -- -vv  # arguments after -- are passed to molecule
+task converge S=dbfs-ol9 C=false # without reinstalling the collection
 task login S=default H=ol9
 task destroy S=dbfs-ol9
 task collection                # reinstall collection after role changes
 ----
+
+`task converge` and `task test` install the collection from the repository (`task collection`) before molecule is started.
+The dependency step of molecule installs the collection only when the version in `galaxy.yml` has changed.
+Without the installation, changes in `plugins/` or `roles/` are not used.
+`C=false` skips the installation.
 
 The tasks are also available from the repository root as `task molecule:<task>`.
 
@@ -918,8 +925,8 @@ task module-test S=has-ol9 M=oracle_asmdg               # selected modules in ha
 
 `task module-test` installs the collection from the repository (`task collection`) and runs `molecule side-effect -s <scenario>` with the environment variables `MODULE_TESTS` (comma separated list of modules) and `MODULE_TESTS_LABEL` (name of the result file).
 
-IMPORTANT: `molecule side-effect` alone does not install the collection, only `converge` does. +
-Without `task collection` the tests use the code of the last converge.
+IMPORTANT: `molecule side-effect` alone does not install the collection. +
+Without `task collection` the tests use the code of the last `task converge` or `task collection`.
 
 `C=false` skips `task collection`, e.g. for repeated runs when only the tests in `module_tests/` have changed (they are read from the repository, not from the installed collection).
 Changes in `plugins/` or `roles/` are not used until the collection is installed again.

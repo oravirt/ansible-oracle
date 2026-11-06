@@ -1,0 +1,96 @@
+---
+# Scenario dataguard: Data Guard on Oracle Linux 10 with Oracle AI Database 26ai
+#
+# Common configuration of all members of the Data Guard configuration DG1.
+# The databases are defined in host_vars/dataguard-1.yml and host_vars/dataguard-2.yml,
+# because oracle_db_unique_name differs per member.
+#
+# Inventory structure: doc/guides/standby_inventory.adoc
+
+db_standby_config:
+  - name: DG1
+    type: dataguard
+    dg:
+      protection_mode: MaxPerformance
+    members:
+      - hosts: [dataguard-1]
+        db_unique_name: DB1_SITE1
+        initial_role: primary
+        dg:
+          connect_identifier: DB1_SITE1
+          log_xpt_mode: ASYNC
+      - hosts: [dataguard-2]
+        db_unique_name: DB1_SITE2
+        initial_role: physical_standby
+        dg:
+          connect_identifier: DB1_SITE2
+          log_xpt_mode: ASYNC
+
+db_homes_installed:
+  - home: db26-si-ee
+    state: present
+    apply_patches: false
+
+listener_installed:
+  - home: db26-si-ee
+    listener_name: LISTENER
+    state: present
+
+# alias for the wallet credential (items2dict in group_vars/all drops 'alias')
+oracle_tnsnames_config:
+  ORCLPDB:
+    alias:
+      - ORCLPDB_SYSTEM
+    connect:
+      service_name: ORCLPDB
+    address:
+      - host: "{{ ansible_hostname }}"
+  DB1_SITE1:
+    connect:
+      service_name: DB1_SITE1
+    address:
+      - host: dataguard-1
+        port: 1521
+  DB1_SITE2:
+    connect:
+      service_name: DB1_SITE2
+    address:
+      - host: dataguard-2
+        port: 1521
+
+tnsnames_installed:
+  - tnsname: ORCLPDB
+    home: db26-si-ee
+    state: present
+  - tnsname: DB1_SITE1
+    home: db26-si-ee
+    state: present
+  - tnsname: DB1_SITE2
+    home: db26-si-ee
+    state: present
+
+sqlnet_installed:
+  - home: db26-si-ee
+    sqlnet: sqlnetalias1
+    state: present
+
+# wallet from group_vars/all uses home db19-si-ee
+oracle_wallet_config:
+  - name: wallet1
+    home: db26-si-ee
+    path: /u01/app/oracle/wallet
+    state: present
+    dbcredentials:
+      - tns_name: ORCLPDB_SYSTEM
+        db_name: ORCLPDB
+        db_user: system
+        state: present
+
+oracle_pdbs:
+  - cdb: DB1
+    home: db26-si-ee
+    pdb_name: ORCLPDB
+    pdbadmin_user: PDBROOT
+    listener_port: 1521
+    state: present
+    datafile_dest: /u01/app/oracle/oradata

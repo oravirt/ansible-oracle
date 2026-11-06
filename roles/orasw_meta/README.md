@@ -29,6 +29,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [autostartup_service_stop_timeout](#autostartup_service_stop_timeout)
   - [db_homes_config](#db_homes_config)
   - [db_homes_installed](#db_homes_installed)
+  - [db_standby_config](#db_standby_config)
   - [dbenvdir](#dbenvdir)
   - [dbpasswords](#dbpasswords)
   - [default_dbpass](#default_dbpass)
@@ -76,6 +77,7 @@ There are a lot of variables who are used by `orasw_meta`
   - [oracle_sw_patches](#oracle_sw_patches)
   - [oracle_sw_source_local](#oracle_sw_source_local)
   - [oracle_sw_source_www](#oracle_sw_source_www)
+  - [orasw_meta_assert_db_standby_config](#orasw_meta_assert_db_standby_config)
   - [orasw_meta_assert_oracle_databases](#orasw_meta_assert_oracle_databases)
   - [orasw_meta_cluster_hostgroup](#orasw_meta_cluster_hostgroup)
   - [orasw_meta_forced_lang](#orasw_meta_forced_lang)
@@ -348,6 +350,40 @@ db_homes_installed:
   - home: 19300-base
     apply_patches: true
     state: present
+```
+
+### db_standby_config
+
+Defines the standby configurations (Data Guard, Dbvisit).
+
+Not set by default. Must be identical on all members of a configuration.
+A database is assigned with `standby_config` in `oracle_databases`.
+
+The inventory structure is described in `doc/guides/standby_inventory.adoc`.
+
+IMPORTANT! Only the asserts are implemented at the moment.
+
+#### Example usage
+
+```YAML
+db_standby_config:
+  - name: DG1
+    type: dataguard
+    dg:
+      protection_mode: MaxPerformance
+    members:
+      - hosts: [dbhost1]
+        db_unique_name: DB1_SITE1
+        initial_role: primary
+        dg:
+          connect_identifier: DB1_SITE1
+          log_xpt_mode: ASYNC
+      - hosts: [dbhost2]
+        db_unique_name: DB1_SITE2
+        initial_role: physical_standby
+        dg:
+          connect_identifier: DB1_SITE2
+          log_xpt_mode: ASYNC
 ```
 
 ### dbenvdir
@@ -1176,6 +1212,19 @@ server during software installation and patching.
 
 ```YAML
 oracle_sw_source_www: http://www/orasw
+```
+
+### orasw_meta_assert_db_standby_config
+
+Switch for enable/disable assert on `db_standby_config`
+and `standby_config` in `oracle_databases`.
+
+Please change the state only when really needed!
+
+#### Default value
+
+```YAML
+orasw_meta_assert_db_standby_config: true
 ```
 
 ### orasw_meta_assert_oracle_databases

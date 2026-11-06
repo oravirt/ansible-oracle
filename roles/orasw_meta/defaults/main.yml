@@ -799,6 +799,45 @@ dbpasswords: {}
 # @end
 orasw_meta_assert_oracle_databases: true
 
+# @var orasw_meta_assert_db_standby_config:description: >
+# Switch for enable/disable assert on `db_standby_config`
+# and `standby_config` in `oracle_databases`.
+#
+# Please change the state only when really needed!
+# @end
+orasw_meta_assert_db_standby_config: true
+
+# @var db_standby_config:description: >
+# Defines the standby configurations (Data Guard, Dbvisit).
+#
+# Not set by default. Must be identical on all members of a configuration.
+# A database is assigned with `standby_config` in `oracle_databases`.
+#
+# The inventory structure is described in `doc/guides/standby_inventory.adoc`.
+#
+# IMPORTANT! Only the asserts are implemented at the moment.
+# @end
+# @var db_standby_config:example: >
+# db_standby_config:
+#   - name: DG1
+#     type: dataguard
+#     dg:
+#       protection_mode: MaxPerformance
+#     members:
+#       - hosts: [dbhost1]
+#         db_unique_name: DB1_SITE1
+#         initial_role: primary
+#         dg:
+#           connect_identifier: DB1_SITE1
+#           log_xpt_mode: ASYNC
+#       - hosts: [dbhost2]
+#         db_unique_name: DB1_SITE2
+#         initial_role: physical_standby
+#         dg:
+#           connect_identifier: DB1_SITE2
+#           log_xpt_mode: ASYNC
+# @end
+
 # @var assert_db_homes_config:description: >
 # Switch for enable/disable assert on `db_homes_config`.
 #

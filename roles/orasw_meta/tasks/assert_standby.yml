@@ -1,0 +1,201 @@
+---
+# Inventory structure: doc/guides/standby_inventory.adoc
+- name: Assert standby configuration
+  tags:
+    - always
+    - assert_ansible_oracle
+  block:
+    - name: Check switch for orasw_meta_assert_db_standby_config
+      ansible.builtin.debug:
+        msg: >-
+          WARNING!!! Assert for db_standby_config has been disabled!
+      when:
+        - not orasw_meta_assert_db_standby_config | bool
+
+    - name: Assert db_standby_config
+      when:
+        - orasw_meta_assert_db_standby_config | bool
+        - db_standby_config is defined
+      block:
+        - name: Assert db_standby_config
+          ansible.builtin.assert:
+            quiet: true
+            that:
+              - ass_sc | type_debug == 'dict'
+              - ass_sc.name is defined
+              - >-
+                db_standby_config | selectattr('name', 'defined')
+                | selectattr('name', 'equalto', ass_sc.name) | list | length == 1
+              - ass_sc.type is defined
+              - ass_sc.type in ['dataguard', 'dbvisit']
+              # only the sub-dictionary matching type is allowed
+              - ass_sc.type == 'dataguard' or ass_sc.dg is not defined
+              - ass_sc.type == 'dbvisit' or ass_sc.dbvisit is not defined
+              - ass_sc.dg | default({}) | type_debug == 'dict'
+              - ass_sc.dbvisit | default({}) | type_debug == 'dict'
+              - ass_sc.members is defined
+              - ass_sc.members | type_debug == 'list'
+              - ass_sc.members | length > 0
+              - ass_sc.members | map('type_debug') | reject('equalto', 'dict') | list | length == 0
+              - >-
+                ass_sc.type == 'dataguard'
+                or ass_sc.members | selectattr('dg', 'defined') | list | length == 0
+              - >-
+                ass_sc.type == 'dbvisit'
+                or ass_sc.members | selectattr('dbvisit', 'defined') | list | length == 0
+              # hosts: non empty list of inventory_hostname
+              - >-
+                ass_sc.members | map(attribute='hosts', default='')
+                | map('type_debug') | reject('equalto', 'list') | list | length == 0
+              - >-
+                ass_sc.members | map(attribute='hosts', default=[])
+                | map('length') | select('equalto', 0) | list | length == 0
+              - >-
+                ass_sc.members | map(attribute='hosts', default=[]) | flatten
+                | difference(groups['all']) | length == 0
+              # initial_role
+              - >-
+                ass_sc.members | map(attribute='initial_role', default='')
+                | reject('in', ['primary', 'physical_standby']) | list | length == 0
+              - >-
+                ass_sc.members | selectattr('initial_role', 'defined')
+                | selectattr('initial_role', 'equalto', 'primary') | list | length == 1
+              # a database on this host must reference the configuration
+              - >-
+                ass_sc.members | selectattr('hosts', 'defined')
+                | selectattr('hosts', 'contains', inventory_hostname) | list | length == 0
+                or oracle_databases | default([]) | selectattr('standby_config', 'defined')
+                | selectattr('standby_config', 'equalto', ass_sc.name) | list | length > 0
+          loop: "{{ db_standby_config }}"
+          loop_control:
+            label: "{{ ass_sc.name | default('') }}"
+            loop_var: ass_sc
+          register: assertdb_standby_config
+
+      rescue:
+        - name: Assert failed db_standby_config
+          ansible.builtin.debug:
+            msg: "{{ item.assertion }}"
+          loop: "{{ assertdb_standby_config['results'] }}"
+          loop_control:
+            label: "{{ item['ass_sc']['name'] | default('') }}"
+          when:
+            - assertdb_standby_config.results is defined
+            - item.failed is defined
+            - item.failed | bool
+
+        - name: Fail assert db_standby_config
+          ansible.builtin.fail:
+            msg: "See previous debug task for assertation failure"
+
+    - name: Assert db_standby_config type dataguard
+      when:
+        - orasw_meta_assert_db_standby_config | bool
+        - db_standby_config is defined
+      block:
+        - name: Assert db_standby_config type dataguard
+          ansible.builtin.assert:
+            quiet: true
+            that:
+              # db_unique_name is mandatory and unique
+              - ass_scdg.members | rejectattr('db_unique_name', 'defined') | list | length == 0
+              - >-
+                ass_scdg.members | map(attribute='db_unique_name') | map('upper')
+                | unique | list | length == ass_scdg.members | length
+              - _protection_mode in ['MaxPerformance', 'MaxAvailability', 'MaxProtection']
+              - >-
+                _members_dg | map(attribute='log_xpt_mode', default='ASYNC')
+                | reject('in', ['ASYNC', 'SYNC', 'FASTSYNC']) | list | length == 0
+              - >-
+                _members_dg | map(attribute='delay_mins', default=0) | map('string')
+                | reject('match', '^[0-9]+$') | list | length == 0
+              # MaxAvailability and MaxProtection need SYNC or FASTSYNC for a standby
+              - >-
+                _protection_mode == 'MaxPerformance'
+                or ass_scdg.members | selectattr('initial_role', 'equalto', 'physical_standby')
+                | map(attribute='dg', default={}) | map(attribute='log_xpt_mode', default='ASYNC')
+                | select('in', ['SYNC', 'FASTSYNC']) | list | length > 0
+              # connect_identifier is mandatory and defined in oracle_tnsnames_config
+              - >-
+                _members_dg | map(attribute='connect_identifier', default='')
+                | reject('in', oracle_tnsnames_config | default({}) | list) | list | length == 0
+          vars:
+            _protection_mode: "{{ ass_scdg.dg.protection_mode | default('MaxPerformance') }}"
+            _members_dg: "{{ ass_scdg.members | map(attribute='dg', default={}) | list }}"
+          loop: >-
+            {{ db_standby_config | selectattr('type', 'defined')
+               | selectattr('type', 'equalto', 'dataguard') | list }}
+          loop_control:
+            label: "{{ ass_scdg.name | default('') }}"
+            loop_var: ass_scdg
+          register: assertdb_standby_config_dg
+
+      rescue:
+        - name: Assert failed db_standby_config type dataguard
+          ansible.builtin.debug:
+            msg: "{{ item.assertion }}"
+          loop: "{{ assertdb_standby_config_dg['results'] }}"
+          loop_control:
+            label: "{{ item['ass_scdg']['name'] | default('') }}"
+          when:
+            - assertdb_standby_config_dg.results is defined
+            - item.failed is defined
+            - item.failed | bool
+
+        - name: Fail assert db_standby_config type dataguard
+          ansible.builtin.fail:
+            msg: "See previous debug task for assertation failure"
+
+    - name: Assert standby_config in oracle_databases
+      when:
+        - orasw_meta_assert_db_standby_config | bool
+        - oracle_databases is defined
+      block:
+        - name: Assert standby_config in oracle_databases
+          ansible.builtin.assert:
+            quiet: true
+            that:
+              # technology specific attributes are defined in the member
+              - ass_sdb.dg is not defined
+              - ass_sdb.dbvisit is not defined
+              - _sc | length > 0
+              # exactly 1 member: by host, by db_unique_name when ambiguous
+              - _member | length == 1
+              - _sc.type != 'dataguard' or ass_sdb.oracle_db_unique_name is defined
+              - >-
+                _member | length != 1
+                or (ass_sdb.oracle_db_unique_name | default(ass_sdb.oracle_db_name) | upper)
+                   == (_member[0].db_unique_name | default(ass_sdb.oracle_db_name) | upper)
+          vars:
+            _sc: >-
+              {{ db_standby_config | default([]) | selectattr('name', 'defined')
+                 | selectattr('name', 'equalto', ass_sdb.standby_config) | first | default({}) }}
+            _candidates: >-
+              {{ _sc.members | default([]) | selectattr('hosts', 'defined')
+                 | selectattr('hosts', 'contains', inventory_hostname) | list }}
+            _member: >-
+              {{ _candidates if _candidates | length <= 1
+                 else _candidates | selectattr('db_unique_name', 'defined')
+                      | selectattr('db_unique_name', 'equalto', ass_sdb.oracle_db_unique_name | default(''))
+                      | list }}
+          loop: "{{ oracle_databases | selectattr('standby_config', 'defined') | list }}"
+          loop_control:
+            label: "{{ ass_sdb.oracle_db_name | default('') }}"
+            loop_var: ass_sdb
+          register: assertoracle_databases_standby
+
+      rescue:
+        - name: Assert failed standby_config in oracle_databases
+          ansible.builtin.debug:
+            msg: "{{ item.assertion }}"
+          loop: "{{ assertoracle_databases_standby['results'] }}"
+          loop_control:
+            label: "{{ item['ass_sdb']['oracle_db_name'] | default('') }}"
+          when:
+            - assertoracle_databases_standby.results is defined
+            - item.failed is defined
+            - item.failed | bool
+
+        - name: Fail assert standby_config in oracle_databases
+          ansible.builtin.fail:
+            msg: "See previous debug task for assertation failure"
