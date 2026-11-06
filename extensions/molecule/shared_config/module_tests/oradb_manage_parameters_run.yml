@@ -1,0 +1,48 @@
+---
+# Run oradb_manage_parameters with init_parameters for the CDB and the PDB of the scenario
+# (included by oradb_manage_parameters.yml).
+#
+# _mp_id:     id of the check: oradb_manage_parameters.<step>
+# _mp_cdb:    init_parameters of mt_cdb (oracle_databases), default []
+# _mp_pdb:    init_parameters of mt_pdb (oracle_pdbs), default []
+# _mp_expect: changed | ok | failed
+#
+# oracle_databases and oracle_pdbs of the inventory are reduced to mt_cdb/mt_pdb with only
+# these init_parameters. The role does not return a result => changed is taken from the
+# registered results of the role (param_change_cdb, param_change_pdb).
+- name: "oradb_manage_parameters | {{ _mp_id }} | reset registered results"
+  ansible.builtin.set_fact:
+    param_change_cdb: {}
+    param_change_pdb: {}
+
+- name: "oradb_manage_parameters | {{ _mp_id }} | run role"
+  ansible.builtin.include_tasks: _role_run.yml
+  vars:
+    mt_id: "{{ _mp_id }}"
+    mt_role: oradb_manage_parameters
+    mt_role_expect: "{{ 'failed' if _mp_expect == 'failed' else 'ok' }}"
+    # orasw_meta asserts sga_target in init_parameters or oracle_db_mem_totalmb
+    # (only used by dbca) => dummy oracle_db_mem_totalmb, only the test parameters are set
+    oracle_databases: >-
+      {{ _mp_inventory_dbs | selectattr('oracle_db_name', 'equalto', mt_cdb)
+         | map('combine', {'init_parameters': _mp_cdb | default([]),
+                           'oracle_db_mem_totalmb': 2048}) | list }}
+    oracle_pdbs: >-
+      {{ _mp_inventory_pdbs | selectattr('pdb_name', 'equalto', mt_pdb)
+         | map('combine', {'init_parameters': _mp_pdb | default([])}) | list }}
+
+- name: "oradb_manage_parameters | {{ _mp_id }} | check changed"
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: "{{ _mp_id }}_changed"
+    mt_res:
+      changed: >-
+        {{ (param_change_cdb.changed | default(false) | bool)
+           or (param_change_pdb.changed | default(false) | bool) }}
+      msg: >-
+        cdb: {{ param_change_cdb.results | default([]) | selectattr('msg', 'defined')
+                | map(attribute='msg') | list }}
+        pdb: {{ param_change_pdb.results | default([]) | selectattr('msg', 'defined')
+                | map(attribute='msg') | list }}
+    mt_expect: "{{ _mp_expect }}"
+  when: _mp_expect != 'failed'

@@ -16,9 +16,10 @@ _oradb_manage_db_listener_protocols_template: >-
 # build init_param_list for dbca execution
 # Only parameter with attribute dbca=true are added to the list
 # => parameter could be send to dbca directly during execution!
+# Parameter for one instance (sid not '*') are not passed to dbca by default (no SID clause).
 _oradb_manage_db_init_params_list: "{%- if odb.init_parameters is defined -%}\
                       {%- for p in odb.init_parameters -%}\
-                        {%- if p.dbca | default(True) -%}\
+                        {%- if p.dbca | default(p.sid | default('*') == '*') -%}\
                             {{ p.name }}={{ p.value }}{%- if not loop.last -%},{%- endif -%}\
                         {%- endif -%}\
                       {%- endfor -%}\

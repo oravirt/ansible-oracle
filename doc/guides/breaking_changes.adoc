@@ -86,6 +86,10 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<Autostart of databases is enabled by default>>
 |Single Instance without Grid Infrastructure / Oracle Restart *and* `autostartup_service` is not set in the inventory
 |No action, if the databases should start with the server. Otherwise set `autostartup_service: false`
+
+|<<init_parameters for one instance: sid and dbca>>
+|An entry in `init_parameters` of `oracle_databases` has an attribute `sid` other than `*` *and* `dbca: true`
+|Remove `dbca: true` from the entry. The parameter is set by `oradb_manage_parameters` after the creation of the database
 |===
 
 ==== Minimum ansible-core 2.16
@@ -892,6 +896,38 @@ The databases are written with the flag `Y` into `/etc/oratab` (as before with `
 [source,yaml]
 ----
 autostartup_service: false
+----
+
+==== init_parameters for one instance: sid and dbca
+
+`init_parameters` in `oracle_databases` and `oracle_pdbs` support the new attribute `sid` (link:https://github.com/oravirt/ansible-oracle/issues/677[#677]).
+It is the `SID` clause of `ALTER SYSTEM SET`, e.g. for `local_listener` per RAC instance.
+Without `sid` or with `sid: '*'` the parameter is set for all instances as before.
+
+dbca has no `SID` clause for initialization parameters.
+A parameter for one instance would be set for all instances during the creation of the database.
+Therefore `sid` other than `*` together with `dbca: true` is not allowed, the assert of `oracle_databases` in `orasw_meta` fails.
+Entries with `sid` and without `dbca` are not passed to dbca (default `dbca: false` for these entries), they are set by `oradb_manage_parameters` after the creation of the database.
+
+NOTE: `sid` is case-sensitive like the `SID` clause of `ALTER SYSTEM`, use the instance name exactly as in `V$INSTANCE.INSTANCE_NAME`.
+
+.Not allowed
+[source,yaml]
+----
+oracle_databases:
+  - oracle_db_name: orcl
+    init_parameters:
+      - {name: local_listener, value: 'rac1-vip:1521', scope: both, state: present, sid: orcl1, dbca: true}
+----
+
+.local_listener per instance
+[source,yaml]
+----
+oracle_databases:
+  - oracle_db_name: orcl
+    init_parameters:
+      - {name: local_listener, value: 'rac1-vip:1521', scope: both, state: present, sid: orcl1}
+      - {name: local_listener, value: 'rac2-vip:1521', scope: both, state: present, sid: orcl2}
 ----
 
 === Adding new breaking changes

@@ -28,13 +28,22 @@ description:
       (C(V$SGAINFO)) larger than O(value). The spfile value is compared exactly.
       With O(scope=both), the memory and the spfile value for O(sid) are compared. If
       only the spfile value differs, the parameter is set with C(SCOPE=SPFILE).
-    - With O(scope=spfile), the current value is read from C(V$SPPARAMETER), otherwise
-      from C(V$PARAMETER). With O(mode=sysdba), the C(X$) tables are used instead.
-      O(sid) is not considered when reading the current value.
+    - With O(sid=*) and O(scope=spfile), the current value is read from the entry for
+      V(*) in C(V$SPPARAMETER), otherwise from C(V$PARAMETER) of the connected
+      instance. With O(mode=sysdba), the C(X$) tables are used instead.
+    - With another O(sid) (e.g. one instance of a RAC database), the memory value of
+      that instance (C(GV$PARAMETER), O(scope=memory) or O(scope=both)) and the
+      spfile entry for O(sid) (C(V$SPPARAMETER), O(scope=spfile) or O(scope=both))
+      are compared, independent of the connected instance and of O(mode). If only the
+      spfile entry differs, the parameter is set with C(SCOPE=SPFILE).
+    - When the instance O(sid) is not running (C(GV$INSTANCE)), only the spfile entry
+      is compared and changed. O(scope=memory) fails for an instance that is not
+      running.
     - With O(state=reset) or O(state=absent), C(ALTER SYSTEM RESET) is executed when the
       parameter is set in the spfile (C(V$SPPARAMETER.ISSPECIFIED) for O(sid), with
       O(scope=spfile) or O(scope=both)) or modified in memory
-      (C(V$PARAMETER.ISMODIFIED), with O(scope=memory) or O(scope=both)).
+      (C(V$PARAMETER.ISMODIFIED), with O(scope=memory) or O(scope=both); for another
+      O(sid) than V(*) C(GV$PARAMETER.ISMODIFIED) of the running instance O(sid)).
       Otherwise the module returns C(changed=false).
     - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
       (C(/@<service_name>)) is used. Otherwise both must be set.
@@ -118,6 +127,9 @@ options:
         description:
             - The C(SID) clause of the C(ALTER SYSTEM) statement.
             - V(*) means all instances.
+            - Another value is the instance name (C(V$INSTANCE.INSTANCE_NAME)) of one
+              instance, case-sensitive. The instance does not need to exist or run.
+            - Supported for O(state=present) and O(state=reset) (see description).
         type: str
         required: false
         default: '*'
@@ -164,6 +176,17 @@ EXAMPLES = '''
     value: 100G
     comment: Changed by Ansible
     scope: spfile
+
+- name: Set local_listener for the instance orcl2 of a RAC database
+  opitzconsulting.ansible_oracle.oracle_parameter:
+    hostname: remote-db-server
+    service_name: orcl
+    user: system
+    password: "{{ system_password }}"
+    name: local_listener
+    value: 'rac2-vip:1521'
+    scope: both
+    sid: orcl2
 
 - name: Reset open_cursors to its default value
   opitzconsulting.ansible_oracle.oracle_parameter:
@@ -247,8 +270,18 @@ def modify_parameter(module, mode, msg, cursor, name, value, comment, scope, sid
         )
         return False
 
+    running = instance_is_running(module, cursor, sid)
+    if scope == 'memory' and not running:
+        module.fail_json(
+            msg='The instance (%s) is not running, the parameter (%s) can not be '
+            'changed with scope=memory' % (sid, clean_string(name)),
+            changed=False,
+        )
+
     size_scope = get_size_parameter_scope(module, cursor, name, value, scope, sid)
-    currval = get_curr_value(module, mode, msg, cursor, name, scope)
+    if size_scope is None and sid != '*':
+        size_scope = get_sid_parameter_scope(module, cursor, name, value, scope, sid)
+    currval = get_curr_value(module, mode, msg, cursor, name, scope, sid)
 
     if size_scope is None:
         is_set = currval == value.lower() or not currval and value == "''"
@@ -347,6 +380,80 @@ def execute_sql_get(module, cursor, sql, binds):
         )
 
 
+# memory value of the instance :sid (RAC: the connected instance can be another one)
+SQL_INSTANCE_PARAMETER = (
+    'select p.type, %s from gv$parameter p, gv$instance i '
+    'where p.inst_id = i.inst_id and p.name = :name and i.instance_name = :sid'
+)
+
+# entry of the spfile for :sid ('*' = all instances)
+SQL_SPFILE_ENTRY = (
+    'select %s from v$spparameter '
+    'where name = :name and sid = :sid and isspecified = \'TRUE\''
+)
+
+
+def instance_is_running(module, cursor, sid):
+    """True for sid '*' or when the instance sid is running (GV$INSTANCE).
+
+    The SID clause of ALTER SYSTEM is case-sensitive, so is the comparison.
+    """
+    if sid == '*':
+        return True
+    result = execute_sql_get(
+        module,
+        cursor,
+        'select count(*) from gv$instance where instance_name = :sid',
+        {'sid': sid},
+    )
+    return bool(result) and result[0][0] > 0
+
+
+def get_sid_parameter_scope(module, cursor, name, value, scope, sid):
+    """Compare a parameter for one instance (sid != '*').
+
+    With scope memory or both, the memory value of the running instance sid is
+    compared, with scope spfile or both the spfile entry for sid. When the instance
+    is not running, only the spfile is compared and changed.
+    Returns '' if nothing has to be changed, otherwise the scope for ALTER SYSTEM SET.
+    """
+    name = clean_string(name).lower()
+    wanted = value.lower()
+
+    def is_equal(current):
+        current = (current or '').lower()
+        return current == wanted or (current == '' and value == "''")
+
+    running = instance_is_running(module, cursor, sid)
+
+    memory_ok = True
+    if scope in ('memory', 'both') and running:
+        result = execute_sql_get(
+            module,
+            cursor,
+            SQL_INSTANCE_PARAMETER % 'p.display_value',
+            {'name': name, 'sid': sid},
+        )
+        memory_ok = bool(result) and is_equal(result[0][1])
+
+    spfile_ok = True
+    if scope in ('spfile', 'both'):
+        result = execute_sql_get(
+            module,
+            cursor,
+            SQL_SPFILE_ENTRY % 'display_value',
+            {'name': name, 'sid': sid},
+        )
+        spfile_ok = bool(result) and is_equal(result[0][0])
+
+    if memory_ok and spfile_ok:
+        return ''
+    if memory_ok:
+        # memory unchanged or instance not running => only the spfile entry
+        return 'spfile'
+    return scope
+
+
 def get_size_parameter_scope(module, cursor, name, value, scope, sid):
     """Compare a size parameter in bytes.
 
@@ -368,8 +475,16 @@ def get_size_parameter_scope(module, cursor, name, value, scope, sid):
         return None
 
     memory_ok = True
-    if scope in ('memory', 'both'):
-        current = int(result[0][1] or 0)
+    if scope in ('memory', 'both') and instance_is_running(module, cursor, sid):
+        if sid != '*':
+            # memory value of the instance sid (RAC: not the connected instance)
+            result = execute_sql_get(
+                module,
+                cursor,
+                SQL_INSTANCE_PARAMETER % 'p.value',
+                {'name': name, 'sid': sid},
+            )
+        current = int((result[0][1] if result else None) or 0)
         granule = 1
         if name in GRANULE_PARAMETERS or re.match(r'^db_\d+k_cache_size$', name):
             granule_result = execute_sql_get(
@@ -435,12 +550,22 @@ def parameter_is_set(module, cursor, name, scope, sid):
                 {'name': name, 'sid': sid},
             )
         )
-    if scope in ('memory', 'both'):
+    if scope in ('memory', 'both') and sid == '*':
         checks.append(
             (
                 'select count(*) from v$parameter '
                 'where name = :name and ismodified <> \'FALSE\'',
                 {'name': name},
+            )
+        )
+    elif scope in ('memory', 'both'):
+        # memory of the instance sid, nothing to reset when it is not running
+        checks.append(
+            (
+                'select count(*) from gv$parameter p, gv$instance i '
+                'where p.inst_id = i.inst_id and p.name = :name '
+                'and i.instance_name = :sid and p.ismodified <> \'FALSE\'',
+                {'name': name, 'sid': sid},
             )
         )
 
@@ -500,47 +625,48 @@ def reset_parameter(module, mode, msg, cursor, name, value, comment, scope, sid)
     return True
 
 
-def get_curr_value(module, mode, msg, cursor, name, scope):
+def get_curr_value(module, mode, msg, cursor, name, scope, sid='*'):
+    """Current value (lower case) or None, when there is no value.
+
+    sid '*': memory value of the connected instance or the spfile entry for '*'.
+    Other sid: memory value of the running instance sid, the spfile entry for sid
+    with scope=spfile or when the instance is not running.
+    """
     name = clean_string(name)
+    binds = {'name': name.lower(), 'sid': sid}
 
-    if scope == 'spfile':
-        parameter_source = 'v$spparameter'
-    else:
-        parameter_source = 'v$parameter'
-
-    if mode == 'sysdba':
+    if sid != '*':
+        if scope != 'spfile' and instance_is_running(module, cursor, sid):
+            sql = SQL_INSTANCE_PARAMETER % 'lower(p.display_value)'
+        else:
+            sql = SQL_SPFILE_ENTRY % 'null, lower(display_value)'
+    elif mode == 'sysdba':
         if scope == 'spfile':
             sql = (
-                'select lower(KSPSPFFTCTXSPDVALUE) '
+                'select null, lower(KSPSPFFTCTXSPDVALUE) '
                 'from x$kspspfile '
-                'where lower(KSPSPFFTCTXSPNAME) = lower(\'%s\')' % (name)
+                'where lower(KSPSPFFTCTXSPNAME) = :name '
+                'and KSPSPFFTCTXSPSID = :sid'
             )
         else:
             sql = (
-                'select lower(y.ksppstdvl) '
+                'select null, lower(y.ksppstdvl) '
                 'from sys.x$ksppi x, sys.x$ksppcv y '
                 'where x.indx = y.indx '
-                '  and x.ksppinm = lower(\'%s\')' % (name)
+                '  and x.ksppinm = :name'
             )
+            del binds['sid']
+    elif scope == 'spfile':
+        sql = (
+            'select null, lower(display_value) from v$spparameter '
+            'where name = :name and sid = :sid'
+        )
     else:
-        sql = 'select lower(display_value) from %s where name = lower(\'%s\')' % (
-            parameter_source,
-            name,
-        )
+        sql = 'select null, lower(display_value) from v$parameter where name = :name'
+        del binds['sid']
 
-    try:
-        cursor.execute(sql)
-        result = cursor.fetchall()[0][0]
-
-    except oracledb.DatabaseError as exc:
-        (error,) = exc.args
-        msg = (
-            'Blergh, something went wrong while getting current value - %s sql: %s'
-            % (error.message, sql)
-        )
-        module.fail_json(msg=msg, changed=False)
-
-    return result
+    result = execute_sql_get(module, cursor, sql, binds)
+    return result[0][1] if result else None
 
 
 def main():
