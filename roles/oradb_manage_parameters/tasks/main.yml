@@ -1,6 +1,8 @@
 ---
 # @tag initparams:description: Configure parameter for nonCDB, CDB and PDB
 # @tag initparams_cdb:description: Configure parameter for nonCDB and CDB
+# state standby (oradb_facts): parameters are changed on a mounted standby database too,
+# e.g. dg_broker_start for the Data Guard Broker. PDB parameters and the bounce are for primary databases only.
 - name: Manage parameters (db/cdb)
   opitzconsulting.ansible_oracle.oracle_parameter:
     hostname: "{{ oracle_hostname }}"
@@ -24,7 +26,7 @@
     - orasw_meta_primary_node | bool
     - oracle_databases is defined
     - odb.0.state == 'present'
-    - oracledb_facts[_oracle_db_unique_name]['state'] | default('') == 'present'
+    - oracledb_facts[_oracle_db_unique_name]['state'] | default('') in ['present', 'standby']
     - odb.1 is defined
   become: true
   become_user: "{{ oracle_user }}"
