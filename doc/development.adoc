@@ -1042,6 +1042,57 @@ A check from these lists that passes is reported as `KNOWN BUGS NOT REPRODUCED` 
 ----
 * Not tested: `oracle_asmvol` (no ADVM/ACFS in a container), `oracle_ldapuser` (LDAP), `oracle_opatch`, `oracle_gi_facts`, `oracle_sqldba` (no python-oracledb).
 
+[[claude-aotest]]
+=== Run molecule tests with Claude Code
+
+`tools/claude/skills/aotest` contains the skill `/aotest` for https://claude.com/claude-code[Claude Code].
+It runs the molecule actions of `extensions/Taskfile.yml` inside `nix-shell` and reports the result.
+
+Install the skill like `/pr` (see <<claude-pr>>):
+
+----
+mkdir -p ~/.claude/skills
+ln -sfn "$(pwd)/tools/claude/skills/aotest" ~/.claude/skills/aotest
+----
+
+.Usage
+----
+/aotest [S=<scenario>] [T=full|destroy|converge|module[,...]] [M=<module>[,<module>...]]
+----
+
+[cols="1,1,3"]
+|===
+|Argument |Default |Description
+
+|`S=<scenario>`
+|`dbfs`
+|Scenario in `extensions/molecule`.
+
+|`T=<action>[,...]`
+|`module`
+|Actions in the given order: `full` (`task test`), `destroy`, `converge`, `module` (`task module-test`).
+
+|`M=<module>[,...]`
+|all modules
+|Modules for `T=module`, see <<module-tests>>.
+|===
+
+.Examples
+----
+/aotest                                   # module tests in dbfs
+/aotest S=has-ol9 M=oracle_asmdg
+/aotest S=dbfs T=destroy,converge,module
+/aotest S=dbfs-ol10 T=full
+----
+
+* Scenario, actions and modules are checked before the start.
+* Each action runs in the background with its own log file. A failed action stops the following actions.
+* `T=module` on a scenario without running instances is not started, the skill proposes `T=converge,module`.
+* The report contains the `PLAY RECAP`, the summary of the module tests and the failed checks with message.
+  The skill does not change code or tests.
+
+IMPORTANT: Invoking `/aotest` allows Claude to run the requested actions, including `destroy` and `converge`, without further confirmation.
+
 === Oracle XE (not used at the moment!)
 
 IMPORTANT: This chapter was designed for testing the `oradb_managed_`-Roles. +
