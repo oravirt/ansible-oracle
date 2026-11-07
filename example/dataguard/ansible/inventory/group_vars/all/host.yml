@@ -1,0 +1,27 @@
+---
+configure_public_yum_repo: false
+configure_motd: false
+
+autostartup_service: true
+
+configure_hugepages_by: memory
+
+# disable hugepages on small systems
+# don't forget to enable use_large_pages in oracle parameter
+# size_in_gb_hugepages: 2
+size_in_gb_hugepages: 0
+
+
+configure_host_disks: true
+
+# Hyper-V VM from packer-hyperv: one disk /dev/sda, the free space of VG "ol" (/dev/sda3)
+# is used for the Oracle filesystems.
+host_fs_layout:
+  - vgname: ol
+    state: present
+    filesystem:
+      - {mntp: swap, lvname: lvswap, lvsize: 16G, fstype: swap}
+      - {mntp: /u01, lvname: lvorabase, lvsize: 40G, fstype: xfs}
+      - {mntp: /u02, lvname: lvoradata, lvsize: 25G, fstype: xfs, fsopts: "-m reflink=1 -m crc=1"}
+    disk:
+      - {device: /dev/sda, pvname: /dev/sda3}

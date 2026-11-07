@@ -1,0 +1,26 @@
+---
+# Connect identifiers of the members (dg.connect_identifier in db_standby_config).
+# Used by RMAN DUPLICATE (oradb_standby), the Data Guard Broker (dgmgrl) and for redo transport.
+# The service <db_unique_name> is registered dynamically at the listener of each host.
+# IP addresses from ansible_host => no DNS needed between the database servers.
+oracle_tnsnames_config:
+  DB1_SITE1:
+    connect:
+      service_name: DB1_SITE1
+    address:
+      - host: "{{ hostvars['dataguard-dbfs1']['ansible_host'] }}"
+        port: 1521
+  DB1_SITE2:
+    connect:
+      service_name: DB1_SITE2
+    address:
+      - host: "{{ hostvars['dataguard-dbfs2']['ansible_host'] }}"
+        port: 1521
+
+tnsnames_installed:
+  - tnsname: DB1_SITE1
+    home: db26_si_ee
+    state: present
+  - tnsname: DB1_SITE2
+    home: db26_si_ee
+    state: present

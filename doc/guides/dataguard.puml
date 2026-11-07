@@ -1,0 +1,42 @@
+@startuml
+!include <C4/C4_Component>
+
+LAYOUT_TOP_DOWN()
+
+AddContainerTag("oradb", $legendText="Database")
+AddContainerTag("media", $legendText="Installation Media")
+AddContainerTag("ansible", $bgColor="DarkBlue", $legendText="Ansible")
+
+Person(admin, "Administrator")
+System_Ext(mos, "My Oracle Support", "Gold Image 26ai")
+
+System_Boundary(host, "Ansible Controller", "Ubuntu on WSL2 (Windows)") {
+  Container(ansible, "Ansible", "ansible-playbook playbooks/do_all.yml", $tags="ansible")
+}
+
+System_Boundary(vmhost, "Hypervisor", "e.g. Hyper-V") {
+  System_Boundary(dbfs1, "VM dataguard-dbfs1 (192.168.66.166)") {
+    Container(autoupgrade, "AutoUpgrade", "autoupgrade.jar -patch -mode download", $tags="ansible")
+    Container(nfs, "NFS Server", "export /u01/sw (read only)", $tags="media")
+    Container(instmedia, "Installation Media", "/u01/sw/db_home_26.xx.zip", $tags="media")
+    ContainerDb(primary, "DB1_SITE1", "Oracle AI Database 26ai\ninitial primary (dbca)\nCDB DB1, PDB ORCLPDB", $tags="oradb")
+  }
+  System_Boundary(dbfs2, "VM dataguard-dbfs2 (192.168.66.167)") {
+    Container(nfsmount, "NFS Mount", "/u01/sw\nduring the ORACLE_HOME installation", $tags="media")
+    ContainerDb(standby, "DB1_SITE2", "Oracle AI Database 26ai\ninitial physical standby\n(RMAN DUPLICATE)", $tags="oradb")
+  }
+}
+
+Rel_Down(admin, ansible, "ansible-playbook")
+Rel_Down(ansible, dbfs1, "ssh: os, nfs_server, autoupgrade, single_instance_fs")
+Rel_Down(ansible, dbfs2, "ssh: os, single_instance_fs")
+Rel(autoupgrade, mos, "download")
+Rel(autoupgrade, instmedia, "")
+Rel(instmedia, nfs, "")
+Rel(nfs, nfsmount, "NFS")
+Rel(instmedia, primary, "install")
+Rel(nfsmount, standby, "install")
+Rel(primary, standby, "Redo Transport\nData Guard Broker")
+
+SHOW_LEGEND()
+@enduml
