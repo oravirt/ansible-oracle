@@ -1,0 +1,39 @@
+---
+# Switchover from dg_primary to dg_standby with the broker.
+# Input: dg_primary, dg_standby
+#
+# After a switchover the broker needs some time until the apply lag of the new standby is known
+# => VALIDATE DATABASE is repeated until "Ready for Switchover: Yes".
+- name: Validate database before switchover {{ dg_standby }}
+  ansible.builtin.command:
+    argv:
+      - "{{ dg_oracle_home }}/bin/dgmgrl"
+      - -silent
+    stdin: |
+      connect sys/"{{ dg_sys_password }}"@{{ dg_primary }}
+      validate database {{ dg_standby }};
+  environment: "{{ dg_env }}"
+  register: _dg_validate
+  changed_when: false
+  no_log: true
+  retries: 30
+  delay: 10
+  until: _dg_validate.stdout_lines | select('match', '^\s*Ready for Switchover:\s+Yes') | list | length > 0
+
+- name: Result of validate database {{ dg_standby }}
+  ansible.builtin.debug:
+    var: _dg_validate.stdout_lines
+
+- name: Switchover to {{ dg_standby }}
+  ansible.builtin.include_tasks: dg_dgmgrl.yml
+  vars:
+    dg_dgmgrl_ci: "{{ dg_primary }}"
+    dg_dgmgrl: "switchover to {{ dg_standby }};"
+
+- name: Assert switchover to {{ dg_standby }}
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - dg_dgmgrl_result | select('search', 'Switchover succeeded') | list | length > 0
+      - dg_dgmgrl_result | select('match', '^(Error:|ORA-)') | list | length == 0
+    fail_msg: "Switchover to {{ dg_standby }} failed"

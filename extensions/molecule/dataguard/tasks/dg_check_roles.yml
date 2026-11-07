@@ -1,0 +1,48 @@
+---
+# Check the Data Guard configuration:
+# - broker configuration status SUCCESS (waits for the broker after a switchover)
+# - dg_primary is PRIMARY / READ WRITE, dg_standby is PHYSICAL STANDBY / MOUNTED (no Active Data Guard)
+# Input: dg_primary, dg_standby (db_unique_name = connect identifier in this scenario)
+- name: Wait for broker configuration SUCCESS (primary {{ dg_primary }})
+  ansible.builtin.command:
+    argv:
+      - "{{ dg_oracle_home }}/bin/dgmgrl"
+      - -silent
+    stdin: |
+      connect sys/"{{ dg_sys_password }}"@{{ dg_primary }}
+      show configuration;
+  environment: "{{ dg_env }}"
+  register: _dg_show_config
+  changed_when: false
+  no_log: true
+  retries: 30
+  delay: 10
+  until: >-
+    _dg_show_config.stdout_lines | select('match', '^SUCCESS') | list | length > 0
+    and _dg_show_config.stdout is search(dg_primary ~ ' - Primary database')
+
+- name: Role and open mode of {{ dg_primary }}
+  ansible.builtin.include_tasks: dg_sql.yml
+  vars:
+    dg_sql_ci: "{{ dg_primary }}"
+    dg_sql: "select 'ROLE=' || database_role || ':' || open_mode from v$database;"
+
+- name: Assert PRIMARY / READ WRITE for {{ dg_primary }}
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - "'ROLE=PRIMARY:READ WRITE' in dg_sql_result"
+    fail_msg: "{{ dg_primary }}: {{ dg_sql_result }}"
+
+- name: Role and open mode of {{ dg_standby }}
+  ansible.builtin.include_tasks: dg_sql.yml
+  vars:
+    dg_sql_ci: "{{ dg_standby }}"
+    dg_sql: "select 'ROLE=' || database_role || ':' || open_mode from v$database;"
+
+- name: Assert PHYSICAL STANDBY / MOUNTED for {{ dg_standby }}
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - "'ROLE=PHYSICAL STANDBY:MOUNTED' in dg_sql_result"
+    fail_msg: "{{ dg_standby }}: {{ dg_sql_result }}"

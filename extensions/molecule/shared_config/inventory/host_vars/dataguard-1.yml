@@ -20,7 +20,7 @@ oracle_databases:
     listener_name: LISTENER
     listener_port: 1521
     archivelog: true
-    flashback: false
+    flashback: true
     force_logging: true
     state: present
     init_parameters:
@@ -28,7 +28,12 @@ oracle_databases:
       # the standby gets its own value with SET in RMAN DUPLICATE (oradb_standby)
       - {name: local_listener, value: '//dataguard-1:1521', scope: both, state: present}
       # Data Guard Broker (dgmgrl.cfg from oradb_standby), not used by dbca
+      # broker configuration files outside of ORACLE_HOME (Out-of-Place Patching): read-only ORACLE_HOME => ORACLE_BASE/dbs,
+      # before dg_broker_start: the files cannot be changed while the broker is running
+      - {name: dg_broker_config_file1, value: '/u01/app/oracle/dbs/dr1DB1_SITE1.dat', scope: both, state: present, dbca: false}
+      - {name: dg_broker_config_file2, value: '/u01/app/oracle/dbs/dr2DB1_SITE1.dat', scope: both, state: present, dbca: false}
       - {name: dg_broker_start, value: 'TRUE', scope: both, state: present, dbca: false}
+      - {name: standby_file_management, value: 'AUTO', scope: both, state: present}
       - {name: db_create_file_dest, value: '/u01/app/oracle/oradata', scope: both, state: present}
       - {name: db_create_online_log_dest_1, value: '/u01/app/oracle/oradata', scope: both, state: present}
       - {name: recyclebin, value: 'off', scope: spfile, state: present}

@@ -780,7 +780,7 @@ The following scenarios are existing in the `ansible-oracle profect.
 | dbfs | Full stage for installation of RDBMS 19c + Patching and create database. Requires installation media in /vagrant on local host.
 | dbfs-ol9 | Full stage for installation of RDBMS 19c + Patching on OL9 and create database. Requires installation media in /vagrant on local host.
 | dbfs-ol10 | Same as `dbfs` on OL10: Oracle AI Database 26ai with module tests. Requires installation media in /vagrant on local host.
-| dataguard | Data Guard on OL10 with Oracle AI Database 26ai: 2 containers `dataguard-1` (primary) and `dataguard-2` (standby). Only the primary database is created at the moment. Requires installation media in /vagrant on local host.
+| dataguard | Data Guard on OL10 with Oracle AI Database 26ai: 2 containers `dataguard-1` (primary) and `dataguard-2` (standby created by `oradb_standby`), broker configuration `DG1`. Side-effect: switchover tests, see <<dataguard-tests>>. Requires installation media in /vagrant on local host.
 | default | Stage for testing common and orahost roles with different Distributions.
 | download | Download Patches from support.oracle.com for dbfs stage.
 | golden | Create Golden-Image for installation from dbfs.
@@ -892,6 +892,27 @@ Executing a full test with `molicule test -s golden` will destroy an existing in
 cd extensions
 molecule test -s golden
 ----
+
+[[dataguard-tests]]
+=== Data Guard tests
+
+The side-effect of the scenario `dataguard` tests the Data Guard configuration created by `converge`
+(`extensions/molecule/dataguard/side_effect.yml`, tasks in `extensions/molecule/dataguard/tasks`):
+
+. Initial state: broker configuration `SUCCESS`, `DB1_SITE1` primary (`READ WRITE`), `DB1_SITE2` physical standby (`MOUNTED`)
+. `VALIDATE DATABASE` (repeated until `Ready for Switchover: Yes`) and switchover to `DB1_SITE2`
+. Roles after the switchover, tempfiles of all temporary tablespaces of the new primary
+  (RMAN `DUPLICATE` does not copy tempfiles, they are created when the standby is opened as primary)
+. Switchover back to `DB1_SITE1`, roles and tempfiles
+
+----
+cd extensions
+task side-effect S=dataguard
+----
+
+The tests connect with `dgmgrl` and `sqlplus` from `dataguard-1` with the connect identifiers of `db_standby_config`,
+the SYS password is passed with stdin (`no_log`).
+After a failed test the configuration may stay switched over: the next run expects `DB1_SITE1` as primary.
 
 [[module-tests]]
 === Module tests
