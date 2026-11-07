@@ -361,7 +361,10 @@ A database is assigned with `standby_config` in `oracle_databases`.
 
 The inventory structure is described in `doc/guides/standby_databases.adoc`.
 
-IMPORTANT! Only the asserts are implemented at the moment.
+Type `dataguard`: the standby databases and the broker configuration are created
+by the role `oradb_standby`.
+
+IMPORTANT! Only the asserts are implemented for type `dbvisit` at the moment.
 
 #### Example usage
 

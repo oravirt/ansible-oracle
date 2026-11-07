@@ -1,0 +1,103 @@
+---
+# Create the Data Guard Broker configuration with dgmgrl.cfg (broker_cfg.yml) on the host
+# of the primary database. Only when
+# - the local database is the PRIMARY (oradb_facts)
+# - no broker configuration exists (ORA-16532)
+# - all other members are PHYSICAL STANDBY databases (oradb_facts)
+- name: Broker create | Data Guard Broker configuration
+  when:
+    - _odb_standby_config.type | default('') == 'dataguard'
+    - _oradb_standby_local_role | trim == 'PRIMARY'
+  block:
+    - name: Broker create | Check broker configuration
+      ansible.builtin.command:
+        argv:
+          - "{{ _oracle_home_db }}/bin/dgmgrl"
+          - -silent
+          - /
+          - show configuration
+      environment: "{{ _oracle_env | combine({'ORACLE_SID': _orasw_meta_standby_sid}) }}"
+      become: true
+      become_user: "{{ oracle_user }}"
+      register: _oradb_standby_broker_show
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    # neither a broker configuration nor ORA-16532, e.g. ORA-16525 (broker not started)
+    - name: Broker create | Broker not available
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: The broker configuration {{ _odb_standby_config.name }} cannot be checked/created.
+          Is dg_broker_start=TRUE in init_parameters of all members?
+          dgmgrl: {{ _oradb_standby_broker_show.stdout_lines | reject('match', '^\\s*$') | list }}
+      when:
+        - "'ORA-16532' not in _oradb_standby_broker_show.stdout"
+        - "'Configuration - ' not in _oradb_standby_broker_show.stdout"
+
+    - name: Broker create | Broker configuration not created (standby databases missing)
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: The broker configuration {{ _odb_standby_config.name }} is not created,
+          not all other members are physical standby databases: {{ _oradb_standby_member_roles }}
+      when:
+        - "'ORA-16532' in _oradb_standby_broker_show.stdout"
+        - _oradb_standby_missing | length > 0
+      vars:
+        _oradb_standby_missing: >-
+          {{ _oradb_standby_member_roles | rejectattr('database_role', 'equalto', 'PHYSICAL STANDBY') | list }}
+
+    - name: Broker create | Execute dgmgrl.cfg
+      ansible.builtin.command:
+        argv:
+          - "{{ _oracle_home_db }}/bin/dgmgrl"
+          - -silent
+          - /
+          - "@{{ _oradb_standby_dgmgrl_cfg }}"
+      environment: "{{ _oracle_env | combine({'ORACLE_SID': _orasw_meta_standby_sid}) }}"
+      become: true
+      become_user: "{{ oracle_user }}"
+      register: _oradb_standby_broker_create
+      changed_when: true
+      # dgmgrl returns 0 for failed commands => check the output
+      # (warnings of SHOW CONFIGURATION, e.g. apply lag after ENABLE, are indented)
+      failed_when: >-
+        _oradb_standby_broker_create.rc != 0
+        or _oradb_standby_broker_create.stdout_lines
+           | select('match', '^(Error:|ORA-|Syntax error|.* was not found)') | list | length > 0
+      when:
+        - "'ORA-16532' in _oradb_standby_broker_show.stdout"
+        - >-
+          _oradb_standby_member_roles | length > 0
+          and _oradb_standby_member_roles | rejectattr('database_role', 'equalto', 'PHYSICAL STANDBY')
+          | list | length == 0
+
+    - name: Broker create | Result of dgmgrl.cfg
+      ansible.builtin.debug:
+        var: _oradb_standby_broker_create.stdout_lines
+      when: _oradb_standby_broker_create.stdout_lines is defined
+
+    - name: Broker create | Check members of broker configuration
+      ansible.builtin.command:
+        argv:
+          - "{{ _oracle_home_db }}/bin/dgmgrl"
+          - -silent
+          - /
+          - show configuration
+      environment: "{{ _oracle_env | combine({'ORACLE_SID': _orasw_meta_standby_sid}) }}"
+      become: true
+      become_user: "{{ oracle_user }}"
+      register: _oradb_standby_broker_check
+      changed_when: false
+      when: _oradb_standby_broker_create.stdout_lines is defined
+
+    - name: Broker create | Assert members of broker configuration
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _oradb_standby_broker_check.stdout is search('(?m)^\\s+' ~ item ~ ' - ')
+        fail_msg: >-
+          {{ item }} is not a member of the broker configuration {{ _odb_standby_config.name }}:
+          {{ _oradb_standby_broker_check.stdout_lines }}
+      loop: "{{ _odb_standby_config.members | map(attribute='db_unique_name') | list }}"
+      when: _oradb_standby_broker_check.stdout is defined

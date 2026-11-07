@@ -1,0 +1,95 @@
+---
+- name: Standby | State of database
+  ansible.builtin.include_role:
+    name: orasw_meta
+    tasks_from: standby_state.yml
+  when:
+    - _odb_standby_config.type | default('') == 'dataguard'
+
+# Only a missing database of a member with initial_role physical_standby is created.
+# An existing database is never changed by oradb_standby.
+# The decision is stored before the block: the when of a block is evaluated for each task
+# and _orasw_meta_standby_state changes during the creation (exists=True after DUPLICATE)
+# => without the fact, the tasks after the creation would be skipped.
+- name: Standby | Check for creation of standby database
+  ansible.builtin.set_fact:
+    _oradb_standby_create: >-
+      {{ _odb_standby_config.type | default('') == 'dataguard'
+         and _odb_standby_member.initial_role | default('') == 'physical_standby'
+         and not _orasw_meta_standby_state.exists | default(true) | bool }}
+
+- name: Standby | Create standby database
+  when:
+    - _oradb_standby_create | bool
+  block:
+    - name: Standby | Standby database is created outside of ansible-oracle
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: The standby database {{ _oradb_standby_unique_name }} does not exist.
+          create_method is external => create it outside of ansible-oracle.
+      when: _odb_standby_create_method == 'external'
+
+    - name: Standby | Create standby database with {{ _odb_standby_create_method }}
+      when: _odb_standby_create_method != 'external'
+      block:
+        - name: Standby | Find primary database
+          ansible.builtin.include_tasks: primary_detect.yml
+
+        - name: Standby | Prepare primary database
+          ansible.builtin.include_tasks: primary_prepare.yml
+
+        - name: Standby | Create standby database with rman_duplicate_active
+          ansible.builtin.include_tasks: create_rman_duplicate_active.yml
+          when: _odb_standby_create_method == 'rman_duplicate_active'
+
+        - name: Standby | Create standby database with custom tasks file
+          ansible.builtin.include_tasks: "{{ _oradb_standby_create_tasks_file }}"
+          when: _odb_standby_create_method == 'custom'
+
+        - name: Standby | State of database after creation
+          ansible.builtin.include_role:
+            name: orasw_meta
+            tasks_from: standby_state.yml
+
+        # failed unit after start attempts without database (start limit) => reset before start
+        - name: Standby | Reset failed systemd unit of standby database
+          ansible.builtin.command: "systemctl reset-failed oracle-db@{{ _orasw_meta_standby_sid }}.service"
+          become: true
+          become_user: root
+          changed_when: false
+          failed_when: false
+          when:
+            - autostartup_service | bool
+            - autostartup_service_mode == 'units'
+            - ansible_service_mgr == 'systemd'
+            - oracle_install_option_gi | default('') | length == 0
+
+        # the instance is running outside of systemd => the unit attaches the running instance
+        - name: Standby | Start systemd unit of standby database
+          ansible.builtin.systemd:
+            name: "oracle-db@{{ _orasw_meta_standby_sid }}.service"
+            enabled: true
+            state: started
+          become: true
+          become_user: root
+          when:
+            - autostartup_service | bool
+            - autostartup_service_mode == 'units'
+            - ansible_service_mgr == 'systemd'
+            - oracle_install_option_gi | default('') | length == 0
+
+        - name: Standby | Assert standby database
+          ansible.builtin.assert:
+            quiet: true
+            that:
+              - _orasw_meta_standby_state.exists | bool
+              - _orasw_meta_standby_state.role == 'PHYSICAL STANDBY'
+            fail_msg: >-
+              The creation of the standby database {{ _oradb_standby_unique_name }}
+              with {{ _odb_standby_create_method }} did not result in a mounted physical standby
+              (exists={{ _orasw_meta_standby_state.exists }}, role={{ _orasw_meta_standby_state.role }}).
+
+- name: Standby | dgmgrl configuration file
+  ansible.builtin.include_tasks: broker_cfg.yml
+  when:
+    - _odb_standby_config.type | default('') == 'dataguard'

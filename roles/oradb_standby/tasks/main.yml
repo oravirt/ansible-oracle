@@ -1,0 +1,43 @@
+---
+# Creation of standby databases for the members of db_standby_config.
+# The inventory structure is described in doc/guides/standby_databases.adoc.
+- name: Standby databases
+  ansible.builtin.include_tasks: standby.yml
+  loop: >-
+    {{ oracle_databases | default([]) | selectattr('standby_config', 'defined')
+       | selectattr('state', 'equalto', 'present') | list }}
+  loop_control:
+    loop_var: odb
+    label: >-
+      {{ odb.oracle_db_name | default('') }}
+      standby_config={{ odb.standby_config | default('') }}
+  when:
+    - orasw_meta_primary_node | bool
+  tags: oradb_standby
+
+# The standby databases have been created in the task above on all hosts
+# => facts with database_role of all members for the broker configuration
+- name: Regather facts after creation of standby databases
+  ansible.builtin.include_role:
+    name: oradb_facts
+    allow_duplicates: true
+  when:
+    - orasw_meta_primary_node | bool
+    - oradb_standby_broker_create | bool
+  tags: oradb_standby
+
+# Executed after the creation of all standby databases (task above runs on all hosts first)
+- name: Data Guard Broker configuration
+  ansible.builtin.include_tasks: broker_create.yml
+  loop: >-
+    {{ oracle_databases | default([]) | selectattr('standby_config', 'defined')
+       | selectattr('state', 'equalto', 'present') | list }}
+  loop_control:
+    loop_var: odb
+    label: >-
+      {{ odb.oracle_db_name | default('') }}
+      standby_config={{ odb.standby_config | default('') }}
+  when:
+    - orasw_meta_primary_node | bool
+    - oradb_standby_broker_create | bool
+  tags: oradb_standby

@@ -1,0 +1,18 @@
+# Managed by ansible-oracle (oradb_standby)
+# RMAN DUPLICATE ... FOR STANDBY of {{ _oradb_standby_unique_name | trim }}
+# from the primary database {{ _oradb_standby_primary_member.db_unique_name }}.
+# Called by {{ _oradb_standby_rman_shell }} (connections with ORADB_STANDBY_SYS_PASSWORD).
+run {
+{% for i in range(oradb_standby_rman_parallel | int) %}
+  allocate channel p{{ i + 1 }} device type disk;
+  allocate auxiliary channel s{{ i + 1 }} device type disk;
+{% endfor %}
+  duplicate target database for standby from active database
+    using {{ 'compressed ' if oradb_standby_rman_compressed | bool else '' }}backupset
+    spfile
+      parameter_value_convert '{{ _oradb_standby_primary_member.db_unique_name }}','{{ _oradb_standby_unique_name | trim }}'
+{% for name, value in _oradb_standby_spfile_params.items() %}
+      set {{ name }}='{{ value }}'
+{% endfor %}
+    nofilenamecheck;
+}

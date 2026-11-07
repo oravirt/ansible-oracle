@@ -1,0 +1,40 @@
+---
+# @meta description: >
+# Creates standby databases for the standby configurations in `db_standby_config`.
+#
+# The method for the creation is selected with `create_method` in `db_standby_config`:
+#
+# - `rman_duplicate_active`: RMAN `DUPLICATE ... FOR STANDBY FROM ACTIVE DATABASE` (default)
+# - `external`: the standby database is created outside of `ansible-oracle`
+# - `custom`: tasks file from `create_tasks_file`
+#
+# The inventory structure is described in `doc/guides/standby_databases.adoc`.
+# @end
+# @meta author: >
+# - Thorsten Bruhns
+# @end
+galaxy_info:
+  role_name: oradb_standby
+  author: Thorsten Bruhns
+  description: Creates standby databases (Data Guard)
+  company: OPITZ CONSULTING Deutschland GmbH
+
+  license: license (MIT)
+
+  min_ansible_version: 2.16.0
+
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+        - "10"
+
+  galaxy_tags:
+    - database
+    - oracle
+    - dataguard
+
+dependencies:
+  - role: orasw_meta
+  - role: oradb_facts

@@ -1,0 +1,196 @@
+---
+# create_method: rman_duplicate_active
+# RMAN DUPLICATE ... FOR STANDBY FROM ACTIVE DATABASE from the standby host.
+# - target:    primary database (connect_identifier of the primary member)
+# - auxiliary: static service <db_unique_name>_DGMGRL of the listener (listener_name in oracle_databases)
+# Result: physical standby database in MOUNT with SPFile, password file from the primary.
+- name: Duplicate | Assert file destination
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _oradb_standby_file_dest | trim | length > 0
+    fail_msg: >-
+      db_create_file_dest in init_parameters or datafile_dest is needed for
+      {{ odb.oracle_db_name }} (OMF for the standby database).
+
+# only missing directories are created (file destinations, audit_file_dest, diagnostic_dest, broker files)
+- name: Duplicate | Directories of database
+  ansible.builtin.include_role:
+    name: orasw_meta
+    tasks_from: standby_prepare.yml
+  vars:
+    orasw_meta_standby_prepare_dirs:
+      - "{{ _oradb_standby_control_file | trim | dirname }}"
+      - "{{ oradb_standby_rman_logdir }}"
+      - "{{ _oradb_standby_admin_dir }}"
+      - "{{ _oradb_standby_pfile_dir }}"
+
+# PFile in ORACLE_BASE/admin/<db_unique_name>/pfile => an existing PFile in dbs is not overwritten.
+# The PFile is kept after DUPLICATE for a manual repeat of RMAN DUPLICATE on the host.
+- name: Duplicate | PFile for NOMOUNT
+  ansible.builtin.copy:
+    content: |
+      # Managed by ansible-oracle (oradb_standby)
+      # PFile for the auxiliary instance in NOMOUNT for RMAN DUPLICATE:
+      # startup nomount pfile='{{ _oradb_standby_nomount_pfile }}'
+      db_name={{ odb.oracle_db_name }}
+      {% for name, value in _oradb_standby_nomount_params.items() %}
+      {{ name }}='{{ value }}'
+      {% endfor %}
+    dest: "{{ _oradb_standby_nomount_pfile }}"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: "0640"
+  become: true
+
+# Temporary password file for the connection to the auxiliary instance.
+# It is replaced by the password file of the primary during DUPLICATE FOR STANDBY.
+# format=12: no password complexity check (format=12.2 rejects passwords accepted by dbca)
+- name: Duplicate | Password file
+  ansible.builtin.command:
+    argv:
+      - "{{ _oracle_home_db }}/bin/orapwd"
+      - "file={{ _orasw_meta_standby_state.dbs_dir }}/orapw{{ _orasw_meta_standby_sid }}"
+      - "password={{ _oradb_standby_sys_password }}"
+      - format=12
+      - force=y
+  environment: "{{ _oracle_env }}"
+  vars:
+    db_user: sys
+  become: true
+  become_user: "{{ oracle_user }}"
+  register: _oradb_standby_orapwd
+  changed_when: true
+  failed_when: false
+  no_log: true
+
+# orapwd does not print the password => show the result without no_log
+- name: Duplicate | Assert password file
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _oradb_standby_orapwd.rc == 0
+    fail_msg: "orapwd failed: {{ _oradb_standby_orapwd.stdout | default('') }} {{ _oradb_standby_orapwd.stderr | default('') }}"
+
+- name: Duplicate | Start instance in NOMOUNT
+  ansible.builtin.shell: |
+    set -eu
+    if pgrep -f "^ora_pmon_${ORACLE_SID}$" > /dev/null ; then
+      echo "Instance already running"
+      exit 0
+    fi
+    "${ORACLE_HOME}/bin/sqlplus" -S -L /nolog <<EOF
+    connect / as sysdba
+    whenever sqlerror exit failure
+    startup nomount pfile='{{ _oradb_standby_nomount_pfile }}'
+    EOF
+  args:
+    executable: /bin/bash
+  environment: "{{ _oracle_env | combine({'ORACLE_SID': _orasw_meta_standby_sid}) }}"
+  become: true
+  become_user: "{{ oracle_user }}"
+  register: _oradb_standby_nomount
+  changed_when: "'Instance already running' not in _oradb_standby_nomount.stdout"
+
+# RMAN script and shell script in ORACLE_BASE/admin/<db_unique_name>/pfile without passwords
+# => the same scripts are used by Ansible and for a manual repeat on the host
+#    (manual: SYS password in ORADB_STANDBY_SYS_PASSWORD).
+# Ansible passes the SYS password with stdin: the environment of a task with become
+# is part of the command line (process list, -vvv).
+- name: Duplicate | RMAN DUPLICATE
+  block:
+    - name: Duplicate | RMAN script and shell script
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        owner: "{{ oracle_user }}"
+        group: "{{ oracle_group }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - {src: duplicate_standby.rman.j2, dest: "{{ _oradb_standby_rman_script }}", mode: "0640"}
+        - {src: duplicate_standby.sh.j2, dest: "{{ _oradb_standby_rman_shell }}", mode: "0750"}
+      loop_control:
+        label: "{{ item.dest }}"
+      become: true
+
+    - name: Duplicate | Start RMAN DUPLICATE (this takes some time)
+      ansible.builtin.debug:
+        msg: >-
+          RMAN DUPLICATE {{ _oradb_standby_primary_member.db_unique_name }}
+          => {{ _oradb_standby_unique_name }}, log:
+          {{ _oradb_standby_rman_log }}
+
+    - name: Duplicate | RMAN DUPLICATE
+      ansible.builtin.command:
+        argv:
+          - "{{ _oradb_standby_rman_shell }}"
+        stdin: "{{ _oradb_standby_sys_password }}"
+      vars:
+        db_user: sys
+      # stdin contains the SYS password, the logfile is shown in rescue
+      no_log: true
+      become: true
+      become_user: "{{ oracle_user }}"
+      register: _oradb_standby_duplicate
+      changed_when: true
+
+  rescue:
+    - name: Duplicate | Logfile of RMAN DUPLICATE
+      ansible.builtin.command: >-
+        tail -50 {{ _oradb_standby_rman_log }}
+      become: true
+      register: _oradb_standby_duplicate_log
+      changed_when: false
+      failed_when: false
+
+    - name: Duplicate | Show logfile of RMAN DUPLICATE
+      ansible.builtin.debug:
+        var: _oradb_standby_duplicate_log.stdout_lines
+
+    # The SPFile did not exist before (checked in standby.yml) => it was created by this DUPLICATE.
+    # Remove it, otherwise the next run treats the database as existing and skips the creation.
+    - name: Duplicate | Shutdown auxiliary instance
+      ansible.builtin.shell: |
+        set -u
+        pgrep -f "^ora_pmon_${ORACLE_SID}$" > /dev/null || exit 0
+        "${ORACLE_HOME}/bin/sqlplus" -S -L /nolog <<EOF
+        connect / as sysdba
+        shutdown abort
+        EOF
+      args:
+        executable: /bin/bash
+      environment: "{{ _oracle_env | combine({'ORACLE_SID': _orasw_meta_standby_sid}) }}"
+      become: true
+      become_user: "{{ oracle_user }}"
+      changed_when: true
+      failed_when: false
+
+    - name: Duplicate | Remove SPFile of failed DUPLICATE
+      ansible.builtin.file:
+        path: "{{ _orasw_meta_standby_state.dbs_dir }}/spfile{{ _orasw_meta_standby_sid }}.ora"
+        state: absent
+      become: true
+
+    - name: Duplicate | Fail RMAN DUPLICATE
+      ansible.builtin.fail:
+        msg: >-
+          RMAN DUPLICATE failed, see logfile above. The auxiliary instance has been stopped and
+          the SPFile has been removed => the next run starts a new DUPLICATE.
+          Files restored by the failed DUPLICATE below
+          {{ _oradb_standby_directories | join(', ') }} are not removed.
+
+- name: Duplicate | Start Redo Apply
+  ansible.builtin.shell: |
+    set -eu
+    "${ORACLE_HOME}/bin/sqlplus" -S -L /nolog <<EOF
+    connect / as sysdba
+    whenever sqlerror exit failure
+    alter database recover managed standby database disconnect from session;
+    EOF
+  args:
+    executable: /bin/bash
+  environment: "{{ _oracle_env | combine({'ORACLE_SID': _orasw_meta_standby_sid}) }}"
+  become: true
+  become_user: "{{ oracle_user }}"
+  changed_when: true
+  when: oradb_standby_start_apply | bool
