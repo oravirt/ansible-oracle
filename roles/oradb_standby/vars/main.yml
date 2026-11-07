@@ -1,0 +1,108 @@
+---
+# Internal variables of oradb_standby. Do not set them in inventory!
+# Requires odb (entry of oracle_databases) as loop_var.
+
+# SYS password: same lookup as oradb_facts (dbpasswords[db_name]['sys'] or default_dbpass)
+_oradb_standby_sys_password: "{{ _db_password_cdb }}"
+
+_oradb_standby_unique_name: >-
+  {{ _odb_standby_member.db_unique_name | default(odb.oracle_db_unique_name | default(odb.oracle_db_name)) }}
+
+_oradb_standby_connect_identifier: "{{ _odb_standby_member.dg.connect_identifier | default('') }}"
+
+# address of the standby database from its connect_identifier in oracle_tnsnames_config
+_oradb_standby_address: >-
+  {{ (oracle_tnsnames_config[_oradb_standby_connect_identifier].address | default([]) + [{}]) | first }}
+_oradb_standby_host: "{{ _oradb_standby_address.host | default(oracle_hostname) }}"
+_oradb_standby_port: "{{ _oradb_standby_address.port | default(_listener_port_cdb) }}"
+
+# static service of the listener (listener_name in oracle_databases) for the instance in NOMOUNT
+_oradb_standby_aux_connect: "//{{ _oradb_standby_host }}:{{ _oradb_standby_port }}/{{ _oradb_standby_unique_name }}_DGMGRL"
+
+_oradb_standby_create_tasks_file: >-
+  {{ _odb_standby_member.dg.create_tasks_file
+     | default(_odb_standby_config.dg.create_tasks_file | default('')) }}
+
+# member of the primary database (connect_identifier from primary_detect.yml)
+_oradb_standby_primary_member: >-
+  {{ (_odb_standby_others | selectattr('dg', 'defined')
+      | selectattr('dg.connect_identifier', 'defined')
+      | selectattr('dg.connect_identifier', 'equalto', _oradb_standby_primary_ci | default(''))
+      | list + [{}]) | first }}
+
+# db_create_file_dest for the controlfile of the standby database
+_oradb_standby_file_dest: >-
+  {{ (odb.init_parameters | default([]) | selectattr('name', 'equalto', 'db_create_file_dest')
+      | map(attribute='value') | list + [odb.datafile_dest | default('')]) | first }}
+# file destinations of the database (OMF, FRA) and audit_file_dest, diagnostic_dest
+# for the message of a failed DUPLICATE (the directories are created by orasw_meta/standby_prepare.yml)
+_oradb_standby_directories: >-
+  {{ ([odb.datafile_dest | default(''), odb.recoveryfile_dest | default('')]
+      + (odb.init_parameters | default([])
+         | selectattr('name', 'defined')
+         | selectattr('name', 'match', '^(db_create_file_dest|db_create_online_log_dest_[0-9]+|db_recovery_file_dest'
+                                       ~ '|audit_file_dest|diagnostic_dest)$')
+         | map(attribute='value', default='') | map('string') | list))
+     | select | map('trim') | select | unique | list }}
+
+_oradb_standby_control_file: >-
+  {{ _oradb_standby_file_dest }}/{{ _oradb_standby_unique_name }}/controlfile/control01.ctl
+
+# Parameters for SPFILE ... SET of RMAN DUPLICATE (the SPFile of the primary is cloned):
+# - init_parameters of the standby in oracle_databases: state present, scope not memory, sid '*'
+#   (RMAN SET has no SID clause)
+# - control_files: from init_parameters or <db_create_file_dest>/<db_unique_name>/controlfile/control01.ctl
+# - local_listener: from init_parameters, otherwise empty
+#   (the value of the primary is usually a TNS alias that does not exist on the standby host)
+# - db_unique_name: always from the member
+_oradb_standby_spfile_params: >-
+  {%- set __p = {'control_files': _oradb_standby_control_file | trim, 'local_listener': ''} -%}
+  {%- for ip in odb.init_parameters | default([])
+        if ip.state | default('present') == 'present'
+           and ip.scope | default('both') != 'memory'
+           and ip.sid | default('*') == '*'
+           and ip.value is defined -%}
+  {%-   set _ = __p.update({ip.name | lower: ip.value | string}) -%}
+  {%- endfor -%}
+  {%- set _ = __p.update({'db_unique_name': _oradb_standby_unique_name | trim}) -%}
+  {{ __p }}
+
+# Parameters of the PFile for NOMOUNT in addition to db_name: audit_file_dest and diagnostic_dest
+# from init_parameters (same filter as SET of DUPLICATE). Without them the instance uses the defaults
+# (e.g. ORACLE_BASE/admin/<db_name>/adump) and the start fails when they cannot be written.
+_oradb_standby_nomount_params: >-
+  {{ _oradb_standby_spfile_params
+     | dict2items | selectattr('key', 'in', ['audit_file_dest', 'diagnostic_dest'])
+     | items2dict }}
+
+# ORACLE_BASE/admin/<db_unique_name>/pfile:
+# - dgmgrl.cfg: Data Guard Broker configuration file (dgmgrl script)
+# - init<SID>_duplicate.ora: PFile for the auxiliary instance in NOMOUNT (RMAN DUPLICATE)
+#   => an existing PFile in the dbs directory is not overwritten, kept for a manual repeat of RMAN DUPLICATE
+_oradb_standby_admin_dir: "{{ oracle_base }}/admin/{{ _oradb_standby_unique_name | trim }}"
+_oradb_standby_pfile_dir: "{{ _oradb_standby_admin_dir }}/pfile"
+_oradb_standby_dgmgrl_cfg: "{{ _oradb_standby_pfile_dir }}/dgmgrl.cfg"
+_oradb_standby_nomount_pfile: "{{ _oradb_standby_pfile_dir }}/init{{ _orasw_meta_standby_sid }}_duplicate.ora"
+# RMAN DUPLICATE without passwords: RMAN script and shell script (SYS password from ORADB_STANDBY_SYS_PASSWORD)
+_oradb_standby_rman_script: "{{ _oradb_standby_pfile_dir }}/duplicate_{{ _oradb_standby_unique_name | trim }}.rman"
+_oradb_standby_rman_shell: "{{ _oradb_standby_pfile_dir }}/duplicate_{{ _oradb_standby_unique_name | trim }}.sh"
+_oradb_standby_rman_log: "{{ oradb_standby_rman_logdir }}/duplicate_{{ _oradb_standby_unique_name | trim }}.log"
+_oradb_standby_protection_mode: "{{ _odb_standby_config.dg.protection_mode | default('MaxPerformance') }}"
+
+# Current role of all other members from oradb_facts (hostvars of the hosts of each member):
+# [{db_unique_name, host, database_role, state}]
+_oradb_standby_member_roles: >-
+  {%- set __roles = [] -%}
+  {%- for m in _odb_standby_others -%}
+  {%-   for h in m.hosts | default([]) -%}
+  {%-     set __f = hostvars[h]['oracledb_facts'][m.db_unique_name] | default({}) if h in hostvars else {} -%}
+  {%-     set _ = __roles.append({'db_unique_name': m.db_unique_name, 'host': h,
+                                  'database_role': __f.database_role | default(''),
+                                  'state': __f.state | default('no facts')}) -%}
+  {%-   endfor -%}
+  {%- endfor -%}
+  {{ __roles }}
+
+# role of the local database from oradb_facts
+_oradb_standby_local_role: >-
+  {{ oracledb_facts[_oradb_standby_unique_name | trim]['database_role'] | default('') }}

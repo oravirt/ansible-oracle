@@ -1,0 +1,31 @@
+---
+# @var oradb_standby_rman_parallel:description: >
+# Number of RMAN channels on the primary and on the standby database
+# for `create_method: rman_duplicate_active`.
+# @end
+oradb_standby_rman_parallel: 2
+
+# @var oradb_standby_rman_compressed:description: >
+# Use `USING COMPRESSED BACKUPSET` for `DUPLICATE ... FROM ACTIVE DATABASE`.
+# `false` uses `USING BACKUPSET`.
+# @end
+oradb_standby_rman_compressed: true
+
+# @var oradb_standby_rman_logdir:description: >
+# Directory for the logfiles of RMAN `DUPLICATE`.
+# @end
+oradb_standby_rman_logdir: "{{ oracle_base }}/cfgtoollogs/oradb_standby"
+
+# @var oradb_standby_start_apply:description: >
+# Start Redo Apply (`RECOVER MANAGED STANDBY DATABASE DISCONNECT`) after the creation
+# of the standby database.
+# @end
+oradb_standby_start_apply: true
+
+# @var oradb_standby_broker_create:description: >
+# Create the Data Guard Broker configuration with `dgmgrl.cfg` on the host of the primary database,
+# when no broker configuration exists and all other members are physical standby databases.
+#
+# `false`: `dgmgrl.cfg` is created on all members, but not executed.
+# @end
+oradb_standby_broker_create: true

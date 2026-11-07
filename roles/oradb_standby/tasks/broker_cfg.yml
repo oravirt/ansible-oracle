@@ -1,0 +1,23 @@
+---
+# dgmgrl script for the creation of the Data Guard Broker configuration.
+# Each member gets its own file with the local database as primary database:
+# the file is valid on the host, where the database is the PRIMARY at execution time.
+# The content depends on the inventory only => identical on every run, independent of the current role.
+# only missing directories are created (incl. dg_broker_config_file1/2)
+- name: Broker cfg | Directories of database
+  ansible.builtin.include_role:
+    name: orasw_meta
+    tasks_from: standby_prepare.yml
+  vars:
+    orasw_meta_standby_prepare_dirs:
+      - "{{ _oradb_standby_admin_dir }}"
+      - "{{ _oradb_standby_pfile_dir }}"
+
+- name: Broker cfg | dgmgrl configuration file
+  ansible.builtin.template:
+    src: dgmgrl.cfg.j2
+    dest: "{{ _oradb_standby_dgmgrl_cfg }}"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: "0640"
+  become: true

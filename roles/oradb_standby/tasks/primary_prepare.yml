@@ -1,0 +1,58 @@
+---
+# Prepare the primary database for a standby database (executed from the standby host).
+# Idempotent: changes only differing settings.
+# - FORCE LOGGING
+# - Standby redo logs: (number of online redo log groups + 1) per thread, size of the largest
+#   online redo log (OMF: db_create_online_log_dest_n or db_create_file_dest is needed)
+# The standby redo logs are created on the standby database by RMAN DUPLICATE.
+# LOG_ARCHIVE_CONFIG, FAL_SERVER and LOG_ARCHIVE_DEST_n are set by the Data Guard Broker (dgmgrl).
+# STANDBY_FILE_MANAGEMENT is set from init_parameters (oradb_manage_parameters, SET in RMAN DUPLICATE).
+- name: Primary prepare | Prepare primary database
+  ansible.builtin.shell: |
+    set -u
+    # unquoted EOF for ORADB_STANDBY_PW => \$ for v$ views
+    "${ORACLE_HOME}/bin/sqlplus" -S -L /nolog <<EOF
+    whenever sqlerror exit failure
+    connect sys/"${ORADB_STANDBY_PW}"@{{ _oradb_standby_primary_ci }} as sysdba
+    set serveroutput on feedback off heading off
+    declare
+      v_val varchar2(4000);
+      v_cnt number;
+      procedure changed(p_msg varchar2) is
+      begin
+        dbms_output.put_line('CHANGED: ' || p_msg);
+      end;
+    begin
+      select database_role into v_val from v\$database;
+      if v_val != 'PRIMARY' then
+        raise_application_error(-20001, 'Database is not a primary database: ' || v_val);
+      end if;
+      select force_logging into v_val from v\$database;
+      if v_val != 'YES' then
+        execute immediate 'alter database force logging';
+        changed('force logging');
+      end if;
+      for t in (select thread#, count(*) cnt, max(bytes) bytes from v\$log group by thread#) loop
+        select count(*) into v_cnt from v\$standby_log where thread# = t.thread#;
+        for i in v_cnt + 1 .. t.cnt + 1 loop
+          execute immediate 'alter database add standby logfile thread ' || t.thread# || ' size ' || t.bytes;
+          changed('standby logfile thread ' || t.thread# || ' size ' || t.bytes);
+        end loop;
+      end loop;
+    end;
+    /
+    EOF
+  args:
+    executable: /bin/bash
+  environment: "{{ _oracle_env | combine({'ORADB_STANDBY_PW': _oradb_standby_sys_password}) }}"
+  vars:
+    db_user: sys
+  become: true
+  become_user: "{{ oracle_user }}"
+  register: _oradb_standby_prepare
+  changed_when: "'CHANGED:' in _oradb_standby_prepare.stdout"
+
+- name: Primary prepare | Result
+  ansible.builtin.debug:
+    msg: "{{ _oradb_standby_prepare.stdout_lines | select('match', '^CHANGED:') | list }}"
+  when: "'CHANGED:' in _oradb_standby_prepare.stdout"

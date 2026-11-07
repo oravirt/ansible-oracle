@@ -1,0 +1,22 @@
+-- Managed by ansible-oracle (oradb_standby) - do not edit
+--
+-- Data Guard Broker configuration {{ _odb_standby_config.name }}
+-- Valid when {{ _oradb_standby_unique_name }} on {{ inventory_hostname }} is the PRIMARY database.
+-- Each member has its own file with itself as primary database.
+--
+-- Requirements: dg_broker_start=TRUE on all members, no existing broker configuration
+-- Usage:        dgmgrl / "@{{ _oradb_standby_dgmgrl_cfg }}"
+--
+CREATE CONFIGURATION '{{ _odb_standby_config.name }}' AS PRIMARY DATABASE IS '{{ _oradb_standby_unique_name }}' CONNECT IDENTIFIER IS '{{ _oradb_standby_connect_identifier }}';
+{% for m in _odb_standby_others %}
+ADD DATABASE '{{ m.db_unique_name }}' AS CONNECT IDENTIFIER IS '{{ m.dg.connect_identifier }}';
+{% endfor %}
+{% for m in [_odb_standby_member] + _odb_standby_others %}
+EDIT DATABASE '{{ m.db_unique_name }}' SET PROPERTY 'LogXptMode'='{{ m.dg.log_xpt_mode | default('ASYNC') }}';
+EDIT DATABASE '{{ m.db_unique_name }}' SET PROPERTY 'DelayMins'={{ m.dg.delay_mins | default(0) | int }};
+{% endfor %}
+ENABLE CONFIGURATION;
+{% if _oradb_standby_protection_mode != 'MaxPerformance' %}
+EDIT CONFIGURATION SET PROTECTION MODE AS {{ _oradb_standby_protection_mode }};
+{% endif %}
+SHOW CONFIGURATION;

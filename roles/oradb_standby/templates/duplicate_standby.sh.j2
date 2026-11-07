@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Managed by ansible-oracle (oradb_standby)
+#
+# RMAN DUPLICATE ... FOR STANDBY of {{ _oradb_standby_unique_name | trim }}
+# from the primary database {{ _oradb_standby_primary_member.db_unique_name }} ({{ _oradb_standby_primary_ci }}).
+# Used by Ansible and for a manual repeat on this host.
+#
+# Requirements:
+# - auxiliary instance in NOMOUNT:
+#   startup nomount pfile='{{ _oradb_standby_nomount_pfile }}'
+# - SYS password in ORADB_STANDBY_SYS_PASSWORD (not stored in this script):
+#   read -rs ORADB_STANDBY_SYS_PASSWORD; export ORADB_STANDBY_SYS_PASSWORD
+#   Without ORADB_STANDBY_SYS_PASSWORD the password is read from stdin, when stdin is not a terminal
+#   (used by Ansible: the environment of a task is visible in the process list with become).
+#
+# Usage: {{ _oradb_standby_rman_shell }}
+# Log:   {{ _oradb_standby_rman_log }}
+set -euo pipefail
+
+if [ -z "${ORADB_STANDBY_SYS_PASSWORD:-}" ] && [ ! -t 0 ] ; then
+  # || true: read returns 1 for a last line without newline (set -e)
+  IFS= read -r ORADB_STANDBY_SYS_PASSWORD || true
+fi
+: "${ORADB_STANDBY_SYS_PASSWORD:?Set ORADB_STANDBY_SYS_PASSWORD to the SYS password}"
+
+export ORACLE_HOME="{{ _oracle_home_db }}"
+export ORACLE_SID="{{ _orasw_meta_standby_sid }}"
+export LD_LIBRARY_PATH="${ORACLE_HOME}/lib"
+logfile="{{ _oradb_standby_rman_log }}"
+
+# connections from stdin => the password is not visible in the process list,
+# RMAN writes 'connect target *' into the logfile.
+# || rc=$?: no exit by set -e => message with the logfile below
+rc=0
+"${ORACLE_HOME}/bin/rman" log="${logfile}" <<RMAN_EOF || rc=$?
+connect target 'sys/"${ORADB_STANDBY_SYS_PASSWORD}"@{{ _oradb_standby_primary_ci }}';
+connect auxiliary 'sys/"${ORADB_STANDBY_SYS_PASSWORD}"@{{ _oradb_standby_aux_connect }}';
+@{{ _oradb_standby_rman_script }}
+RMAN_EOF
+
+# RMAN may return 0 for errors in a script called with @ => check the logfile
+if [ "${rc}" -ne 0 ] || grep -q "RMAN-00569" "${logfile}" ; then
+  echo "RMAN DUPLICATE failed (rc=${rc}), see ${logfile}" >&2
+  exit 1
+fi
+echo "RMAN DUPLICATE finished, see ${logfile}"

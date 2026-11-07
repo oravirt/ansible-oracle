@@ -1,0 +1,32 @@
+---
+# Find the primary database from the facts of the other members (oradb_facts):
+# oracledb_facts[<db_unique_name>].database_role of the hosts of each member.
+# The hosts of the primary must be part of the play (oradb_facts runs in oradb_manage_db).
+# _oradb_standby_member_roles: vars/main.yml
+- name: Primary detect | Set primary database
+  ansible.builtin.set_fact:
+    _oradb_standby_primary_ci: >-
+      {{ (_odb_standby_others
+          | selectattr('db_unique_name', 'in', _oradb_standby_primary_names)
+          | map(attribute='dg', default={}) | map(attribute='connect_identifier', default='')
+          | list + ['']) | first }}
+  vars:
+    _oradb_standby_primary_names: >-
+      {{ _oradb_standby_member_roles | selectattr('database_role', 'equalto', 'PRIMARY')
+         | map(attribute='db_unique_name') | unique | list }}
+
+- name: Primary detect | Assert primary database
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - >-
+        _oradb_standby_member_roles | selectattr('database_role', 'equalto', 'PRIMARY')
+        | map(attribute='db_unique_name') | unique | list | length == 1
+      - _oradb_standby_primary_member | length > 0
+    fail_msg: >-
+      Exactly 1 primary database is needed for the creation of {{ _oradb_standby_unique_name }}.
+      The hosts of the primary database must be part of the play (oradb_facts).
+      Facts of the other members: {{ _oradb_standby_member_roles }}
+    success_msg: >-
+      Primary database: {{ _oradb_standby_primary_member.db_unique_name | default('') }}
+      ({{ _oradb_standby_primary_ci }})
