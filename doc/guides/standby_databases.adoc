@@ -1,0 +1,593 @@
+:toc:
+:toc-placement!:
+:toclevels: 4
+toc::[]
+
+:sectnums:
+:sectnumlevels: 4
+
+== Standby Databases
+
+IMPORTANT: Standby databases are *experimental* in `ansible-oracle`
+(https://github.com/oravirt/ansible-oracle/issues/65[Issue #65]). +
+Implemented: inventory structure with asserts, creation of a physical standby database
+and of the Data Guard Broker configuration (role `oradb_standby`).
+See <<_open_points>> for missing features. Variable names and attributes may change.
+
+The inventory structure is shared by different standby technologies:
+
+- Oracle Data Guard (`type: dataguard`)
+- Dbvisit StandbyMP (`type: dbvisit`) - reserved, not planned for the first implementation
+
+Attributes that apply to every technology are defined at the top level.
+Attributes for one technology are placed in a sub-dictionary named after it
+(`dg` for Data Guard, `dbvisit` for Dbvisit).
+No additional variables are needed when a new technology is added.
+
+Only Oracle Database 19c and newer are supported.
+
+=== Overview
+
+[options="header"]
+|=======================
+|Variable |Location |Description
+|`db_standby_config` | `group_vars` of all members | Standby configurations with technology, members and topology
+|`oracle_databases[].standby_config` | `host_vars` | Reference from a database to an entry in `db_standby_config`
+|`oracle_databases[].oracle_db_unique_name` | `host_vars` | `db_unique_name` of the local member
+|`oracle_tnsnames_config` / `tnsnames_installed` | `group_vars` | TNS aliases for redo transport, broker and RMAN duplicate
+|`oracle_listeners_config` / `listener_installed` | `group_vars` / `host_vars` | Listener with static entries for the instances
+|=======================
+
+`db_standby_config` must be identical on all members of a configuration.
+Each member needs the complete topology, e.g. for `log_archive_config`, `fal_server`
+or `ADD DATABASE` in the broker.
+The topology is never collected from `hostvars` of other hosts.
+Only the current role of the other members (`database_role` from `oradb_facts`) is read from `hostvars`.
+
+=== db_standby_config
+
+List of standby configurations.
+
+.Attributes of a standby configuration
+[options="header"]
+|=======================
+|Attribute |Mandatory |Description
+|`name` | yes | Name of the configuration. Referenced by `oracle_databases[].standby_config`. Used as name of the broker configuration for Data Guard.
+|`type` | yes | `dataguard` or `dbvisit`. No default value.
+|`members` | yes | List of members, see below.
+|`dg` | no | Data Guard attributes of the configuration. Only allowed with `type: dataguard`.
+|`dbvisit` | no | Dbvisit attributes of the configuration. Only allowed with `type: dbvisit`.
+|=======================
+
+.Attributes of a member
+[options="header"]
+|=======================
+|Attribute |Mandatory |Description
+|`hosts` | yes | List of `inventory_hostname` of the member. More than 1 host for RAC.
+|`db_unique_name` | `dataguard`: yes, `dbvisit`: no | `db_unique_name` of the member. Default for `dbvisit`: `oracle_db_name`.
+|`initial_role` | yes | `primary` or `physical_standby`. Used during creation only, see <<_initial_role>>.
+|`dg` | no | Data Guard attributes of the member. Only allowed with `type: dataguard`.
+|`dbvisit` | no | Dbvisit attributes of the member. Only allowed with `type: dbvisit`.
+|=======================
+
+==== Data Guard attributes (`dg`)
+
+.Configuration (`db_standby_config[].dg`)
+[options="header"]
+|=======================
+|Attribute |Default |Description
+|`protection_mode` | `MaxPerformance` | `MaxPerformance`, `MaxAvailability` or `MaxProtection`
+|`create_method` | `rman_duplicate_active` | Default method for the creation of the standby databases, see <<_creation_of_a_standby_database>>
+|`create_tasks_file` | - | Tasks file for `create_method: custom`
+|=======================
+
+.Member (`db_standby_config[].members[].dg`)
+[options="header"]
+|=======================
+|Attribute |Default |Description
+|`connect_identifier` | - | TNS alias from `oracle_tnsnames_config`. Used for redo transport and as broker property `DGConnectIdentifier`.
+|`log_xpt_mode` | `ASYNC` | Broker property `LogXptMode`: `ASYNC`, `SYNC` or `FASTSYNC`
+|`delay_mins` | `0` | Broker property `DelayMins` (delay of redo apply in minutes)
+|`create_method` | `create_method` of the configuration | Method for the creation of this standby database
+|`create_tasks_file` | `create_tasks_file` of the configuration | Tasks file for `create_method: custom`
+|=======================
+
+NOTE: `MaxAvailability` and `MaxProtection` need `SYNC` or `FASTSYNC` for at least one standby member.
+
+==== Dbvisit attributes (`dbvisit`)
+
+Reserved for a later implementation.
+
+=== oracle_databases
+
+A database becomes a member of a standby configuration with the attribute `standby_config`.
+
+.Additional attributes in `oracle_databases`
+[options="header"]
+|=======================
+|Attribute |Description
+|`standby_config` | `name` of an entry in `db_standby_config`. The type is inherited from that entry.
+|`oracle_db_unique_name` | Mandatory for `type: dataguard`. Must match `db_unique_name` of the local member.
+|`listener_name` | Mandatory for `type: dataguard`. Adds the static entries for the instance to `listener.ora`, including `<db_unique_name>_DGMGRL` (used by RMAN `DUPLICATE` and the broker). See link:../../roles/oradb_manage_db/LISTENER.md[LISTENER.md].
+|=======================
+
+All technology specific attributes of a database are defined in its member in `db_standby_config`
+(e.g. `members[].dg.connect_identifier`), not in `oracle_databases`.
+
+=== Assignment of a database to a member
+
+The member of a database is found by the following rules:
+
+. Search all members of the referenced configuration with `inventory_hostname` in `hosts`.
+. When more than 1 member matches (e.g. primary and standby on the same host),
+  the member with `db_unique_name` = `oracle_db_unique_name` is used.
+. Exactly 1 member must match. Otherwise the play fails.
+
+[options="header"]
+|=======================
+|Setup |Unique by
+|Data Guard, different hosts | host
+|Data Guard, same host | host + `db_unique_name`
+|Dbvisit (same `db_unique_name` on all members) | host
+|RAC | host (more than 1 entry in `hosts`)
+|=======================
+
+[[_initial_role]]
+=== initial_role
+
+`initial_role` is only used when a member is created:
+
+- `primary`: the database is created with `dbca`.
+- `physical_standby`: the database is created as standby of the primary.
+
+The role is never enforced afterwards.
+After a switchover or failover the inventory is *not* changed and `ansible-oracle` does not switch back.
+All decisions at runtime are based on `database_role` from `v$database`.
+
+`oradb_manage_db` does not execute `oracle_db` (`dbca`) for a database of a standby configuration, when
+
+- the instance is running and `database_role` is not `PRIMARY`, or
+- the instance is not running/mounted and `initial_role` of the member is `physical_standby`.
+
+Listener, `tnsnames.ora`, `oratab` and the systemd units are configured for all members.
+
+Before `dbca`, `oradb_manage_db` creates the missing directories of a database with `standby_config`
+(`orasw_meta/tasks/standby_prepare.yml`): file destinations, `audit_file_dest`, `diagnostic_dest`
+and the directories of `dg_broker_config_file1/2` from `init_parameters`.
+`oradb_manage_parameters` sets `dg_broker_start=TRUE` on the primary before `oradb_standby` is executed,
+the broker configuration files must be accessible at this time.
+Existing directories are not changed (owner, group and mode are kept).
+
+The systemd unit of a database with `standby_config` uses `ORACLE_START_MODE=auto`:
+the database is started in `MOUNT` and only a `PRIMARY` database is opened.
+A physical standby database is never opened read only by the autostart (no Active Data Guard).
+
+[IMPORTANT]
+====
+Standby databases are supported with the systemd units of `oradb_manage_db` only
+(`autostartup_service_mode: units`, default since 5.0.0).
+
+The `legacy` solution (`oracle-rdbms.service` with `dbstart`) does not know `ORACLE_START_MODE=auto`:
+it opens every database, a physical standby database is opened read only
+(Active Data Guard, separate license).
+====
+
+`oradb_facts` stores `database_role` in `oracledb_facts[<db_unique_name>]`.
+`state` is `present` for a `PRIMARY` database only and `standby` for all other roles.
+All roles which check `state == 'present'` (e.g. `oradb_manage_pdb`, `oradb_manage_redo`,
+`oradb_manage_users`) skip a standby database.
+`oradb_manage_parameters` changes the `init_parameters` of `oracle_databases` on a standby database too
+(`state: standby`), but not the parameters of PDBs and without a restart for `scope: spfile`.
+A database of a standby configuration that is not reachable (e.g. not created yet) gets `state: unreachable`
+without a failure of `oradb_facts`.
+
+[[_creation_of_a_standby_database]]
+=== Creation of a standby database
+
+The role `oradb_standby` (playbook `manage_db.yml`, after `oradb_manage_parameters`, only when `db_standby_config` is not empty) creates a missing standby database:
+a member with `initial_role: physical_standby` without an SPFile of the instance.
+An existing database is never changed by `oradb_standby`.
+
+.create_method
+[options="header"]
+|=======================
+|Method |Description
+|`rman_duplicate_active` | RMAN `DUPLICATE TARGET DATABASE FOR STANDBY FROM ACTIVE DATABASE USING COMPRESSED BACKUPSET` from the standby host (default)
+|`external` | The standby database is created outside of `ansible-oracle`. A warning is shown while the database is missing.
+|`custom` | The tasks file `create_tasks_file` is included. The result must be a mounted physical standby database.
+|=======================
+
+The SPFile of the standby database is created by `rman_duplicate_active` only.
+With `external` and `custom` the SPFile is the responsibility of the DBA.
+
+Steps for `rman_duplicate_active` and `custom`:
+
+. The primary database is searched in the facts of the other members:
+  `hostvars[<host>].oracledb_facts[<db_unique_name>].database_role` = `PRIMARY` (`oradb_facts`).
+  The hosts of the primary database must be part of the play.
+. The primary database is prepared over its `connect_identifier` (idempotent):
+  `FORCE LOGGING`
+  and standby redo logs (number of online redo log groups + 1 per thread, OMF is needed).
+  `log_archive_config`, `fal_server` and `log_archive_dest_n` are set by the Data Guard Broker (`dgmgrl`).
+. The standby database is created with the method.
+. The result is checked: SPFile exists and `database_role` = `PHYSICAL STANDBY`.
+
+Details of `rman_duplicate_active`:
+
+- Password file in `orabaseconfig/dbs`, PFile in `$ORACLE_BASE/admin/<db_unique_name>/pfile/init<SID>_duplicate.ora`
+  (an existing PFile in `dbs` is not overwritten), instance in `NOMOUNT`.
+  The PFile contains `db_name` and `audit_file_dest`, `diagnostic_dest` from `init_parameters` (when defined).
+  Without them the instance uses the defaults (e.g. `$ORACLE_BASE/admin/<db_name>/adump`) and the start fails,
+  when these directories cannot be written.
+  The PFile is kept after `DUPLICATE` for a manual repeat of RMAN `DUPLICATE` on the host.
+- `target`: `connect_identifier` of the primary, `auxiliary`: `//<host>:<port>/<db_unique_name>_DGMGRL`
+  (host and port from `oracle_tnsnames_config` of the `connect_identifier` of the standby)
+- The SPFile of the primary is cloned (`SPFILE PARAMETER_VALUE_CONVERT '<primary db_unique_name>','<standby db_unique_name>'`).
+  Different or additional parameters of the standby are read from `init_parameters` of the standby database
+  in `oracle_databases` (`state: present`, `scope` not `memory`, `sid` `*`) and set with `SET`.
+  The role sets in addition:
+  * `db_unique_name` of the member (always)
+  * `control_files`: `<db_create_file_dest>/<db_unique_name>/controlfile/control01.ctl`, unless defined in `init_parameters`
+  * `local_listener`: empty, unless defined in `init_parameters`.
+    The value of the primary is usually a TNS alias (e.g. `LISTENER_<SID>` from `dbca`), which does not exist on the standby host.
+    An empty `local_listener` registers the instance at the default listener (local host, port 1521).
+- Missing directories of `datafile_dest`, `recoveryfile_dest` and `db_create_file_dest`, `db_create_online_log_dest_n`,
+  `db_recovery_file_dest`, `audit_file_dest`, `diagnostic_dest`, `dg_broker_config_file1/2` from `init_parameters`
+  are created before `NOMOUNT`. Existing directories are not changed (owner, group and mode are kept).
+  Parameters of the cloned SPFile that are not defined in `init_parameters` keep the value of the primary
+  (after `PARAMETER_VALUE_CONVERT`): their directories must exist on the standby host.
+- A failed `DUPLICATE` stops the auxiliary instance and removes the SPFile created by `DUPLICATE`.
+  The next run starts a new `DUPLICATE`.
+- RMAN script `duplicate_<db_unique_name>.rman` and shell script `duplicate_<db_unique_name>.sh`
+  in `$ORACLE_BASE/admin/<db_unique_name>/pfile`, without passwords.
+  The shell script reads the SYS password from the environment variable `ORADB_STANDBY_SYS_PASSWORD`
+  (or from stdin, when the variable is not set and stdin is not a terminal)
+  and passes the connections with stdin to RMAN (not visible in the process list, `connect target *` in the logfile).
+  Ansible uses the same scripts and passes the password with stdin, because the environment of a task with `become`
+  is visible in the process list. Both files are kept for a manual repeat on the host:
++
+----
+sqlplus / as sysdba <<< "startup nomount pfile='$ORACLE_BASE/admin/<db_unique_name>/pfile/init<SID>_duplicate.ora'"
+read -rs ORADB_STANDBY_SYS_PASSWORD; export ORADB_STANDBY_SYS_PASSWORD
+$ORACLE_BASE/admin/<db_unique_name>/pfile/duplicate_<db_unique_name>.sh
+----
++
+  The logfile is in `oradb_standby_rman_logdir`.
+- Redo Apply is started after `DUPLICATE` (`oradb_standby_start_apply`).
+
+IMPORTANT: `local_listener` of the standby database is empty after `DUPLICATE`, unless it is defined in `init_parameters`
+of the standby database in `oracle_databases`. +
+The DBA is responsible for the inventory: a listener with a different address or port than the default
+(local host, port 1521) needs `local_listener` in `init_parameters` of the standby database.
+Otherwise the instance is not registered at the listener and the dynamic services (e.g. `<db_unique_name>`) are missing.
+
+TIP: Define `local_listener` with EZConnect in `init_parameters` of all members, e.g.
+`- {name: local_listener, value: '//dbhost1:1521', scope: both, state: present}`. +
+The primary gets a clean value instead of the alias `LISTENER_<SID>` from `dbca` (set by `oradb_manage_parameters`),
+the standby gets its own value with `SET` in RMAN `DUPLICATE`.
+
+The SYS password is read from `dbpasswords[<oracle_db_name>]['sys']` or `default_dbpass`, like `dbca` in `oradb_manage_db`.
+
+=== Data Guard Broker configuration file
+
+`oradb_standby` creates a `dgmgrl` script for each database with `type: dataguard`:
+`$ORACLE_BASE/admin/<db_unique_name>/pfile/dgmgrl.cfg`.
+
+Each member gets its own file with the *local* database as primary database.
+The file is valid on the host where the database is the `PRIMARY` at execution time
+(e.g. after a switchover the file on the new primary is used).
+The content depends on the inventory only, not on the current role => it is identical on every run.
+
+.Content
+- `CREATE CONFIGURATION '<name>' AS PRIMARY DATABASE IS '<local db_unique_name>' CONNECT IDENTIFIER IS '<connect_identifier>'`
+- `ADD DATABASE ... MAINTAINED AS PHYSICAL` for all other members
+- `EDIT DATABASE ... SET PROPERTY` `LogXptMode` (`log_xpt_mode`) and `DelayMins` (`delay_mins`) for all members
+- `ENABLE CONFIGURATION`
+- `EDIT CONFIGURATION SET PROTECTION MODE` (only when `protection_mode` is not `MaxPerformance`)
+- `SHOW CONFIGURATION`
+
+.Usage on the host of the primary database
+----
+dgmgrl / "@$ORACLE_BASE/admin/<db_unique_name>/pfile/dgmgrl.cfg"
+----
+
+Requirements: `dg_broker_start=TRUE` on all members and no existing broker configuration.
+
+IMPORTANT: `dg_broker_config_file1`, `dg_broker_config_file2`, `dg_broker_start` and `standby_file_management`
+must be defined in `init_parameters` of all members (`state: present`, `sid: '*'`).
+`orasw_meta` checks this with an assert at the start of every play (before `oradb_manage_parameters`):
+
+[source,yaml]
+----
+init_parameters:
+  # before dg_broker_start: the files cannot be changed while the broker is running
+  # read-only ORACLE_HOME: ORACLE_BASE/dbs (location of SPFile and password file)
+  - {name: dg_broker_config_file1, value: '/u01/app/oracle/dbs/dr1<db_unique_name>.dat', scope: both, state: present, dbca: false}
+  - {name: dg_broker_config_file2, value: '/u01/app/oracle/dbs/dr2<db_unique_name>.dat', scope: both, state: present, dbca: false}
+  - {name: dg_broker_start, value: 'TRUE', scope: both, state: present, dbca: false}
+  - {name: standby_file_management, value: 'AUTO', scope: both, state: present}
+----
+
+- `dg_broker_config_file1/2` must be different and must not be below the `ORACLE_HOME`:
+  the default (`$ORACLE_HOME/dbs`) is lost with Out-of-Place Patching.
+  Recommendation:
+  * read-only `ORACLE_HOME`: `$ORACLE_BASE/dbs` (`orabaseconfig`, location of SPFile and password file)
+  * read-write `ORACLE_HOME`: `$ORACLE_BASE/admin/<db_unique_name>/dgbroker` (`dbs` is below the `ORACLE_HOME`)
++
+  The directories are created by `oradb_standby`.
+- `dg_broker_start` must be `TRUE`, the value of `standby_file_management` is not checked (e.g. `MANUAL` is allowed).
+
+WARNING: `dg_broker_config_file1/2` can only be changed while the broker is stopped (`dg_broker_start=FALSE`),
+otherwise `ORA-16573: attempt to change or access configuration file for an enabled broker configuration`. +
+`oradb_manage_parameters` changes the parameters in the order of `init_parameters`
+=> `dg_broker_start` must *always* be defined *below* `dg_broker_config_file1` and `dg_broker_config_file2`
+(checked by the assert in `orasw_meta`). +
+When the parameters are added to an existing environment with a running broker, the DBA must stop the broker
+on each member before the next run of `ansible-oracle` (`alter system set dg_broker_start=FALSE`)
+and copy the existing broker configuration files to the new location, if the configuration should be kept.
+The value is set by `oradb_manage_parameters` on the primary and on a mounted standby database
+(`state: standby`), a new standby database gets it with `SET` in RMAN `DUPLICATE`.
+`oradb_standby` executes the file once on the host of the primary database
+(`oradb_standby_broker_create: true`, default), after the creation of the standby databases, when
+
+- the local database is the `PRIMARY` (`oradb_facts`),
+- no broker configuration exists (`show configuration` returns `ORA-16532`) and
+- all other members are `PHYSICAL STANDBY` databases (`oradb_facts` of the hosts of the members).
+  Otherwise a warning is shown, e.g. for a standby database with `create_method: external` that does not exist yet.
+
+An existing broker configuration is never changed.
+Errors in the output of `dgmgrl` (`Error:`, `ORA-`, `Syntax error`, `... was not found`) fail the task,
+all members must be part of the configuration afterwards.
+A warning is shown, when the broker is not available (e.g. `dg_broker_start` not `TRUE`).
+
+[[_role_transitions]]
+=== Role transitions outside of ansible-oracle
+
+IMPORTANT: This section describes the *planned* behavior. Only the current behavior is implemented.
+
+Switchover, failover and Fast-Start Failover are usually executed outside of `ansible-oracle`
+(DBA, broker observer). `ansible-oracle` must handle the result of a role transition on the next run.
+
+.Current behavior after a failover
+- The old primary database needs a reinstatement (`ORA-16661` in the broker configuration).
+- `oradb_standby` does nothing: the database of the old primary has an SPFile and `initial_role: primary`.
+- `oradb_manage_db` skips `oracle_db` while the instance of the old primary is running with a role other than `PRIMARY`.
+- `oradb_manage_db` does not start the systemd unit of a database that is skipped as standby database
+  (it may not exist yet or be damaged), a warning is shown when the instance is not running.
++
+WARNING: When the instance of the old primary is *not* running, its role is unknown and `initial_role` is `primary`
+=> `oracle_db` in `oradb_manage_db` would start and open the database (split brain).
+`oradb_manage_db` must check the facts of the other members before `oracle_db`, see <<_open_points>>.
+
+==== Case 1: Reinstate (automatic, not destructive)
+
+The broker reports `ORA-16661` for a member => `REINSTATE DATABASE '<member>'` on the current primary.
+
+- Requires Flashback Database on the old primary (`flashback: true` in `oracle_databases`).
+- Typical case after a failover, no RMAN `DUPLICATE` needed.
+- Planned switch: `oradb_standby_reinstate`.
+
+==== Case 2: Missing member (automatic, not destructive)
+
+The database of a member does not exist (e.g. a reinstalled server of the old primary)
+and another member is the `PRIMARY` (`oradb_facts`) => the member is created as standby database,
+independent of `initial_role`. `initial_role` is only used for the initial setup (no member is `PRIMARY`).
+
+- `ENABLE DATABASE '<member>'` (or `ADD DATABASE`) in the broker after the creation.
+- `oradb_manage_db` must use the same rule to skip `dbca`.
+
+==== Case 3: Rebuild of an existing standby database (on request only, destructive)
+
+Most frequent case in practice: a reinstatement is not possible (no Flashback Database) or the standby database is damaged.
+
+The rebuild is never executed automatically. It is requested at runtime with the `db_unique_name` of the member,
+never in the inventory (otherwise every run would rebuild the standby database):
+
+----
+ansible-playbook -i <inventory> playbooks/standby_rebuild.yml -e '{"oradb_standby_rebuild": ["DB1_SITE1"]}'
+----
+
+The rebuild uses the current creation of a standby database (`create_method: rman_duplicate_active`).
+`create_method: custom` is not supported for a rebuild at the moment.
+
+.Steps of the rebuild on the host of the member
+[options="header"]
+|=======================
+|Step |Description
+|Checks | The member is not the `PRIMARY` (local state). Another member is the `PRIMARY` (`oradb_facts`). Otherwise the rebuild fails.
+|Broker | `DISABLE DATABASE '<member>'` on the primary (no failure, when the member is already disabled, e.g. after a failover).
+|Autostart | `systemctl stop oracle-db@<SID>` => no restart by systemd.
+|Drop | `shutdown abort`, `startup mount restrict exclusive`, SQL `DROP DATABASE` (data files, redo logs, control files, SPFile with OMF), remove the broker configuration files (`dg_broker_config_file1/2`). Backups and archived redo logs are not removed: backups of a standby database are valid for the whole configuration. A database that cannot be mounted (e.g. lost control files or data files) is not dropped: the SPFile and the broker configuration files are removed, a warning lists the remaining files below the file destinations of the member.
+|Creation | The SPFile does not exist => creation with `rman_duplicate_active`, see <<_creation_of_a_standby_database>>.
+|Broker | `ENABLE DATABASE '<member>'` (or `ADD DATABASE`) on the primary, check of the member in `SHOW CONFIGURATION`.
+|=======================
+
+The playbook `standby_rebuild.yml` executes `oradb_facts` and `oradb_standby` on all hosts of the configuration only:
+`oradb_manage_db` is not executed (see the warning above), the hosts of the primary database must be part of the play.
+
+=== Validation
+
+The rules are checked by the role `orasw_meta` (`roles/orasw_meta/tasks/assert_standby.yml`).
+The asserts can be disabled with `orasw_meta_assert_db_standby_config: false`.
+
+`db_standby_config`:
+
+- `db_standby_config` is a list.
+- `name` is defined and unique in `db_standby_config`.
+- `type` is defined and has an allowed value.
+- Only the sub-dictionary matching `type` is defined (`dg` or `dbvisit`)
+  in the configuration and its members.
+- `members` is a non empty list.
+- `hosts` is a non empty list for each member. Each host exists in the inventory.
+- `initial_role` is `primary` or `physical_standby`. Exactly 1 member has `initial_role: primary`.
+- When the current host is part of a member, at least 1 database in `oracle_databases`
+  references the configuration.
+
+`type: dataguard`:
+
+- `db_unique_name` is defined for each member and unique in the configuration (case insensitive).
+- `protection_mode` is `MaxPerformance`, `MaxAvailability` or `MaxProtection` (case sensitive).
+- `log_xpt_mode` is `ASYNC`, `SYNC` or `FASTSYNC`.
+- `delay_mins` is an integer >= 0.
+- `MaxAvailability` and `MaxProtection` need `SYNC` or `FASTSYNC` for at least 1 member
+  with `initial_role: physical_standby`.
+- `connect_identifier` is defined for each member and exists in `oracle_tnsnames_config`.
+- `create_method` is `rman_duplicate_active`, `external` or `custom`.
+  `custom` needs `create_tasks_file` in the member or in the configuration.
+
+`oracle_databases` with `standby_config`:
+
+- `dg` and `dbvisit` are not defined.
+- `standby_config` references an existing entry.
+- Exactly 1 member matches the database, see <<_assignment_of_a_database_to_a_member>>.
+- `type: dataguard`: `oracle_db_unique_name` and `listener_name` are defined.
+- `oracle_db_unique_name` matches `db_unique_name` of the member (case insensitive).
+  Both default to `oracle_db_name`.
+- `type: dataguard`: `init_parameters` contain `dg_broker_config_file1/2` (different, not below `ORACLE_HOME`),
+  `dg_broker_start=TRUE` below both file parameters and `standby_file_management`.
+
+=== Example: Data Guard with 2 hosts
+
+Hosts `dbhost1` (primary) and `dbhost2` (standby) are members of the group `dg_db1`.
+
+.inventory/hosts.yml
+----
+all:
+  children:
+    dg_db1:
+      hosts:
+        dbhost1:
+        dbhost2:
+----
+
+.inventory/group_vars/dg_db1/standby.yml
+----
+db_standby_config:
+  - name: DG1
+    type: dataguard
+    dg:
+      protection_mode: MaxPerformance
+    members:
+      - hosts: [dbhost1]
+        db_unique_name: DB1_SITE1
+        initial_role: primary
+        dg:
+          connect_identifier: DB1_SITE1
+          log_xpt_mode: ASYNC
+      - hosts: [dbhost2]
+        db_unique_name: DB1_SITE2
+        initial_role: physical_standby
+        dg:
+          connect_identifier: DB1_SITE2
+          log_xpt_mode: ASYNC
+          delay_mins: 0
+
+oracle_tnsnames_config:
+  DB1_SITE1:
+    connect:
+      service_name: DB1_SITE1
+    address:
+      - host: dbhost1
+        port: 1521
+  DB1_SITE2:
+    connect:
+      service_name: DB1_SITE2
+    address:
+      - host: dbhost2
+        port: 1521
+
+tnsnames_installed:
+  - tnsname: DB1_SITE1
+    home: db19-si-ee
+    state: present
+  - tnsname: DB1_SITE2
+    home: db19-si-ee
+    state: present
+----
+
+.inventory/host_vars/dbhost1/databases.yml
+----
+oracle_databases:
+  - home: db19-si-ee
+    oracle_db_name: DB1
+    oracle_db_unique_name: DB1_SITE1
+    listener_name: LISTENER
+    standby_config: DG1
+    init_parameters:
+      - {name: local_listener, value: '//dbhost1:1521', scope: both, state: present}
+      - {name: dg_broker_config_file1, value: '/u01/app/oracle/dbs/dr1DB1_SITE1.dat', scope: both, state: present, dbca: false}
+      - {name: dg_broker_config_file2, value: '/u01/app/oracle/dbs/dr2DB1_SITE1.dat', scope: both, state: present, dbca: false}
+      - {name: dg_broker_start, value: 'TRUE', scope: both, state: present, dbca: false}
+      - {name: standby_file_management, value: 'AUTO', scope: both, state: present}
+    # ... other attributes of oracle_databases
+----
+
+.inventory/host_vars/dbhost2/databases.yml
+----
+oracle_databases:
+  - home: db19-si-ee
+    oracle_db_name: DB1
+    oracle_db_unique_name: DB1_SITE2
+    listener_name: LISTENER
+    standby_config: DG1
+    init_parameters:
+      - {name: local_listener, value: '//dbhost2:1521', scope: both, state: present}
+      - {name: dg_broker_config_file1, value: '/u01/app/oracle/dbs/dr1DB1_SITE2.dat', scope: both, state: present, dbca: false}
+      - {name: dg_broker_config_file2, value: '/u01/app/oracle/dbs/dr2DB1_SITE2.dat', scope: both, state: present, dbca: false}
+      - {name: dg_broker_start, value: 'TRUE', scope: both, state: present, dbca: false}
+      - {name: standby_file_management, value: 'AUTO', scope: both, state: present}
+    # ... other attributes of oracle_databases
+----
+
+`listener_name` adds a static entry for the instance to `listener.ora`
+(see link:../../roles/oradb_manage_db/LISTENER.md[LISTENER.md]).
+The static entry is needed for RMAN duplicate, because the auxiliary instance is in `NOMOUNT`.
+
+[[_open_points]]
+=== Open Points and TODOs
+
+==== Open Points
+
+The following points are not decided yet:
+
+[options="header"]
+|=======================
+|Topic |Description
+|`oracle_db_unique_name` in `host_vars` | `oracle_databases` must be placed in `host_vars`, because `oracle_db_unique_name` differs per member. Alternative: derive it in `orasw_meta` from the member. Then `oracle_databases` could be placed in `group_vars`, but all roles must use the derived value.
+|List vs. dictionary | `db_standby_config` is a list with `name`. `oracle_listeners_config` and `oracle_tnsnames_config` are dictionaries.
+|=======================
+
+==== TODO
+
+* [ ] *Standby redo logs with `oradb_manage_redo`* +
+  The standby redo logs are created by `oradb_standby` on the primary database before `DUPLICATE`
+  (number of online redo log groups + 1 per thread, size of the largest online redo log).
+  They should be managed by `oradb_manage_redo` on all members (primary and standby), based on
+  `redolog_size` and `redolog_groups` in `oracle_databases`. `oradb_manage_redo` skips a standby database at the moment.
+* [ ] *RMAN backups with `oradb_rman`* +
+  Backups depending on the current role of the database (e.g. backups on the standby database only),
+  archivelog deletion policy `APPLIED ON ALL STANDBY` / `SHIPPED TO ALL STANDBY`,
+  RMAN configuration (`db_unique_name` in the RMAN catalog).
+* [ ] *Support for Oracle Restart* +
+  `srvctl add database -role PHYSICAL_STANDBY -startoption MOUNT` for the standby database,
+  SPFile and password file in ASM, no systemd units of `oradb_manage_db`.
+  `standby_state.yml` and `rman_duplicate_active` support databases on filesystem without Oracle Restart only.
+* [ ] *Management of database services* +
+  Role based services with `oradb_manage_services`: services for the role `PRIMARY` or `PHYSICAL_STANDBY`
+  (`srvctl -role` with Oracle Restart, a trigger or the broker for databases on filesystem),
+  e.g. a service for the application on the primary database only.
+* [ ] *Split brain protection in `oradb_manage_db`* +
+  `oracle_db` must not be executed for a member, when another member is the `PRIMARY` (`oradb_facts`),
+  see <<_role_transitions>>.
+* [ ] *Reinstate after a failover* (case 1 in <<_role_transitions>>), `flashback: true` in the molecule scenario.
+* [ ] *Creation of a missing member independent of `initial_role`* (case 2 in <<_role_transitions>>).
+* [ ] *Rebuild of a standby database on request* (case 3 in <<_role_transitions>>):
+  `oradb_standby_rebuild`, `playbooks/standby_rebuild.yml`, molecule test: failover, rebuild, switchover back.
+* [ ] *Changes of an existing broker configuration* +
+  `dgmgrl.cfg` is executed only when no broker configuration exists.
+  Changes of properties, protection mode or new members are not applied to an existing configuration.
+* [ ] *Out-of-Place Patching* +
+  `switch_home.yml` in `oradb_manage_db` starts the database with `startup` => opens a standby database read only.
+  Datapatch must run on the primary database only.
+* [ ] *RAC* +
+  Members with more than 1 host (`hosts`) are allowed by the inventory structure, but not supported by `oradb_standby`.
