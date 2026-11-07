@@ -359,7 +359,7 @@ Defines the standby configurations (Data Guard, Dbvisit).
 Not set by default. Must be identical on all members of a configuration.
 A database is assigned with `standby_config` in `oracle_databases`.
 
-The inventory structure is described in `doc/guides/standby_inventory.adoc`.
+The inventory structure is described in `doc/guides/standby_databases.adoc`.
 
 IMPORTANT! Only the asserts are implemented at the moment.
 

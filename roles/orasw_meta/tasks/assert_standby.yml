@@ -1,5 +1,5 @@
 ---
-# Inventory structure: doc/guides/standby_inventory.adoc
+# Inventory structure: doc/guides/standby_databases.adoc
 - name: Assert standby configuration
   tags:
     - always
@@ -216,5 +216,98 @@
             - item.failed | bool
 
         - name: Fail assert standby_config in oracle_databases
+          ansible.builtin.fail:
+            msg: "See previous debug task for assertation failure"
+
+    # Data Guard requirements in init_parameters of oracle_databases (standby_config type dataguard):
+    # - dg_broker_start: TRUE (Data Guard Broker, dgmgrl.cfg of oradb_standby)
+    # - standby_file_management: defined, the value is not checked (AUTO or MANUAL)
+    # - dg_broker_config_file1/2: defined, different, not below ORACLE_HOME (Out-of-Place Patching)
+    # - dg_broker_start below dg_broker_config_file1/2: oradb_manage_parameters changes the parameters
+    #   in the order of init_parameters, the files cannot be changed while the broker is running
+    # Checked here (start of every play), before oradb_manage_parameters changes the parameters.
+    - name: Assert init_parameters for Data Guard
+      when:
+        - orasw_meta_assert_db_standby_config | bool
+        - oracle_databases is defined
+      block:
+        - name: Assert init_parameters for Data Guard
+          ansible.builtin.assert:
+            quiet: true
+            that:
+              - >-
+                _orasw_meta_sb_init_params | selectattr('name', 'equalto', 'dg_broker_start')
+                | map(attribute='value', default='') | map('string') | map('upper')
+                | select('equalto', 'TRUE') | list | length > 0
+              - >-
+                _orasw_meta_sb_init_params | selectattr('name', 'equalto', 'standby_file_management')
+                | list | length > 0
+              - _orasw_meta_sb_broker_files | length == 2
+              - _orasw_meta_sb_broker_files | unique | length == 2
+              - >-
+                _orasw_meta_sb_broker_files | select('match', '^' ~ (_oracle_home_db | regex_escape) ~ '/')
+                | list | length == 0
+              - _orasw_meta_sb_broker_order | bool
+            fail_msg: >-
+              {{ odb.oracle_db_name }} (standby_config {{ odb.standby_config }}):
+              init_parameters needs dg_broker_start=TRUE, standby_file_management
+              and dg_broker_config_file1/2 (different, not below ORACLE_HOME {{ _oracle_home_db }})
+              (state present, sid '*'), e.g.
+              - {name: dg_broker_config_file1, value: '<ORACLE_BASE>/dbs/dr1<db_unique_name>.dat', scope: both, state: present, dbca: false}
+              - {name: dg_broker_config_file2, value: '<ORACLE_BASE>/dbs/dr2<db_unique_name>.dat', scope: both, state: present, dbca: false}
+              (read-only ORACLE_HOME: ORACLE_BASE/dbs, read-write ORACLE_HOME: ORACLE_BASE/admin/<db_unique_name>/dgbroker)
+              - {name: dg_broker_start, value: 'TRUE', scope: both, state: present, dbca: false}
+              - {name: standby_file_management, value: 'AUTO', scope: both, state: present}
+              dg_broker_start must be defined below dg_broker_config_file1/2.
+              Current values: {{ _orasw_meta_sb_broker_files }}
+          vars:
+            # init_parameters with state present (default) and sid '*' (default)
+            _orasw_meta_sb_init_params: >-
+              {%- set __p = [] -%}
+              {%- for ip in odb.init_parameters | default([])
+                    if ip.name is defined
+                       and ip.state | default('present') == 'present'
+                       and ip.sid | default('*') == '*' -%}
+              {%-   set _ = __p.append(ip) -%}
+              {%- endfor -%}
+              {{ __p }}
+            # dg_broker_start below dg_broker_config_file1/2 in init_parameters
+            _orasw_meta_sb_broker_order: >-
+              {%- set __ns = namespace(start=-1, files=[-1]) -%}
+              {%- for ip in _orasw_meta_sb_init_params -%}
+              {%-   if ip.name | lower == 'dg_broker_start' -%}
+              {%-     set __ns.start = loop.index0 -%}
+              {%-   elif ip.name | lower in ['dg_broker_config_file1', 'dg_broker_config_file2'] -%}
+              {%-     set __ns.files = __ns.files + [loop.index0] -%}
+              {%-   endif -%}
+              {%- endfor -%}
+              {{ __ns.start > __ns.files | max }}
+            _orasw_meta_sb_broker_files: >-
+              {{ _orasw_meta_sb_init_params
+                 | selectattr('name', 'in', ['dg_broker_config_file1', 'dg_broker_config_file2'])
+                 | map(attribute='value', default='') | map('string') | map('trim') | select | list }}
+          loop: >-
+            {{ oracle_databases | selectattr('standby_config', 'defined')
+               | selectattr('state', 'defined') | selectattr('state', 'equalto', 'present') | list }}
+          loop_control:
+            label: "{{ odb.oracle_db_name | default('') }}"
+            loop_var: odb
+          when:
+            - _odb_standby_config.type | default('') == 'dataguard'
+          register: assertoracle_databases_dg_params
+
+      rescue:
+        - name: Assert failed init_parameters for Data Guard
+          ansible.builtin.debug:
+            msg: "{{ item.msg | default(item.assertion | default('')) }}"
+          loop: "{{ assertoracle_databases_dg_params['results'] }}"
+          loop_control:
+            label: "{{ item['odb']['oracle_db_name'] | default('') }}"
+          when:
+            - assertoracle_databases_dg_params.results is defined
+            - item.failed is defined
+            - item.failed | bool
+
+        - name: Fail assert init_parameters for Data Guard
           ansible.builtin.fail:
             msg: "See previous debug task for assertation failure"
