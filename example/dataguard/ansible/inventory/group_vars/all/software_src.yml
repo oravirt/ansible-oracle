@@ -1,0 +1,20 @@
+---
+is_sw_source_local: true
+oracle_sw_copy: false
+oracle_sw_unpack: true
+
+# Installation media: target of the AutoUpgrade download on the NFS server (dataguard-dbfs1).
+# The ORACLE_HOME is extracted from oracle_stage_remote, because oracle_sw_copy is false.
+oracle_sw_source_local: /u01/sw
+oracle_stage_remote: /u01/sw
+
+# Directory for response files, extracted patches etc.
+oracle_stage: /u01/stage
+
+# NFS share with the installation media (playbooks/nfs_server.yml)
+# install_from_nfs: true is set for the NFS clients in host_vars.
+# They mount the share on oracle_stage_remote during the installation of the ORACLE_HOME
+# (same path as on the NFS server => the symlink db_home_26_latest.zip works on all hosts).
+install_from_nfs: false
+nfs_server_sw: "{{ hostvars[groups['nfs_server'][0]]['ansible_host'] }}"
+nfs_server_sw_path: /u01/sw

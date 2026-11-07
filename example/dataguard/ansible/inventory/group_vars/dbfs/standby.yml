@@ -1,0 +1,23 @@
+---
+# Data Guard configuration DG1 with 2 members.
+# Must be identical on all members => group_vars of the group with all members.
+#
+# Inventory structure: doc/guides/standby_databases.adoc
+db_standby_config:
+  - name: DG1
+    type: dataguard
+    dg:
+      protection_mode: MaxPerformance
+    members:
+      - hosts: [dataguard-dbfs1]
+        db_unique_name: DB1_SITE1
+        initial_role: primary
+        dg:
+          connect_identifier: DB1_SITE1
+          log_xpt_mode: ASYNC
+      - hosts: [dataguard-dbfs2]
+        db_unique_name: DB1_SITE2
+        initial_role: physical_standby
+        dg:
+          connect_identifier: DB1_SITE2
+          log_xpt_mode: ASYNC

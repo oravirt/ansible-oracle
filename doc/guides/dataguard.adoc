@@ -1,0 +1,313 @@
+:toc:
+:toc-placement!:
+:toclevels: 4
+toc::[]
+
+:sectnums:
+:sectnumlevels: 4
+
+== Data Guard Guide
+
+This guide installs an Oracle AI Database 26ai with Data Guard on two Oracle Linux 9 VMs with `ansible-oracle`:
+
+- `dataguard-dbfs1`: primary database `DB1_SITE1` (container database `DB1` with the PDB `ORCLPDB`)
+- `dataguard-dbfs2`: physical standby database `DB1_SITE2`, managed by the Data Guard Broker
+
+The 1st VM exports its installation media with NFS.
+AutoUpgrade downloads the gold image on the 1st VM only, the 2nd VM mounts the installation media with NFS.
+
+The guide is based on the link:beginner.adoc[Beginners Guide].
+Steps that are identical are referenced and not repeated.
+
+See link:standby_databases.adoc[Standby Databases] for the details of the Data Guard implementation in `ansible-oracle`.
+
+=== Overview
+
+==== Architecture overview
+:puml: http://www.plantuml.com/plantuml/proxy?src=https://raw.githubusercontent.com/oravirt/ansible-oracle/master/doc
+
+image::{puml}/guides/dataguard.puml[Architecture]
+
+==== What are we going to do?
+
+. Prepare the Ansible controller: Ansible in Ubuntu on WSL2 on Windows.
+. Create two Oracle Linux 9 VMs on Hyper-V.
+. Configure the inventory with the IP addresses and login user of the VMs.
+. Start the playbook `playbooks/do_all.yml`. It executes all needed playbooks:
+.. `opitzconsulting.ansible_oracle.os`: prepare both VMs
+.. `playbooks/nfs_server.yml`: NFS server on `dataguard-dbfs1`, export of the installation media `/u01/sw`
+.. `playbooks/autoupgrade.yml`: install AutoUpgrade on `dataguard-dbfs1` and download a _gold image_ from My Oracle Support
+.. `opitzconsulting.ansible_oracle.single_instance_fs` on both VMs:
+... install the ORACLE_HOME on `dataguard-dbfs1` from `/u01/sw` and on `dataguard-dbfs2` from the NFS share,
+... create the primary database `DB1_SITE1` with `dbca`,
+... create the physical standby database `DB1_SITE2` with RMAN `DUPLICATE ... FROM ACTIVE DATABASE`,
+... create the Data Guard Broker configuration `DG1`.
+
+==== Defaults
+
+.Defaults used in this guide
+[options="header"]
+|=======================
+|Value |Description
+|`~/git/ansible-oracle` |git repository on the Ansible controller
+|`~/git/ansible-oracle/example/dataguard/ansible` |Working directory for all Ansible commands
+|`dataguard-dbfs1` |Name of the 1st VM in the inventory: initial primary, NFS server
+|`192.168.66.166` |IP address of the 1st VM (`ansible_host`)
+|`dataguard-dbfs2` |Name of the 2nd VM in the inventory: initial physical standby, NFS client
+|`192.168.66.167` |IP address of the 2nd VM (`ansible_host`)
+|`ol` |Login user on the VMs (`ansible_user`)
+|`/u01/sw` |Installation media: target of the download on `dataguard-dbfs1`, NFS mount point on `dataguard-dbfs2`
+|`/u01/stage` |Staging directory on the VMs (`oracle_stage`)
+|=======================
+
+=== Requirements
+
+==== Oracle Linux 9 VMs
+
+Two VMs with the requirements of the link:beginner.adoc#_oracle_linux_9_vm[Beginners Guide] are needed.
+
+In addition:
+
+- Both VMs reach each other on the fixed IP addresses: SSH is not needed between the VMs,
+  but the listener port `1521` (Data Guard) and NFS from `dataguard-dbfs2` to `dataguard-dbfs1`.
+  The playbooks open the ports in `firewalld`.
+- Internet access for My Oracle Support is needed on `dataguard-dbfs1` only.
+
+==== Create the VMs with Hyper-V and Packer
+
+Build the Oracle Linux 9 template as described in
+link:beginner.adoc#_create_the_vm_with_hyper_v_and_packer[Create the VM with Hyper-V and Packer] of the Beginners Guide.
+
+IMPORTANT: All steps in this chapter are executed in PowerShell on Windows, not in WSL.
+
+.Create the VMs from the template
+----
+cd OL9
+.\create-vm.ps1 -NewVMName dataguard-dbfs1 -Hostname dataguard-dbfs1 -ExternalSwitch intern_66 -FixedIP 192.168.66.166 -CPUs 2 -MemoryGB 8
+.\create-vm.ps1 -NewVMName dataguard-dbfs2 -Hostname dataguard-dbfs2 -ExternalSwitch intern_66 -FixedIP 192.168.66.167 -CPUs 2 -MemoryGB 8
+----
+
+IMPORTANT: The template has a disk with 80 GB, but the guide needs 81 GB free space in the volume group `ol`. +
+Increase the disk of both VMs, e.g. to 130 GB, before you start the installation.
+
+==== Ansible controller and My Oracle Support
+
+The requirements are identical to the Beginners Guide:
+
+- link:beginner.adoc#_ansible_controller[Ansible controller]
+- link:beginner.adoc#_my_oracle_support[My Oracle Support]
+
+=== Setup Ansible controller
+
+Follow link:beginner.adoc#_setup_ansible_controller[Setup Ansible controller] of the Beginners Guide,
+but install the collections in the working directory of this guide.
+
+.Install collections
+----
+cd ~/git/ansible-oracle/example/dataguard/ansible
+ansible-galaxy collection install -r requirements.yml
+----
+
+IMPORTANT: Data Guard needs `ansible-oracle` 5.0.0 or newer (role `oradb_standby`). +
+Use the development entry in `requirements.yml` to install the collection from the git repository,
+as long as 5.0.0 is not released.
+
+=== Configure inventory
+
+==== IP addresses and login user
+
+The VMs are configured in `inventory/hosts.yml`.
+Change `ansible_host` and `ansible_user` for your VMs.
+
+.inventory/hosts.yml
+----
+---
+all:
+  children:
+    # both database servers of the Data Guard configuration DG1
+    dbfs:
+      hosts:
+        dataguard-dbfs1:
+          # IP address or DNS name of the 1st Oracle Linux 9 VM (initial primary)
+          ansible_host: 192.168.66.166
+          # Login user on the VM with sudo privileges (SSH key login)
+          ansible_user: ol
+        dataguard-dbfs2:
+          # IP address or DNS name of the 2nd Oracle Linux 9 VM (initial physical standby)
+          ansible_host: 192.168.66.167
+          ansible_user: ol
+
+    # NFS server for the installation media (playbooks/nfs_server.yml)
+    # AutoUpgrade downloads the gold image on this host only.
+    nfs_server:
+      hosts:
+        dataguard-dbfs1:
+
+    # Database servers which mount the installation media from nfs_server
+    nfs_client:
+      hosts:
+        dataguard-dbfs2:
+----
+
+`ansible_host` is used for the connect identifiers of the databases (`group_vars/dbfs/tnsnames.yml`),
+for `local_listener` (`group_vars/dbfs/database_DB1.yml`) and for the NFS export.
+No DNS is needed between the VMs.
+
+NOTE: The host names `dataguard-dbfs1` and `dataguard-dbfs2` are used in `db_standby_config`
+(`group_vars/dbfs/standby.yml`), in `group_vars/dbfs/tnsnames.yml` and as directories in `host_vars`.
+Change all of them, when you rename a host.
+
+==== SSH key, connection test, credentials and passwords
+
+Follow the Beginners Guide for both VMs:
+
+- link:beginner.adoc#_ssh_key[SSH key]: `ssh-copy-id` for `ol@192.168.66.166` and `ol@192.168.66.167`
+- link:beginner.adoc#_check_the_connection[Check the connection]
+- link:beginner.adoc#_my_oracle_support_credentials[My Oracle Support credentials] (`.env` in `example/dataguard/ansible`)
+- link:beginner.adoc#_database_passwords[Database passwords]
+
+==== Data Guard configuration
+
+.Inventory files for Data Guard
+[options="header"]
+|=======================
+|File |Content
+|`group_vars/dbfs/standby.yml` |`db_standby_config`: configuration `DG1` with the members `DB1_SITE1` (`initial_role: primary`) and `DB1_SITE2` (`initial_role: physical_standby`)
+|`group_vars/dbfs/tnsnames.yml` |Connect identifiers `DB1_SITE1` and `DB1_SITE2` with the IP addresses of the VMs
+|`group_vars/dbfs/database_DB1.yml` |Database `DB1` with `standby_config: DG1` for both members
+|`host_vars/<host>/databases.yml` |`db1_unique_name`: `db_unique_name` of the member on the host
+|=======================
+
+The database is defined once for both members.
+Only the `db_unique_name` differs, it is set per host with `db1_unique_name`.
+
+.Data Guard specific settings of the database in group_vars/dbfs/database_DB1.yml
+[options="header"]
+|=======================
+|Setting |Description
+|`oracle_db_unique_name: "{{ db1_unique_name }}"` |`DB1_SITE1` or `DB1_SITE2`
+|`standby_config: DG1` |Assignment to the Data Guard configuration
+|`listener_name: LISTENER` |Static listener entry `<db_unique_name>_DGMGRL` for RMAN `DUPLICATE` and the broker
+|`archivelog`, `force_logging`, `flashback` |`true`
+|`local_listener` |`//<ansible_host>:1521`
+|`db_create_file_dest`, `db_create_online_log_dest_1` |Oracle Managed Files (OMF) are mandatory
+|`dg_broker_config_file1/2` |`/u01/app/oracle/dbs/dr1<db_unique_name>.dat`: outside of the read-only ORACLE_HOME
+|`dg_broker_start` |`TRUE`, below `dg_broker_config_file1/2`
+|`standby_file_management` |`AUTO`
+|=======================
+
+==== Installation media with NFS
+
+AutoUpgrade is installed and executed on `dataguard-dbfs1` only (group `nfs_server`).
+The download of the gold image works as in the Beginners Guide,
+see link:beginner.adoc#_autoupgrade_on_the_vm[AutoUpgrade on the VM].
+
+`playbooks/nfs_server.yml` configures `dataguard-dbfs1` as NFS server:
+
+- package `nfs-utils`, service `nfs-server`
+- directory `/u01/sw` (owner `oracle`), target of the AutoUpgrade download
+- export of `/u01/sw` read only for the IP addresses of the group `nfs_client` (`/etc/exports.d/oracle-sw.exports`)
+- services `nfs`, `rpc-bind` and `mountd` in `firewalld`, when `firewalld` is running
+
+`dataguard-dbfs2` (group `nfs_client`) mounts the share during the installation of the ORACLE_HOME
+(role `oraswdb_install`) and unmounts it afterwards.
+
+.NFS settings in inventory/group_vars/all/software_src.yml
+[options="header"]
+|=======================
+|Variable |Value |Description
+|`install_from_nfs` |`false`, `true` in `host_vars/dataguard-dbfs2/software_src.yml` |Mount the NFS share during the installation
+|`nfs_server_sw` |`ansible_host` of the 1st host of the group `nfs_server` |NFS server
+|`nfs_server_sw_path` |`/u01/sw` |Exported directory on the NFS server
+|`oracle_stage_remote` |`/u01/sw` |Source of the installation media: mount point on the NFS client, local directory on the NFS server
+|`oracle_sw_copy` |`false` |The ORACLE_HOME is extracted directly from `oracle_stage_remote`
+|=======================
+
+The mount point is identical to the directory on the NFS server.
+Therefore the symlink `db_home_26_latest.zip` of the gold image works on both hosts.
+
+TIP: Use the same settings for any database server, which mounts its installation media from an existing NFS server:
+`install_from_nfs: true`, `nfs_server_sw`, `nfs_server_sw_path` and `oracle_stage_remote`.
+
+=== Install databases with Ansible
+
+.Start installation
+----
+cd ~/git/ansible-oracle/example/dataguard/ansible
+ansible-playbook playbooks/do_all.yml
+----
+
+NOTE: The execution takes approx. 60 minutes plus the download of the gold image.
+
+`single_instance_fs` is executed for both VMs in one play.
+`oradb_standby` needs the facts of the primary database on `dataguard-dbfs1`
+to create the standby database on `dataguard-dbfs2`.
+
+.Configuration of the databases
+[options="header"]
+|=======================
+|Parameter |dataguard-dbfs1 |dataguard-dbfs2
+|ORACLE_BASE 2+|`/u01/app/oracle`
+|ORACLE_HOME 2+|`/u01/app/oracle/product/db26_si_ee` (read-only)
+|ORACLE_SID 2+|`DB1`
+|db_unique_name |`DB1_SITE1` |`DB1_SITE2`
+|initial role |primary |physical standby
+|Created by |`dbca` |RMAN `DUPLICATE ... FROM ACTIVE DATABASE`
+|PDB 2+|`ORCLPDB` (open on the primary only)
+|db_create_file_dest 2+|`/u02/oradata`
+|db_recovery_file_dest 2+|`/u02/fra`
+|Listener 2+|`LISTENER`, port 1521
+|Data Guard Broker 2+|configuration `DG1`, `MaxPerformance`, `LogXptMode` `ASYNC`
+|=======================
+
+The systemd unit `oracle-db@DB1.service` starts the database in `MOUNT` and opens a primary database only.
+The physical standby database is not opened read only (no Active Data Guard).
+
+=== How to work with the Data Guard configuration
+
+.Login into the 1st VM and set the environment
+----
+ssh ol@192.168.66.166
+sudo -iu oracle
+ocenv
+DB1
+----
+
+.Show the broker configuration
+----
+dgmgrl / "show configuration"
+----
+
+.Example
+----
+Configuration - DG1
+
+  Protection Mode: MaxPerformance
+  Members:
+  DB1_SITE1 - Primary database
+    DB1_SITE2 - Physical standby database
+
+Fast-Start Failover:  Disabled
+
+Configuration Status:
+SUCCESS
+----
+
+NOTE: The broker needs approx. 1 minute after the creation until the status is `SUCCESS`.
+
+.Switchover to DB1_SITE2 (password of SYS)
+----
+dgmgrl sys@DB1_SITE1
+DGMGRL> validate database DB1_SITE2;
+DGMGRL> switchover to DB1_SITE2;
+----
+
+IMPORTANT: The inventory is not changed after a switchover.
+`initial_role` is used for the creation of the databases only, `ansible-oracle` does not switch back.
+See link:standby_databases.adoc#_role_transitions_outside_of_ansible_oracle[Role transitions outside of ansible-oracle].
+
+=== Next Steps
+
+* link:standby_databases.adoc[Standby Databases in `ansible-oracle`]
+* link:autoupgrade.adoc[Oracle AutoUpgrade in `ansible-oracle`]
+* link:../roles.adoc[List of roles in `ansible-oracle`]

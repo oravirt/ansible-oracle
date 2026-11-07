@@ -1,0 +1,26 @@
+---
+# 1. OS of both database servers
+- name: Import_playbook os
+  import_playbook: opitzconsulting.ansible_oracle.os
+  vars:
+    hostgroup: dbfs
+
+# 2. NFS server for the installation media on dataguard-dbfs1
+- name: Import_playbook nfs_server
+  import_playbook: nfs_server.yml
+  vars:
+    hostgroup: nfs_server
+
+# 3. AutoUpgrade and download of the gold image on dataguard-dbfs1
+- name: Import_playbook autoupgrade
+  import_playbook: autoupgrade.yml
+  vars:
+    hostgroup: nfs_server
+
+# 4. ORACLE_HOME on both hosts (dataguard-dbfs2 with NFS),
+#    primary database with dbca, standby database with RMAN DUPLICATE, Data Guard Broker
+#    Both hosts must be part of the play: oradb_standby needs the facts of the primary.
+- name: Import_playbook single_instance_fs
+  import_playbook: opitzconsulting.ansible_oracle.single_instance_fs
+  vars:
+    hostgroup: dbfs

@@ -1,0 +1,69 @@
+---
+# NFS server for the installation media on the 1st database server (group nfs_server).
+#
+# AutoUpgrade downloads the gold image into nfs_server_sw_path on this host only.
+# The hosts of the group nfs_client mount the share read only with install_from_nfs: true
+# during the installation of the ORACLE_HOME (role oraswdb_install).
+#
+# Requires the playbook opitzconsulting.ansible_oracle.os before: filesystem /u01, user oracle.
+- name: NFS server for installation media
+  hosts: "{{ hostgroup | default('nfs_server') }}"
+  become: true
+  any_errors_fatal: true
+  vars:
+    # IP addresses of the NFS clients
+    nfs_server_clients: >-
+      {{ groups['nfs_client'] | default([]) | map('extract', hostvars, 'ansible_host') | list }}
+  tasks:
+    - name: Install nfs-utils
+      ansible.builtin.package:
+        name: nfs-utils
+        state: present
+
+    # target of the AutoUpgrade download
+    - name: Create directory for installation media
+      ansible.builtin.file:
+        path: "{{ nfs_server_sw_path }}"
+        state: directory
+        owner: "{{ oracle_user | default('oracle') }}"
+        group: "{{ oracle_group | default('oinstall') }}"
+        mode: "0755"
+
+    - name: Export installation media
+      ansible.builtin.copy:
+        content: |
+          # Managed by Ansible (playbooks/nfs_server.yml): installation media for ansible-oracle
+          {{ nfs_server_sw_path }} {{ nfs_server_clients | map('regex_replace', '$', '(ro,sync,root_squash)') | join(' ') }}
+        dest: /etc/exports.d/oracle-sw.exports
+        owner: root
+        group: root
+        mode: "0644"
+      register: _nfs_server_exports
+
+    - name: Start NFS server
+      ansible.builtin.systemd:
+        name: nfs-server
+        enabled: true
+        state: started
+
+    - name: Reload exports
+      ansible.builtin.command: exportfs -ra
+      when: _nfs_server_exports is changed  # noqa no-handler
+      changed_when: true
+
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Open NFS in firewalld
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        permanent: true
+        immediate: true
+        state: enabled
+      loop:
+        - nfs
+        - rpc-bind
+        - mountd
+      when:
+        - ansible_facts.services['firewalld.service'] is defined
+        - ansible_facts.services['firewalld.service'].state == 'running'

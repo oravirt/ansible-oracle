@@ -1,0 +1,88 @@
+---
+# Database DB1 on both members of the Data Guard configuration DG1.
+#
+# Host specific values in host_vars/<host>/databases.yml:
+# - db1_unique_name: db_unique_name of the member in db_standby_config (group_vars/dbfs/standby.yml)
+#
+# dataguard-dbfs1 (initial_role primary):          created with dbca
+# dataguard-dbfs2 (initial_role physical_standby): created with RMAN DUPLICATE by oradb_standby
+oracle_database_db1:
+  home: &db_config_home db26_si_ee
+  oracle_db_name: &oracle_db_name DB1
+  oracle_db_unique_name: "{{ db1_unique_name }}"
+  standby_config: DG1
+  oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
+  is_container: true                                   # 26ai supports only container databases
+  storage_type: FS                                     # Database storage to be used. ASM or FS.
+  oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+  redolog_size: 75M
+  redolog_groups: 3
+  datafile_dest: /u02/oradata
+  recoveryfile_dest: /u02/fra
+  # mandatory for Data Guard: static listener entry <db_unique_name>_DGMGRL
+  listener_name: LISTENER
+  listener_port: &cdb_listener_port 1521
+  # Data Guard needs archivelog and force logging, flashback allows the reinstate after a failover
+  archivelog: true
+  flashback: true
+  force_logging: true
+  state: present
+  tablespaces:
+    - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+    - {name: sysaux, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+    - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
+    - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
+    - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+  init_parameters:
+    - {name: processes, value: '400', scope: spfile, state: present, dbca: false}
+    # EZConnect of the local listener with the IP address of the host.
+    # The standby gets its own value with SET in RMAN DUPLICATE (oradb_standby).
+    - {name: local_listener, value: '//{{ ansible_host }}:1521', scope: both, state: present}
+    - {name: control_management_pack_access, value: 'NONE', scope: both, state: present}
+    - {name: control_file_record_keep_time, value: '30', scope: both, state: present}
+    - {name: deferred_segment_creation, value: 'false', scope: both, state: present}
+    - {name: filesystemio_options, value: 'setall', scope: spfile, state: present}
+    - {name: job_queue_processes, value: '10', scope: both, state: present}
+    - {name: log_archive_dest_1, value: 'location=USE_DB_RECOVERY_FILE_DEST', scope: both, state: present}
+    - {name: pga_aggregate_target, value: '200M', scope: both, state: present}
+    - {name: sga_target, value: '1800M', scope: spfile, state: present}
+    - {name: recyclebin, value: 'off', scope: spfile, state: present}
+    - {name: max_pdbs, value: '3', scope: both, state: present}
+    # Oracle Managed Files are mandatory for Data Guard in ansible-oracle
+    - {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
+    - {name: db_create_online_log_dest_1, value: '/u02/oradata', scope: both, state: present}
+    - {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
+    # Data Guard Broker: configuration files outside of ORACLE_HOME (read-only ORACLE_HOME => ORACLE_BASE/dbs),
+    # dg_broker_start below the file parameters: the files cannot be changed while the broker is running
+    - {name: dg_broker_config_file1, value: '/u01/app/oracle/dbs/dr1{{ db1_unique_name }}.dat', scope: both, state: present, dbca: false}
+    - {name: dg_broker_config_file2, value: '/u01/app/oracle/dbs/dr2{{ db1_unique_name }}.dat', scope: both, state: present, dbca: false}
+    - {name: dg_broker_start, value: 'TRUE', scope: both, state: present, dbca: false}
+    - {name: standby_file_management, value: 'AUTO', scope: both, state: present}
+
+  profiles:
+    - name: DEFAULT
+      state: present
+      attributes:
+        - {name: password_life_time, value: unlimited}
+
+oracle_pdb_db1_orclpdb:
+  home: *db_config_home
+  listener_port: *cdb_listener_port
+  cdb: *oracle_db_name
+  pdb_name: ORCLPDB
+  state: present
+  profiles: "{{ oracle_default_profiles }}"
+
+  tablespaces:
+    - {name: system, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+    - {name: sysaux, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+    - {name: undotbs1, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
+    - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
+    - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 4G, content: permanent, state: present, bigfile: false}
+
+oracle_databases:
+  - "{{ oracle_database_db1 }}"
+
+# PDBs are managed on the primary database only (oradb_manage_pdb skips a standby database)
+oracle_pdbs:
+  - "{{ oracle_pdb_db1_orclpdb }}"
