@@ -132,8 +132,11 @@
   become: true
   become_user: root
 
-# A standby database (standby_config) may not exist yet: it is created by oradb_standby.
-# => start the unit only when the SPFile exists, enable it always
+# Databases in standby configurations (standby_config):
+# - a standby database (_oradb_manage_db_standby_dbs from manage-db.yml) is not started:
+#   it may not exist yet (created by oradb_standby) or be damaged (rebuild)
+# - other databases are started only when the SPFile exists
+# The unit is enabled always.
 - name: systemd_units | check SPFile of databases in standby configurations
   ansible.builtin.shell: >-
     test -f "$("${ORACLE_HOME}/bin/orabaseconfig")/dbs/spfile{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}.ora"
@@ -156,9 +159,11 @@
     state: >-
       {{ 'started'
          if odb.standby_config is not defined
-            or _oradb_manage_db_standby_spfile.results
-               | selectattr('odb.oracle_db_name', 'equalto', odb.oracle_db_name)
-               | selectattr('rc', 'equalto', 0) | list | length > 0
+            or ((odb.oracle_db_instance_name | default(odb.oracle_db_name))
+                  not in _oradb_manage_db_standby_dbs | default({})
+                and _oradb_manage_db_standby_spfile.results
+                    | selectattr('odb.oracle_db_name', 'equalto', odb.oracle_db_name)
+                    | selectattr('rc', 'equalto', 0) | list | length > 0)
          else omit }}
   loop: "{{ oracle_databases | selectattr('state', 'equalto', 'present') | list }}"
   loop_control:
@@ -166,6 +171,15 @@
     label: "oracle-db@{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}.service"
   become: true
   become_user: root
+
+- name: systemd_units | standby databases not running
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: The standby database {{ item.key }} is not running. oradb_manage_db does not start
+      a standby database. Start it manually or rebuild it (doc/guides/standby_databases.adoc).
+  loop: "{{ _oradb_manage_db_standby_dbs | default({}) | dict2items | rejectattr('value.running') | list }}"
+  loop_control:
+    label: "{{ item.key }}"
 
 # The database is already dropped by manage-db.yml => only disable the unit
 - name: systemd_units | disable units of removed databases

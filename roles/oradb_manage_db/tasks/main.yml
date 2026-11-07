@@ -143,3 +143,14 @@
   ansible.builtin.import_role:
     name: oradb_facts
     allow_duplicates: true
+
+# after oradb_facts: state of the databases for the repair
+- name: manage_db | Repair failed systemd units of databases
+  ansible.builtin.include_tasks: systemd_units_repair.yml
+  when:
+    - autostartup_service | bool
+    - autostartup_service_mode == 'units'
+    - ansible_service_mgr == 'systemd'
+    - oracle_install_option_gi | default('') | length == 0
+    - oracle_databases is defined
+  tags: autostartup_service

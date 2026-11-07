@@ -1,3 +1,6 @@
 ---
 minor_changes:
   - "oradb_manage_db: oracle_db (dbca) is not executed for a standby database of db_standby_config, systemd unit with ORACLE_START_MODE=auto opens only a PRIMARY database, the unit of a database in db_standby_config is started only when the SPFile exists (oravirt#65)"
+  - "oradb_manage_db: the systemd unit of a standby database is enabled, but not started (database may not exist or be damaged), warning when the instance is not running (oravirt#65)"
+  - "oradb_manage_db: repair of failed systemd units (reset-failed, start) for databases in OPEN or physical standby databases in MOUNT (state from oradb_facts) (oravirt#65)"
+  - "oradb_manage_db: missing directories of a database in a standby configuration are created before dbca (e.g. dg_broker_config_file1/2 for dg_broker_start on the primary) (oravirt#65)"

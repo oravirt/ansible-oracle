@@ -124,6 +124,15 @@
               or (_orasw_meta_standby_state.role | length == 0
                   and _odb_standby_member.initial_role | default('') == 'physical_standby')) }}
 
+# used by systemd_units.yml: the unit of a standby database is enabled, but not started
+- name: manage_db | Remember standby database
+  ansible.builtin.set_fact:
+    _oradb_manage_db_standby_dbs: >-
+      {{ _oradb_manage_db_standby_dbs | default({})
+         | combine({_orasw_meta_standby_sid: {'running': _orasw_meta_standby_state.running | bool,
+                                              'role': _orasw_meta_standby_state.role}}) }}
+  when: _oradb_manage_db_standby_skip | bool
+
 - name: manage_db | Skip oracle_db for standby database
   ansible.builtin.debug:
     msg: >-
@@ -132,6 +141,18 @@
       initial_role: {{ _odb_standby_member.initial_role | default('') }})
       => oracle_db is not executed. The standby database is created by oradb_standby.
   when: _oradb_manage_db_standby_skip | bool
+
+# Missing directories of a database in a standby configuration before dbca,
+# e.g. dg_broker_config_file1/2: oradb_manage_parameters sets dg_broker_start
+# on the primary before oradb_standby is executed.
+- name: manage_db | Directories of database in standby configuration
+  ansible.builtin.include_role:
+    name: orasw_meta
+    tasks_from: standby_prepare.yml
+  when:
+    - odb.state == 'present'
+    - _odb_standby_config | length > 0
+    - orasw_meta_primary_node | bool
 
 # show debug task for environments with display_skipped_hosts = false
 - name: manage_db | Start create/manage database

@@ -140,3 +140,21 @@ _oradb_manage_db_switch_env_new:
 # Empty when the listener is not running.
 _oradb_manage_db_listener_running_home: >-
   {{ _oradb_manage_db_listener_running.stdout | default('') | trim }}
+
+# failed database units with the state of the database from oracledb_facts (systemd_units_repair.yml)
+_oradb_manage_db_unit_failed: >-
+  {%- set __units = [] -%}
+  {%- for r in _oradb_manage_db_unit_status.results | default([])
+        if r.status is defined and r.status.ActiveState | default('') == 'failed' -%}
+  {%-   set __db = oracledb_facts[r.odb.oracle_db_unique_name | default(r.odb.oracle_db_name)]['database']
+                   | default({}) -%}
+  {%-   set __role = __db.DATABASE_ROLE | default('') -%}
+  {%-   set __mode = __db.OPEN_MODE | default('') -%}
+  {%-   set _ = __units.append({'name': r.name | default('oracle-db@' ~ (r.odb.oracle_db_instance_name
+                                 | default(r.odb.oracle_db_name)) ~ '.service'),
+                                'role': __role, 'open_mode': __mode,
+                                'repair': __mode.startswith('READ')
+                                          or (__role == 'PHYSICAL STANDBY' and __mode == 'MOUNTED')}) -%}
+  {%- endfor -%}
+  {{ __units }}
+_oradb_manage_db_unit_repair: "{{ _oradb_manage_db_unit_failed | selectattr('repair') | list }}"

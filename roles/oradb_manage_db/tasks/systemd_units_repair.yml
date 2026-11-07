@@ -1,0 +1,46 @@
+---
+# Repair of failed database units (autostartup_service_mode: units), executed after oradb_facts:
+# a unit in state failed (e.g. start limit after start attempts without database) is repaired,
+# when the database is OPEN (READ WRITE, READ ONLY ...) or a PHYSICAL STANDBY in MOUNT (oracledb_facts)
+# => reset-failed and start (db-start does not start a running database, the unit attaches it)
+- name: systemd_units_repair | state of database units
+  ansible.builtin.systemd:
+    name: "oracle-db@{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}.service"
+  loop: "{{ oracle_databases | selectattr('state', 'equalto', 'present') | list }}"
+  loop_control:
+    loop_var: odb
+    label: "oracle-db@{{ odb.oracle_db_instance_name | default(odb.oracle_db_name) }}.service"
+  register: _oradb_manage_db_unit_status
+  become: true
+  become_user: root
+  check_mode: false
+
+# reset-failed: no option in ansible.builtin.systemd => command
+- name: systemd_units_repair | reset failed database units
+  ansible.builtin.command: "systemctl reset-failed {{ item.name }}"
+  loop: "{{ _oradb_manage_db_unit_repair }}"
+  loop_control:
+    label: "{{ item.name }}: {{ item.role }} {{ item.open_mode }}"
+  become: true
+  become_user: root
+  changed_when: true
+
+- name: systemd_units_repair | start repaired database units
+  ansible.builtin.systemd:
+    name: "{{ item.name }}"
+    state: started
+  loop: "{{ _oradb_manage_db_unit_repair }}"
+  loop_control:
+    label: "{{ item.name }}"
+  become: true
+  become_user: root
+
+- name: systemd_units_repair | failed database units not repaired
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: {{ item.name }} is failed and not repaired (role: {{ item.role or 'unknown' }},
+      open mode: {{ item.open_mode or 'unknown' }}). The unit is repaired only for a database
+      in OPEN or a PHYSICAL STANDBY in MOUNT.
+  loop: "{{ _oradb_manage_db_unit_failed | rejectattr('repair') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
