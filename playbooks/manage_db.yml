@@ -6,11 +6,13 @@
   roles:
     - opitzconsulting.ansible_oracle.oradb_manage_wallet
     - opitzconsulting.ansible_oracle.oradb_manage_db
-    # standby databases are only relevant for environments with db_standby_config
-    - role: opitzconsulting.ansible_oracle.oradb_standby
-      when: db_standby_config | default([]) | length > 0
     - opitzconsulting.ansible_oracle.oradb_manage_pdb
     - opitzconsulting.ansible_oracle.oradb_manage_parameters
+    # standby databases are only relevant for environments with db_standby_config
+    # after oradb_manage_parameters: the primary has all init_parameters (e.g. dg_broker_start)
+    # before RMAN DUPLICATE and the creation of the broker configuration
+    - role: opitzconsulting.ansible_oracle.oradb_standby
+      when: db_standby_config | default([]) | length > 0
     - opitzconsulting.ansible_oracle.oradb_manage_tablespace
     - opitzconsulting.ansible_oracle.oradb_manage_redo
     - opitzconsulting.ansible_oracle.oradb_manage_profiles
