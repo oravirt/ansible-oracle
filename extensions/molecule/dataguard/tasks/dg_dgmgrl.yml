@@ -1,0 +1,25 @@
+---
+# Execute dgmgrl commands with a connect identifier (SYS password with stdin).
+# A switchover restarts databases => dgmgrl needs a connection with password.
+# Input:  dg_dgmgrl_ci (connect identifier), dg_dgmgrl (commands)
+# Result: dg_dgmgrl_result (stdout_lines)
+- name: dgmgrl with {{ dg_dgmgrl_ci }}
+  ansible.builtin.command:
+    argv:
+      - "{{ dg_oracle_home }}/bin/dgmgrl"
+      - -silent
+    stdin: |
+      connect sys/"{{ dg_sys_password }}"@{{ dg_dgmgrl_ci }}
+      {{ dg_dgmgrl }}
+  environment: "{{ dg_env }}"
+  register: _dg_dgmgrl
+  changed_when: false
+  no_log: true
+
+- name: dgmgrl result with {{ dg_dgmgrl_ci }}
+  ansible.builtin.set_fact:
+    dg_dgmgrl_result: "{{ _dg_dgmgrl.stdout_lines }}"
+
+- name: dgmgrl output
+  ansible.builtin.debug:
+    var: dg_dgmgrl_result

@@ -43,10 +43,7 @@
 - name: Converge sql_zauberkasten
   ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.sql_zauberkasten
 
-# TODO Data Guard: The creation of a standby database is not implemented yet.
-# oradb_manage_db would create a 2nd primary with dbca on dataguard-2
-# => manage_db on the initial primary only until the standby creation exists.
+# dataguard-1: primary database with dbca (oradb_manage_db)
+# dataguard-2: standby database with RMAN DUPLICATE (oradb_standby)
 - name: Converge manage_db
   ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db
-  vars:
-    hostgroup: dataguard-1

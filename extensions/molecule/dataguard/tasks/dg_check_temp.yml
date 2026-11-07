@@ -1,0 +1,32 @@
+---
+# Check temporary tablespaces of the primary database dg_primary:
+# every temporary tablespace of all open containers has at least 1 tempfile.
+# RMAN DUPLICATE does not copy tempfiles => they are created when the database is opened as primary.
+# Input: dg_primary
+- name: Temporary tablespaces and tempfiles of {{ dg_primary }}
+  ansible.builtin.include_tasks: dg_sql.yml
+  vars:
+    dg_sql_ci: "{{ dg_primary }}"
+    dg_sql: |
+      select 'PDB=' || name || ':' || open_mode from v$pdbs;
+      select 'TEMPFILE=' || c.name || ':' || f.tablespace_name || ':' || f.file_name
+        from cdb_temp_files f join v$containers c on c.con_id = f.con_id;
+      select 'TEMP_MISSING=' || c.name || ':' || t.tablespace_name
+        from cdb_tablespaces t join v$containers c on c.con_id = t.con_id
+       where t.contents = 'TEMPORARY'
+         and not exists (select 1 from cdb_temp_files f
+                          where f.con_id = t.con_id and f.tablespace_name = t.tablespace_name);
+
+- name: Show temporary tablespaces of {{ dg_primary }}
+  ansible.builtin.debug:
+    var: dg_sql_result
+
+- name: Assert tempfiles of {{ dg_primary }}
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - dg_sql_result | select('match', '^PDB=ORCLPDB:READ WRITE$') | list | length == 1
+      - dg_sql_result | select('match', '^TEMPFILE=CDB\$ROOT:') | list | length > 0
+      - dg_sql_result | select('match', '^TEMPFILE=ORCLPDB:') | list | length > 0
+      - dg_sql_result | select('match', '^TEMP_MISSING=') | list | length == 0
+    fail_msg: "Temporary tablespaces of {{ dg_primary }}: {{ dg_sql_result }}"

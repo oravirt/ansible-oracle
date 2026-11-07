@@ -1,0 +1,25 @@
+---
+# Execute SQL as SYSDBA with a connect identifier (SYS password with stdin).
+# Input:  dg_sql_ci (connect identifier), dg_sql (statements)
+# Result: dg_sql_result (stdout_lines)
+- name: SQL on {{ dg_sql_ci }}
+  ansible.builtin.command:
+    argv:
+      - "{{ dg_oracle_home }}/bin/sqlplus"
+      - -S
+      - -L
+      - /nolog
+    stdin: |
+      whenever sqlerror exit failure
+      connect sys/"{{ dg_sys_password }}"@{{ dg_sql_ci }} as sysdba
+      set heading off feedback off pagesize 0 linesize 200
+      {{ dg_sql }}
+      exit
+  environment: "{{ dg_env }}"
+  register: _dg_sql
+  changed_when: false
+  no_log: true
+
+- name: SQL result of {{ dg_sql_ci }}
+  ansible.builtin.set_fact:
+    dg_sql_result: "{{ _dg_sql.stdout_lines | map('trim') | select | list }}"
