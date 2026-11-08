@@ -471,6 +471,19 @@ _odb_standby_create_method: >-
   {{ _odb_standby_member.dg.create_method
      | default(_odb_standby_config.dg.create_method | default('rman_duplicate_active')) }}
 
+# @var _odb_standby_archivelog_deletion_policy:description: >
+# The variable is internal used only.
+#
+# Do not set it in inventory!
+#
+# RMAN `CONFIGURE ARCHIVELOG DELETION POLICY TO <value>` of the current member:
+# `archivelog_deletion_policy` of the member or of the configuration (mandatory, checked by `orasw_meta`).
+# @end
+# @var _odb_standby_archivelog_deletion_policy: $ "_internal_used_"
+_odb_standby_archivelog_deletion_policy: >-
+  {{ _odb_standby_member.dg.archivelog_deletion_policy
+     | default(_odb_standby_config.dg.archivelog_deletion_policy | default('')) }}
+
 # @var _orasw_meta_standby_sid:description: >
 # The variable is internal used only.
 #

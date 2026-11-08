@@ -374,6 +374,7 @@ db_standby_config:
     type: dataguard
     dg:
       protection_mode: MaxPerformance
+      archivelog_deletion_policy: APPLIED ON ALL STANDBY
     members:
       - hosts: [dbhost1]
         db_unique_name: DB1_SITE1

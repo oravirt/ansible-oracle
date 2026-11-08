@@ -178,7 +178,7 @@ Follow the Beginners Guide for both VMs:
 [options="header"]
 |=======================
 |File |Content
-|`group_vars/dbfs/standby.yml` |`db_standby_config`: configuration `DG1` with the members `DB1_SITE1` (`initial_role: primary`) and `DB1_SITE2` (`initial_role: physical_standby`)
+|`group_vars/dbfs/standby.yml` |`db_standby_config`: configuration `DG1` with the members `DB1_SITE1` (`initial_role: primary`) and `DB1_SITE2` (`initial_role: physical_standby`), `archivelog_deletion_policy: APPLIED ON ALL STANDBY` (mandatory)
 |`group_vars/dbfs/tnsnames.yml` |Connect identifiers `DB1_SITE1` and `DB1_SITE2` with the IP addresses of the VMs
 |`group_vars/dbfs/database_DB1.yml` |Database `DB1` with `standby_config: DG1` for both members
 |`host_vars/<host>/databases.yml` |`db1_unique_name`: `db_unique_name` of the member on the host
@@ -297,6 +297,12 @@ see link:rman.adoc[RMAN Guide].
 ls -l /u01/app/oracle/rman/log
 ----
 
+`oradb_standby` configures `ARCHIVELOG DELETION POLICY TO APPLIED ON ALL STANDBY` on both members
+(`archivelog_deletion_policy` in `group_vars/dbfs/standby.yml`):
+`archivelog` deletes only archive logs, which are applied on the standby database.
+`BACKED UP ...` is not used: without catalog the standby database does not know the backups of the primary
+and its archive logs would never be eligible for deletion.
+
 NOTE: The example uses no RMAN catalog.
 The backups of a member are only known in its own controlfile.
 
@@ -332,6 +338,7 @@ to create the standby database on `dataguard-dbfs2`.
 |db_recovery_file_dest 2+|`/u02/fra`
 |Listener 2+|`LISTENER`, port 1521
 |Data Guard Broker 2+|configuration `DG1`, `MaxPerformance`, `LogXptMode` `ASYNC`
+|Archivelog deletion policy 2+|`APPLIED ON ALL STANDBY`
 |=======================
 
 The systemd unit `oracle-db@DB1.service` starts the database in `MOUNT` and opens a primary database only.

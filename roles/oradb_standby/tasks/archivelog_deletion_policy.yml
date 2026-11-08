@@ -1,0 +1,44 @@
+---
+# RMAN CONFIGURE ARCHIVELOG DELETION POLICY of the local member (primary and standby).
+# The policy is stored in the controlfile of each member => executed on every member,
+# e.g. the controlfile of a standby database from RMAN DUPLICATE contains the policy of the primary.
+# Value: archivelog_deletion_policy of the member or of the configuration (mandatory, assert in orasw_meta).
+#
+# SHOW ARCHIVELOG DELETION POLICY prints 'TO DISK' / 'TO 'SBT_TAPE'' instead of 'TO DEVICE TYPE ...'
+# => both values are normalized before the comparison, CONFIGURE only when they differ.
+# RMAN-08591 (warning: invalid archived log deletion policy, e.g. no standby destination) is no error.
+- name: Archivelog deletion policy | Current policy
+  ansible.builtin.command:
+    argv:
+      - "{{ _oracle_home_db }}/bin/rman"
+      - target
+      - /
+    stdin: "show archivelog deletion policy;"
+  environment: "{{ _oracle_env | combine({'ORACLE_SID': _orasw_meta_standby_sid}) }}"
+  become: true
+  become_user: "{{ oracle_user }}"
+  register: _oradb_standby_adp_show
+  changed_when: false
+  check_mode: false
+
+- name: Archivelog deletion policy | Configure {{ _oradb_standby_adp }}
+  ansible.builtin.command:
+    argv:
+      - "{{ _oracle_home_db }}/bin/rman"
+      - target
+      - /
+    stdin: "configure archivelog deletion policy to {{ _oradb_standby_adp }};"
+  environment: "{{ _oracle_env | combine({'ORACLE_SID': _orasw_meta_standby_sid}) }}"
+  become: true
+  become_user: "{{ oracle_user }}"
+  register: _oradb_standby_adp_configure
+  changed_when: true
+  when:
+    - _oradb_standby_adp_current != _oradb_standby_adp_wanted
+
+- name: Archivelog deletion policy | Result
+  ansible.builtin.debug:
+    msg: >-
+      {{ _oradb_standby_unique_name | trim }}: {{ _oradb_standby_adp_configure.stdout_lines
+         | select('search', 'DELETION POLICY|RMAN-') | list }}
+  when: _oradb_standby_adp_configure is changed  # noqa no-handler

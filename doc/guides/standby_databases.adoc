@@ -55,7 +55,7 @@ List of standby configurations.
 |`name` | yes | Name of the configuration. Referenced by `oracle_databases[].standby_config`. Used as name of the broker configuration for Data Guard.
 |`type` | yes | `dataguard` or `dbvisit`. No default value.
 |`members` | yes | List of members, see below.
-|`dg` | no | Data Guard attributes of the configuration. Only allowed with `type: dataguard`.
+|`dg` | `dataguard`: for `archivelog_deletion_policy` | Data Guard attributes of the configuration. Only allowed with `type: dataguard`. Not needed, when `archivelog_deletion_policy` is defined in each member.
 |`dbvisit` | no | Dbvisit attributes of the configuration. Only allowed with `type: dbvisit`.
 |=======================
 
@@ -79,6 +79,7 @@ List of standby configurations.
 |`protection_mode` | `MaxPerformance` | `MaxPerformance`, `MaxAvailability` or `MaxProtection`
 |`create_method` | `rman_duplicate_active` | Default method for the creation of the standby databases, see <<_creation_of_a_standby_database>>
 |`create_tasks_file` | - | Tasks file for `create_method: custom`
+|`archivelog_deletion_policy` | - (mandatory here or in each member) | RMAN `CONFIGURE ARCHIVELOG DELETION POLICY TO <value>` of all members, see <<_archivelog_deletion_policy>>
 |=======================
 
 .Member (`db_standby_config[].members[].dg`)
@@ -90,6 +91,7 @@ List of standby configurations.
 |`delay_mins` | `0` | Broker property `DelayMins` (delay of redo apply in minutes)
 |`create_method` | `create_method` of the configuration | Method for the creation of this standby database
 |`create_tasks_file` | `create_tasks_file` of the configuration | Tasks file for `create_method: custom`
+|`archivelog_deletion_policy` | `archivelog_deletion_policy` of the configuration | RMAN `CONFIGURE ARCHIVELOG DELETION POLICY TO <value>` of this member
 |=======================
 
 NOTE: `MaxAvailability` and `MaxProtection` need `SYNC` or `FASTSYNC` for at least one standby member.
@@ -268,6 +270,64 @@ the standby gets its own value with `SET` in RMAN `DUPLICATE`.
 
 The SYS password is read from `dbpasswords[<oracle_db_name>]['sys']` or `default_dbpass`, like `dbca` in `oradb_manage_db`.
 
+=== Archivelog deletion policy
+
+`archivelog_deletion_policy` is mandatory for `type: dataguard`:
+in `dg` of the configuration (all members) or in `dg` of each member.
+The policy decides, when RMAN and the Fast Recovery Area may delete an archive log,
+e.g. not before it is applied on all standby databases.
+It belongs to the Data Guard configuration and must be defined consciously for every member.
+
+`oradb_standby` executes RMAN on every member, primary and physical standby,
+because the policy is stored in the controlfile of each member:
+
+----
+show archivelog deletion policy;
+configure archivelog deletion policy to <archivelog_deletion_policy>;
+----
+
+- `CONFIGURE` is only executed when the current policy differs (idempotent).
+  `SHOW` prints `TO DISK` instead of `TO DEVICE TYPE DISK`, both are compared normalized.
+- The instance must be mounted. A missing standby database (e.g. `create_method: external`) is skipped.
+- The controlfile of a new standby database from RMAN `DUPLICATE` contains the policy of the primary,
+  the policy of the member is configured afterwards.
+- The warning `RMAN-08591: warning: invalid archived log deletion policy` (e.g. no standby destination yet) is no error.
+
+.Valid values (case insensitive)
+[options="header"]
+|=======================
+|Value |Description
+|`NONE` |RMAN default: no deletion policy
+|`APPLIED ON [ALL] STANDBY` |Eligible after the archive log is applied on (all) standby databases
+|`SHIPPED TO [ALL] STANDBY` |Eligible after the archive log is shipped to (all) standby databases
+|`BACKED UP <n> TIMES TO DEVICE TYPE DISK\|SBT` |Eligible after `<n>` backups, can be repeated for several devices
+|`APPLIED ON ALL STANDBY BACKED UP <n> TIMES TO DEVICE TYPE DISK` |Combination: `APPLIED`/`SHIPPED` first, then `BACKED UP`
+|=======================
+
+IMPORTANT: `BACKED UP` needs an RMAN catalog in a Data Guard configuration:
+without catalog the controlfile of a member knows only its own backups,
+e.g. the archive logs of a standby database are never eligible for deletion, when the backups run on the primary.
+
+.Example without RMAN catalog
+[source,yaml]
+----
+db_standby_config:
+  - name: DG1
+    type: dataguard
+    dg:
+      archivelog_deletion_policy: APPLIED ON ALL STANDBY
+----
+
+.Example with RMAN catalog and backups on the standby database
+[source,yaml]
+----
+db_standby_config:
+  - name: DG1
+    type: dataguard
+    dg:
+      archivelog_deletion_policy: APPLIED ON ALL STANDBY BACKED UP 1 TIMES TO DEVICE TYPE DISK
+----
+
 === Data Guard Broker configuration file
 
 `oradb_standby` creates a `dgmgrl` script for each database with `type: dataguard`:
@@ -434,6 +494,8 @@ The asserts can be disabled with `orasw_meta_assert_db_standby_config: false`.
 - `connect_identifier` is defined for each member and exists in `oracle_tnsnames_config`.
 - `create_method` is `rman_duplicate_active`, `external` or `custom`.
   `custom` needs `create_tasks_file` in the member or in the configuration.
+- `archivelog_deletion_policy` is defined for each member (in the member or in the configuration)
+  and is a valid policy, see <<_archivelog_deletion_policy>>.
 
 `oracle_databases` with `standby_config`:
 
@@ -469,6 +531,7 @@ db_standby_config:
     type: dataguard
     dg:
       protection_mode: MaxPerformance
+      archivelog_deletion_policy: APPLIED ON ALL STANDBY
     members:
       - hosts: [dbhost1]
         db_unique_name: DB1_SITE1

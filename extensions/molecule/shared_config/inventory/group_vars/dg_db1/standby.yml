@@ -12,6 +12,11 @@ db_standby_config:
     type: dataguard
     dg:
       protection_mode: MaxPerformance
+      # mandatory: RMAN CONFIGURE ARCHIVELOG DELETION POLICY of all members (oradb_standby).
+      # Archive logs are eligible for deletion after they are applied on all standby databases.
+      # 'BACKED UP ...' needs an RMAN catalog: without catalog the controlfile of a standby
+      # does not know the backups of the primary => no archive log of the standby would be eligible.
+      archivelog_deletion_policy: APPLIED ON ALL STANDBY
     members:
       - hosts: [dataguard-1]
         db_unique_name: DB1_SITE1
