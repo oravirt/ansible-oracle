@@ -1,0 +1,14 @@
+---
+# RMAN backups with NFS (playbooks/nfs_server.yml, role oradb_rman)
+#
+# dataguard-dbfs1 (group nfs_server) exports nfs_server_backup_path read write,
+# the hosts of the group nfs_client mount the share permanently on the same path.
+# => all members of the Data Guard configuration write their backups into the same directory
+#    and every member can read the backups of the other member.
+nfs_server_backup: "{{ hostvars[groups['nfs_server'][0]]['ansible_host'] }}"
+nfs_server_backup_path: /u01/app/oracle/backup
+# Mount options of the backup share on the NFS clients
+nfs_client_backup_opts: rw,bg,hard,tcp,timeo=600,rsize=1048576,wsize=1048576
+
+# CONFIGURE DEVICE TYPE DISK in the RMAN script parameter (role oradb_rman)
+rman_device_type_disk: 'PARALLELISM 1 BACKUP TYPE TO COMPRESSED BACKUPSET'

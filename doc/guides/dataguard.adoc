@@ -16,6 +16,9 @@ This guide installs an Oracle AI Database 26ai with Data Guard on two Oracle Lin
 The 1st VM exports its installation media with NFS.
 AutoUpgrade downloads the gold image on the 1st VM only, the 2nd VM mounts the installation media with NFS.
 
+The 1st VM exports a 2nd NFS share for the RMAN backups, the 2nd VM mounts it permanently.
+A weekly level 0 backup and an hourly archivelog backup run on the current primary database.
+
 The guide is based on the link:beginner.adoc[Beginners Guide].
 Steps that are identical are referenced and not repeated.
 
@@ -36,12 +39,14 @@ image::{puml}/guides/dataguard.puml[Architecture]
 . Start the playbook `playbooks/do_all.yml`. It executes all needed playbooks:
 .. `opitzconsulting.ansible_oracle.os`: prepare both VMs
 .. `playbooks/nfs_server.yml`: NFS server on `dataguard-dbfs1`, export of the installation media `/u01/sw`
+   and of the RMAN backups `/u01/app/oracle/backup`, permanent mount of the RMAN backups on `dataguard-dbfs2`
 .. `playbooks/autoupgrade.yml`: install AutoUpgrade on `dataguard-dbfs1` and download a _gold image_ from My Oracle Support
 .. `opitzconsulting.ansible_oracle.single_instance_fs` on both VMs:
 ... install the ORACLE_HOME on `dataguard-dbfs1` from `/u01/sw` and on `dataguard-dbfs2` from the NFS share,
 ... create the primary database `DB1_SITE1` with `dbca`,
 ... create the physical standby database `DB1_SITE2` with RMAN `DUPLICATE ... FROM ACTIVE DATABASE`,
-... create the Data Guard Broker configuration `DG1`.
+... create the Data Guard Broker configuration `DG1`,
+... configure the RMAN backups with cron (role `oradb_rman`).
 
 ==== Defaults
 
@@ -57,6 +62,7 @@ image::{puml}/guides/dataguard.puml[Architecture]
 |`192.168.66.167` |IP address of the 2nd VM (`ansible_host`)
 |`ol` |Login user on the VMs (`ansible_user`)
 |`/u01/sw` |Installation media: target of the download on `dataguard-dbfs1`, NFS mount point on `dataguard-dbfs2`
+|`/u01/app/oracle/backup` |RMAN backups: directory on `dataguard-dbfs1`, NFS mount point on `dataguard-dbfs2`
 |`/u01/stage` |Staging directory on the VMs (`oracle_stage`)
 |=======================
 
@@ -228,6 +234,74 @@ Therefore the symlink `db_home_26_latest.zip` of the gold image works on both ho
 
 TIP: Use the same settings for any database server, which mounts its installation media from an existing NFS server:
 `install_from_nfs: true`, `nfs_server_sw`, `nfs_server_sw_path` and `oracle_stage_remote`.
+
+==== RMAN backups with NFS
+
+`playbooks/nfs_server.yml` configures the NFS share for the RMAN backups as well:
+
+- `dataguard-dbfs1`: directory `/u01/app/oracle/backup` and one subdirectory per `oracle_db_name` (`DB1`),
+  owner `oracle`, mode `0750` (RMAN does not create directories)
+- `dataguard-dbfs1`: export of `/u01/app/oracle/backup` read write for the group `nfs_client` (`/etc/exports.d/oracle-backup.exports`)
+- `dataguard-dbfs2`: permanent mount (`/etc/fstab`) on the same path
+
+Both members write their backups into the same directory.
+Backups of the primary can be used on the standby and vice versa.
+
+.Backup settings in inventory/group_vars/all/backup.yml
+[options="header"]
+|=======================
+|Variable |Value |Description
+|`nfs_server_backup` |`ansible_host` of the 1st host of the group `nfs_server` |NFS server
+|`nfs_server_backup_path` |`/u01/app/oracle/backup` |Exported directory and mount point
+|`nfs_client_backup_opts` |`rw,bg,hard,tcp,timeo=600,rsize=1048576,wsize=1048576` |Mount options on the NFS client
+|`rman_device_type_disk` |`PARALLELISM 1 BACKUP TYPE TO COMPRESSED BACKUPSET` |`CONFIGURE DEVICE TYPE DISK`
+|=======================
+
+The RMAN settings are part of `oracle_database_db1` in `group_vars/dbfs/database_DB1.yml`:
+
+.RMAN settings of DB1
+[source,yaml]
+----
+  rman_retention_policy: 'RECOVERY WINDOW OF 7 DAYS'
+  rman_channel_disk: "format '/u01/app/oracle/backup/%d/%d_%T_%U'"
+  rman_controlfile_autobackup_disk: "'/u01/app/oracle/backup/%d/%d_{{ db1_unique_name }}_%F'"
+  rman_jobs:
+    - {name: parameter, role: primary, immediate: true}
+    - {name: parameter_standby, role: standby, immediate: true}
+    - {name: online_level0, role: primary, weekday: "0", hour: "01", minute: "10", day: "*"}
+    - {name: archivelog, role: primary, weekday: "*", hour: "*", minute: "30", day: "*"}
+----
+
+.RMAN jobs
+[options="header"]
+|=======================
+|Job |Schedule |Executed on
+|`parameter` |during the playbook |current primary: `CONFIGURE ...` in the controlfile
+|`parameter_standby` |during the playbook |current standby: `CONFIGURE ...` without the retention policy (not configurable on a standby)
+|`online_level0` |Sunday 01:10 |current primary, `delete obsolete` with the retention policy of the inventory
+|`archivelog` |hourly at minute 30 |current primary
+|=======================
+
+Both members get the same crontab entries.
+`rman_backup.sh --role primary` skips the backup on the physical standby (exit code 0).
+After a switchover the backups run on the new primary, the inventory is not changed.
+
+`%F` contains the DBID, which is identical on all members.
+Therefore the format of the controlfile autobackup contains the `db_unique_name`.
+
+`control_file_record_keep_time` (`30`) is greater than the recovery window (`7` days),
+see link:rman.adoc[RMAN Guide].
+
+.Logfiles of the backups
+----
+ls -l /u01/app/oracle/rman/log
+----
+
+NOTE: The example uses no RMAN catalog.
+The backups of a member are only known in its own controlfile.
+
+WARNING: The share is mounted with `hard`: RMAN hangs on `dataguard-dbfs2`, while `dataguard-dbfs1` is not available.
+Use a separate NFS server for production systems.
 
 === Install databases with Ansible
 
