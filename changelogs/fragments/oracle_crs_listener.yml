@@ -1,0 +1,14 @@
+---
+major_changes:
+  - "oracle_crs_listener: new module in opitzconsulting.ansible_oracle, replaces ibre5041.ansible_oracle_modules.oracle_crs_listener in oradb_manage_db. The dependency ibre5041.ansible_oracle_modules is removed from galaxy.yml."
+  - "oracle_crs_listener: state present adds/modifies and starts the listener (same as started), a disabled listener is not started. state stopped adds a listener without starting it"
+  - "oracle_crs_listener: srvctl add/modify listener is executed with srvctl of the ORACLE_HOME of the listener (srvctl of a newer GI home fails with PRCN-3018 for a listener in an older database home)"
+  - "oracle_crs_listener: the GI home is always crs_home from /etc/oracle/olr.loc, there is no option crs_home"
+bugfixes:
+  - "oracle_crs_listener: srvctl add listener used -oraclehome %CRS_HOME% (default of oraclehome) for a new listener. oraclehome is not set by default now, the GI home is used for a new listener and an existing ORACLE_HOME is not changed"
+  - "oracle_crs_listener: endpoints without protocol (1521) or in lower case (tcp:1521) were modified in every run. Endpoints are normalized before the comparison"
+  - "oracle_crs_listener: oraclehome with the path of the GI home was modified in every run, the path and %CRS_HOME% are the same now"
+  - "oracle_crs_listener: the last resource of crsctl stat res -p was lost, when the output did not end with an empty line"
+  - "oracle_crs_listener: srvctl/crsctl used ORACLE_HOME and LD_LIBRARY_PATH of the environment (e.g. database home), now the GI home is used"
+  - "oracle_crs_listener: fail_json was called without msg when the status of the listener could not be read, warnings on stderr of srvctl failed the module"
+  - "molecule: module test oracle_crs_listener in scenario has-ol9"
