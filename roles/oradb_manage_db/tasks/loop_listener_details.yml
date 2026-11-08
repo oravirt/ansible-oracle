@@ -1,4 +1,25 @@
 ---
+# use_gi_home => the listener is in the GI / Oracle Restart home: crs_home from /etc/oracle/olr.loc
+# (only one Grid Infrastructure / Oracle Restart per host => the home cannot differ)
+- name: listener | GI / Oracle Restart home
+  when:
+    - lsnrinst.use_gi_home | default(false) | bool
+    - _oradb_manage_db_crs_home is not defined
+  tags:
+    - listener
+    - listener2
+  block:
+    - name: listener | Read /etc/oracle/olr.loc
+      ansible.builtin.slurp:
+        src: /etc/oracle/olr.loc
+      register: _oradb_manage_db_olr_loc
+
+    - name: listener | crs_home from /etc/oracle/olr.loc
+      ansible.builtin.set_fact:
+        _oradb_manage_db_crs_home: >-
+          {{ _oradb_manage_db_olr_loc.content | b64decode
+             | regex_search('(?m)^crs_home=(.*)$', '\1') | first | trim }}
+
 - name: listener | loop data
   ansible.builtin.debug:
     msg:
@@ -106,9 +127,12 @@
       tags:
         - molecule-idempotence-notest
 
+    # srvctl add/modify listener with the ORACLE_HOME of the listener:
+    # home => ORACLE_HOME of home, use_gi_home => GI / Oracle Restart home
     - name: listener | Register listener with srvctl
       opitzconsulting.ansible_oracle.oracle_crs_listener:
         name: "{{ lsnrinst.listener_name }}"
+        oraclehome: "{{ _oradb_manage_db_listener_crs_oraclehome }}"
         endpoints: >-
           {{ _oradb_manage_db_endpoints['protocol'] | default('TCP') }}:{{ _oradb_manage_db_endpoints['port'] | default('1521') }}
         enabled: true

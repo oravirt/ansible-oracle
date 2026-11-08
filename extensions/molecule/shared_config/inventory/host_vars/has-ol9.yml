@@ -68,9 +68,36 @@ db_homes_installed:
     state: present
     apply_patches: false
 
+# Listener resources in Oracle Restart (srvctl), for the tests of the listener management:
+# - LISTENER:          GI / Oracle Restart home (created in converge.yml)
+# - LISTENER_RES_1522: additional listener in the Oracle Restart home (use_gi_home)
+# - LISTENER_DB_1523:  additional listener in the ORACLE_HOME of the database (srvctl -oraclehome)
+oracle_listeners_config:
+  LISTENER:
+    address:
+      - host: "{{ ansible_hostname }}"
+        protocol: TCP
+        port: 1521
+  LISTENER_RES_1522:
+    address:
+      - host: "{{ ansible_hostname }}"
+        protocol: TCP
+        port: 1522
+  LISTENER_DB_1523:
+    address:
+      - host: "{{ ansible_hostname }}"
+        protocol: TCP
+        port: 1523
+
 listener_installed:
   - listener_name: LISTENER
     use_gi_home: true
+    state: present
+  - listener_name: LISTENER_RES_1522
+    use_gi_home: true
+    state: present
+  - listener_name: LISTENER_DB_1523
+    home: db19-gi-ee
     state: present
 
 # tnsnames.ora, sqlnet.ora and wallet for the module tests (side_effect)

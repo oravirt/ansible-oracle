@@ -42,19 +42,36 @@ _oradb_manage_db_create_listener: >-
 _oradb_manage_db_listener_loop_helper: |-
   {{ lsnrinst | default(tnsinst) | default(sqlnetinst) | default({}) }}
 
+# GI / Oracle Restart home: use_gi_home (listener_installed, tnsnames_installed, sqlnet_installed)
+_oradb_manage_db_listener_gi: "{{ _oradb_manage_db_listener_loop_helper.use_gi_home | default(false) | bool }}"
+
 # OS-User for ORACLE_HOME from Listener
 _oradb_manage_db_listener_oracle_user: >-
-  {{ _oradb_manage_db_listener_loop_helper.use_gi_home | default(false)
+  {{ _oradb_manage_db_listener_gi | bool
   | ternary((role_separation | bool | ternary(grid_user, oracle_user)), oracle_user) }}
 
+# use_gi_home in listener_installed => crs_home from /etc/oracle/olr.loc (loop_listener_details.yml)
 _oradb_manage_db_listener_home: |-
-  {% if _oradb_manage_db_listener_loop_helper.use_gi_home | default(false) | bool %}
+  {% if lsnrinst is defined and _oradb_manage_db_listener_gi | bool %}
+  {{- _oradb_manage_db_crs_home | default(oracle_home_gi) }}
+  {%- elif _oradb_manage_db_listener_gi | bool %}
   {{- oracle_home_gi }}
   {%- elif db_homes_config[_oradb_manage_db_listener_loop_helper.home]['readonly_home'] | default(false) | bool %}
   {{- oracle_base }}/homes/{{ db_homes_config[_oradb_manage_db_listener_loop_helper.home]['oracle_home_name'] }}
   {%- else %}
   {{- db_homes_config[_oradb_manage_db_listener_loop_helper.home]['oracle_home'] }}
   {%- endif %}
+
+# ORACLE_HOME of the listener resource in Grid Infrastructure / Oracle Restart (srvctl -oraclehome):
+# - use_gi_home => crs_home from /etc/oracle/olr.loc
+# - otherwise the ORACLE_HOME of home (not ORACLE_BASE_HOME of a read-only ORACLE_HOME)
+_oradb_manage_db_listener_crs_oraclehome: >-
+  {%- if lsnrinst.use_gi_home | default(false) | bool -%}
+  {{ _oradb_manage_db_crs_home | default(oracle_home_gi) }}
+  {%- else -%}
+  {{ db_homes_config[lsnrinst.home]['oracle_home']
+     | default(oracle_base ~ '/' ~ db_homes_config[lsnrinst.home]['version'] ~ '/' ~ lsnrinst.home) }}
+  {%- endif -%}
 
 _oradb_manage_db_dbca_sys_pass: "{% if dbpasswords[odb.oracle_db_name] is defined %}\
                   {%- if dbpasswords[odb.oracle_db_name]['sys'] is defined %}{{ dbpasswords[odb.oracle_db_name]['sys'] }}\
