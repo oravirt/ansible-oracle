@@ -1,0 +1,35 @@
+---
+# Execute rman_backup.sh as oracle and record the result (included by oradb_rman.yml).
+#
+# _rm_id:      id of the check: oradb_rman.<step>
+# _rm_args:    arguments of rman_backup.sh (list)
+# _rm_rc:      expected exit code
+# _rm_search:  (optional) regular expression, which must be found in the output
+# _rm_env:     (optional) additional environment variables
+#
+# ORACLE_SID is set by the environment of the play (mt_env) => no -s needed.
+# Result: _rm_out (registered result)
+- name: "oradb_rman | {{ _rm_id }} | rman_backup.sh {{ _rm_args | join(' ') }}"
+  ansible.builtin.command:
+    argv: "{{ [_rm_script] + _rm_args }}"
+  environment: "{{ mt_env | combine(_rm_env | default({})) }}"
+  register: _rm_out
+  changed_when: false
+  failed_when: false
+
+- name: "oradb_rman | {{ _rm_id }} | check"
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: "oradb_rman.{{ _rm_id }}"
+    mt_expect: ok
+    mt_res:
+      failed: >-
+        {{ _rm_out.rc != _rm_rc | int
+           or (_rm_search | default('') | length > 0 and _rm_out.stdout is not search(_rm_search | default(''))) }}
+      msg: >-
+        rc={{ _rm_out.rc }} (expected {{ _rm_rc }}){{ _rm_missing }}:
+        {{ (_rm_out.stdout_lines | default([]))[-8:] | join(' | ') }}
+    _rm_missing: >-
+      {{ (', not found: ' ~ _rm_search)
+         if (_rm_search | default('') | length > 0 and _rm_out.stdout is not search(_rm_search | default('')))
+         else '' }}
