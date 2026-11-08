@@ -14,10 +14,10 @@ All other role variables from `oradb_rman` are deprecated and will be removed in
   - [oradb_rman_autofs](#oradb_rman_autofs)
   - [oradb_rman_channel_disk_default](#oradb_rman_channel_disk_default)
   - [oradb_rman_controlfile_autobackup_disk_default](#oradb_rman_controlfile_autobackup_disk_default)
-  - [oradb_rman_cron_logdir](#oradb_rman_cron_logdir)
   - [oradb_rman_cron_mkjob](#oradb_rman_cron_mkjob)
   - [oradb_rman_cronfile](#oradb_rman_cronfile)
   - [oradb_rman_log_dir](#oradb_rman_log_dir)
+  - [oradb_rman_log_retention](#oradb_rman_log_retention)
   - [oradb_rman_retention_policy_default](#oradb_rman_retention_policy_default)
   - [oradb_rman_script_dir](#oradb_rman_script_dir)
   - [oradb_rman_tns_admin](#oradb_rman_tns_admin)
@@ -85,16 +85,6 @@ oradb_rman_controlfile_autobackup_disk_default: >-
   {{ rman_controlfile_autobackup_disk_default | default(__autobackup_disk_default) -}}
 ```
 
-### oradb_rman_cron_logdir
-
-Lgofiledirectory for output of cronjobs.
-
-#### Default value
-
-```YAML
-oradb_rman_cron_logdir: "{{ rman_cron_logdir | default('/var/log/oracle/rman/log') }}"
-```
-
 ### oradb_rman_cron_mkjob
 
 Add mk-job to all cronjobs in `/etc/cron.d` for RMAN backups.
@@ -125,6 +115,20 @@ Lgofiledirectory for `rman_wrapper.sh`.
 
 ```YAML
 oradb_rman_log_dir: "{{ rman_log_dir | default((odb.0 | default(odb)).rman_log_dir | default(oracle_base + '/rman/log')) }}"
+```
+
+### oradb_rman_log_retention
+
+Days to keep the logfiles of `rman_backup.sh` in `oradb_rman_log_dir` (`RMAN_LOG_RETENTION`).
+
+`rman_backup.sh` writes one logfile per execution and removes the logfiles
+of the database and action, which are older than this number of days.
+`0` keeps all logfiles.
+
+#### Default value
+
+```YAML
+oradb_rman_log_retention: 30
 ```
 
 ### oradb_rman_retention_policy_default

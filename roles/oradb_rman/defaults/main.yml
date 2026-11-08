@@ -1,8 +1,12 @@
 ---
-# @var oradb_rman_cron_logdir:description: >
-# Lgofiledirectory for output of cronjobs.
+# @var oradb_rman_log_retention:description: >
+# Days to keep the logfiles of `rman_backup.sh` in `oradb_rman_log_dir` (`RMAN_LOG_RETENTION`).
+#
+# `rman_backup.sh` writes one logfile per execution and removes the logfiles
+# of the database and action, which are older than this number of days.
+# `0` keeps all logfiles.
 # @end
-oradb_rman_cron_logdir: "{{ rman_cron_logdir | default('/var/log/oracle/rman/log') }}"
+oradb_rman_log_retention: 30
 
 # @var oradb_rman_cron_mkjob:description: >
 # Add mk-job to all cronjobs in `/etc/cron.d` for RMAN backups.

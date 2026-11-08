@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 #
-# Date: 18.07.2023
-#
 # Thorsten Bruhns (thorsten.bruhns@opitz-consulting.de)
 #
 # Simple RMAN-Backupscript
@@ -35,9 +33,17 @@
 # The script checks for the catalog. When the catalog is not reachable the backup
 # will run without a catalog.
 #
-# Major actions are logged in syslog of operating system
-# A Logfile with name <RMAN_LOGDIR>/<ORACLE_SID>_<action>.log includes
-# all output from RMAN
+# Logging
+# =======
+# All output of the script and RMAN is written to stdout and to a logfile per execution:
+#   <RMAN_LOGDIR>/<db_unique_name>_<action>_<YYYYmmdd>_<HHMMSS>_<pid>.log
+# The symlink <RMAN_LOGDIR>/<db_unique_name>_<action>.log points to the logfile of the
+# last execution. Logfiles older than RMAN_LOG_RETENTION days are removed (0: keep all).
+# => cron could redirect the output to /dev/null.
+# Major actions and errors before the logfile is opened are logged in syslog.
+#
+# Parallel executions of the same action for a database are not allowed (flock):
+# the 2nd execution stops with exit code 30.
 #
 # Exit codes:
 #   0     RMAN successful or backup skipped (service not running on this node,
@@ -47,6 +53,7 @@
 #   13    database role could not be determined (--role)
 #   14    configuration file not readable
 #   21-23 log directory, RMAN script or logfile not existing
+#   30    the action is running already for the database
 #   99    RMAN failed
 #
 # This program is free software; you can redistribute it and/or modify
@@ -70,7 +77,11 @@ ORATAB=/etc/oratab
 CFGNAME=rman_backup.cfg
 
 # keys of the configuration file (= environment variables)
-CFG_KEYS="RMAN_SCRIPTDIR RMAN_LOGDIR RMAN_TARGETCONNECT RMAN_CATALOGCONNECT RMAN_SERVICE RMAN_ROLE RMAN_TNS_ADMIN"
+CFG_KEYS="RMAN_SCRIPTDIR RMAN_LOGDIR RMAN_LOG_RETENTION RMAN_TARGETCONNECT RMAN_CATALOGCONNECT RMAN_SERVICE RMAN_ROLE RMAN_TNS_ADMIN"
+
+# output before the logfile is opened (written to the logfile afterwards)
+early_log=''
+log_open=false
 
 function print_usage() {
 	echo "Usage:"
@@ -96,8 +107,10 @@ function print_help() {
 	echo "                                            <ORACLE_SID|DB_NAME> when the instance is not running"
 	echo "-r/--rmanscriptdir    RMAN_SCRIPTDIR       Directory for *.rman-Scripts"
 	echo "                                            Default: <ORACLE_ADMIN>/rman"
-	echo "-l/--logdir           RMAN_LOGDIR          Directory for the logfiles of RMAN"
+	echo "-l/--logdir           RMAN_LOGDIR          Directory for the logfiles"
 	echo "                                            Default: <RMAN_SCRIPTDIR>/log"
+	echo "-                     RMAN_LOG_RETENTION   Remove logfiles older than <n> days, 0: keep all"
+	echo "                                            Default: 30"
 	echo "-c/--catalogconnect   RMAN_CATALOGCONNECT  connect catalog <catalogconnect>"
 	echo "                                            Use the configuration file for passwords,"
 	echo "                                            parameters are visible in the process list!"
@@ -116,6 +129,9 @@ function print_help() {
 	echo "  RMAN_CATALOGCONNECT=rman/password@rmancat"
 	echo "  RMAN_ROLE=PRIMARY"
 	echo ""
+	echo "Logfile: <RMAN_LOGDIR>/<db_unique_name>_<action>_<YYYYmmdd>_<HHMMSS>_<pid>.log"
+	echo "         symlink <db_unique_name>_<action>.log to the last execution"
+	echo ""
 	echo "The old environment variables RMANSCRIPTDIR, RMANLOGDIR, CATALOGCONNECT,"
 	echo "TARGETCONNECT and RMANTNS_ADMIN are still supported."
 }
@@ -127,9 +143,17 @@ print_syslog() {
 	fi
 }
 
+# message to stdout, buffered until the logfile is opened
+say() {
+	echo "${*}"
+	if [ "${log_open}" = 'false' ]; then
+		early_log+="${*}"$'\n'
+	fi
+}
+
 # message to stdout and syslog
 print_msg() {
-	echo "${*}"
+	say "${*}"
 	print_syslog "${*}"
 }
 
@@ -300,11 +324,11 @@ setenv_admin() {
 		if [ -n "${db_unique_name}" ]; then
 			ORACLE_ADMIN="${ORACLE_BASE}/admin/${db_unique_name}"
 		else
-			echo "db_unique_name of ${ORACLE_SID} could not be determined (instance not running?)."
+			say "db_unique_name of ${ORACLE_SID} could not be determined (instance not running?)."
 			ORACLE_ADMIN="${ORACLE_BASE}/admin/${DB_NAME}"
 		fi
 	fi
-	echo "ORACLE_ADMIN: ${ORACLE_ADMIN}"
+	say "ORACLE_ADMIN: ${ORACLE_ADMIN}"
 }
 
 # Read KEY=VALUE from the configuration file.
@@ -313,7 +337,7 @@ read_config() {
 	cfgfile="${ORACLE_ADMIN}/rman/${CFGNAME}"
 
 	if [ ! -e "${cfgfile}" ]; then
-		echo "No configuration file ${cfgfile}"
+		say "No configuration file ${cfgfile}"
 		return
 	fi
 
@@ -326,7 +350,7 @@ read_config() {
 		print_msg "WARNING: ${cfgfile} is readable by other users (mode 0600 recommended)."
 	fi
 
-	echo "Configuration file: ${cfgfile}"
+	say "Configuration file: ${cfgfile}"
 	while IFS= read -r line || [ -n "${line}" ]; do
 		line=${line%$'\r'}
 		# remove leading whitespace, skip empty lines and comments
@@ -373,15 +397,98 @@ setenv_rman() {
 	RMAN_SCRIPTDIR=${RMAN_SCRIPTDIR:-${ORACLE_ADMIN}/rman}
 	RMAN_LOGDIR=${RMAN_LOGDIR:-${RMAN_SCRIPTDIR}/log}
 	RMAN_TARGETCONNECT=${RMAN_TARGETCONNECT:-/}
+	RMAN_LOG_RETENTION=${RMAN_LOG_RETENTION:-30}
+	if [[ ! "${RMAN_LOG_RETENTION}" =~ ^[0-9]+$ ]]; then
+		print_msg "WARNING: invalid RMAN_LOG_RETENTION ${RMAN_LOG_RETENTION}, using 30 days"
+		RMAN_LOG_RETENTION=30
+	fi
 	RMAN_ROLE=$(echo "${RMAN_ROLE}" | tr '[:lower:]' '[:upper:]')
 
 	if [ -n "${RMAN_TNS_ADMIN}" ]; then
-		echo "Setting TNS_ADMIN from RMAN_TNS_ADMIN to: ${RMAN_TNS_ADMIN}"
+		say "Setting TNS_ADMIN from RMAN_TNS_ADMIN to: ${RMAN_TNS_ADMIN}"
 		export TNS_ADMIN="${RMAN_TNS_ADMIN}"
 	fi
 
 	rmanskript="${RMAN_SCRIPTDIR}/${rmanbackuptyp}.rman"
-	rmanlog="${RMAN_LOGDIR}/${ORACLE_SID}_${rmanbackuptyp}.log"
+
+	# name of the logfiles and the lock: db_unique_name or the name of ORACLE_ADMIN
+	log_id="${db_unique_name:-$(basename "${ORACLE_ADMIN}")}_${rmanbackuptyp}"
+}
+
+# Called at the end of the script (trap EXIT in open_log), also after exit in abort_script.
+# tee runs as own process and writes the last lines after the script has finished, when we
+# do not wait for it => the end of the logfile would be missing or appear after the prompt.
+# shellcheck disable=SC2329
+finish_log() {
+	if [ "${log_open}" = 'true' ]; then
+		# connect stdout/stderr to the saved file descriptors (terminal or cron) again
+		# => the pipe to tee is closed, tee gets EOF, writes the rest and terminates
+		exec 1>&3 2>&4
+		# wait until tee has written everything to the logfile
+		wait "${tee_pid}" 2>/dev/null
+	fi
+}
+
+# stdout and stderr => terminal and logfile of the execution
+open_log() {
+	if [ ! -d "${RMAN_LOGDIR}" ]; then
+		print_msg "Directory ${RMAN_LOGDIR} for RMAN logfiles not existing."
+		abort_script 21
+	fi
+
+	rmanlog="${RMAN_LOGDIR}/${log_id}_$(date '+%Y%m%d_%H%M%S')_$$.log"
+	if ! printf '%s' "${early_log}" >> "${rmanlog}"; then
+		print_msg "Logfile ${rmanlog} for RMAN could not be created."
+		abort_script 23
+	fi
+
+	# Redirect all output of the script to terminal and logfile (like '| tee', but for the
+	# whole script instead of a single command):
+	#
+	# 1. Save the current stdout (fd 1) and stderr (fd 2) as fd 3 and fd 4.
+	#    They point to the terminal for a manual execution or /dev/null in cron.
+	#    finish_log restores them at the end.
+	exec 3>&1 4>&2
+	# 2. 'exec' without a command changes the file descriptors of the running shell itself,
+	#    from here on for all commands of the script (echo, sqlplus, rman, ...).
+	#    '>(tee -a <logfile>)' is a process substitution: bash starts 'tee' as a separate
+	#    background process and provides its stdin as a file (pipe), e.g. /dev/fd/63.
+	#    '> /dev/fd/63' sends stdout into the pipe, '2>&1' sends stderr to the same place.
+	#    tee copies everything it reads to its own stdout (= the saved terminal/cron output)
+	#    and appends it to the logfile.
+	exec > >(tee -a "${rmanlog}") 2>&1
+	# 3. $! is the PID of the last background process = tee from the process substitution,
+	#    needed for 'wait' in finish_log.
+	tee_pid=$!
+	log_open=true
+	# 4. finish_log runs at every end of the script (normal end, exit, abort_script)
+	trap finish_log EXIT
+	echo "Logfile: ${rmanlog}"
+}
+
+# only one execution of an action for a database
+lock_action() {
+	lockfile="${RMAN_LOGDIR}/.${log_id}.lock"
+	exec 9>> "${lockfile}"
+	if ! flock -n 9; then
+		print_msg "${rmanbackuptyp} is running already for ${log_id%_"${rmanbackuptyp}"} (lock ${lockfile}). Aborting!"
+		abort_script 30
+	fi
+
+	# symlink to the logfile of the last execution
+	# an existing logfile of older versions (appended on every execution) is kept as *.log.old
+	latest="${RMAN_LOGDIR}/${log_id}.log"
+	if [ -f "${latest}" ] && [ ! -L "${latest}" ]; then
+		mv "${latest}" "${latest}.old"
+		echo "Old logfile moved to ${latest}.old"
+	fi
+	ln -sfn "$(basename "${rmanlog}")" "${latest}"
+
+	# remove old logfiles of the action
+	if [ "${RMAN_LOG_RETENTION}" -gt 0 ]; then
+		find "${RMAN_LOGDIR}" -maxdepth 1 -type f -name "${log_id}_[0-9]*_[0-9]*_[0-9]*.log" \
+			-mtime "+${RMAN_LOG_RETENTION}" -print -delete
+	fi
 }
 
 check_service() {
@@ -474,30 +581,19 @@ _EOF_
 }
 
 check_requirements() {
-	if [ ! -d "${RMAN_LOGDIR}" ]; then
-		print_msg "Directory ${RMAN_LOGDIR} for RMAN logfiles not existing."
-		abort_script 21
-	fi
-
 	if [ ! -f "${rmanskript}" ]; then
 		print_msg "RMAN-script ${rmanskript} not existing!"
 		abort_script 22
 	fi
-
-	if ! touch "${rmanlog}"; then
-		print_msg "Logfile ${rmanlog} for RMAN could not be created."
-		abort_script 23
-	fi
 }
 
 do_backup() {
-	# tee: all output is written to the logfile as well
-	"${ORACLE_HOME}/bin/rman" << _EOF_ | tee -a "${rmanlog}"
+	"${ORACLE_HOME}/bin/rman" << _EOF_
 connect target ${RMAN_TARGETCONNECT}
 ${catalogconnect}
 @${rmanskript}
 _EOF_
-	retcode=${PIPESTATUS[0]}
+	retcode=$?
 	if [ "${retcode}" -eq 0 ]; then
 		print_syslog "RMAN Backup successful. Logfile ${rmanlog}"
 	else
@@ -518,6 +614,8 @@ setenv_oracle
 setenv_admin
 read_config
 setenv_rman
+open_log
+lock_action
 check_service
 check_role
 check_requirements
