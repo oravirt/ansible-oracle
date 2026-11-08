@@ -334,16 +334,18 @@
 # The task is only execute once on master_node when GI is installed!
 # no catalog connection (--nocatalog), because setting initial parameters with catalog takes much more time
 # rman_backup.sh writes the logfile in RMAN_LOGDIR, a failed execution fails the task
+# service and role of the job are used like in the crontab:
+# e.g. role: primary => rman_backup.sh skips the job on a standby database (exit code 0)
 - name: Execute RMAN-Script at playbook
   # noqa no-changed-when
   ansible.builtin.command:
-    argv:
-      - "{{ oracle_base }}/bin/rman_backup.sh"
-      - -a
-      - "{{ odb.1.name }}"
-      - -s
-      - "{{ odb.0.oracle_db_instance_name | default(odb.0.oracle_db_name) }}"
-      - --nocatalog
+    argv: >-
+      {{ [oracle_base ~ '/bin/rman_backup.sh',
+          '-a', odb.1.name,
+          '-s', odb.0.oracle_db_instance_name | default(odb.0.oracle_db_name),
+          '--nocatalog']
+         + (['--service', odb.1.service] if odb.1.service is defined else [])
+         + (['--role', odb.1.role] if odb.1.role is defined else []) }}
   environment:
     PATH: /bin:/usr/bin
   become: true

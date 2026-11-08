@@ -52,10 +52,14 @@ Every job executes the RMAN script `<name>.rman`.
 |`state` |no |`present` (default) or `absent` (removes the crontab entry)
 |`minute`, `hour`, `day`, `weekday` |for cron |Schedule of the crontab entry. A job without schedule gets no crontab entry (e.g. `parameter`).
 |`disabled` |no |`true`: the crontab entry is commented out
-|`immediate` |no |`true`: the job is executed during the playbook (without catalog), e.g. for `parameter`
-|`service` |no |Backup only on the node where the service is running (Grid Infrastructure / Oracle Restart), `rman_backup.sh --service`
-|`role` |no |`primary` or `standby`: backup only when the database has this role (Data Guard), `rman_backup.sh --role`
+|`immediate` |no |`true`: the job is executed during the playbook (without catalog), e.g. for `parameter`. `service` and `role` are used as in the crontab.
+|`service` |no |Backup only on the node where the service is running (Grid Infrastructure / Oracle Restart), `rman_backup.sh --service`. Not together with `role`.
+|`role` |no |`primary` or `standby`: backup only when the database has this role (Data Guard), `rman_backup.sh --role`. Not together with `service`.
 |=======================
+
+IMPORTANT: `service` and `role` are mutually exclusive in a job, an assert stops the role when both are defined.
+Both select the member or node which executes the backup, a combination makes no sense.
+For Data Guard use `role`.
 
 ==== Attributes of oracle_databases
 
@@ -201,7 +205,7 @@ The first value wins:
 |`--nocatalog` |- |- |No catalog, even when `RMAN_CATALOGCONNECT` is set
 |`-t/--targetconnect` |`RMAN_TARGETCONNECT` |`/` |`connect target <value>`
 |`--service` |`RMAN_SERVICE` |- |Backup only when the service runs on the current node (GI / Oracle Restart)
-|`--role` |`RMAN_ROLE` |- |`PRIMARY` or `STANDBY` (= `PHYSICAL STANDBY`)
+|`--role` |`RMAN_ROLE` |- |`PRIMARY` or `STANDBY` (= `PHYSICAL STANDBY`). Use either `--service` or `--role`.
 |- |`RMAN_TNS_ADMIN` |- |`TNS_ADMIN` for RMAN
 |=======================
 
@@ -302,9 +306,28 @@ All members of a Data Guard configuration get the same `rman_jobs`.
 
 - `role: standby`: backups of the database on the physical standby, the primary is not loaded
 - `role: primary`: backups on the primary only
-- without `role`: the job runs on every member (e.g. `archivelog`)
+- without `role`: the job runs on every member, e.g. `parameter`: the `CONFIGURE` commands are stored
+  in the controlfile of each member and must be executed on all members
 
 After a switchover the backups follow the role automatically, the inventory is not changed.
+
+.Example: CONFIGURE on all members, backups on the primary only
+[source,yaml]
+----
+oracle_databases:
+  - oracle_db_name: DB1
+    rman_jobs:
+      # no role: executed on every member during the playbook
+      - {name: parameter, immediate: true}
+      # role primary: crontab entry on every member, rman_backup.sh --role primary skips it on the standby
+      - {name: online_level0, role: primary, weekday: "0", hour: "01", minute: "10", day: "*"}
+      - {name: archivelog, role: primary, weekday: "*", hour: "*", minute: "30", day: "*"}
+----
+
+All members get the same crontab entries.
+`rman_backup.sh` checks `database_role` in `v$database` at every execution
+and skips the backup with exit code 0, when the role does not match.
+Valid values of `role` are `primary` and `standby` (checked by an assert).
 
 IMPORTANT: Use an RMAN catalog for Data Guard.
 Backups of a physical standby database can be used for the primary database (and vice versa),
