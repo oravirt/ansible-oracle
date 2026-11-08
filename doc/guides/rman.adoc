@@ -1,0 +1,301 @@
+:toc:
+:toc-placement!:
+:toclevels: 4
+toc::[]
+
+:sectnums:
+:sectnumlevels: 4
+
+== RMAN Backups with oradb_rman
+
+This guide describes the configuration of RMAN backups with the role `oradb_rman`
+and the backup script `rman_backup.sh`.
+
+=== Overview
+
+`oradb_rman` is executed by the playbook `opitzconsulting.ansible_oracle.manage_db` (last role).
+It configures for every database in `oracle_databases` with `rman_jobs`:
+
+.Files created by oradb_rman
+[options="header"]
+|=======================
+|File |Description
+|`$ORACLE_BASE/bin/rman_backup.sh` |Backup script, executes an RMAN script
+|`<RMAN_SCRIPTDIR>/<job>.rman` |RMAN script of a job, from the template `<job>.rman.j2`
+|`$ORACLE_BASE/admin/<db_unique_name>/rman/rman_backup.cfg` |Configuration of `rman_backup.sh` for the database (mode `0600`)
+|`/etc/cron.d/oracle_rman_ansible` |Crontab with one entry per job (`oradb_rman_cronfile`)
+|`<oradb_rman_tns_admin>/tnsnames.ora`, `sqlnet.ora` |Connection to the RMAN catalog (`rman_tnsalias`)
+|`<oradb_rman_wallet_loc>` |Wallet with the credential of the RMAN catalog (`rman_wallet: true`)
+|=======================
+
+The crontab contains no passwords and no directories:
+
+----
+10 01 * * 0 oracle /u01/app/oracle/bin/rman_backup.sh -a online_level0 -s DB1 >> /var/log/oracle/rman/log/rman_DB1_online_level0.log 2>&1
+----
+
+All other settings are read by `rman_backup.sh` from `rman_backup.cfg`.
+
+=== Inventory
+
+==== rman_jobs
+
+`rman_jobs` is a list in an entry of `oracle_databases`.
+Every job executes the RMAN script `<name>.rman`.
+
+.Attributes of rman_jobs
+[options="header"]
+|=======================
+|Attribute |Mandatory |Description
+|`name` |yes |Name of the job = name of the template `<name>.rman.j2` and of the RMAN script `<name>.rman`
+|`state` |no |`present` (default) or `absent` (removes the crontab entry)
+|`minute`, `hour`, `day`, `weekday` |for cron |Schedule of the crontab entry. A job without schedule gets no crontab entry (e.g. `parameter`).
+|`disabled` |no |`true`: the crontab entry is commented out
+|`immediate` |no |`true`: the job is executed during the playbook (without catalog), e.g. for `parameter`
+|`service` |no |Backup only on the node where the service is running (Grid Infrastructure / Oracle Restart), `rman_backup.sh --service`
+|`role` |no |`primary` or `standby`: backup only when the database has this role (Data Guard), `rman_backup.sh --role`
+|=======================
+
+==== Attributes of oracle_databases
+
+.RMAN attributes of an entry in oracle_databases
+[options="header"]
+|=======================
+|Attribute |Description
+|`rman_jobs` |List of jobs, see above
+|`rman_retention_policy` |`CONFIGURE RETENTION POLICY` in the template `parameter`, default: `oradb_rman_retention_policy_default`
+|`rman_channel_disk` |`CONFIGURE CHANNEL DEVICE TYPE DISK`, default: `oradb_rman_channel_disk_default`
+|`rman_controlfile_autobackup_disk` |`CONFIGURE CONTROLFILE AUTOBACKUP FORMAT`, default: `oradb_rman_controlfile_autobackup_disk_default`
+|`rman_script_dir` |Directory of the RMAN scripts of the database, default: `oradb_rman_script_dir`
+|`rman_log_dir` |Directory of the RMAN logfiles of the database, default: `oradb_rman_log_dir`
+|`rman_tnsalias` |TNS alias of the RMAN catalog (entry in `oracle_tnsnames_config`)
+|`rman_user` |Owner of the RMAN catalog, password from `dbpasswords[<rman_tnsalias>][<rman_user>]`
+|`rman_wallet` |`true`: the password is stored in a wallet (`oradb_rman_wallet_loc`), the connect is `/@<rman_tnsalias>`
+|`oracle_db_unique_name` |Directory of `rman_backup.cfg`: `$ORACLE_BASE/admin/<db_unique_name>/rman`, default: `oracle_db_name`
+|=======================
+
+`rman_password` in `oracle_databases` is deprecated. Use `dbpasswords` instead.
+
+==== control_file_record_keep_time
+
+Best practice: `control_file_record_keep_time` is defined in `init_parameters` of every database with `rman_jobs`.
+The controlfile keeps the records of the backups for this number of days.
+Without catalog, RMAN knows only the backups in the controlfile.
+
+`oradb_rman` asserts:
+
+- `control_file_record_keep_time` is defined in `init_parameters` (`state: present`, `sid: '*'`), and
+- the value is >= `<n>` for the retention policy `RECOVERY WINDOW OF <n> DAYS`.
+
+----
+init_parameters:
+  - {name: control_file_record_keep_time, value: '30', scope: both, state: present}
+----
+
+The assert can be disabled with `oradb_rman_assert_control_file_record_keep_time: false`.
+
+==== Global variables
+
+The variables of the role are described in the link:../../roles/oradb_rman/README.md[README of oradb_rman].
+
+.Important variables
+[options="header"]
+|=======================
+|Variable |Default |Description
+|`oradb_rman_script_dir` |`$ORACLE_BASE/rman` |RMAN scripts (`RMAN_SCRIPTDIR`)
+|`oradb_rman_log_dir` |`$ORACLE_BASE/rman/log` |RMAN logfiles (`RMAN_LOGDIR`)
+|`oradb_rman_cron_logdir` |`/var/log/oracle/rman/log` |Output of the cron jobs
+|`oradb_rman_cronfile` |`oracle_rman_ansible` |File in `/etc/cron.d`
+|`oradb_rman_tns_admin` |`$ORACLE_BASE/rman/network/admin` |`TNS_ADMIN` for the catalog (`RMAN_TNS_ADMIN`)
+|`oradb_rman_cron_mkjob` |`false` |Prefix `mk-job` for checkmk
+|=======================
+
+IMPORTANT: The template `parameter` uses `rman_device_type_disk`
+(e.g. `'PARALLELISM 1 BACKUP TYPE TO COMPRESSED BACKUPSET'`),
+the templates `*_fra_disk` use `rman_fra_backupdir`.
+The role has no default for these variables, define them in the inventory when the templates are used.
+
+==== RMAN templates
+
+.Templates of oradb_rman
+[options="header"]
+|=======================
+|Name |Description
+|`parameter` |RMAN configuration: retention policy, controlfile autobackup, channel
+|`online_level0` |Online incremental level 0 backup, archive logs, `delete obsolete`
+|`online_level1` |Online incremental level 1 backup, archive logs, `delete obsolete`
+|`offline_level0` |Offline level 0 backup: the database is restarted in `MOUNT`, opened afterwards
+|`archivelog` |Backup of the archive logs, deletes the archive logs backed up 1 time
+|`*_fra_disk`, `parameter_rac` |Variants for backups of the FRA to disk and for RAC
+|=======================
+
+Own templates `<name>.rman.j2` are found by Ansible in the `templates` directory of the playbook
+(Ansible search path), the job uses the same `name`.
+
+==== Example
+
+.Database with RMAN catalog and Data Guard
+----
+oracle_databases:
+  - oracle_db_name: DB1
+    oracle_db_unique_name: DB1_SITE1
+    ...
+    rman_retention_policy: 'RECOVERY WINDOW OF 14 DAYS'
+    rman_tnsalias: RMANCAT
+    rman_user: rman_db1
+    rman_jobs:
+      - {name: parameter, immediate: true}
+      - {name: online_level0, role: standby, weekday: "0", hour: "01", minute: "10", day: "*"}
+      - {name: online_level1, role: standby, weekday: "1-6", hour: "01", minute: "10", day: "*"}
+      - {name: archivelog, weekday: "*", hour: "*", minute: "30", day: "*"}
+
+rman_device_type_disk: 'PARALLELISM 1 BACKUP TYPE TO COMPRESSED BACKUPSET'
+
+dbpasswords:
+  RMANCAT:
+    rman_db1: <password>
+----
+
+=== rman_backup.sh
+
+==== Usage
+
+----
+rman_backup.sh -a <action> [-s <ORACLE_SID|DB_NAME>] [--admin <Directory>]
+               [-r <Directory>] [-l <Directory>] [-c <CATALOGCONNECT>] [-t <TARGETCONNECT>]
+               [--service <Service>] [--role <PRIMARY|STANDBY>] [--nocatalog]
+rman_backup.sh -h
+----
+
+`-a` is the only mandatory parameter.
+All other settings are read from the command line, the environment or the configuration file.
+
+.Interactive usage as oracle
+----
+export ORACLE_SID=DB1
+$ORACLE_BASE/bin/rman_backup.sh -a archivelog
+$ORACLE_BASE/bin/rman_backup.sh -a online_level0 --nocatalog
+----
+
+==== Order of the settings
+
+The first value wins:
+
+. parameter on the command line
+. environment variable
+. configuration file `<ORACLE_ADMIN>/rman/rman_backup.cfg`
+. default of `rman_backup.sh`
+
+.Parameters, environment variables and defaults
+[options="header"]
+|=======================
+|Parameter |Environment / rman_backup.cfg |Default |Description
+|`-a/--action` |- |- |RMAN script `<RMAN_SCRIPTDIR>/<action>.rman`
+|`-s/--ORACLE_SID` |`ORACLE_SID` |- |ORACLE_SID, DB_NAME in RAC environments (the instance is determined with `srvctl`)
+|`--admin` |`ORACLE_ADMIN` |see below |Directory of `rman/rman_backup.cfg`
+|`-r/--rmanscriptdir` |`RMAN_SCRIPTDIR` |`<ORACLE_ADMIN>/rman` |RMAN scripts
+|`-l/--logdir` |`RMAN_LOGDIR` |`<RMAN_SCRIPTDIR>/log` |Logfile `<RMAN_LOGDIR>/<ORACLE_SID>_<action>.log`
+|`-c/--catalogconnect` |`RMAN_CATALOGCONNECT` |no catalog |`connect catalog <value>`
+|`--nocatalog` |- |- |No catalog, even when `RMAN_CATALOGCONNECT` is set
+|`-t/--targetconnect` |`RMAN_TARGETCONNECT` |`/` |`connect target <value>`
+|`--service` |`RMAN_SERVICE` |- |Backup only when the service runs on the current node (GI / Oracle Restart)
+|`--role` |`RMAN_ROLE` |- |`PRIMARY` or `STANDBY` (= `PHYSICAL STANDBY`)
+|- |`RMAN_TNS_ADMIN` |- |`TNS_ADMIN` for RMAN
+|=======================
+
+The old environment variables `RMANSCRIPTDIR`, `RMANLOGDIR`, `CATALOGCONNECT`, `TARGETCONNECT`
+and `RMANTNS_ADMIN` are still supported.
+
+WARNING: Parameters are visible in the process list. Use `rman_backup.cfg` for the password of the catalog,
+not `-c`.
+
+==== ORACLE_ADMIN
+
+`rman_backup.sh` determines `ORACLE_ADMIN` in the following order:
+
+. `--admin` or the environment variable `ORACLE_ADMIN`
+. `$ORACLE_BASE/admin/<db_unique_name>`: `db_unique_name` is read from the running instance
+  (`v$parameter`, `sqlplus / as sysdba`, works in `NOMOUNT`)
+. `$ORACLE_BASE/admin/<ORACLE_SID>`, when the instance is not running
+
+The `db_unique_name` makes the configuration unique on every member of a Data Guard configuration:
+the ORACLE_SID is identical on all members, the `db_unique_name` is different.
+
+==== rman_backup.cfg
+
+The configuration file contains lines with `KEY=VALUE`.
+It is read line by line and *not* sourced: shell code is not executed.
+
+----
+# Managed by Ansible
+RMAN_SCRIPTDIR=/u01/app/oracle/rman
+RMAN_LOGDIR=/u01/app/oracle/rman/log
+RMAN_TNS_ADMIN=/u01/app/oracle/rman/network/admin
+RMAN_CATALOGCONNECT=rman_db1/<password>@RMANCAT
+----
+
+- Allowed keys: `RMAN_SCRIPTDIR`, `RMAN_LOGDIR`, `RMAN_TARGETCONNECT`, `RMAN_CATALOGCONNECT`,
+  `RMAN_SERVICE`, `RMAN_ROLE`, `RMAN_TNS_ADMIN`. Unknown keys and invalid lines are ignored with a warning.
+- One pair of quotes around the value is removed.
+- Empty lines and lines starting with `#` are ignored.
+- The file could contain the password of the catalog: mode `0600`.
+  `rman_backup.sh` warns, when the file is readable by other users.
+- `oradb_rman` creates the file. Manual changes are overwritten by the next execution of the role.
+
+`RMAN_SERVICE` and `RMAN_ROLE` are set per job in the crontab (`--service`, `--role`) and not in the file,
+because the jobs of a database could use different values.
+
+==== Catalog
+
+`rman_backup.sh` checks the connection to the catalog before the backup.
+The backup runs without catalog, when the catalog is not reachable.
+
+==== Logfiles and exit codes
+
+- RMAN output: `<RMAN_LOGDIR>/<ORACLE_SID>_<action>.log`
+- Output of the cron job: `<oradb_rman_cron_logdir>/rman_<oracle_db_name>_<job>.log`
+- Major actions are logged in syslog (tag `rman_backup.sh`)
+
+.Exit codes of rman_backup.sh
+[options="header"]
+|=======================
+|Code |Description
+|0 |RMAN successful, or backup skipped (`--service` not running on this node, `--role` does not match)
+|1 |Wrong parameters, service not existing
+|10, 11, 12 |ORACLE_SID not in `/etc/oratab`, ORACLE_HOME or ORACLE_BASE not found
+|13 |Database role could not be determined (`--role`, instance not mounted)
+|14 |`rman_backup.cfg` not readable
+|21, 22, 23 |Log directory, RMAN script or logfile not existing
+|99 |RMAN failed
+|=======================
+
+=== Data Guard
+
+All members of a Data Guard configuration get the same `rman_jobs`.
+`role` decides, on which member a job executes the backup:
+
+- `role: standby`: backups of the database on the physical standby, the primary is not loaded
+- `role: primary`: backups on the primary only
+- without `role`: the job runs on every member (e.g. `archivelog`)
+
+After a switchover the backups follow the role automatically, the inventory is not changed.
+
+IMPORTANT: Use an RMAN catalog for Data Guard.
+Backups of a physical standby database can be used for the primary database (and vice versa),
+the catalog makes the backups known to all members.
+
+NOTE: `archivelog` deletes all archive logs that were backed up once.
+Configure an `ARCHIVELOG DELETION POLICY` (e.g. `APPLIED ON ALL STANDBY`) with an own template
+to prevent the deletion of archive logs which are not yet applied on the standby database.
+
+=== Migration from older versions
+
+- The crontab entries contained the directories and the catalog connect (`-r`, `-l`, `-c`)
+  or the environment variables `RMANLOGDIR`, `RMANSCRIPTDIR` and `RMANTNS_ADMIN` in `/etc/cron.d`.
+  `oradb_rman` removes the environment variables and recreates the crontab entries.
+  The values are in `rman_backup.cfg` now.
+- Existing calls of `rman_backup.sh` with all parameters still work.
+- Before this change, the attributes `service`, `rman_retention_policy`, `rman_channel_disk`,
+  `rman_controlfile_autobackup_disk`, `rman_log_dir`, `rman_script_dir` and the catalog connect
+  of a database were ignored by `oradb_rman` (bug).
+  They are used now: check the values in the inventory before the update.
