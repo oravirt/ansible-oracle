@@ -131,6 +131,11 @@ Code blocks are highlighted by Prism (light theme), Chroma is disabled for Markd
 The image of the hugo container is tagged with the tag of the base image, e.g. `rendanic/hugo:0.169.0-ext-ubuntu`.
 A new version in the Dockerfile builds a new image automatically with the next `task build`.
 
+renovate updates only `website/go.mod` and `website/go.sum`.
+`go` from `shell.nix` is needed for `go.sum`.
+The steps below are still manual, the Pull-Request of renovate (group `docsy`) lists them as a note.
+There is no github workflow which builds the website, so a Docsy Pull-Request is green even when the website is broken.
+
 Steps for an update of Docsy:
 
 . Read the release notes of Docsy (minimum version of hugo, breaking changes).

@@ -15,6 +15,7 @@ pkgs.mkShell {
     pkgs.yq
     pkgs.gh   # needed for renovate
     pkgs.renovate
+    pkgs.go   # needed for renovate: go.sum of website/go.mod (Docsy)
 
   ];
 
