@@ -1139,8 +1139,18 @@ def start_db(
     # debug.append('start_db called with open_mode %s,
     #              calling start_instance' % \
     #              (open_mode or "None"))
+    # keyword arguments: the positional call shifted all arguments by one
+    # (script_env missing, israc=sid => srvctl ... instance in Oracle Restart)
     return start_instance(
-        module, oracle_home, db_name, db_unique_name, sid, open_mode, is_cluster, sid
+        module,
+        oracle_home,
+        db_name,
+        db_unique_name,
+        sid,
+        script_env,
+        open_mode=open_mode,
+        israc=is_cluster,
+        instance_name=sid,
     )
 
 

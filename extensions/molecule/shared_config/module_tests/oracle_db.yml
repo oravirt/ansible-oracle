@@ -1,14 +1,25 @@
 ---
-# Tests for oracle_db against the existing CDB DB1 (no Grid Infrastructure => oratab/sqlplus)
+# Tests for oracle_db against the existing CDB mt_cdb.
+# Without Grid Infrastructure the module uses /etc/oratab and sqlplus,
+# with Grid Infrastructure / Oracle Restart (/etc/oracle/olr.loc) srvctl.
 # Only low-risk checks: no dbca, no shutdown/restart.
 # - state=started on the running database (startup returns ORA-01081 => ok)
 # - state=present with the current settings of DB1 (no restart because archivelog is unchanged)
 # - state=present with hostname as ip address and with a host name that does not resolve
 # - state=started/absent for a database that does not exist (only checks /etc/oratab)
+#   => not executed with Grid Infrastructure / Oracle Restart
 # Connection: the module always connects as sys as sysdba (sys_password) to the service
 # db_name; there is no wallet entry for DB1, so the wallet variant is not tested.
+
+# same check as the module: /etc/oracle/olr.loc => managed by Grid Infrastructure / Oracle Restart
+- name: oracle_db | Grid Infrastructure / Oracle Restart
+  ansible.builtin.stat:
+    path: /etc/oracle/olr.loc
+  register: _db_olr_loc
+
 - name: oracle_db | variables
   ansible.builtin.set_fact:
+    _db_gi: "{{ _db_olr_loc.stat.exists }}"
     _db_args:
       oracle_home: "{{ mt_oracle_home }}"
       db_name: "{{ mt_cdb }}"
@@ -212,31 +223,35 @@
         mt_sql_id: oracle_db.cdb.supplemental_restore_sql
 
 # databases that do not exist: only /etc/oratab is checked, no database access
-- name: oracle_db | started for missing database
-  opitzconsulting.ansible_oracle.oracle_db:
-    oracle_home: "{{ _db_args.oracle_home }}"
-    db_name: MOLTEST_NODB
-    sid: MOLTEST_NODB
-    sys_password: "{{ _db_args.sys_password }}"
-    state: started
-  register: _res
-  ignore_errors: true
-- name: oracle_db | check started for missing database
-  ansible.builtin.include_tasks: _check.yml
-  vars: {mt_id: oracle_db.cdb.started_missing, mt_res: "{{ _res }}", mt_expect: failed}
+# => not with Grid Infrastructure / Oracle Restart (srvctl instead of /etc/oratab)
+- name: oracle_db | missing database (without Grid Infrastructure)
+  when: not _db_gi | bool
+  block:
+    - name: oracle_db | started for missing database
+      opitzconsulting.ansible_oracle.oracle_db:
+        oracle_home: "{{ _db_args.oracle_home }}"
+        db_name: MOLTEST_NODB
+        sid: MOLTEST_NODB
+        sys_password: "{{ _db_args.sys_password }}"
+        state: started
+      register: _res
+      ignore_errors: true
+    - name: oracle_db | check started for missing database
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_db.cdb.started_missing, mt_res: "{{ _res }}", mt_expect: failed}
 
-- name: oracle_db | absent for missing database
-  opitzconsulting.ansible_oracle.oracle_db:
-    oracle_home: "{{ _db_args.oracle_home }}"
-    db_name: MOLTEST_NODB
-    sid: MOLTEST_NODB
-    sys_password: "{{ _db_args.sys_password }}"
-    state: absent
-  register: _res
-  ignore_errors: true
-- name: oracle_db | check absent for missing database
-  ansible.builtin.include_tasks: _check.yml
-  vars: {mt_id: oracle_db.cdb.absent_missing, mt_res: "{{ _res }}", mt_expect: ok}
+    - name: oracle_db | absent for missing database
+      opitzconsulting.ansible_oracle.oracle_db:
+        oracle_home: "{{ _db_args.oracle_home }}"
+        db_name: MOLTEST_NODB
+        sid: MOLTEST_NODB
+        sys_password: "{{ _db_args.sys_password }}"
+        state: absent
+      register: _res
+      ignore_errors: true
+    - name: oracle_db | check absent for missing database
+      ansible.builtin.include_tasks: _check.yml
+      vars: {mt_id: oracle_db.cdb.absent_missing, mt_res: "{{ _res }}", mt_expect: ok}
 
 # error handling: wrong sys password (state=present connects to the database)
 - name: oracle_db | wrong sys password
