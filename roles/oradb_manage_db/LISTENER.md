@@ -2,9 +2,8 @@
 # Information for listener configuration
 
 The following special configurations for
-listener are currently supported for
-installations without Oracle Restart or
-Grid Infraststructure.
+listener are supported. See below for Oracle Restart and
+Grid Infrastructure.
 
 # Requirements
 
@@ -47,7 +46,28 @@ listener_installed:
         listener_name: LISTENER1523
         state: present
 
-oracle_databases:
-      - home: 18300-base
-        oracle_db_name: cdb183
-        listener_name: LISTENER
+# Grid Infrastructure / Oracle Restart
+
+With Grid Infrastructure or Oracle Restart (`oracle_install_option_gi`) every listener from
+`listener_installed` is registered with `srvctl add/modify listener` (module `oracle_crs_listener`).
+
+| Entry in `listener_installed` | ORACLE_HOME of the listener resource | `listener.ora` | OS user |
+|---|---|---|---|
+| `home: <db_homes_config key>` | ORACLE_HOME of `home` (`srvctl ... -oraclehome`) | ORACLE_HOME / ORACLE_BASE_HOME of `home` | `oracle_user` |
+| `use_gi_home: true` (without `home`) | GI / Oracle Restart home: `crs_home` from `/etc/oracle/olr.loc` | GI / Oracle Restart home | `grid_user` with `role_separation`, otherwise `oracle_user` |
+
+- Each entry has either `home` or `use_gi_home: true`.
+- The GI / Oracle Restart home of a listener is always `crs_home` from `/etc/oracle/olr.loc`:
+  there is only one Grid Infrastructure / Oracle Restart per host.
+
+```yaml
+listener_installed:
+  # listener in the GI / Oracle Restart home
+  - listener_name: LISTENER
+    use_gi_home: true
+    state: present
+  # additional listener in the ORACLE_HOME of the database
+  - listener_name: LISTENER2
+    home: db19-gi-ee
+    state: present
+```

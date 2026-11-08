@@ -98,6 +98,10 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<oradb_rman: logfiles of rman_backup.sh>>
 |A database in `oracle_databases` has `rman_jobs` *and* the RMAN logfiles are monitored, evaluated or rotated (e.g. checkmk logwatch, logrotate, own scripts), or `oradb_rman_cron_logdir` / `rman_cron_logdir` is set
 |Change the monitoring to the new logfile names in `RMAN_LOGDIR`, remove `oradb_rman_cron_logdir` / `rman_cron_logdir` and the old logfiles
+
+|<<listener_installed with Grid Infrastructure / Oracle Restart: listener in its home>>
+|Grid Infrastructure / Oracle Restart *and* an entry in `listener_installed` with `home`
+|Use `use_gi_home: true` for a listener, which must stay in the GI / Oracle Restart home. Check the ORACLE_HOME of the listener resources (`srvctl config listener`)
 |===
 
 ==== Minimum ansible-core 2.16
@@ -1031,6 +1035,63 @@ rm <RMAN_LOGDIR>/*.log.old
 ----
 
 See link:rman.adoc#Logfiles[RMAN Guide - Logfiles].
+
+==== listener_installed with Grid Infrastructure / Oracle Restart: listener in its home
+
+With Grid Infrastructure or Oracle Restart `oradb_manage_db` registers every listener of `listener_installed`
+with `srvctl add/modify listener` (module `oracle_crs_listener`).
+As of 5.0.0 the listener resource uses the ORACLE_HOME of the entry:
+
+.Before and as of 5.0.0
+[options="header",cols="2,3,3"]
+|=======================
+|Entry in `listener_installed` |Before 5.0.0 |As of 5.0.0
+|`home: <db_homes_config key>`
+|`listener.ora` in the ORACLE_HOME of `home`, but a new listener resource was added in the GI home (`-oraclehome %CRS_HOME%`)
+|`listener.ora` and the listener resource (`srvctl ... -oraclehome`) in the ORACLE_HOME of `home`
+|`use_gi_home: true`
+|GI home from `oracle_home_gi`
+|GI home from `crs_home` in `/etc/oracle/olr.loc` (there is only one Grid Infrastructure / Oracle Restart per host)
+|=======================
+
+Changes in detail:
+
+- A listener with `home` is registered with the ORACLE_HOME of `home`.
+  An existing listener resource in the GI home is modified with `srvctl modify listener -oraclehome <ORACLE_HOME of home>`.
+  The running listener keeps its ORACLE_HOME until the next restart of the listener.
+- A listener with `use_gi_home: true` stays in the GI / Oracle Restart home.
+
+Who is affected:
+
+- Inventories with Grid Infrastructure / Oracle Restart and `home` in `listener_installed`,
+  where the listener runs from the GI home, e.g. `LISTENER` with `home` of the database.
+
+Required actions:
+
+. Use `use_gi_home: true` without `home` for a listener, which must stay in the GI / Oracle Restart home.
+. Check the ORACLE_HOME of the listener resources after the upgrade and restart a moved listener in a maintenance window:
++
+----
+srvctl config listener -listener <listener_name>
+srvctl stop listener -listener <listener_name>
+srvctl start listener -listener <listener_name>
+----
+
+.Example
+[source,yaml]
+----
+listener_installed:
+  # listener in the GI / Oracle Restart home (crs_home from /etc/oracle/olr.loc)
+  - listener_name: LISTENER
+    use_gi_home: true
+    state: present
+  # additional listener in the ORACLE_HOME of the database, registered with srvctl in this home
+  - listener_name: LISTENER2
+    home: db19-gi-ee
+    state: present
+----
+
+See link:../../roles/oradb_manage_db/LISTENER.md[LISTENER.md].
 
 === Adding new breaking changes
 
