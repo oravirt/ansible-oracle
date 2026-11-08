@@ -52,6 +52,31 @@
     - assert
     - assert_rman_tns_admin
 
+# role of a job: rman_backup.sh --role (Data Guard)
+# service and role are mutually exclusive: both select the member/node which executes the backup
+- name: Assert role in rman_jobs
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - odb.1.role | lower in ['primary', 'standby']
+      - odb.1.service is not defined
+    fail_msg: >-
+      {{ odb.0.oracle_db_name }}: rman_jobs {{ odb.1.name | default('') }}:
+      role '{{ odb.1.role }}' must be primary or standby
+      and is not allowed together with service (mutually exclusive)
+  with_subelements:
+    - "{{ oracle_databases }}"
+    - rman_jobs
+    - skip_missing: true
+  loop_control:
+    loop_var: odb
+    label: >-
+      oracle_db_name {{ odb.0.oracle_db_name | default('') }}
+      job {{ odb.1.name | default('') }}
+  when: odb.1.role is defined
+  tags:
+    - assert
+
 # Best practice for RMAN: control_file_record_keep_time in init_parameters
 # (state present, sid '*'). With RECOVERY WINDOW OF <n> DAYS the value must be >= <n>:
 # otherwise the controlfile reuses records of backups, which are needed without catalog.
