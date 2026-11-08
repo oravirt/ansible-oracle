@@ -280,6 +280,36 @@
   tags:
     - wallet
 
+# connect string for the RMAN catalog with rman_user (without wallet) for the crontab:
+# the password is stored in a file readable by oracle_user only (rman_backup.sh --catalogfile)
+- name: Create directory for RMAN catalog connect
+  ansible.builtin.file:
+    path: "{{ oradb_rman_catalog_dir }}"
+    state: directory
+    owner: "{{ oracle_user }}"
+    mode: '0700'
+  when:
+    - oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_user', 'defined') | list | length > 0
+  tags:
+    - rmancron
+
+- name: Create file with RMAN catalog connect
+  ansible.builtin.copy:
+    content: "{{ odb.rman_user }}/{{ _oradb_rman_password }}@{{ odb.rman_tnsalias }}\n"
+    dest: "{{ _oradb_rman_catalog_file }}"
+    owner: "{{ oracle_user }}"
+    mode: '0600'
+  no_log: true
+  with_items:
+    - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_user', 'defined') }}"
+  loop_control:
+    loop_var: odb
+    label: "oracle_db_name {{ odb.oracle_db_name | default('') }}"
+  when:
+    - not odb.rman_wallet | default(false) | bool
+  tags:
+    - rmancron
+
 - name: Register Database in RMAN Catalog
   become: true
   become_user: "{{ oracle_user }}"
@@ -307,14 +337,18 @@
 # The execution isn't done in async mode!
 # The task is only execute once on master_node when GI is installed!
 # no catalog connection, because setting initial parameters with catalog takes much more time
+# pipefail: a failed rman_backup.sh fails the task (tee would hide the return code)
 - name: Execute RMAN-Script at playbook
-  # noqa risky-shell-pipe no-changed-when
-  ansible.builtin.shell: >-
-    {{ oracle_base }}/bin/rman_backup.sh
-    -a {{ odb.1.name }}
-    -s {{ odb.0.oracle_db_instance_name | default(odb.0.oracle_db_name) }}
-    -r {{ oradb_rman_script_dir }}
-    -l {{ oradb_rman_log_dir }} | tee -a {{ rman_cron_logdir }}/rman_{{ odb.1.name }}.log
+  # noqa no-changed-when
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail;
+      {{ oracle_base }}/bin/rman_backup.sh
+      -a {{ odb.1.name }}
+      -s {{ odb.0.oracle_db_instance_name | default(odb.0.oracle_db_name) }}
+      -r {{ oradb_rman_script_dir }}
+      -l {{ oradb_rman_log_dir }} | tee -a {{ oradb_rman_cron_logdir }}/rman_{{ odb.1.name }}.log
+    executable: /bin/bash
   environment:
     PATH: /bin:/usr/bin
   become: true
