@@ -216,6 +216,11 @@
               - _sc.type != 'dataguard' or ass_sdb.oracle_db_unique_name is defined
               # static listener entry <db_unique_name>_DGMGRL for RMAN DUPLICATE and broker
               - _sc.type != 'dataguard' or ass_sdb.listener_name is defined
+              # ARCHIVELOG mode is mandatory for redo transport and RMAN DUPLICATE
+              - _sc.type != 'dataguard' or ass_sdb.archivelog | default(false) | bool
+              # FORCE LOGGING is set by oradb_standby (primary_prepare.yml),
+              # force_logging: false would disable it again in oradb_manage_db
+              - _sc.type != 'dataguard' or ass_sdb.force_logging | default(true) | bool
               - >-
                 _member | length != 1
                 or (ass_sdb.oracle_db_unique_name | default(ass_sdb.oracle_db_name) | upper)
