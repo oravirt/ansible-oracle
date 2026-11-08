@@ -27,6 +27,8 @@ description:
     - With Grid Infrastructure, the configuration of an existing service is compared
       with O(preferred_instances), O(available_instances), O(clbgoal) and O(rlbgoal)
       and changed with C(srvctl modify service) if it differs.
+    - Oracle Restart (C(local_only=TRUE) in C(/etc/oracle/ocr.loc)) has no instances:
+      O(preferred_instances) and O(available_instances) are ignored there.
 version_added: "2.1.0.0"
 options:
     name:
@@ -71,7 +73,7 @@ options:
         description:
             - Comma-separated list of the RAC instances on which the service actively
               runs (C(srvctl -r) / C(-preferred)).
-            - Grid Infrastructure only.
+            - Grid Infrastructure cluster only, ignored with Oracle Restart.
         type: str
         required: false
         aliases: ['pi']
@@ -79,7 +81,7 @@ options:
         description:
             - Comma-separated list of the RAC instances on which the service can run
               when the O(preferred_instances) fail (C(srvctl -a) / C(-available)).
-            - Grid Infrastructure only.
+            - Grid Infrastructure cluster only, ignored with Oracle Restart.
         type: str
         required: false
         aliases: ['ai']
@@ -293,10 +295,11 @@ def create_service(
             database_name,
             name,
         )
-        if preferred_instances is not None:
+        # Oracle Restart has no instances => no -r/-a
+        if is_cluster and preferred_instances is not None:
             command += ' -r %s' % (preferred_instances)
 
-        if available_instances is not None:
+        if is_cluster and available_instances is not None:
             command += ' -a %s' % (available_instances)
 
         if pdb is not None:
@@ -394,10 +397,17 @@ def ensure_service_state(
             cursor, module, msg, oracle_home, name, database_name
         )
 
-        # Compare instance configurations
-        if _wanted_pi != _curr_config_pi:
+        # Compare instance configurations: only in a Grid Infrastructure cluster
+        # (Oracle Restart has no -modifyconfig/-preferred/-available) and only
+        # when the instances are given (otherwise '-preferred None' was added)
+        if is_cluster and preferred_instances and _wanted_pi != _curr_config_pi:
             _inst_temp += ' -preferred %s' % (preferred_instances)
-        if _wanted_ai != _curr_config_ai and '' not in _wanted_ai:
+        if (
+            is_cluster
+            and available_instances
+            and _wanted_ai != _curr_config_ai
+            and '' not in _wanted_ai
+        ):
             _inst_temp += ' -available %s' % (available_instances)
 
         if len(_inst_temp) > 0:
@@ -713,12 +723,29 @@ def execute_sql(module, msg, cursor, sql):
     return True
 
 
+def _is_cluster(ocr_loc='/etc/oracle/ocr.loc'):
+    """True for a Grid Infrastructure cluster (local_only=FALSE in ocr.loc).
+
+    Oracle Restart has local_only=TRUE.
+    """
+    try:
+        with open(ocr_loc) as f:
+            for line in f:
+                key, _sep, value = line.strip().partition('=')
+                if key.strip().lower() == 'local_only':
+                    return value.strip().upper() == 'FALSE'
+    except IOError:
+        pass
+    return False
+
+
 def main():
     global msg
 
     msg = ['']
     cursor = None
     global gimanaged
+    global is_cluster
     global newservice
     global configchange
     configchange = False
@@ -795,6 +822,16 @@ def main():
         gimanaged = True
     else:
         gimanaged = False
+    # Grid Infrastructure cluster: local_only=FALSE in ocr.loc
+    # Oracle Restart: local_only=TRUE => no instances (-preferred/-available)
+    is_cluster = gimanaged and _is_cluster()
+    if gimanaged and not is_cluster:
+        if preferred_instances or available_instances:
+            module.warn(
+                'Oracle Restart: preferred_instances and available_instances '
+                'are ignored'
+            )
+    if not gimanaged:
         # Without GI the services are managed with DBMS_SERVICE => database connection.
         # The module has no option mode => normal connection
         if not service_name:
