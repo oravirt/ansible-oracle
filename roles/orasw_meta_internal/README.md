@@ -19,6 +19,7 @@ This will create issues and problems in `ansible-oracle` and is not supported.
   - [_listener_port_cdb](#_listener_port_cdb)
   - [_listener_port_pdb](#_listener_port_pdb)
   - [_odb_loop_helper](#_odb_loop_helper)
+  - [_odb_standby_archivelog_deletion_policy](#_odb_standby_archivelog_deletion_policy)
   - [_odb_standby_config](#_odb_standby_config)
   - [_odb_standby_create_method](#_odb_standby_create_method)
   - [_odb_standby_member](#_odb_standby_member)
@@ -184,6 +185,21 @@ Do not set it in inventory!
 
 ```YAML
 _odb_loop_helper: _internal_used_
+```
+
+### _odb_standby_archivelog_deletion_policy
+
+The variable is internal used only.
+
+Do not set it in inventory!
+
+RMAN `CONFIGURE ARCHIVELOG DELETION POLICY TO <value>` of the current member:
+`archivelog_deletion_policy` of the member or of the configuration (mandatory, checked by `orasw_meta`).
+
+#### Default value
+
+```YAML
+_odb_standby_archivelog_deletion_policy: _internal_used_
 ```
 
 ### _odb_standby_config

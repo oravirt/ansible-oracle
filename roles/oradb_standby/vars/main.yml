@@ -106,3 +106,18 @@ _oradb_standby_member_roles: >-
 # role of the local database from oradb_facts
 _oradb_standby_local_role: >-
   {{ oracledb_facts[_oradb_standby_unique_name | trim]['database_role'] | default('') }}
+
+# RMAN CONFIGURE ARCHIVELOG DELETION POLICY (archivelog_deletion_policy.yml):
+# _oradb_standby_adp: value from the inventory (single blanks)
+# _oradb_standby_adp_wanted / _current: normalized for the comparison with SHOW ARCHIVELOG DELETION POLICY
+# (upper case, 'TO DEVICE TYPE DISK' => 'TO DISK', 'TO DEVICE TYPE SBT[_TAPE]' => 'TO SBT_TAPE', no quotes)
+_oradb_standby_adp: "{{ _odb_standby_archivelog_deletion_policy | string | regex_replace('\\s+', ' ') | trim }}"
+_oradb_standby_adp_wanted: >-
+  {{ _oradb_standby_adp | upper
+     | regex_replace('TO DEVICE TYPE DISK', 'TO DISK')
+     | regex_replace('TO DEVICE TYPE SBT(_TAPE)?', 'TO SBT_TAPE') }}
+_oradb_standby_adp_current: >-
+  {{ (_oradb_standby_adp_show.stdout_lines | default([])
+      | select('match', '^CONFIGURE ARCHIVELOG DELETION POLICY TO ') | list + [''])
+     | first | upper | regex_replace('^CONFIGURE ARCHIVELOG DELETION POLICY TO ', '')
+     | regex_replace(';.*$', '') | replace("'", '') | regex_replace('\\s+', ' ') | trim }}

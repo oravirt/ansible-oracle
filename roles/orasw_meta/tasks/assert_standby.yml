@@ -163,6 +163,41 @@
           ansible.builtin.fail:
             msg: "See previous debug task for assertation failure"
 
+    # RMAN CONFIGURE ARCHIVELOG DELETION POLICY of each member (oradb_standby)
+    # mandatory: archivelog_deletion_policy in dg of the configuration or of each member
+    # valid: NONE or [APPLIED ON|SHIPPED TO] [ALL] STANDBY [BACKED UP <n> TIMES TO DEVICE TYPE DISK|SBT]...
+    # (APPLIED/SHIPPED before BACKED UP, otherwise no archive log is eligible for deletion)
+    - name: Assert archivelog_deletion_policy in db_standby_config
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _adp_members | select('equalto', '') | list | length == 0
+          - _adp_members | reject('match', _adp_regex) | list | length == 0
+        fail_msg: >-
+          {{ ass_scadp.name | default('') }}: archivelog_deletion_policy is mandatory
+          in dg of the configuration or in dg of each member, see doc/guides/standby_databases.adoc.
+          Valid values: NONE or [APPLIED ON|SHIPPED TO] [ALL] STANDBY [BACKED UP <n> TIMES TO DEVICE TYPE DISK|SBT],
+          e.g. 'APPLIED ON ALL STANDBY BACKED UP 1 TIMES TO DEVICE TYPE DISK'.
+          Current values of the members: {{ _adp_members }}
+      vars:
+        _adp: "{{ ass_scadp.dg.archivelog_deletion_policy | default('') }}"
+        # value of each member, upper case, single blanks
+        _adp_members: >-
+          {{ ass_scadp.members | default([]) | map(attribute='dg', default={})
+             | map(attribute='archivelog_deletion_policy', default=_adp)
+             | map('string') | map('upper') | map('regex_replace', '\\s+', ' ') | map('trim') | list }}
+        _adp_regex: >-
+          ^(NONE|((APPLIED ON|SHIPPED TO) (ALL )?STANDBY)?( ?BACKED UP [0-9]+ TIMES TO DEVICE TYPE (DISK|SBT|SBT_TAPE))*)$
+      loop: >-
+        {{ db_standby_config | default([]) | selectattr('type', 'defined')
+           | selectattr('type', 'equalto', 'dataguard') | list }}
+      loop_control:
+        label: "{{ ass_scadp.name | default('') }}"
+        loop_var: ass_scadp
+      when:
+        - orasw_meta_assert_db_standby_config | bool
+        - db_standby_config is defined
+
     - name: Assert standby_config in oracle_databases
       when:
         - orasw_meta_assert_db_standby_config | bool

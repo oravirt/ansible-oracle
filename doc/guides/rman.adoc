@@ -346,7 +346,9 @@ Backups of a physical standby database can be used for the primary database (and
 the catalog makes the backups known to all members.
 
 NOTE: `archivelog` deletes all archive logs that were backed up once.
-Configure an `ARCHIVELOG DELETION POLICY` (e.g. `APPLIED ON ALL STANDBY`) with an own template
+The `ARCHIVELOG DELETION POLICY` (e.g. `APPLIED ON ALL STANDBY`) is configured by `oradb_standby`
+with the mandatory attribute `archivelog_deletion_policy` in `db_standby_config`,
+see link:standby_databases.adoc#_archivelog_deletion_policy[Standby Databases - Archivelog deletion policy],
 to prevent the deletion of archive logs which are not yet applied on the standby database.
 
 === Migration from older versions

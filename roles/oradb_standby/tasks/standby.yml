@@ -93,3 +93,11 @@
   ansible.builtin.include_tasks: broker_cfg.yml
   when:
     - _odb_standby_config.type | default('') == 'dataguard'
+
+# primary and standby: the policy is stored in the controlfile of each member
+# (the instance must be mounted, e.g. not for a missing standby database with create_method external)
+- name: Standby | Archivelog deletion policy
+  ansible.builtin.include_tasks: archivelog_deletion_policy.yml
+  when:
+    - _odb_standby_config.type | default('') == 'dataguard'
+    - _orasw_meta_standby_state.role | default('') | trim in ['PRIMARY', 'PHYSICAL STANDBY']
