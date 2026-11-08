@@ -1,0 +1,35 @@
+---
+# Execute the asserts of orasw_meta (assert_standby.yml) with a modified inventory
+# and record the result in dg_assert_results.
+# Input: dg_assert_id     id of the test case
+#        dg_assert_expect ok or failed
+#        oracle_databases / db_standby_config: modified inventory as vars of include_tasks
+- name: "Assert {{ dg_assert_id }} | orasw_meta assert_standby.yml"
+  block:
+    - name: "Assert {{ dg_assert_id }} | run asserts"
+      ansible.builtin.include_role:
+        name: opitzconsulting.ansible_oracle.orasw_meta
+        tasks_from: assert_standby.yml
+
+    - name: "Assert {{ dg_assert_id }} | record ok"
+      ansible.builtin.set_fact:
+        _dg_assert_result: {failed: false, msg: ''}
+
+  # result failed: only when an assert failed (assert task or 'Fail assert ...' after the rescue
+  # of assert_standby.yml), any other failure is an error of the test (result error)
+  rescue:
+    - name: "Assert {{ dg_assert_id }} | record failure"
+      ansible.builtin.set_fact:
+        _dg_assert_result:
+          failed: true
+          msg: "{{ ansible_failed_task.name | default('') }}"
+
+- name: "Assert {{ dg_assert_id }} | result"
+  ansible.builtin.set_fact:
+    dg_assert_results: >-
+      {{ dg_assert_results | default([])
+         + [{'id': dg_assert_id, 'expect': dg_assert_expect,
+             'result': ('ok' if not _dg_assert_result.failed
+                        else 'failed' if _dg_assert_result.msg is match('(?i)^(fail )?assert')
+                        else 'error'),
+             'task': _dg_assert_result.msg}] }}

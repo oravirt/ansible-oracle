@@ -110,6 +110,8 @@ A database becomes a member of a standby configuration with the attribute `stand
 |Attribute |Description
 |`standby_config` | `name` of an entry in `db_standby_config`. The type is inherited from that entry.
 |`oracle_db_unique_name` | Mandatory for `type: dataguard`. Must match `db_unique_name` of the local member.
+|`archivelog` | Mandatory `true` for `type: dataguard` (ARCHIVELOG mode for redo transport and RMAN `DUPLICATE`).
+|`force_logging` | Must not be `false` for `type: dataguard`. `oradb_standby` enables FORCE LOGGING on the primary database, `force_logging: false` would disable it again.
 |`listener_name` | Mandatory for `type: dataguard`. Adds the static entries for the instance to `listener.ora`, including `<db_unique_name>_DGMGRL` (used by RMAN `DUPLICATE` and the broker). See link:../../roles/oradb_manage_db/LISTENER.md[LISTENER.md].
 |=======================
 
@@ -503,6 +505,7 @@ The asserts can be disabled with `orasw_meta_assert_db_standby_config: false`.
 - `standby_config` references an existing entry.
 - Exactly 1 member matches the database, see <<_assignment_of_a_database_to_a_member>>.
 - `type: dataguard`: `oracle_db_unique_name` and `listener_name` are defined.
+- `type: dataguard`: `archivelog: true`, `force_logging` is not `false`.
 - `oracle_db_unique_name` matches `db_unique_name` of the member (case insensitive).
   Both default to `oracle_db_name`.
 - `type: dataguard`: `init_parameters` contain `dg_broker_config_file1/2` (different, not below `ORACLE_HOME`),
