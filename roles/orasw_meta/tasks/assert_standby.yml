@@ -185,7 +185,7 @@
         _adp_members: >-
           {{ ass_scadp.members | default([]) | map(attribute='dg', default={})
              | map(attribute='archivelog_deletion_policy', default=_adp)
-             | map('string') | map('upper') | map('regex_replace', '\\s+', ' ') | map('trim') | list }}
+             | map('string') | map('upper') | map('regex_replace', '\s+', ' ') | map('trim') | list }}
         _adp_regex: >-
           ^(NONE|((APPLIED ON|SHIPPED TO) (ALL )?STANDBY)?( ?BACKED UP [0-9]+ TIMES TO DEVICE TYPE (DISK|SBT|SBT_TAPE))*)$
       loop: >-

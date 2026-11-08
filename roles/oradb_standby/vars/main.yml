@@ -120,4 +120,4 @@ _oradb_standby_adp_current: >-
   {{ (_oradb_standby_adp_show.stdout_lines | default([])
       | select('match', '^CONFIGURE ARCHIVELOG DELETION POLICY TO ') | list + [''])
      | first | upper | regex_replace('^CONFIGURE ARCHIVELOG DELETION POLICY TO ', '')
-     | regex_replace(';.*$', '') | replace("'", '') | regex_replace('\\s+', ' ') | trim }}
+     | regex_replace(';.*$', '') | replace("'", '') | regex_replace('\s+', ' ') | trim }}
