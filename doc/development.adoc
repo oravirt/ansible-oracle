@@ -702,14 +702,12 @@ gh auth login     # GitHub.com, HTTPS, login with a web browser
 gh auth status
 ----
 
-The token of `gh` needs the scope `repo` for pushing branches into your fork.
-This is part of the default scopes of `gh auth login`.
+The token of `gh` needs the scope `repo` for pushing branches into your fork and `workflow` for updates in `.github/workflows`.
+Both are part of the default scopes of `gh auth login`.
 
-renovate reads the token from `RENOVATE_TOKEN`:
-
-----
-export RENOVATE_TOKEN=$(gh auth token)
-----
+`task renovate:fork` takes the token from `gh auth token` for each run.
+It is passed only to renovate and not stored anywhere.
+A token in `RENOVATE_TOKEN` is used instead, if it is set.
 
 === Run renovate against your fork
 
@@ -726,7 +724,17 @@ task renovate:fork:dry-run FORK_REPO=<github user>/ansible-oracle
 
 # create branches and Pull-Requests in the fork
 task renovate:fork FORK_REPO=<github user>/ansible-oracle
+
+# with milestone and labels for the Pull-Requests
+task renovate:fork FORK_REPO=<github user>/ansible-oracle M=<milestone> L=<label>,<label>
 ----
+
+Optional parameters for the Pull-Requests:
+
+* `M`: number or title of a milestone in `FORK_REPO`. The task fails, when the title does not exist.
+* `L`: comma separated list of labels. Missing labels are created by GitHub.
+
+Milestone and labels are set, when renovate creates a Pull-Request.
 
 The branches can be tested locally after `git fetch origin`.
 
@@ -736,6 +744,26 @@ The PR reference is added later with `tools/release/fix_fragments.py`.
 
 NOTE: renovate keeps the clones and its cache in `~/.cache/renovate`.
 The clone is reset by each run, do not use it as working copy.
+
+=== Run renovate against upstream
+
+IMPORTANT: Only for maintainers with write access to `oravirt/ansible-oracle`. +
+The branches and Pull-Requests are created in the upstream repository and are public.
+
+renovate runs directly on the upstream repository (`UPSTREAM_REPO`, default `oravirt/ansible-oracle`) and `UPSTREAM_BASE` (default `master`).
+The branches `pr/renovate/<update>` are pushed into the upstream repository, so they do not collide with the branches of `task renovate:fork` in your fork.
+The configuration is taken from `renovate.json` in `UPSTREAM_BASE`.
+
+----
+# show what would be done
+task renovate:upstream:dry-run
+
+# create branches and Pull-Requests in upstream
+task renovate:upstream M=<milestone> L=<label>,<label>
+----
+
+The task fails, when your GitHub account has no write access to `UPSTREAM_REPO`.
+`M` and `L` work as described for `task renovate:fork`, the milestone is searched in `UPSTREAM_REPO`.
 
 == Update Vagrantbox on vagrantcloud for examples
 

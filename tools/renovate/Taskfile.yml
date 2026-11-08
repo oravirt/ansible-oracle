@@ -1,12 +1,15 @@
 # Taskfile.yml
 # Local renovate checks - lookup only, nothing is changed in the repository.
 # fork: run renovate against the github fork - creates branches and PRs there.
+# upstream: run renovate against the upstream repository - creates branches and PRs there.
 version: '3'
 
 vars:
   RENOVATE_REPORT: .renovate-report.json
   FORK_REPO: '{{.FORK_REPO | default "Rendanic/ansible-oracle"}}'
   FORK_BASE: '{{.FORK_BASE | default "master"}}'
+  UPSTREAM_REPO: '{{.UPSTREAM_REPO | default "oravirt/ansible-oracle"}}'
+  UPSTREAM_BASE: '{{.UPSTREAM_BASE | default "master"}}'
 
 env:
   # keep clones and cache between runs (default is $TMPDIR, which differs per nix-shell)
@@ -74,37 +77,71 @@ tasks:
   fork:dry-run:
     desc: Show what renovate would do on the github fork (FORK_REPO, FORK_BASE)
     cmds:
-      - task: fork-run
-        vars:
-          DRY_RUN: full
+      - task: run
+        vars: {REPO: '{{.FORK_REPO}}', BASE: '{{.FORK_BASE}}', FORK: 'true', DRY_RUN: full}
 
   fork:
-    desc: Run renovate on the github fork - creates branches and PRs (FORK_REPO, FORK_BASE)
-    prompt: Create renovate branches and PRs in {{.FORK_REPO}} ({{.FORK_BASE}})?
+    desc: Run renovate on the github fork - creates branches and PRs (FORK_REPO, FORK_BASE, M=<milestone>, L=<label,...>)
+    prompt: Create renovate branches and PRs in {{.FORK_REPO}} ({{.FORK_BASE}}){{if .M}} milestone {{.M}}{{end}}{{if .L}} labels {{.L}}{{end}}?
     cmds:
-      - task: fork-run
+      - task: run
+        vars: {REPO: '{{.FORK_REPO}}', BASE: '{{.FORK_BASE}}', FORK: 'true'}
 
-  fork-run:
+  upstream:dry-run:
+    desc: Show what renovate would do on the upstream repository (UPSTREAM_REPO, UPSTREAM_BASE)
+    cmds:
+      - task: run
+        vars: {REPO: '{{.UPSTREAM_REPO}}', BASE: '{{.UPSTREAM_BASE}}', DRY_RUN: full}
+
+  upstream:
+    desc: Run renovate on the upstream repository - creates branches and PRs there (UPSTREAM_REPO, UPSTREAM_BASE, M=<milestone>, L=<label,...>)
+    prompt: Create renovate branches and PRs in the UPSTREAM repository {{.UPSTREAM_REPO}} ({{.UPSTREAM_BASE}}){{if .M}} milestone {{.M}}{{end}}{{if .L}} labels {{.L}}{{end}}?
+    cmds:
+      - task: run
+        vars: {REPO: '{{.UPSTREAM_REPO}}', BASE: '{{.UPSTREAM_BASE}}'}
+
+  run:
     internal: true
+    vars:
+      # M: number or title of a milestone in REPO
+      MILESTONE:
+        sh: |
+          m='{{.M | default ""}}'
+          case "$m" in
+            '') ;;
+            *[!0-9]*) gh api 'repos/{{.REPO}}/milestones?state=all' --paginate \
+                        -q ".[] | select(.title == \"$m\") | .number" ;;
+            *) echo "$m" ;;
+          esac
+      # L: comma separated list of labels
+      LABELS: '{{if .L}}{{regexSplit "\\s*,\\s*" (trim .L) -1 | toJson}}{{end}}'
     preconditions:
-      - sh: '[ -n "${RENOVATE_TOKEN:-}" ]'
-        msg: RENOVATE_TOKEN must contain a github token with write access to {{.FORK_REPO}}
-      - sh: '[ "{{.FORK_REPO | lower}}" = "{{.FORK_REPO | lower | trimPrefix "oravirt/"}}" ]'
+      - sh: '[ -z "{{.M | default ""}}" ] || [ -n "{{.MILESTONE}}" ]'
+        msg: milestone '{{.M}}' not found in {{.REPO}}
+      - sh: '[ -n "${RENOVATE_TOKEN:-}" ] || gh auth token >/dev/null 2>&1'
+        msg: login with 'gh auth login' or set RENOVATE_TOKEN to a github token with write access to {{.REPO}}
+      - sh: '{{if .FORK}}[ "{{.REPO | lower}}" = "{{.REPO | lower | trimPrefix "oravirt/"}}" ]{{else}}true{{end}}'
         msg: FORK_REPO must be a fork, not the upstream repository oravirt/ansible-oracle
+      - sh: '{{if .FORK}}true{{else}}[ "$(gh api repos/{{.REPO}} -q .permissions.push)" = true ]{{end}}'
+        msg: your github account has no write access to {{.REPO}}
     env:
-      # no fork mode: branches and PRs are created in FORK_REPO, not in the upstream repository
+      # RENOVATE_TOKEN from the environment, otherwise the token from gh (only for this run)
+      RENOVATE_TOKEN:
+        sh: printf '%s' "${RENOVATE_TOKEN:-$(gh auth token 2>/dev/null)}"
+      # no fork mode: branches and PRs are created in REPO
       RENOVATE_FORK_TOKEN: ''
       LOG_LEVEL: '{{.LOG_LEVEL | default "info"}}'
       RENOVATE_PLATFORM: github
-      RENOVATE_REPOSITORIES: '["{{.FORK_REPO}}"]'
-      RENOVATE_BASE_BRANCH_PATTERNS: '["{{.FORK_BASE}}"]'
-      # renovate.json is read from FORK_BASE in the fork - no run without it
+      RENOVATE_REPOSITORIES: '["{{.REPO}}"]'
+      RENOVATE_BASE_BRANCH_PATTERNS: '["{{.BASE}}"]'
+      # renovate.json is read from BASE in REPO - no run without it
       RENOVATE_REQUIRE_CONFIG: required
       RENOVATE_ONBOARDING: 'false'
       # renovate skips forked repositories by default
       RENOVATE_FORK_PROCESSING: enabled
-      # issues are disabled in the fork - force overrides config:recommended
-      RENOVATE_FORCE: '{"dependencyDashboard": false}'
+      # no dependency dashboard (issues are disabled in the fork) - force overrides config:recommended
+      # labels and milestone (L, M) for the PRs
+      RENOVATE_FORCE: '{"dependencyDashboard": false{{if .LABELS}}, "labels": {{.LABELS}}{{end}}{{if .MILESTONE}}, "milestone": {{.MILESTONE}}{{end}}}'
       # postUpgradeTasks in renovate.json: changelog fragment for antsibull-changelog
       RENOVATE_ALLOWED_COMMANDS: '["^tools/renovate/changelog_fragment\\.sh "]'
     cmds:
