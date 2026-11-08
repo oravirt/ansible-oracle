@@ -19,28 +19,18 @@ oradb_rman_cronfile: oracle_rman_ansible
 # @var oradb_rman_script_dir:description: >
 # Directory for `*.rman`-Files.
 # @end
-oradb_rman_script_dir: "{{ rman_script_dir | default(odb.0.rman_script_dir | default(oracle_base + '/rman')) }}"
+oradb_rman_script_dir: "{{ rman_script_dir | default((odb.0 | default(odb)).rman_script_dir | default(oracle_base + '/rman')) }}"
 
 # @var oradb_rman_log_dir:description: >
 # Lgofiledirectory for `rman_wrapper.sh`.
 # @end
-oradb_rman_log_dir: "{{ rman_log_dir | default(odb.0.rman_log_dir | default(oracle_base + '/rman/log')) }}"
+oradb_rman_log_dir: "{{ rman_log_dir | default((odb.0 | default(odb)).rman_log_dir | default(oracle_base + '/rman/log')) }}"
 
 # @var oradb_rman_tns_admin:description: >
 # TNS_ADMIN for `rman_wrapper.sh`.
 # This is needed for RMAN-Catalogconnections.
 # @end
 oradb_rman_tns_admin: "{{ rman_tns_admin | default(oracle_base + '/rman/network/admin') }}"
-
-# @var oradb_rman_catalog_dir:description: >
-# Directory for the files with the connect string of the RMAN catalog
-# (`rman_user` without `rman_wallet`).
-#
-# The files `<oracle_db_name>.conf` are readable by `oracle_user` only.
-# `rman_backup.sh` reads the connect string with `--catalogfile`,
-# the password is not part of the crontab.
-# @end
-oradb_rman_catalog_dir: "{{ oracle_base }}/rman/catalog"
 
 # @var oradb_rman_wallet_loc:description: >
 # Directory for Oracle wallet.

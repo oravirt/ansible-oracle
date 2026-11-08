@@ -4,6 +4,4 @@ bugfixes:
   - "oradb_rman: Execute RMAN-Script at playbook fails when rman_backup.sh fails (pipefail), uses oradb_rman_cron_logdir instead of rman_cron_logdir"
   - "oradb_rman: rman_wallet false was handled as wallet for the registration in the catalog"
   - "oradb_rman: ASM template parameter_fra_disk used item instead of odb"
-minor_changes:
-  - "oradb_rman: the catalog connect with rman_user (without rman_wallet) is stored in oradb_rman_catalog_dir/<oracle_db_name>.conf (mode 0600) and passed with rman_backup.sh --catalogfile => the password is not part of the crontab"
-  - "oradb_rman: rman_backup.sh --role PRIMARY|STANDBY executes the backup only for a database with this role (Data Guard), --catalogfile reads the catalog connect from a file"
+  - "oradb_rman: rman_script_dir and rman_log_dir of a database were not created (oradb_rman_script_dir, oradb_rman_log_dir in loops over oracle_databases)"

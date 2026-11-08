@@ -1,0 +1,17 @@
+# {{ ansible_managed }}
+#
+# Configuration of rman_backup.sh for {{ _oradb_rman_db.oracle_db_unique_name | default(_oradb_rman_db.oracle_db_name) }}
+#
+# KEY=VALUE, the file is not sourced by rman_backup.sh.
+# Order of the settings (the 1st value wins):
+#   parameter of rman_backup.sh, environment, this file, default of rman_backup.sh
+#
+RMAN_SCRIPTDIR={{ oradb_rman_script_dir }}
+RMAN_LOGDIR={{ oradb_rman_log_dir }}
+RMAN_TNS_ADMIN={{ oradb_rman_tns_admin }}
+{% if _oradb_rman_catalog_connect | length > 0 %}
+RMAN_CATALOGCONNECT={{ _oradb_rman_catalog_connect }}
+{% else %}
+# no RMAN catalog (rman_tnsalias with rman_user or rman_wallet in oracle_databases)
+# RMAN_CATALOGCONNECT=
+{% endif %}

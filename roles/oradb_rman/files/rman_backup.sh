@@ -12,29 +12,40 @@
 # clusterware. We are able to backup RAC OneNode Databases or policy managed
 # environments now!
 #
-# This script search for an rman-file in $ORACLE_BASE/admin/<ORACLE_SID|DB_NAME>/rman
-# with filename <action>.rman. This search could be changed with -r or RMANSCRIPTDIR.
+# Configuration
+# =============
+# The settings are read in the following order (the 1st value wins):
+#   1. parameters on the command line
+#   2. environment variables
+#   3. configuration file <ORACLE_ADMIN>/rman/rman_backup.cfg
+#   4. defaults of the script
 #
-# The script checks for an existing directory $ORACLE_BASE/admin/<ORACLE_SID|DB_NAME>/rman/log.
-# This directory could be changed with -l or RMANLOGDIR.
-# Backup will not start when directory or backupscript is not existing.
-# Script will check for a catalog. When the catalog is not reachable the backup
+# ORACLE_ADMIN is determined in the following order:
+#   1. --admin on the command line or environment variable ORACLE_ADMIN
+#   2. <ORACLE_BASE>/admin/<db_unique_name> (db_unique_name from the running instance)
+#   3. <ORACLE_BASE>/admin/<ORACLE_SID|DB_NAME>
+#
+# The configuration file contains lines with KEY=VALUE (no shell code, it is not sourced).
+# Allowed keys: see CFG_KEYS below or the help of the script (-h).
+# The file could contain the password of the RMAN catalog => mode 0600.
+#
+# Backup
+# ======
+# The RMAN script <RMAN_SCRIPTDIR>/<action>.rman is executed.
+# The script checks for the catalog. When the catalog is not reachable the backup
 # will run without a catalog.
-# Configuration for RMAN-Catalog is done with Environment variable CATALOGCONNECT
-# Example:
-# CATALOGCONNECT=rman/catalog@hostname:port/service
-# rman target / catalog $CATALOGCONNECT
 #
 # Major actions are logged in syslog of operating system
-# A Logfile with name <logdir>/<ORACLE_SID>_<action>.log includes
+# A Logfile with name <RMAN_LOGDIR>/<ORACLE_SID>_<action>.log includes
 # all output from RMAN
 #
 # Exit codes:
-#   0     RMAN successful or backup skipped (service not running on this node)
+#   0     RMAN successful or backup skipped (service not running on this node,
+#         --role does not match the database role)
 #   1     wrong parameters or service not existing
-#   0     backup skipped (--role does not match the database role)
 #   10-12 ORACLE_SID, ORACLE_HOME or ORACLE_BASE not found
 #   13    database role could not be determined (--role)
+#   14    configuration file not readable
 #   21-23 log directory, RMAN script or logfile not existing
 #   99    RMAN failed
 #
@@ -56,13 +67,16 @@
 
 PROGNAME=$(basename "$0")
 ORATAB=/etc/oratab
+CFGNAME=rman_backup.cfg
+
+# keys of the configuration file (= environment variables)
+CFG_KEYS="RMAN_SCRIPTDIR RMAN_LOGDIR RMAN_TARGETCONNECT RMAN_CATALOGCONNECT RMAN_SERVICE RMAN_ROLE RMAN_TNS_ADMIN"
 
 function print_usage() {
 	echo "Usage:"
-	echo "  $PROGNAME -a <action> -s <ORACLE_SID|DB_NAME> [-r <Directory>]"
-	echo "            [-l <Directory>] [-c <CATALOGCONNECT>] [-t <TARGETCONNECT>]"
-	echo "            [--catalogfile <file>]"
-	echo "            [--service <Servicename in GI/Restart>] [--role <PRIMARY|STANDBY>]"
+	echo "  $PROGNAME -a <action> [-s <ORACLE_SID|DB_NAME>] [--admin <Directory>]"
+	echo "            [-r <Directory>] [-l <Directory>] [-c <CATALOGCONNECT>] [-t <TARGETCONNECT>]"
+	echo "            [--service <Servicename in GI/Restart>] [--role <PRIMARY|STANDBY>] [--nocatalog]"
 	echo "  $PROGNAME -h"
 }
 
@@ -72,28 +86,38 @@ function print_help() {
 	echo ""
 	echo "RMAN Backupscript"
 	echo ""
-	echo "-a/--action           Name for .rman-Script without extension"
-	echo "-s/--ORACLE_SID       ORACLE_SID / DB_NAME (RAC) of Database"
-	echo "                       Please use the DB_NAME from oratab in RAC-Environments!"
-	echo "-r/--rmanscriptdir    Directory for *.rman-Scripts"
-	echo "                       You could use the environment variable RMANSCRIPTDIR as well"
-	echo "                       Default: <ORACLE_BASE>/admin/<ORACLE_SID|DB_NAME>/rman"
-	echo "-l/--logdir           Directory for tee-output of RMAN"
-	echo "                       You could use the environment variable RMANLOGDIR as well"
-	echo "                       Default: <rmanscriptdir>/log"
-	echo "-c/--catalogconnect   connect catalog <catalogconnect>"
-	echo "                       You could use the environment variable CATALOGCONNECT as well"
-	echo "--catalogfile         File with the connect string for the catalog (1st line)"
-	echo "                       The password is not visible in the crontab or process list."
-	echo "-t/--targetconnect    connect target <targetconnect>"
-	echo "                       You could use the environment variable TARGETCONNECT as well"
-	echo "--service             Execute rman when Service in GI/Restart is running on current node."
-	echo "--role                Execute rman only when the database has this role (Data Guard)."
-	echo "                       PRIMARY: database_role PRIMARY"
-	echo "                       STANDBY: database_role PHYSICAL STANDBY"
-	echo "                       The role is read with 'sqlplus / as sysdba' from the local instance."
+	echo "Parameter             Environment / configuration file"
+	echo "-a/--action           -                    Name of the .rman-Script without extension (mandatory)"
+	echo "-s/--ORACLE_SID       ORACLE_SID           ORACLE_SID / DB_NAME (RAC) of Database"
+	echo "                                            Please use the DB_NAME from oratab in RAC-Environments!"
+	echo "--admin               ORACLE_ADMIN         Admin directory of the database"
+	echo "                                            Default: <ORACLE_BASE>/admin/<db_unique_name>"
+	echo "                                            db_unique_name from the running instance,"
+	echo "                                            <ORACLE_SID|DB_NAME> when the instance is not running"
+	echo "-r/--rmanscriptdir    RMAN_SCRIPTDIR       Directory for *.rman-Scripts"
+	echo "                                            Default: <ORACLE_ADMIN>/rman"
+	echo "-l/--logdir           RMAN_LOGDIR          Directory for the logfiles of RMAN"
+	echo "                                            Default: <RMAN_SCRIPTDIR>/log"
+	echo "-c/--catalogconnect   RMAN_CATALOGCONNECT  connect catalog <catalogconnect>"
+	echo "                                            Use the configuration file for passwords,"
+	echo "                                            parameters are visible in the process list!"
+	echo "--nocatalog           -                    Do not use the catalog (overrides RMAN_CATALOGCONNECT)"
+	echo "-t/--targetconnect    RMAN_TARGETCONNECT   connect target <targetconnect>, Default: /"
+	echo "--service             RMAN_SERVICE         Execute rman when Service in GI/Restart is running on current node."
+	echo "--role                RMAN_ROLE            Execute rman only when the database has this role (Data Guard)."
+	echo "                                            PRIMARY: database_role PRIMARY"
+	echo "                                            STANDBY: database_role PHYSICAL STANDBY"
+	echo "-                     RMAN_TNS_ADMIN       TNS_ADMIN for RMAN (e.g. catalog)"
 	echo ""
-	echo "The environment variable RMANTNS_ADMIN is used as TNS_ADMIN for RMAN."
+	echo "Order of the settings (the 1st value wins):"
+	echo "  parameter, environment, <ORACLE_ADMIN>/rman/${CFGNAME}, default"
+	echo ""
+	echo "${CFGNAME} contains lines with KEY=VALUE, e.g.:"
+	echo "  RMAN_CATALOGCONNECT=rman/password@rmancat"
+	echo "  RMAN_ROLE=PRIMARY"
+	echo ""
+	echo "The old environment variables RMANSCRIPTDIR, RMANLOGDIR, CATALOGCONNECT,"
+	echo "TARGETCONNECT and RMANTNS_ADMIN are still supported."
 }
 
 print_syslog() {
@@ -114,87 +138,23 @@ abort_script() {
 	exit "${1}"
 }
 
-check_catalog() {
-	# check for availible catalog
-	# catalog not working => switch to nocatalog!
-	print_syslog "Check for working RMAN Catalog"
-	catalogconnect="connect catalog ${CATALOGCONNECT}"
-	if "${ORACLE_HOME}/bin/rman" << _EOF_
-connect target ${TARGETCONNECT:-"/"}
-${catalogconnect}
-_EOF_
-	then
-		print_syslog "Using Catalog for Backup!"
-	else
-		# catalog not working => clear variable
-		catalogconnect=''
-		print_syslog "Catalog not reachable. Working without Catalog!"
-	fi
-}
-
-check_service() {
-	# get data from srvctl for service
-	echo "Checking for running service ${INSTANCE_SERVICE} on current node"
-	retstr=$("${SRVCTL}" status service -d "${ORACLE_SID}" -s "${INSTANCE_SERVICE}")
-	echo "${retstr}"
-
-	# Is service existing?
-	if echo "${retstr}" | grep -q "^PRCR-1001:"; then
-		echo "Service not existing. Aborting backup!"
-		abort_script 1
-	fi
-
-	# Is service running on current node?
-	if [ "${local_only}" = 'true' ]; then
-		# Oracle Restart: only one node
-		running_service=$(echo "${retstr}" | sed -e 's/^Service .* is running//g' -e 's/ //g')
-		if [ -n "${running_service}" ]; then
-			print_msg "Service ${INSTANCE_SERVICE} not running on current node. Skipping backup!"
-			exit 0
-		fi
-	else
-		running_instances=$(echo "${retstr}" | sed -e 's/^Service .* is running on instance(s)//g' -e 's/ //g')
-		if [ ! "${node_sid}" = "${running_instances}" ]; then
-			print_msg "Service ${INSTANCE_SERVICE} not running on current node. Skipping backup!"
-			exit 0
-		fi
-	fi
-}
-
-check_role() {
-	# role from the local instance (bequeath connection, no listener needed)
-	case "${DB_ROLE}" in
-		PRIMARY) expected_role='PRIMARY';;
-		STANDBY) expected_role='PHYSICAL STANDBY';;
-		*)
-			echo "Invalid value for --role: ${DB_ROLE} (PRIMARY or STANDBY)"
-			print_usage
-			exit 1;;
-	esac
-
-	database_role=$("${ORACLE_HOME}/bin/sqlplus" -S -L /nolog << _EOF_ 2>&1 | sed -n 's/^ROLE=//p' | head -1
+# Execute SQL with a bequeath connection (no listener, no password) and
+# print the value of the 1st line starting with <prefix>=
+# $1: prefix, $2: SQL
+query_value() {
+	"${ORACLE_HOME}/bin/sqlplus" -S -L /nolog << _EOF_ 2>&1 | sed -n "s/^${1}=//p" | head -1
 whenever sqlerror exit failure
 connect / as sysdba
-set heading off feedback off pagesize 0 linesize 100
-select 'ROLE=' || database_role from v\$database;
+set heading off feedback off pagesize 0 linesize 1000
+${2}
 _EOF_
-	)
-
-	if [ -z "${database_role}" ]; then
-		print_msg "Database role of ${ORACLE_SID} could not be determined (instance not mounted?)."
-		abort_script 13
-	fi
-
-	if [ ! "${database_role}" = "${expected_role}" ]; then
-		print_msg "Database role of ${ORACLE_SID} is ${database_role}, not ${expected_role}. Skipping backup!"
-		exit 0
-	fi
-	print_syslog "Database role of ${ORACLE_SID} is ${database_role}."
 }
 
-setenv() {
+# cli_* variables are read indirectly in setenv_rman (${!cli_var})
+# shellcheck disable=SC2034
+parse_args() {
 	SHORTOPTS="ha:s:r:l:t:c:"
-	LONGOPTS="help,action:,ORACLE_SID:,rmanscriptdir:,logdir:,targetconnect:,catalogconnect:,catalogfile:,service:,role:"
+	LONGOPTS="help,action:,ORACLE_SID:,admin:,rmanscriptdir:,logdir:,targetconnect:,catalogconnect:,nocatalog,service:,role:"
 
 	if ! ARGS=$(getopt -s bash --options "${SHORTOPTS}" --longoptions "${LONGOPTS}" --name "${PROGNAME}" -- "$@"); then
 		print_usage
@@ -203,6 +163,7 @@ setenv() {
 
 	eval set -- "${ARGS}"
 
+	# values from the command line, applied after the configuration file
 	while true; do
 		case "$1" in
 			-h|--help)
@@ -212,28 +173,31 @@ setenv() {
 				rmanbackuptyp=${2}
 				shift 2;;
 			-s|--ORACLE_SID)
-				ORACLE_SID=${2}
+				cli_ORACLE_SID=${2}
+				shift 2;;
+			--admin)
+				cli_ORACLE_ADMIN=${2}
 				shift 2;;
 			-r|--rmanscriptdir)
-				RMANSCRIPTDIR=${2}
+				cli_RMAN_SCRIPTDIR=${2}
 				shift 2;;
 			-l|--logdir)
-				RMANLOGDIR=${2}
+				cli_RMAN_LOGDIR=${2}
 				shift 2;;
 			-t|--targetconnect)
-				TARGETCONNECT=${2}
+				cli_RMAN_TARGETCONNECT=${2}
 				shift 2;;
 			-c|--catalogconnect)
-				CATALOGCONNECT=${2}
+				cli_RMAN_CATALOGCONNECT=${2}
 				shift 2;;
-			--catalogfile)
-				CATALOGFILE=${2}
-				shift 2;;
+			--nocatalog)
+				nocatalog=true
+				shift;;
 			--service)
-				INSTANCE_SERVICE=${2}
+				cli_RMAN_SERVICE=${2}
 				shift 2;;
 			--role)
-				DB_ROLE=$(echo "${2}" | tr '[:lower:]' '[:upper:]')
+				cli_RMAN_ROLE=${2}
 				shift 2;;
 			--)
 				shift
@@ -241,15 +205,27 @@ setenv() {
 		esac
 	done
 
-	if [ -z "${ORACLE_SID}" ]; then
-		echo "Missing parameter for ORACLE_SID"
+	if [ -z "${rmanbackuptyp}" ]; then
+		echo "Missing parameter for action"
 		echo " "
 		print_usage
 		exit 1
 	fi
+}
 
-	if [ -z "${rmanbackuptyp}" ]; then
-		echo "Missing parameter for action"
+# old environment variables => new names (when the new variable is not set)
+legacy_env() {
+	RMAN_SCRIPTDIR=${RMAN_SCRIPTDIR:-${RMANSCRIPTDIR}}
+	RMAN_LOGDIR=${RMAN_LOGDIR:-${RMANLOGDIR}}
+	RMAN_CATALOGCONNECT=${RMAN_CATALOGCONNECT:-${CATALOGCONNECT}}
+	RMAN_TARGETCONNECT=${RMAN_TARGETCONNECT:-${TARGETCONNECT}}
+	RMAN_TNS_ADMIN=${RMAN_TNS_ADMIN:-${RMANTNS_ADMIN}}
+}
+
+setenv_oracle() {
+	ORACLE_SID=${cli_ORACLE_SID:-${ORACLE_SID}}
+	if [ -z "${ORACLE_SID}" ]; then
+		echo "Missing parameter for ORACLE_SID (-s or environment variable ORACLE_SID)"
 		echo " "
 		print_usage
 		exit 1
@@ -258,7 +234,7 @@ setenv() {
 	# set NLS_DATE_FORMAT for nice date-format
 	export NLS_DATE_FORMAT='dd.mm.yy hh24:mi:ss'
 
-	# ORACLE_SID or DB_NAME (RAC) from command line, used for the default directories
+	# ORACLE_SID or DB_NAME (RAC) from command line, used for srvctl and the default directories
 	DB_NAME=${ORACLE_SID}
 
 	# getting ORACLE_HOME from oratab (1st entry)
@@ -279,6 +255,7 @@ setenv() {
 	# we could be on Grid-Infrastructure
 	# => There is only an entry for the DB_NAME in oratab!
 	# => We need to find the right ORACLE_SID from Clusterware
+	local_only=''
 	OCRLOC=/etc/oracle/ocr.loc
 	if [ -f "${OCRLOC}" ]; then
 		# shellcheck source=/dev/null
@@ -295,15 +272,7 @@ setenv() {
 			# => instance of the database on the current node
 			# crs_home is set by olr.loc
 			# shellcheck disable=SC2154
-			node_sid=$("${SRVCTL}" status instance -d "${ORACLE_SID}" -node "$("${crs_home}/bin/olsnodes" -l)" | cut -d" " -f2)
-		fi
-
-		if [ -n "${INSTANCE_SERVICE}" ]; then
-			check_service
-		fi
-
-		if [ "${local_only}" = 'false' ]; then
-			# => overwrite the ORACLE_SID from command parameterline
+			node_sid=$("${SRVCTL}" status instance -d "${DB_NAME}" -node "$("${crs_home}/bin/olsnodes" -l)" | cut -d" " -f2)
 			ORACLE_SID=${node_sid}
 		fi
 	fi
@@ -321,43 +290,192 @@ setenv() {
 		abort_script 12
 	fi
 	export ORACLE_BASE
+}
 
-	# where are the rman-skripts?
-	# Default: $ORACLE_BASE/admin/<ORACLE_SID|DB_NAME>/rman/<action>.rman
-	RMANSCRIPTDIR=${RMANSCRIPTDIR:-${ORACLE_BASE}/admin/${DB_NAME}/rman}
-	RMANLOGDIR=${RMANLOGDIR:-${RMANSCRIPTDIR}/log}
-
-	if [ -n "${RMANTNS_ADMIN}" ]; then
-		echo "Setting TNS_ADMIN from RMANTNS_ADMIN to: ${RMANTNS_ADMIN}"
-		export TNS_ADMIN="${RMANTNS_ADMIN}"
-	fi
-
-	if [ -n "${DB_ROLE}" ]; then
-		check_role
-	fi
-
-	rmanskript="${RMANSCRIPTDIR}/${rmanbackuptyp}.rman"
-	rmanlog="${RMANLOGDIR}/${ORACLE_SID}_${rmanbackuptyp}.log"
-
-	if [ -n "${CATALOGFILE}" ]; then
-		if [ -r "${CATALOGFILE}" ]; then
-			CATALOGCONNECT=$(head -1 "${CATALOGFILE}")
+# ORACLE_ADMIN: parameter, environment, db_unique_name of the running instance, ORACLE_SID/DB_NAME
+setenv_admin() {
+	ORACLE_ADMIN=${cli_ORACLE_ADMIN:-${ORACLE_ADMIN}}
+	if [ -z "${ORACLE_ADMIN}" ]; then
+		db_unique_name=$(query_value UNIQUE "select 'UNIQUE=' || value from v\$parameter where name = 'db_unique_name';")
+		if [ -n "${db_unique_name}" ]; then
+			ORACLE_ADMIN="${ORACLE_BASE}/admin/${db_unique_name}"
 		else
-			print_msg "Catalog file ${CATALOGFILE} not readable. Working without Catalog!"
+			echo "db_unique_name of ${ORACLE_SID} could not be determined (instance not running?)."
+			ORACLE_ADMIN="${ORACLE_BASE}/admin/${DB_NAME}"
 		fi
 	fi
+	echo "ORACLE_ADMIN: ${ORACLE_ADMIN}"
+}
 
-	if [ -n "${CATALOGCONNECT}" ]; then
-		check_catalog
+# Read KEY=VALUE from the configuration file.
+# A value is only set, when the variable is not set in the environment.
+read_config() {
+	cfgfile="${ORACLE_ADMIN}/rman/${CFGNAME}"
+
+	if [ ! -e "${cfgfile}" ]; then
+		echo "No configuration file ${cfgfile}"
+		return
+	fi
+
+	if [ ! -r "${cfgfile}" ]; then
+		print_msg "Configuration file ${cfgfile} not readable."
+		abort_script 14
+	fi
+
+	if [ -n "$(find "${cfgfile}" -perm /077 2>/dev/null)" ]; then
+		print_msg "WARNING: ${cfgfile} is readable by other users (mode 0600 recommended)."
+	fi
+
+	echo "Configuration file: ${cfgfile}"
+	while IFS= read -r line || [ -n "${line}" ]; do
+		line=${line%$'\r'}
+		# remove leading whitespace, skip empty lines and comments
+		line="${line#"${line%%[![:space:]]*}"}"
+		if [ -z "${line}" ] || [[ "${line}" == \#* ]]; then
+			continue
+		fi
+
+		if [[ ! "${line}" =~ ^([A-Z_]+)=(.*)$ ]]; then
+			print_msg "WARNING: invalid line in ${cfgfile} ignored: ${line%%=*}"
+			continue
+		fi
+		key=${BASH_REMATCH[1]}
+		value=${BASH_REMATCH[2]}
+
+		case " ${CFG_KEYS} " in
+			*" ${key} "*) ;;
+			*)
+				print_msg "WARNING: unknown key ${key} in ${cfgfile} ignored"
+				continue;;
+		esac
+
+		# remove one pair of quotes around the value
+		if [[ "${value}" =~ ^\"(.*)\"$ ]] || [[ "${value}" =~ ^\'(.*)\'$ ]]; then
+			value=${BASH_REMATCH[1]}
+		fi
+
+		# environment wins
+		if [ -z "${!key}" ]; then
+			printf -v "${key}" '%s' "${value}"
+		fi
+	done < "${cfgfile}"
+}
+
+# parameters from the command line win, defaults for unset values
+setenv_rman() {
+	for key in ${CFG_KEYS}; do
+		cli_var="cli_${key}"
+		if [ -n "${!cli_var}" ]; then
+			printf -v "${key}" '%s' "${!cli_var}"
+		fi
+	done
+
+	RMAN_SCRIPTDIR=${RMAN_SCRIPTDIR:-${ORACLE_ADMIN}/rman}
+	RMAN_LOGDIR=${RMAN_LOGDIR:-${RMAN_SCRIPTDIR}/log}
+	RMAN_TARGETCONNECT=${RMAN_TARGETCONNECT:-/}
+	RMAN_ROLE=$(echo "${RMAN_ROLE}" | tr '[:lower:]' '[:upper:]')
+
+	if [ -n "${RMAN_TNS_ADMIN}" ]; then
+		echo "Setting TNS_ADMIN from RMAN_TNS_ADMIN to: ${RMAN_TNS_ADMIN}"
+		export TNS_ADMIN="${RMAN_TNS_ADMIN}"
+	fi
+
+	rmanskript="${RMAN_SCRIPTDIR}/${rmanbackuptyp}.rman"
+	rmanlog="${RMAN_LOGDIR}/${ORACLE_SID}_${rmanbackuptyp}.log"
+}
+
+check_service() {
+	if [ -z "${RMAN_SERVICE}" ]; then
+		return
+	fi
+
+	if [ -z "${SRVCTL}" ]; then
+		print_msg "Service ${RMAN_SERVICE} could not be checked without Grid-Infrastructure/Oracle Restart."
+		abort_script 1
+	fi
+
+	# get data from srvctl for service
+	echo "Checking for running service ${RMAN_SERVICE} on current node"
+	retstr=$("${SRVCTL}" status service -d "${DB_NAME}" -s "${RMAN_SERVICE}")
+	echo "${retstr}"
+
+	# Is service existing?
+	if echo "${retstr}" | grep -q "^PRCR-1001:"; then
+		echo "Service not existing. Aborting backup!"
+		abort_script 1
+	fi
+
+	# Is service running on current node?
+	if [ "${local_only}" = 'true' ]; then
+		# Oracle Restart: only one node
+		running_service=$(echo "${retstr}" | sed -e 's/^Service .* is running//g' -e 's/ //g')
+		if [ -n "${running_service}" ]; then
+			print_msg "Service ${RMAN_SERVICE} not running on current node. Skipping backup!"
+			exit 0
+		fi
 	else
+		running_instances=$(echo "${retstr}" | sed -e 's/^Service .* is running on instance(s)//g' -e 's/ //g')
+		if [ ! "${node_sid}" = "${running_instances}" ]; then
+			print_msg "Service ${RMAN_SERVICE} not running on current node. Skipping backup!"
+			exit 0
+		fi
+	fi
+}
+
+check_role() {
+	if [ -z "${RMAN_ROLE}" ]; then
+		return
+	fi
+
+	# role from the local instance (bequeath connection, no listener needed)
+	case "${RMAN_ROLE}" in
+		PRIMARY) expected_role='PRIMARY';;
+		STANDBY) expected_role='PHYSICAL STANDBY';;
+		*)
+			echo "Invalid value for --role/RMAN_ROLE: ${RMAN_ROLE} (PRIMARY or STANDBY)"
+			print_usage
+			exit 1;;
+	esac
+
+	database_role=$(query_value ROLE "select 'ROLE=' || database_role from v\$database;")
+
+	if [ -z "${database_role}" ]; then
+		print_msg "Database role of ${ORACLE_SID} could not be determined (instance not mounted?)."
+		abort_script 13
+	fi
+
+	if [ ! "${database_role}" = "${expected_role}" ]; then
+		print_msg "Database role of ${ORACLE_SID} is ${database_role}, not ${expected_role}. Skipping backup!"
+		exit 0
+	fi
+	print_syslog "Database role of ${ORACLE_SID} is ${database_role}."
+}
+
+check_catalog() {
+	catalogconnect=''
+	if [ -z "${RMAN_CATALOGCONNECT}" ] || [ "${nocatalog}" = 'true' ]; then
 		print_syslog "Using no Catalog for Backup!"
-		catalogconnect=''
+		return
+	fi
+
+	# check for availible catalog
+	# catalog not working => switch to nocatalog!
+	print_syslog "Check for working RMAN Catalog"
+	if "${ORACLE_HOME}/bin/rman" << _EOF_
+connect target ${RMAN_TARGETCONNECT}
+connect catalog ${RMAN_CATALOGCONNECT}
+_EOF_
+	then
+		catalogconnect="connect catalog ${RMAN_CATALOGCONNECT}"
+		print_syslog "Using Catalog for Backup!"
+	else
+		print_msg "Catalog not reachable. Working without Catalog!"
 	fi
 }
 
 check_requirements() {
-	if [ ! -d "${RMANLOGDIR}" ]; then
-		print_msg "Directory ${RMANLOGDIR} for RMAN logfiles not existing."
+	if [ ! -d "${RMAN_LOGDIR}" ]; then
+		print_msg "Directory ${RMAN_LOGDIR} for RMAN logfiles not existing."
 		abort_script 21
 	fi
 
@@ -375,7 +493,7 @@ check_requirements() {
 do_backup() {
 	# tee: all output is written to the logfile as well
 	"${ORACLE_HOME}/bin/rman" << _EOF_ | tee -a "${rmanlog}"
-connect target ${TARGETCONNECT:-"/"}
+connect target ${RMAN_TARGETCONNECT}
 ${catalogconnect}
 @${rmanskript}
 _EOF_
@@ -394,8 +512,16 @@ _EOF_
 #                                                                            #
 ##############################################################################
 print_syslog "Begin"
-setenv "$@"
+parse_args "$@"
+legacy_env
+setenv_oracle
+setenv_admin
+read_config
+setenv_rman
+check_service
+check_role
 check_requirements
+check_catalog
 do_backup
 print_syslog "End Code=0"
 exit 0
