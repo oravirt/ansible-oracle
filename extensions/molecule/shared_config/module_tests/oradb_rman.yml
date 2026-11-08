@@ -1,0 +1,249 @@
+---
+# Role test for oradb_rman and rman_backup.sh with mt_cdb (no RMAN catalog).
+# Backups are written to /u01/app/oracle/backup.
+# - assert control_file_record_keep_time (missing => the role fails)
+# - role: rman_backup.cfg (mode 0600), immediate execution of the job parameter
+#   (the crontab entries are not created: molecule skips the tag notest of the cron tasks)
+# - rman_backup.sh: backup, RMAN failure (99), missing RMAN script (22), --role primary/standby,
+#   logfile per execution with symlink, ORACLE_ADMIN from db_unique_name,
+#   parallel execution of the same action (30)
+# The database runs in NOARCHIVELOG mode => the test scripts back up the controlfile only.
+# At the beginning and at the end: the RMAN configuration is cleared,
+# the test scripts, the logfiles and the backups are removed.
+# oracle_base is a default of the roles => not defined in this play
+- name: oradb_rman | variables
+  ansible.builtin.set_fact:
+    _rm_base: "{{ oracle_base | default('/u01/app/oracle') }}"
+
+- name: oradb_rman | variables (paths)
+  ansible.builtin.set_fact:
+    _rm_backup_dir: "{{ _rm_base }}/backup"
+    _rm_script: "{{ _rm_base }}/bin/rman_backup.sh"
+    _rm_script_dir: "{{ _rm_base }}/rman"
+    _rm_log_dir: "{{ _rm_base }}/rman/log"
+    _rm_cfg: "{{ _rm_base }}/admin/{{ mt_cdb }}/rman/rman_backup.cfg"
+    _rm_inventory_dbs: "{{ oracle_databases }}"
+    # RMAN configuration of the job parameter (CONFIGURE ...)
+    _rm_db_attrs:
+      rman_retention_policy: 'RECOVERY WINDOW OF 7 DAYS'
+      rman_channel_disk: "format '/u01/app/oracle/backup/%d_%T_%U'"
+      rman_controlfile_autobackup_disk: "'/u01/app/oracle/backup/%d_%F'"
+      rman_jobs:
+        - {name: parameter, immediate: true}
+        # disabled => no execution by cron (not created in molecule, tag notest)
+        - {name: archivelog, role: primary, disabled: true, weekday: "*", hour: "*", minute: "30", day: "*"}
+    _rm_keep_time:
+      - {name: control_file_record_keep_time, value: '14', scope: both, state: present}
+
+- name: oradb_rman | cleanup of a previous run
+  ansible.builtin.include_tasks: oradb_rman_cleanup.yml
+
+# ---------------------------------------------------------------- role
+- name: oradb_rman | assert control_file_record_keep_time missing
+  ansible.builtin.include_tasks: _role_run.yml
+  vars:
+    mt_id: oradb_rman.assert_keep_time_missing
+    mt_role: oradb_rman
+    mt_role_root: true
+    mt_role_expect: failed
+    oracle_databases: >-
+      {{ _rm_inventory_dbs | selectattr('oracle_db_name', 'equalto', mt_cdb)
+         | map('combine', _rm_db_attrs) | list }}
+
+- name: oradb_rman | role with rman_jobs
+  ansible.builtin.include_tasks: _role_run.yml
+  vars:
+    mt_id: oradb_rman.role
+    mt_role: oradb_rman
+    mt_role_root: true
+    rman_device_type_disk: 'PARALLELISM 1 BACKUP TYPE TO COMPRESSED BACKUPSET'
+    oracle_databases: >-
+      {{ _rm_inventory_dbs | selectattr('oracle_db_name', 'equalto', mt_cdb)
+         | map('combine', _rm_db_attrs)
+         | map('combine', {'init_parameters': (_rm_inventory_dbs
+                                               | selectattr('oracle_db_name', 'equalto', mt_cdb)
+                                               | first).init_parameters | default([]) + _rm_keep_time})
+         | list }}
+
+- name: oradb_rman | rman_backup.cfg
+  ansible.builtin.stat:
+    path: "{{ _rm_cfg }}"
+  register: _rm_cfg_stat
+
+- name: oradb_rman | content of rman_backup.cfg
+  ansible.builtin.slurp:
+    src: "{{ _rm_cfg }}"
+  register: _rm_cfg_content
+  when: _rm_cfg_stat.stat.exists
+
+- name: oradb_rman | check rman_backup.cfg
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oradb_rman.cfg
+    mt_expect: ok
+    _rm_cfg_text: "{{ _rm_cfg_content.content | default('') | b64decode }}"
+    mt_res:
+      failed: >-
+        {{ not _rm_cfg_stat.stat.exists
+           or _rm_cfg_stat.stat.mode != '0600'
+           or _rm_cfg_text is not search('(?m)^RMAN_SCRIPTDIR=' ~ _rm_script_dir ~ '$')
+           or _rm_cfg_text is not search('(?m)^RMAN_LOGDIR=' ~ _rm_log_dir ~ '$')
+           or _rm_cfg_text is not search('(?m)^RMAN_LOG_RETENTION=30$')
+           or _rm_cfg_text is search('(?m)^RMAN_CATALOGCONNECT=') }}
+      msg: "mode={{ _rm_cfg_stat.stat.mode | default('missing') }}: {{ _rm_cfg_text | regex_findall('(?m)^RMAN_[A-Z_]+=.*$') }}"
+
+- name: oradb_rman | logfile of the immediate job parameter
+  ansible.builtin.stat:
+    path: "{{ _rm_log_dir }}/{{ mt_cdb }}_parameter.log"
+  register: _rm_param_log
+
+- name: oradb_rman | check logfile of the job parameter
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oradb_rman.immediate_parameter_log
+    mt_expect: ok
+    mt_res:
+      failed: "{{ not (_rm_param_log.stat.islnk | default(false)) }}"
+      msg: "symlink {{ _rm_log_dir }}/{{ mt_cdb }}_parameter.log: {{ _rm_param_log.stat.lnk_source | default('missing') }}"
+
+# ---------------------------------------------------------------- rman_backup.sh
+- name: oradb_rman | test RMAN scripts
+  ansible.builtin.copy:
+    content: "{{ item.content }}\n"
+    dest: "{{ _rm_script_dir }}/{{ item.name }}.rman"
+    mode: '0644'
+  loop:
+    - {name: moltest_ok, content: "backup current controlfile format '{{ _rm_backup_dir }}/moltest_%d_%U';"}
+    - {name: moltest_fail, content: "backup datafile 999;"}
+    - {name: moltest_sleep, content: "host 'sleep 20';"}
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: oradb_rman | backup
+  ansible.builtin.include_tasks: oradb_rman_run.yml
+  vars:
+    _rm_id: backup
+    _rm_args: [-a, moltest_ok]
+    _rm_rc: 0
+    _rm_search: "ORACLE_ADMIN: {{ _rm_base }}/admin/{{ mt_cdb }}"
+
+- name: oradb_rman | backup pieces
+  ansible.builtin.find:
+    paths: "{{ _rm_backup_dir }}"
+    patterns: "moltest_{{ mt_cdb }}_*"
+  register: _rm_pieces
+
+- name: oradb_rman | check backup pieces
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oradb_rman.backup_pieces
+    mt_expect: ok
+    mt_res:
+      failed: "{{ _rm_pieces.matched == 0 }}"
+      msg: "{{ _rm_pieces.files | map(attribute='path') | list }}"
+
+- name: oradb_rman | logfile of the backup
+  ansible.builtin.slurp:
+    src: "{{ _rm_log_dir }}/{{ mt_cdb }}_moltest_ok.log"
+  register: _rm_log_content
+  failed_when: false
+
+- name: oradb_rman | check logfile of the backup
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oradb_rman.logfile
+    mt_expect: ok
+    _rm_log_text: "{{ _rm_log_content.content | default('') | b64decode }}"
+    mt_res:
+      failed: >-
+        {{ _rm_log_text is not search('Configuration file: ' ~ _rm_cfg)
+           or _rm_log_text is not search('Recovery Manager complete') }}
+      msg: "{{ (_rm_log_text | split('\n'))[-6:] }}"
+
+- name: oradb_rman | RMAN failure
+  ansible.builtin.include_tasks: oradb_rman_run.yml
+  vars:
+    _rm_id: rman_failure
+    _rm_args: [-a, moltest_fail]
+    _rm_rc: 99
+
+- name: oradb_rman | missing RMAN script
+  ansible.builtin.include_tasks: oradb_rman_run.yml
+  vars:
+    _rm_id: missing_script
+    _rm_args: [-a, moltest_missing]
+    _rm_rc: 22
+
+- name: oradb_rman | role primary
+  ansible.builtin.include_tasks: oradb_rman_run.yml
+  vars:
+    _rm_id: role_primary
+    _rm_args: [-a, moltest_ok, --role, primary]
+    _rm_rc: 0
+    _rm_search: Recovery Manager complete
+
+- name: oradb_rman | role standby
+  ansible.builtin.include_tasks: oradb_rman_run.yml
+  vars:
+    _rm_id: role_standby
+    _rm_args: [-a, moltest_ok, --role, standby]
+    _rm_rc: 0
+    _rm_search: Skipping backup
+
+- name: oradb_rman | role from the environment
+  ansible.builtin.include_tasks: oradb_rman_run.yml
+  vars:
+    _rm_id: role_environment
+    _rm_args: [-a, moltest_ok]
+    _rm_env: {RMAN_ROLE: standby}
+    _rm_rc: 0
+    _rm_search: Skipping backup
+
+# parallel execution: the 2nd execution of the same action stops with exit code 30
+- name: oradb_rman | start 1st execution of moltest_sleep
+  ansible.builtin.command:
+    argv: ["{{ _rm_script }}", -a, moltest_sleep]
+  async: 120
+  poll: 0
+  register: _rm_async
+  changed_when: false
+
+- name: oradb_rman | wait for the logfile of the 1st execution
+  ansible.builtin.wait_for:
+    path: "{{ _rm_log_dir }}/{{ mt_cdb }}_moltest_sleep.log"
+    timeout: 60
+
+- name: oradb_rman | parallel execution
+  ansible.builtin.include_tasks: oradb_rman_run.yml
+  vars:
+    _rm_id: parallel_same_action
+    _rm_args: [-a, moltest_sleep]
+    _rm_rc: 30
+    _rm_search: running already
+
+- name: oradb_rman | parallel execution of another action
+  ansible.builtin.include_tasks: oradb_rman_run.yml
+  vars:
+    _rm_id: parallel_other_action
+    _rm_args: [-a, moltest_ok]
+    _rm_rc: 0
+
+- name: oradb_rman | wait for the 1st execution
+  ansible.builtin.async_status:
+    jid: "{{ _rm_async.ansible_job_id }}"
+  register: _rm_async_result
+  until: _rm_async_result.finished
+  retries: 60
+  delay: 2
+
+- name: oradb_rman | check 1st execution
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oradb_rman.parallel_first
+    mt_expect: ok
+    mt_res:
+      failed: "{{ _rm_async_result.rc | default(1) != 0 }}"
+      msg: "rc={{ _rm_async_result.rc | default('') }}"
+
+- name: oradb_rman | cleanup
+  ansible.builtin.include_tasks: oradb_rman_cleanup.yml

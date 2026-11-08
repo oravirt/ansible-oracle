@@ -1,0 +1,42 @@
+---
+# Cleanup of the oradb_rman test (included by oradb_rman.yml at the beginning and at the end):
+# RMAN configuration of the job parameter, test scripts, logfiles and backups.
+- name: oradb_rman | cleanup | clear RMAN configuration
+  ansible.builtin.command:
+    cmd: "{{ mt_oracle_home }}/bin/rman target /"
+    stdin: |
+      configure retention policy clear;
+      configure controlfile autobackup clear;
+      configure controlfile autobackup format for device type disk clear;
+      configure device type disk clear;
+      configure channel device type disk clear;
+  changed_when: false
+
+- name: oradb_rman | cleanup | find test files
+  ansible.builtin.find:
+    paths:
+      - "{{ _rm_backup_dir }}"
+      - "{{ _rm_log_dir }}"
+      - "{{ _rm_script_dir }}"
+    patterns:
+      # backups (test scripts and controlfile autobackup)
+      - "moltest_*"
+      - "{{ mt_cdb }}_*"
+      - "c-*"
+      # logfiles, symlinks and lock files of the test
+      - ".{{ mt_cdb }}_*.lock"
+    file_type: any
+    hidden: true
+  register: _rm_cleanup_files
+
+- name: oradb_rman | cleanup | remove test files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ _rm_cleanup_files.files | map(attribute='path') | list }}"
+
+- name: oradb_rman | cleanup | backup directory
+  ansible.builtin.file:
+    path: "{{ _rm_backup_dir }}"
+    state: directory
+    mode: '0755'

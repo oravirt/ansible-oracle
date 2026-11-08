@@ -5,6 +5,9 @@
 # mt_role:      name of the role in opitzconsulting.ansible_oracle
 # mt_role_tasks_from: (optional) task file of the role, default main
 # mt_role_expect: (optional) ok (default) or failed (the role must fail)
+# mt_role_root: (optional) true: the role runs as root like in the playbooks of the collection
+#               (become_user root), tasks with an own become_user keep it (e.g. oracle_user).
+#               Default false: the role runs as the user of the play (oracle).
 # The variables for the role (e.g. asm_diskgroups) are set as vars of include_tasks.
 #
 # The check expects that the role does not fail (mt_role_expect: ok). Changes of the role
@@ -15,6 +18,16 @@
       ansible.builtin.include_role:
         name: "opitzconsulting.ansible_oracle.{{ mt_role }}"
         tasks_from: "{{ mt_role_tasks_from | default('main') }}"
+      when: not mt_role_root | default(false) | bool
+
+    - name: "role | run as root | {{ mt_role }}"
+      ansible.builtin.include_role:
+        name: "opitzconsulting.ansible_oracle.{{ mt_role }}"
+        tasks_from: "{{ mt_role_tasks_from | default('main') }}"
+        apply:
+          become: true
+          become_user: root
+      when: mt_role_root | default(false) | bool
 
     - name: "role | record ok | {{ mt_id }}"
       ansible.builtin.include_tasks: _check.yml
