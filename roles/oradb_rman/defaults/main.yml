@@ -58,9 +58,11 @@ oradb_rman_retention_policy_default: "{{ rman_retention_policy_default | default
 
 # @var oradb_rman_channel_disk_default:description: >
 # Defines the format for disk target in RMAN-Templates from role.
+#
+# Used for `CONFIGURE CHANNEL DEVICE TYPE DISK <value>` => the value starts with `format`.
 # @end
 oradb_rman_channel_disk_default: >-
-  {% set __channel_disk_default = "'/u10/rmanbackup/%d/%d_%T_%U'" -%}
+  {% set __channel_disk_default = "format '/u10/rmanbackup/%d/%d_%T_%U'" -%}
   {{ rman_channel_disk_default | default(__channel_disk_default) -}}
 
 # @var oradb_rman_controlfile_autobackup_disk_default:description: >
