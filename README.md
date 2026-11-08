@@ -24,10 +24,11 @@
 
 1. [APEX and ORDS in `ansible-oracle`](doc/guides/apex_ords.adoc)
 2. [Oracle AutoUpgrade in `ansible-oracle`](doc/guides/autoupgrade.adoc)
-3. [Upgrade of PDBs with AutoUpgrade (Unplug/Plug)](doc/guides/autoupgrade_upgrade.adoc)
-4. [How to develop in ansible-oracle](doc/development.adoc)
-5. [List of roles in ansible-oracle](doc/roles.adoc)
-6. [Breaking Changes - Upgrade Guide](doc/guides/breaking_changes.adoc)
+3. [RMAN Backups with `oradb_rman`](doc/guides/rman.adoc)
+4. [Upgrade of PDBs with AutoUpgrade (Unplug/Plug)](doc/guides/autoupgrade_upgrade.adoc)
+5. [How to develop in ansible-oracle](doc/development.adoc)
+6. [List of roles in ansible-oracle](doc/roles.adoc)
+7. [Breaking Changes - Upgrade Guide](doc/guides/breaking_changes.adoc)
 
 
 ## Pre-requisites
