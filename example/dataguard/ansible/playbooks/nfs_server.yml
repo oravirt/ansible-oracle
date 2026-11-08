@@ -1,12 +1,14 @@
 ---
-# NFS server for the installation media on the 1st database server (group nfs_server).
-#
-# AutoUpgrade downloads the gold image into nfs_server_sw_path on this host only.
-# The hosts of the group nfs_client mount the share read only with install_from_nfs: true
-# during the installation of the ORACLE_HOME (role oraswdb_install).
+# NFS server on the 1st database server (group nfs_server) for
+# - the installation media (nfs_server_sw_path, read only):
+#   AutoUpgrade downloads the gold image into nfs_server_sw_path on this host only.
+#   The hosts of the group nfs_client mount the share with install_from_nfs: true
+#   during the installation of the ORACLE_HOME (role oraswdb_install).
+# - the RMAN backups (nfs_server_backup_path, read write):
+#   The hosts of the group nfs_client mount the share permanently on the same path (2nd play).
 #
 # Requires the playbook opitzconsulting.ansible_oracle.os before: filesystem /u01, user oracle.
-- name: NFS server for installation media
+- name: NFS server for installation media and RMAN backups
   hosts: "{{ hostgroup | default('nfs_server') }}"
   become: true
   any_errors_fatal: true
@@ -40,6 +42,39 @@
         mode: "0644"
       register: _nfs_server_exports
 
+    # ORACLE_BASE with the same owner and mode as in the role oraswdb_install
+    - name: Create ORACLE_BASE
+      ansible.builtin.file:
+        path: "{{ oracle_base | default('/u01/app/oracle') }}"
+        state: directory
+        owner: "{{ oracle_user | default('oracle') }}"
+        group: "{{ oracle_group | default('oinstall') }}"
+        mode: "0775"
+
+    # RMAN does not create directories: one directory per DB_NAME (%d in the RMAN format)
+    - name: Create directories for RMAN backups
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ oracle_user | default('oracle') }}"
+        group: "{{ oracle_group | default('oinstall') }}"
+        mode: "0750"
+      loop: >-
+        {{ [nfs_server_backup_path]
+           + oracle_databases | default([]) | map(attribute='oracle_db_name')
+             | map('regex_replace', '^', nfs_server_backup_path ~ '/') | list }}
+
+    - name: Export RMAN backups
+      ansible.builtin.copy:
+        content: |
+          # Managed by Ansible (playbooks/nfs_server.yml): RMAN backups for ansible-oracle
+          {{ nfs_server_backup_path }} {{ nfs_server_clients | map('regex_replace', '$', '(rw,sync,root_squash)') | join(' ') }}
+        dest: /etc/exports.d/oracle-backup.exports
+        owner: root
+        group: root
+        mode: "0644"
+      register: _nfs_server_exports_backup
+
     - name: Start NFS server
       ansible.builtin.systemd:
         name: nfs-server
@@ -48,7 +83,7 @@
 
     - name: Reload exports
       ansible.builtin.command: exportfs -ra
-      when: _nfs_server_exports is changed  # noqa no-handler
+      when: _nfs_server_exports is changed or _nfs_server_exports_backup is changed  # noqa no-handler
       changed_when: true
 
     - name: Gather service facts
@@ -67,3 +102,33 @@
       when:
         - ansible_facts.services['firewalld.service'] is defined
         - ansible_facts.services['firewalld.service'].state == 'running'
+
+# Permanent mount of the RMAN backups on the NFS clients (/etc/fstab).
+# The mount point is identical to the directory on the NFS server
+# => the same RMAN format on all members of the Data Guard configuration.
+- name: NFS client for RMAN backups
+  hosts: "{{ hostgroup_nfs_client | default('nfs_client') }}"
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Install nfs-utils
+      ansible.builtin.package:
+        name: nfs-utils
+        state: present
+
+    - name: Create ORACLE_BASE
+      ansible.builtin.file:
+        path: "{{ oracle_base | default('/u01/app/oracle') }}"
+        state: directory
+        owner: "{{ oracle_user | default('oracle') }}"
+        group: "{{ oracle_group | default('oinstall') }}"
+        mode: "0775"
+
+    # Owner and mode of the directory come from the NFS server after the mount
+    - name: Mount RMAN backups
+      ansible.posix.mount:
+        src: "{{ nfs_server_backup }}:{{ nfs_server_backup_path }}"
+        path: "{{ nfs_server_backup_path }}"
+        fstype: nfs
+        opts: "{{ nfs_client_backup_opts }}"
+        state: mounted

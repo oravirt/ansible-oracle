@@ -65,6 +65,24 @@ oracle_database_db1:
       attributes:
         - {name: password_life_time, value: unlimited}
 
+  # RMAN backups to the NFS share nfs_server_backup_path (group_vars/all/backup.yml)
+  # control_file_record_keep_time (init_parameters) must be >= the days of the RECOVERY WINDOW
+  rman_retention_policy: 'RECOVERY WINDOW OF 7 DAYS'
+  rman_channel_disk: "format '/u01/app/oracle/backup/%d/%d_%T_%U'"
+  # %F contains the DBID, which is identical on all members => db_unique_name in the name
+  rman_controlfile_autobackup_disk: "'/u01/app/oracle/backup/%d/%d_{{ db1_unique_name }}_%F'"
+  # Both members get the same jobs. role: primary => the backup runs on the current primary only,
+  # rman_backup.sh skips it on the standby. After a switchover the backups follow the role.
+  rman_jobs:
+    # CONFIGURE ... during the playbook: parameter on the primary,
+    # parameter_standby on the standby (without CONFIGURE RETENTION POLICY: not configurable on a standby)
+    - {name: parameter, role: primary, immediate: true}
+    - {name: parameter_standby, role: standby, immediate: true}
+    # weekly level 0 backup on Sunday at 01:10
+    - {name: online_level0, role: primary, weekday: "0", hour: "01", minute: "10", day: "*"}
+    # hourly archivelog backup
+    - {name: archivelog, role: primary, weekday: "*", hour: "*", minute: "30", day: "*"}
+
 oracle_pdb_db1_orclpdb:
   home: *db_config_home
   listener_port: *cdb_listener_port

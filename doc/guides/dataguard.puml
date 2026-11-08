@@ -5,6 +5,7 @@ LAYOUT_TOP_DOWN()
 
 AddContainerTag("oradb", $legendText="Database")
 AddContainerTag("media", $legendText="Installation Media")
+AddContainerTag("backup", $legendText="RMAN Backups")
 AddContainerTag("ansible", $bgColor="DarkBlue", $legendText="Ansible")
 
 Person(admin, "Administrator")
@@ -19,17 +20,19 @@ System_Boundary(vmhost, "Hypervisor", "e.g. Hyper-V") {
     Container(autoupgrade, "AutoUpgrade", "autoupgrade.jar -patch -mode download", $tags="ansible")
     Container(nfs, "NFS Server", "export /u01/sw (read only)", $tags="media")
     Container(instmedia, "Installation Media", "/u01/sw/db_home_26.xx.zip", $tags="media")
+    Container(nfsbackup, "NFS Server", "export /u01/app/oracle/backup (read write)", $tags="backup")
     ContainerDb(primary, "DB1_SITE1", "Oracle AI Database 26ai\ninitial primary (dbca)\nCDB DB1, PDB ORCLPDB", $tags="oradb")
   }
   System_Boundary(dbfs2, "VM dataguard-dbfs2 (192.168.66.167)") {
     Container(nfsmount, "NFS Mount", "/u01/sw\nduring the ORACLE_HOME installation", $tags="media")
+    Container(backupmount, "NFS Mount", "/u01/app/oracle/backup\npermanent (/etc/fstab)", $tags="backup")
     ContainerDb(standby, "DB1_SITE2", "Oracle AI Database 26ai\ninitial physical standby\n(RMAN DUPLICATE)", $tags="oradb")
   }
 }
 
 Rel_Down(admin, ansible, "ansible-playbook")
 Rel_Down(ansible, dbfs1, "ssh: os, nfs_server, autoupgrade, single_instance_fs")
-Rel_Down(ansible, dbfs2, "ssh: os, single_instance_fs")
+Rel_Down(ansible, dbfs2, "ssh: os, nfs_server (client), single_instance_fs")
 Rel(autoupgrade, mos, "download")
 Rel(autoupgrade, instmedia, "")
 Rel(instmedia, nfs, "")
@@ -37,6 +40,9 @@ Rel(nfs, nfsmount, "NFS")
 Rel(instmedia, primary, "install")
 Rel(nfsmount, standby, "install")
 Rel(primary, standby, "Redo Transport\nData Guard Broker")
+Rel(primary, nfsbackup, "RMAN backup\n(role primary)")
+Rel(nfsbackup, backupmount, "NFS")
+Rel(standby, backupmount, "RMAN backup\nafter a switchover")
 
 SHOW_LEGEND()
 @enduml
