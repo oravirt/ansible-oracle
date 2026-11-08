@@ -679,7 +679,6 @@ Renovate does not check the dependencies of a collection either.
 `galaxy_requires.py` checks the dependencies of every version against the version ranges in `galaxy.yml` and the minimum ansible-core version.
 `COMPATIBLE` is the newest version without a conflict, the script fails and shows the conflicting dependency, when the version in `galaxy.yml` has a conflict.
 Only one level is checked (dependencies of dependencies are not checked), test the installation with `task molecule:collection` after an update.
-`ibre5041.ansible_oracle_modules` is limited to `<3.4.0` in `renovate.json`, because 3.4.1 and newer depend on `community.crypto>=3.0.0`.
 `opitzconsulting.ansible_oracle` in `requirements.yml` is disabled, because the version is set by `tools/release/galaxy_version.sh` (see <<Collection version in requirements.yml>>).
 
 Tools which are used in requirements, in `.pre-commit-config.yaml` and in the github workflows (`ansible-doctor`, `ansible-lint`, `antsibull-changelog`) are grouped with `groupName`.
@@ -984,6 +983,7 @@ The playbook loads `vars.yml`, `known_bugs.yml` and `<scenario>/module_tests.yml
 |`oracle_services.yml` |`oracle_services` without Grid Infrastructure (DBMS_SERVICE, `dbfs`)
 |`oracle_services_gi.yml` |`oracle_services` with Grid Infrastructure (srvctl, `has-ol9`)
 |`oracle_asmdg.yml` |`oracle_asmdg` with an own disk group on the spare ASM disks (`has-ol9`)
+|`oracle_crs_listener.yml` |`oracle_crs_listener` with an own listener `MOLTEST_LSNR` (srvctl, `has-ol9`)
 |===
 
 ==== Result of a test run

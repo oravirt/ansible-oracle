@@ -8,7 +8,7 @@ galaxy.yml and compares requires_ansible of each version with the minimum
 version from requires_ansible in meta/runtime.yml.
 
 Renovate does not check the dependencies of a collection either, e.g.
-ibre5041.ansible_oracle_modules 3.4.1 needs community.crypto >=3.0.0, while
+a collection which needs community.crypto >=3.0.0, while
 galaxy.yml allows only community.crypto <3.0.0. The dependencies of a version
 must be installable with the version ranges in galaxy.yml and the minimum
 ansible-core version (only one level, dependencies of dependencies are not

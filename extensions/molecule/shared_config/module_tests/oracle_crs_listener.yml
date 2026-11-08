@@ -1,0 +1,476 @@
+---
+# Tests for oracle_crs_listener (Grid Infrastructure / Oracle Restart, scenario has-ol9)
+# Own listener MOLTEST_LSNR: check mode, add (stopped), endpoint normalization, start, modify endpoints,
+# disable/enable, stop, present (= started), restart, remove, idempotence.
+# Own listener MOLTEST_LSNR_DB in the database home (mt_oracle_home): srvctl of this home.
+# The existing LISTENER is only checked for idempotence (call of role oradb_manage_db).
+# Every step is verified with srvctl config/status listener.
+- name: oracle_crs_listener | variables
+  ansible.builtin.set_fact:
+    _lsnr_name: MOLTEST_LSNR
+    _lsnr_db_name: MOLTEST_LSNR_DB
+    _lsnr_srvctl: "{{ mt_asm_oracle_home }}/bin/srvctl"
+    _lsnr_env:
+      ORACLE_HOME: "{{ mt_asm_oracle_home }}"
+      LD_LIBRARY_PATH: "{{ mt_asm_oracle_home }}/lib"
+
+- name: oracle_crs_listener | cleanup
+  ansible.builtin.shell:
+    cmd: >-
+      {{ _lsnr_srvctl }} stop listener -listener {{ _lsnr_name }};
+      {{ _lsnr_srvctl }} remove listener -listener {{ _lsnr_name }} -force;
+      {{ _lsnr_srvctl }} stop listener -listener {{ _lsnr_db_name }};
+      {{ _lsnr_srvctl }} remove listener -listener {{ _lsnr_db_name }} -force
+  environment: "{{ _lsnr_env }}"
+  changed_when: false
+  failed_when: false
+
+# existing LISTENER: same call as in roles/oradb_manage_db/tasks/loop_listener_details.yml
+- name: oracle_crs_listener | existing LISTENER
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: LISTENER
+    endpoints: TCP:1521
+    enabled: true
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check existing LISTENER
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.existing_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+# path of the GI home is the same as %CRS_HOME%
+- name: oracle_crs_listener | existing LISTENER with oraclehome
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: LISTENER
+    oraclehome: "{{ mt_asm_oracle_home }}"
+    endpoints: "1521"
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check existing LISTENER with oraclehome
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.existing_oraclehome, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_crs_listener | add (check mode)
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    endpoints: "1599"
+    state: started
+  check_mode: true
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check add (check mode)
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.add_check_mode, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_crs_listener | srvctl config after check mode
+  ansible.builtin.command:
+    argv: ["{{ _lsnr_srvctl }}", config, listener, -listener, "{{ _lsnr_name }}"]
+  environment: "{{ _lsnr_env }}"
+  register: _lsnr_config
+  changed_when: false
+  failed_when: false
+- name: oracle_crs_listener | check srvctl config after check mode
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_crs_listener.has.add_check_mode_srvctl
+    mt_res:
+      changed: false
+      failed: "{{ _lsnr_config.rc == 0 }}"
+      msg: "{{ _lsnr_config.stdout ~ _lsnr_config.stderr }}"
+    mt_expect: ok
+
+# stopped: add without start (present would start the listener)
+- name: oracle_crs_listener | add
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    endpoints: "1599"
+    state: stopped
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check add
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.add, mt_res: "{{ _res }}", mt_expect: changed}
+
+# crsctl shows ENDPOINTS=TCP:1599
+- name: oracle_crs_listener | add again with protocol
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    endpoints: tcp:1599
+    state: stopped
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check add again with protocol
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.add_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_crs_listener | srvctl config after add
+  ansible.builtin.command:
+    argv: ["{{ _lsnr_srvctl }}", config, listener, -listener, "{{ _lsnr_name }}"]
+  environment: "{{ _lsnr_env }}"
+  register: _lsnr_config
+  changed_when: false
+  failed_when: false
+- name: oracle_crs_listener | check srvctl config after add
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_crs_listener.has.add_srvctl
+    mt_res:
+      changed: false
+      failed: >-
+        {{ _lsnr_config.rc != 0
+           or 'End points: TCP:1599' not in _lsnr_config.stdout
+           or ('Home: ' ~ mt_asm_oracle_home) not in _lsnr_config.stdout
+           or 'is enabled' not in _lsnr_config.stdout }}
+      msg: "{{ _lsnr_config.stdout ~ _lsnr_config.stderr }}"
+    mt_expect: ok
+
+- name: oracle_crs_listener | start
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    state: started
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check start
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.start, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_crs_listener | start again
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    state: started
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check start again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.start_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_crs_listener | srvctl status after start
+  ansible.builtin.command:
+    argv: ["{{ _lsnr_srvctl }}", status, listener, -listener, "{{ _lsnr_name }}"]
+  environment: "{{ _lsnr_env }}"
+  register: _lsnr_status
+  changed_when: false
+  failed_when: false
+- name: oracle_crs_listener | check srvctl status after start
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_crs_listener.has.start_srvctl
+    mt_res:
+      changed: false
+      failed: "{{ ' is running' not in _lsnr_status.stdout }}"
+      msg: "{{ _lsnr_status.stdout ~ _lsnr_status.stderr }}"
+    mt_expect: ok
+
+- name: oracle_crs_listener | modify endpoints
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    endpoints: TCP:1598
+    state: started
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check modify endpoints
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.modify_endpoints, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_crs_listener | modify endpoints again
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    endpoints: TCP:1598
+    state: started
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check modify endpoints again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.modify_endpoints_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_crs_listener | srvctl config after modify
+  ansible.builtin.command:
+    argv: ["{{ _lsnr_srvctl }}", config, listener, -listener, "{{ _lsnr_name }}"]
+  environment: "{{ _lsnr_env }}"
+  register: _lsnr_config
+  changed_when: false
+  failed_when: false
+- name: oracle_crs_listener | check srvctl config after modify
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_crs_listener.has.modify_endpoints_srvctl
+    mt_res:
+      changed: false
+      failed: "{{ _lsnr_config.rc != 0 or 'End points: TCP:1598' not in _lsnr_config.stdout }}"
+      msg: "{{ _lsnr_config.stdout ~ _lsnr_config.stderr }}"
+    mt_expect: ok
+
+- name: oracle_crs_listener | disable
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    enabled: false
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check disable
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.disable, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_crs_listener | disable again
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    enabled: false
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check disable again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.disable_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_crs_listener | srvctl config after disable
+  ansible.builtin.command:
+    argv: ["{{ _lsnr_srvctl }}", config, listener, -listener, "{{ _lsnr_name }}"]
+  environment: "{{ _lsnr_env }}"
+  register: _lsnr_config
+  changed_when: false
+  failed_when: false
+- name: oracle_crs_listener | check srvctl config after disable
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_crs_listener.has.disable_srvctl
+    mt_res:
+      changed: false
+      failed: "{{ _lsnr_config.rc != 0 or 'is disabled' not in _lsnr_config.stdout }}"
+      msg: "{{ _lsnr_config.stdout ~ _lsnr_config.stderr }}"
+    mt_expect: ok
+
+- name: oracle_crs_listener | enable
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    enabled: true
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check enable
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.enable, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_crs_listener | stop
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    state: stopped
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check stop
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.stop, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_crs_listener | stop again
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    state: stopped
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check stop again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.stop_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_crs_listener | srvctl status after stop
+  ansible.builtin.command:
+    argv: ["{{ _lsnr_srvctl }}", status, listener, -listener, "{{ _lsnr_name }}"]
+  environment: "{{ _lsnr_env }}"
+  register: _lsnr_status
+  changed_when: false
+  failed_when: false
+- name: oracle_crs_listener | check srvctl status after stop
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_crs_listener.has.stop_srvctl
+    mt_res:
+      changed: false
+      failed: "{{ ' is not running' not in _lsnr_status.stdout }}"
+      msg: "{{ _lsnr_status.stdout ~ _lsnr_status.stderr }}"
+    mt_expect: ok
+
+# present = started: the stopped listener is started
+- name: oracle_crs_listener | present starts the listener
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check present starts the listener
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.present_start, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_crs_listener | present again
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    state: present
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check present again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.present_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_crs_listener | srvctl status after present
+  ansible.builtin.command:
+    argv: ["{{ _lsnr_srvctl }}", status, listener, -listener, "{{ _lsnr_name }}"]
+  environment: "{{ _lsnr_env }}"
+  register: _lsnr_status
+  changed_when: false
+  failed_when: false
+- name: oracle_crs_listener | check srvctl status after present
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_crs_listener.has.present_srvctl
+    mt_res:
+      changed: false
+      failed: "{{ ' is running' not in _lsnr_status.stdout }}"
+      msg: "{{ _lsnr_status.stdout ~ _lsnr_status.stderr }}"
+    mt_expect: ok
+
+# restarted is always changed (stop when running, start)
+- name: oracle_crs_listener | restart
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    state: restarted
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check restart
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.restart, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_crs_listener | srvctl status after restart
+  ansible.builtin.command:
+    argv: ["{{ _lsnr_srvctl }}", status, listener, -listener, "{{ _lsnr_name }}"]
+  environment: "{{ _lsnr_env }}"
+  register: _lsnr_status
+  changed_when: false
+  failed_when: false
+- name: oracle_crs_listener | check srvctl status after restart
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_crs_listener.has.restart_srvctl
+    mt_res:
+      changed: false
+      failed: "{{ ' is running' not in _lsnr_status.stdout }}"
+      msg: "{{ _lsnr_status.stdout ~ _lsnr_status.stderr }}"
+    mt_expect: ok
+
+# running listener is removed with force (default)
+- name: oracle_crs_listener | remove
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check remove
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.remove, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_crs_listener | remove again
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check remove again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.remove_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_crs_listener | srvctl config after remove
+  ansible.builtin.command:
+    argv: ["{{ _lsnr_srvctl }}", config, listener, -listener, "{{ _lsnr_name }}"]
+  environment: "{{ _lsnr_env }}"
+  register: _lsnr_config
+  changed_when: false
+  failed_when: false
+- name: oracle_crs_listener | check srvctl config after remove
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_crs_listener.has.remove_srvctl
+    mt_res:
+      changed: false
+      failed: "{{ _lsnr_config.rc == 0 }}"
+      msg: "{{ _lsnr_config.stdout ~ _lsnr_config.stderr }}"
+    mt_expect: ok
+
+- name: oracle_crs_listener | final cleanup
+  ansible.builtin.shell:
+    cmd: >-
+      {{ _lsnr_srvctl }} stop listener -listener {{ _lsnr_name }};
+      {{ _lsnr_srvctl }} remove listener -listener {{ _lsnr_name }} -force
+  environment: "{{ _lsnr_env }}"
+  changed_when: false
+  failed_when: false
+
+# ---------------------------------------------------------------- listener in the database home
+# srvctl add/modify listener must be executed with srvctl of the database home (PRCN-3018 with the GI home)
+- name: oracle_crs_listener | add in database home
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_db_name }}"
+    oraclehome: "{{ mt_oracle_home }}"
+    endpoints: "1598"
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check add in database home
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.db_home_add, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_crs_listener | add in database home again
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_db_name }}"
+    oraclehome: "{{ mt_oracle_home }}"
+    endpoints: "1598"
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check add in database home again
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.db_home_idempotent, mt_res: "{{ _res }}", mt_expect: ok}
+
+- name: oracle_crs_listener | srvctl config/status in database home
+  ansible.builtin.shell:
+    cmd: >-
+      {{ _lsnr_srvctl }} config listener -listener {{ _lsnr_db_name }};
+      {{ _lsnr_srvctl }} status listener -listener {{ _lsnr_db_name }}
+  environment: "{{ _lsnr_env }}"
+  register: _lsnr_config
+  changed_when: false
+  failed_when: false
+- name: oracle_crs_listener | check srvctl config/status in database home
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oracle_crs_listener.has.db_home_srvctl
+    mt_res:
+      changed: false
+      failed: >-
+        {{ ('Home: ' ~ mt_oracle_home) not in _lsnr_config.stdout
+           or 'End points: TCP:1598' not in _lsnr_config.stdout
+           or ' is running' not in _lsnr_config.stdout }}
+      msg: "{{ _lsnr_config.stdout ~ _lsnr_config.stderr }}"
+    mt_expect: ok
+
+# move the listener into the GI home (srvctl of the GI home) and back (srvctl of the database home)
+- name: oracle_crs_listener | move to GI home
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_db_name }}"
+    oraclehome: "%CRS_HOME%"
+    state: stopped
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check move to GI home
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.db_home_move_gi, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_crs_listener | move back to database home
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_db_name }}"
+    oraclehome: "{{ mt_oracle_home }}"
+    state: stopped
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check move back to database home
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.db_home_move_db, mt_res: "{{ _res }}", mt_expect: changed}
+
+- name: oracle_crs_listener | remove in database home
+  opitzconsulting.ansible_oracle.oracle_crs_listener:
+    name: "{{ _lsnr_db_name }}"
+    state: absent
+  register: _res
+  ignore_errors: true
+- name: oracle_crs_listener | check remove in database home
+  ansible.builtin.include_tasks: _check.yml
+  vars: {mt_id: oracle_crs_listener.has.db_home_remove, mt_res: "{{ _res }}", mt_expect: changed}
