@@ -51,3 +51,46 @@
   tags:
     - assert
     - assert_rman_tns_admin
+
+# Best practice for RMAN: control_file_record_keep_time in init_parameters
+# (state present, sid '*'). With RECOVERY WINDOW OF <n> DAYS the value must be >= <n>:
+# otherwise the controlfile reuses records of backups, which are needed without catalog.
+- name: Assert control_file_record_keep_time for RMAN
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _oradb_rman_keep_time | length > 0
+      - _oradb_rman_keep_time is match('^[0-9]+$')
+      - _oradb_rman_keep_time | int >= _oradb_rman_window_days | int
+    fail_msg: >-
+      {{ odb.oracle_db_name }}: init_parameters needs control_file_record_keep_time
+      (state present, sid '*') when rman_jobs are defined{{ _oradb_rman_min_msg }}.
+      Current value: '{{ _oradb_rman_keep_time }}'.
+      Example: {name: control_file_record_keep_time, value: '30', scope: both, state: present}
+      Disable the assert with oradb_rman_assert_control_file_record_keep_time: false
+  vars:
+    # value of control_file_record_keep_time with state present (default) and sid '*' (default)
+    _oradb_rman_keep_time: >-
+      {%- set __v = [] -%}
+      {%- for ip in odb.init_parameters | default([])
+            if ip.name | default('') | lower == 'control_file_record_keep_time'
+               and ip.state | default('present') == 'present'
+               and ip.sid | default('*') == '*' -%}
+      {%-   set _ = __v.append(ip.value | default('') | string | trim) -%}
+      {%- endfor -%}
+      {{ __v | first | default('') }}
+    _oradb_rman_policy: "{{ odb.rman_retention_policy | default(oradb_rman_retention_policy_default) }}"
+    _oradb_rman_window_days: >-
+      {{ _oradb_rman_policy | upper | regex_search('RECOVERY WINDOW OF ([0-9]+) DAYS', '\1') | default([0], true) | first }}
+    _oradb_rman_min_msg: >-
+      {{ (', min. ' ~ _oradb_rman_window_days ~ ' days for the retention policy ' ~ _oradb_rman_policy)
+         if _oradb_rman_window_days | int > 0 else '' }}
+  loop: "{{ oracle_databases | selectattr('rman_jobs', 'defined') | list }}"
+  loop_control:
+    loop_var: odb
+    label: "oracle_db_name {{ odb.oracle_db_name | default('') }}"
+  when:
+    - oradb_rman_assert_control_file_record_keep_time | bool
+    - odb.state | default('present') == 'present'
+  tags:
+    - assert

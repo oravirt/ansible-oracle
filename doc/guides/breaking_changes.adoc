@@ -90,6 +90,10 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<init_parameters for one instance: sid and dbca>>
 |An entry in `init_parameters` of `oracle_databases` has an attribute `sid` other than `*` *and* `dbca: true`
 |Remove `dbca: true` from the entry. The parameter is set by `oradb_manage_parameters` after the creation of the database
+
+|<<oradb_rman: control_file_record_keep_time in init_parameters>>
+|A database in `oracle_databases` has `rman_jobs` *and* `control_file_record_keep_time` is missing in `init_parameters` or smaller than the days of `RECOVERY WINDOW OF <n> DAYS`
+|Add `control_file_record_keep_time` to `init_parameters`. Emergency switch: `oradb_rman_assert_control_file_record_keep_time: false`
 |===
 
 ==== Minimum ansible-core 2.16
@@ -929,6 +933,41 @@ oracle_databases:
       - {name: local_listener, value: 'rac1-vip:1521', scope: both, state: present, sid: orcl1}
       - {name: local_listener, value: 'rac2-vip:1521', scope: both, state: present, sid: orcl2}
 ----
+
+==== oradb_rman: control_file_record_keep_time in init_parameters
+
+`control_file_record_keep_time` defines, how many days the controlfile keeps the records of backups.
+Without RMAN catalog, RMAN knows only the backups in the controlfile:
+a value smaller than the recovery window makes backups unusable for RMAN, although they exist.
+
+As of 5.0.0 `oradb_rman` asserts for every database with `rman_jobs`:
+
+- `control_file_record_keep_time` is defined in `init_parameters` (`state: present`, `sid: '*'`), and
+- the value is >= `<n>` for the retention policy `RECOVERY WINDOW OF <n> DAYS`
+  (`rman_retention_policy` of the database or `oradb_rman_retention_policy_default`).
+
+The playbook stops with a failed assert, when the parameter is missing or too small.
+
+.Example for RECOVERY WINDOW OF 14 DAYS
+[source,yaml]
+----
+oracle_databases:
+  - oracle_db_name: DB1
+    rman_retention_policy: 'RECOVERY WINDOW OF 14 DAYS'
+    init_parameters:
+      - {name: control_file_record_keep_time, value: '30', scope: both, state: present}
+    rman_jobs:
+      - {name: parameter}
+----
+
+The assert can be disabled in emergency cases:
+
+[source,yaml]
+----
+oradb_rman_assert_control_file_record_keep_time: false
+----
+
+See link:rman.adoc[RMAN Backups with oradb_rman].
 
 === Adding new breaking changes
 

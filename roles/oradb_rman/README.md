@@ -10,6 +10,7 @@ All other role variables from `oradb_rman` are deprecated and will be removed in
 
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
+  - [oradb_rman_assert_control_file_record_keep_time](#oradb_rman_assert_control_file_record_keep_time)
   - [oradb_rman_autofs](#oradb_rman_autofs)
   - [oradb_rman_catalog_dir](#oradb_rman_catalog_dir)
   - [oradb_rman_channel_disk_default](#oradb_rman_channel_disk_default)
@@ -36,6 +37,20 @@ All other role variables from `oradb_rman` are deprecated and will be removed in
 - Minimum Ansible version: `2.16.0`
 
 ## Default Variables
+
+### oradb_rman_assert_control_file_record_keep_time
+
+Assert `control_file_record_keep_time` in `init_parameters` of databases with `rman_jobs`
+(`state: present`, `sid: '*'`).
+
+With the retention policy `RECOVERY WINDOW OF <n> DAYS` the value must be >= `<n>`.
+Otherwise the controlfile reuses the records of backups, which are needed by RMAN without catalog.
+
+#### Default value
+
+```YAML
+oradb_rman_assert_control_file_record_keep_time: true
+```
 
 ### oradb_rman_autofs
 

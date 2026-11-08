@@ -76,6 +76,15 @@ oradb_rman_controlfile_autobackup_disk_default: >-
   {% set __autobackup_disk_default = "'/u10/rmanbackup/%d/%d_%F'" -%}
   {{ rman_controlfile_autobackup_disk_default | default(__autobackup_disk_default) -}}
 
+# @var oradb_rman_assert_control_file_record_keep_time:description: >
+# Assert `control_file_record_keep_time` in `init_parameters` of databases with `rman_jobs`
+# (`state: present`, `sid: '*'`).
+#
+# With the retention policy `RECOVERY WINDOW OF <n> DAYS` the value must be >= `<n>`.
+# Otherwise the controlfile reuses the records of backups, which are needed by RMAN without catalog.
+# @end
+oradb_rman_assert_control_file_record_keep_time: true
+
 # @var oradb_rman_tnsnames_installed:description: >
 # Defines custom entries in tnsnames.ora in `oradb_rman_tns_admin`.
 #
