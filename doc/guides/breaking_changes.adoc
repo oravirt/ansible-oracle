@@ -94,6 +94,10 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<oradb_rman: control_file_record_keep_time in init_parameters>>
 |A database in `oracle_databases` has `rman_jobs` *and* `control_file_record_keep_time` is missing in `init_parameters` or smaller than the days of `RECOVERY WINDOW OF <n> DAYS`
 |Add `control_file_record_keep_time` to `init_parameters`. Emergency switch: `oradb_rman_assert_control_file_record_keep_time: false`
+
+|<<oradb_rman: logfiles of rman_backup.sh>>
+|A database in `oracle_databases` has `rman_jobs` *and* the RMAN logfiles are monitored, evaluated or rotated (e.g. checkmk logwatch, logrotate, own scripts), or `oradb_rman_cron_logdir` / `rman_cron_logdir` is set
+|Change the monitoring to the new logfile names in `RMAN_LOGDIR`, remove `oradb_rman_cron_logdir` / `rman_cron_logdir` and the old logfiles
 |===
 
 ==== Minimum ansible-core 2.16
@@ -968,6 +972,65 @@ oradb_rman_assert_control_file_record_keep_time: false
 ----
 
 See link:rman.adoc[RMAN Backups with oradb_rman].
+
+==== oradb_rman: logfiles of rman_backup.sh
+
+The logging of `rman_backup.sh` and of the RMAN cron jobs was rebuilt.
+Before 5.0.0 the output was written into two growing files per job,
+which mixed the output of parallel executions and were only cleaned up by an external logrotate (e.g. `orahost_logrotate`).
+
+.Logfiles before and as of 5.0.0
+[options="header",cols="2,3,3"]
+|=======================
+| |Before 5.0.0 |As of 5.0.0
+|Cron output
+|`<oradb_rman_cron_logdir>/rman_<oracle_db_name>_<job>.log` (default `/var/log/oracle/rman/log`), appended
+|`/dev/null`: `rman_backup.sh` writes all output into its own logfile
+|Logfile of `rman_backup.sh`
+|`<RMAN_LOGDIR>/<ORACLE_SID>_<action>.log`, output of RMAN only, appended
+|`<RMAN_LOGDIR>/<db_unique_name>_<action>_<YYYYmmdd>_<HHMMSS>_<pid>.log`, one file per execution with the output of the script, `sqlplus` and RMAN
+|Last execution
+|-
+|Symlink `<RMAN_LOGDIR>/<db_unique_name>_<action>.log` to the logfile of the last execution
+|Cleanup
+|-
+|Logfiles older than `oradb_rman_log_retention` days (default `30`, `RMAN_LOG_RETENTION` in `rman_backup.cfg`) are removed by `rman_backup.sh`
+|Parallel executions of the same action
+|executed, output mixed in one logfile
+|The 2nd execution stops with exit code 30 (lock file `<RMAN_LOGDIR>/.<db_unique_name>_<action>.lock`)
+|=======================
+
+Changes in detail:
+
+- `oradb_rman_cron_logdir` and `rman_cron_logdir` are removed. The directory `/var/log/oracle/rman/log` is no longer created or written.
+- The prefix of the logfile is the `db_unique_name` instead of the `ORACLE_SID`.
+  The name changes for every database with `db_unique_name` != `ORACLE_SID`, e.g. Data Guard or RAC.
+- The 1st execution renames an existing logfile `<RMAN_LOGDIR>/<db_unique_name>_<action>.log` of older versions to `*.log.old`
+  and creates the symlink with this name.
+- Manual executions write the same logfiles as the cron jobs.
+
+Who is affected:
+
+- Monitoring of the logfiles (e.g. checkmk logwatch, own scripts), which reads
+  `/var/log/oracle/rman/log/*` or `<RMAN_LOGDIR>/<ORACLE_SID>_<action>.log`.
+- Monitoring of the exit code (e.g. `mk-job`): exit code 30 for a 2nd execution of a running action is new.
+- logrotate rules for the RMAN logfiles, e.g. the default of `orahost_logrotate`:
+  `rman_backup.sh` removes old logfiles itself, logrotate must not rotate the logfiles with timestamp
+  (`logrotate` refuses to rotate the symlink).
+
+Required actions:
+
+. Remove `oradb_rman_cron_logdir` and `rman_cron_logdir` from the inventory.
+. Change the monitoring to the symlink `<RMAN_LOGDIR>/<db_unique_name>_<action>.log` or to the logfiles with timestamp.
+. Remove logrotate rules for `RMAN_LOGDIR` and set `oradb_rman_log_retention` instead.
+. Remove the old logfiles after the upgrade, when they are not needed anymore:
++
+----
+rm -r /var/log/oracle/rman/log
+rm <RMAN_LOGDIR>/*.log.old
+----
+
+See link:rman.adoc#Logfiles[RMAN Guide - Logfiles].
 
 === Adding new breaking changes
 

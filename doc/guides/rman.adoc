@@ -31,10 +31,11 @@ It configures for every database in `oracle_databases` with `rman_jobs`:
 The crontab contains no passwords and no directories:
 
 ----
-10 01 * * 0 oracle /u01/app/oracle/bin/rman_backup.sh -a online_level0 -s DB1 >> /var/log/oracle/rman/log/rman_DB1_online_level0.log 2>&1
+10 01 * * 0 oracle /u01/app/oracle/bin/rman_backup.sh -a online_level0 -s DB1 > /dev/null 2>&1
 ----
 
 All other settings are read by `rman_backup.sh` from `rman_backup.cfg`.
+The output is written by `rman_backup.sh` to a logfile per execution, see <<Logfiles>>.
 
 === Inventory
 
@@ -103,8 +104,8 @@ The variables of the role are described in the link:../../roles/oradb_rman/READM
 |=======================
 |Variable |Default |Description
 |`oradb_rman_script_dir` |`$ORACLE_BASE/rman` |RMAN scripts (`RMAN_SCRIPTDIR`)
-|`oradb_rman_log_dir` |`$ORACLE_BASE/rman/log` |RMAN logfiles (`RMAN_LOGDIR`)
-|`oradb_rman_cron_logdir` |`/var/log/oracle/rman/log` |Output of the cron jobs
+|`oradb_rman_log_dir` |`$ORACLE_BASE/rman/log` |Logfiles of `rman_backup.sh` (`RMAN_LOGDIR`)
+|`oradb_rman_log_retention` |`30` |Days to keep the logfiles (`RMAN_LOG_RETENTION`), `0`: keep all
 |`oradb_rman_cronfile` |`oracle_rman_ansible` |File in `/etc/cron.d`
 |`oradb_rman_tns_admin` |`$ORACLE_BASE/rman/network/admin` |`TNS_ADMIN` for the catalog (`RMAN_TNS_ADMIN`)
 |`oradb_rman_cron_mkjob` |`false` |Prefix `mk-job` for checkmk
@@ -194,7 +195,8 @@ The first value wins:
 |`-s/--ORACLE_SID` |`ORACLE_SID` |- |ORACLE_SID, DB_NAME in RAC environments (the instance is determined with `srvctl`)
 |`--admin` |`ORACLE_ADMIN` |see below |Directory of `rman/rman_backup.cfg`
 |`-r/--rmanscriptdir` |`RMAN_SCRIPTDIR` |`<ORACLE_ADMIN>/rman` |RMAN scripts
-|`-l/--logdir` |`RMAN_LOGDIR` |`<RMAN_SCRIPTDIR>/log` |Logfile `<RMAN_LOGDIR>/<ORACLE_SID>_<action>.log`
+|`-l/--logdir` |`RMAN_LOGDIR` |`<RMAN_SCRIPTDIR>/log` |Directory of the logfiles, see <<Logfiles>>
+|- |`RMAN_LOG_RETENTION` |`30` |Remove logfiles older than `<n>` days, `0`: keep all
 |`-c/--catalogconnect` |`RMAN_CATALOGCONNECT` |no catalog |`connect catalog <value>`
 |`--nocatalog` |- |- |No catalog, even when `RMAN_CATALOGCONNECT` is set
 |`-t/--targetconnect` |`RMAN_TARGETCONNECT` |`/` |`connect target <value>`
@@ -230,11 +232,12 @@ It is read line by line and *not* sourced: shell code is not executed.
 # Managed by Ansible
 RMAN_SCRIPTDIR=/u01/app/oracle/rman
 RMAN_LOGDIR=/u01/app/oracle/rman/log
+RMAN_LOG_RETENTION=30
 RMAN_TNS_ADMIN=/u01/app/oracle/rman/network/admin
 RMAN_CATALOGCONNECT=rman_db1/<password>@RMANCAT
 ----
 
-- Allowed keys: `RMAN_SCRIPTDIR`, `RMAN_LOGDIR`, `RMAN_TARGETCONNECT`, `RMAN_CATALOGCONNECT`,
+- Allowed keys: `RMAN_SCRIPTDIR`, `RMAN_LOGDIR`, `RMAN_LOG_RETENTION`, `RMAN_TARGETCONNECT`, `RMAN_CATALOGCONNECT`,
   `RMAN_SERVICE`, `RMAN_ROLE`, `RMAN_TNS_ADMIN`. Unknown keys and invalid lines are ignored with a warning.
 - One pair of quotes around the value is removed.
 - Empty lines and lines starting with `#` are ignored.
@@ -250,11 +253,33 @@ because the jobs of a database could use different values.
 `rman_backup.sh` checks the connection to the catalog before the backup.
 The backup runs without catalog, when the catalog is not reachable.
 
-==== Logfiles and exit codes
+[[Logfiles]]
+==== Logfiles
 
-- RMAN output: `<RMAN_LOGDIR>/<ORACLE_SID>_<action>.log`
-- Output of the cron job: `<oradb_rman_cron_logdir>/rman_<oracle_db_name>_<job>.log`
-- Major actions are logged in syslog (tag `rman_backup.sh`)
+`rman_backup.sh` writes all output of the script, `sqlplus` and RMAN to stdout and to a logfile per execution.
+Manual executions are logged the same way as the cron jobs, the crontab redirects the output to `/dev/null`.
+
+----
+<RMAN_LOGDIR>/<db_unique_name>_<action>_<YYYYmmdd>_<HHMMSS>_<pid>.log
+<RMAN_LOGDIR>/<db_unique_name>_<action>.log -> logfile of the last execution
+----
+
+- Every execution has its own logfile: parallel executions do not mix their output.
+- The symlink points to the logfile of the last execution of the action (for monitoring and `tail`).
+- Messages before the logfile is opened (e.g. reading `rman_backup.cfg`) are written to the logfile afterwards.
+- Logfiles of the database and action older than `RMAN_LOG_RETENTION` days are removed.
+- Errors before the logfile is opened (e.g. ORACLE_SID not in `/etc/oratab`) and the major actions
+  are logged in syslog (tag `rman_backup.sh`).
+- `<db_unique_name>` is the name of the directory `ORACLE_ADMIN`, when the instance is not running.
+
+==== Parallel executions
+
+Only one execution of an action is allowed for a database (lock file `<RMAN_LOGDIR>/.<db_unique_name>_<action>.lock`, `flock`).
+A 2nd execution of the same action stops immediately with exit code 30, e.g. an hourly `archivelog`
+while the last execution is still running.
+Different actions of a database run in parallel, e.g. `archivelog` during `online_level0`.
+
+==== Exit codes
 
 .Exit codes of rman_backup.sh
 [options="header"]
@@ -266,6 +291,7 @@ The backup runs without catalog, when the catalog is not reachable.
 |13 |Database role could not be determined (`--role`, instance not mounted)
 |14 |`rman_backup.cfg` not readable
 |21, 22, 23 |Log directory, RMAN script or logfile not existing
+|30 |The action is running already for the database
 |99 |RMAN failed
 |=======================
 
@@ -295,6 +321,9 @@ to prevent the deletion of archive logs which are not yet applied on the standby
   `oradb_rman` removes the environment variables and recreates the crontab entries.
   The values are in `rman_backup.cfg` now.
 - Existing calls of `rman_backup.sh` with all parameters still work.
+- The logfiles are written to `RMAN_LOGDIR` per execution.
+  An existing logfile `<RMAN_LOGDIR>/<name>_<action>.log` of older versions is renamed to `*.log.old` by the first execution.
+  The cron output in `/var/log/oracle/rman/log` (`oradb_rman_cron_logdir`) is no longer written, the directory can be removed.
 - Before this change, the attributes `service`, `rman_retention_policy`, `rman_channel_disk`,
   `rman_controlfile_autobackup_disk`, `rman_log_dir`, `rman_script_dir` and the catalog connect
   of a database were ignored by `oradb_rman` (bug).

@@ -1,0 +1,5 @@
+---
+breaking_changes:
+  - "oradb_rman: rman_backup.sh writes all output to stdout and a logfile per execution <RMAN_LOGDIR>/<db_unique_name>_<action>_<timestamp>_<pid>.log (also manual executions), symlink <db_unique_name>_<action>.log to the last execution, RMAN_LOG_RETENTION removes old logfiles (oradb_rman_log_retention, default 30 days). The prefix is db_unique_name instead of ORACLE_SID, an old logfile with the name of the symlink is renamed to ``*.log.old`` (see doc/guides/breaking_changes.adoc)"
+  - "oradb_rman: rman_backup.sh allows only one execution of an action for a database (flock), a 2nd execution stops with exit code 30 (see doc/guides/breaking_changes.adoc)"
+  - "oradb_rman: the crontab entries redirect the output to /dev/null, oradb_rman_cron_logdir and rman_cron_logdir are removed, /var/log/oracle/rman/log is no longer written (see doc/guides/breaking_changes.adoc)"

@@ -43,16 +43,6 @@
   tags:
     - rmancopy
 
-- name: Create log-Directory for cron output
-  ansible.builtin.file:
-    path: "{{ oradb_rman_cron_logdir }}"
-    state: directory
-    mode: '0755'
-    owner: "{{ oracle_user }}"
-  tags:
-    - rmancron
-    - rmancopy
-
 # dummy with_together for item.0.db_name in default/main.yml
 - name: Create Directory for rman-scripts
   ansible.builtin.file:
@@ -343,18 +333,17 @@
 # The execution isn't done in async mode!
 # The task is only execute once on master_node when GI is installed!
 # no catalog connection (--nocatalog), because setting initial parameters with catalog takes much more time
-# pipefail: a failed rman_backup.sh fails the task (tee would hide the return code)
+# rman_backup.sh writes the logfile in RMAN_LOGDIR, a failed execution fails the task
 - name: Execute RMAN-Script at playbook
   # noqa no-changed-when
-  ansible.builtin.shell:
-    cmd: >-
-      set -o pipefail;
-      {{ oracle_base }}/bin/rman_backup.sh
-      -a {{ odb.1.name }}
-      -s {{ odb.0.oracle_db_instance_name | default(odb.0.oracle_db_name) }}
-      --nocatalog
-      | tee -a {{ oradb_rman_cron_logdir }}/rman_{{ odb.1.name }}.log
-    executable: /bin/bash
+  ansible.builtin.command:
+    argv:
+      - "{{ oracle_base }}/bin/rman_backup.sh"
+      - -a
+      - "{{ odb.1.name }}"
+      - -s
+      - "{{ odb.0.oracle_db_instance_name | default(odb.0.oracle_db_name) }}"
+      - --nocatalog
   environment:
     PATH: /bin:/usr/bin
   become: true
@@ -425,7 +414,7 @@
       -s {{ odb.0.oracle_db_instance_name | default(odb.0.oracle_db_name) }}
       {{ _oradb_rman_rman_service_param }}
       {{ _oradb_rman_rman_role_param }}
-      >> {{ oradb_rman_cron_logdir }}/rman_{{ odb.0.oracle_db_name }}_{{ odb.1.name }}.log 2>&1
+      > /dev/null 2>&1
   with_subelements:
     - "{{ oracle_databases }}"
     - rman_jobs
