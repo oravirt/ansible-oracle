@@ -32,7 +32,9 @@
 # Exit codes:
 #   0     RMAN successful or backup skipped (service not running on this node)
 #   1     wrong parameters or service not existing
+#   0     backup skipped (--role does not match the database role)
 #   10-12 ORACLE_SID, ORACLE_HOME or ORACLE_BASE not found
+#   13    database role could not be determined (--role)
 #   21-23 log directory, RMAN script or logfile not existing
 #   99    RMAN failed
 #
@@ -59,7 +61,8 @@ function print_usage() {
 	echo "Usage:"
 	echo "  $PROGNAME -a <action> -s <ORACLE_SID|DB_NAME> [-r <Directory>]"
 	echo "            [-l <Directory>] [-c <CATALOGCONNECT>] [-t <TARGETCONNECT>]"
-	echo "            [--service <Servicename in GI/Restart>]"
+	echo "            [--catalogfile <file>]"
+	echo "            [--service <Servicename in GI/Restart>] [--role <PRIMARY|STANDBY>]"
 	echo "  $PROGNAME -h"
 }
 
@@ -80,9 +83,15 @@ function print_help() {
 	echo "                       Default: <rmanscriptdir>/log"
 	echo "-c/--catalogconnect   connect catalog <catalogconnect>"
 	echo "                       You could use the environment variable CATALOGCONNECT as well"
+	echo "--catalogfile         File with the connect string for the catalog (1st line)"
+	echo "                       The password is not visible in the crontab or process list."
 	echo "-t/--targetconnect    connect target <targetconnect>"
 	echo "                       You could use the environment variable TARGETCONNECT as well"
 	echo "--service             Execute rman when Service in GI/Restart is running on current node."
+	echo "--role                Execute rman only when the database has this role (Data Guard)."
+	echo "                       PRIMARY: database_role PRIMARY"
+	echo "                       STANDBY: database_role PHYSICAL STANDBY"
+	echo "                       The role is read with 'sqlplus / as sysdba' from the local instance."
 	echo ""
 	echo "The environment variable RMANTNS_ADMIN is used as TNS_ADMIN for RMAN."
 }
@@ -152,9 +161,40 @@ check_service() {
 	fi
 }
 
+check_role() {
+	# role from the local instance (bequeath connection, no listener needed)
+	case "${DB_ROLE}" in
+		PRIMARY) expected_role='PRIMARY';;
+		STANDBY) expected_role='PHYSICAL STANDBY';;
+		*)
+			echo "Invalid value for --role: ${DB_ROLE} (PRIMARY or STANDBY)"
+			print_usage
+			exit 1;;
+	esac
+
+	database_role=$("${ORACLE_HOME}/bin/sqlplus" -S -L /nolog << _EOF_ 2>&1 | sed -n 's/^ROLE=//p' | head -1
+whenever sqlerror exit failure
+connect / as sysdba
+set heading off feedback off pagesize 0 linesize 100
+select 'ROLE=' || database_role from v\$database;
+_EOF_
+	)
+
+	if [ -z "${database_role}" ]; then
+		print_msg "Database role of ${ORACLE_SID} could not be determined (instance not mounted?)."
+		abort_script 13
+	fi
+
+	if [ ! "${database_role}" = "${expected_role}" ]; then
+		print_msg "Database role of ${ORACLE_SID} is ${database_role}, not ${expected_role}. Skipping backup!"
+		exit 0
+	fi
+	print_syslog "Database role of ${ORACLE_SID} is ${database_role}."
+}
+
 setenv() {
 	SHORTOPTS="ha:s:r:l:t:c:"
-	LONGOPTS="help,action:,ORACLE_SID:,rmanscriptdir:,logdir:,targetconnect:,catalogconnect:,service:"
+	LONGOPTS="help,action:,ORACLE_SID:,rmanscriptdir:,logdir:,targetconnect:,catalogconnect:,catalogfile:,service:,role:"
 
 	if ! ARGS=$(getopt -s bash --options "${SHORTOPTS}" --longoptions "${LONGOPTS}" --name "${PROGNAME}" -- "$@"); then
 		print_usage
@@ -186,8 +226,14 @@ setenv() {
 			-c|--catalogconnect)
 				CATALOGCONNECT=${2}
 				shift 2;;
+			--catalogfile)
+				CATALOGFILE=${2}
+				shift 2;;
 			--service)
 				INSTANCE_SERVICE=${2}
+				shift 2;;
+			--role)
+				DB_ROLE=$(echo "${2}" | tr '[:lower:]' '[:upper:]')
 				shift 2;;
 			--)
 				shift
@@ -286,8 +332,20 @@ setenv() {
 		export TNS_ADMIN="${RMANTNS_ADMIN}"
 	fi
 
+	if [ -n "${DB_ROLE}" ]; then
+		check_role
+	fi
+
 	rmanskript="${RMANSCRIPTDIR}/${rmanbackuptyp}.rman"
 	rmanlog="${RMANLOGDIR}/${ORACLE_SID}_${rmanbackuptyp}.log"
+
+	if [ -n "${CATALOGFILE}" ]; then
+		if [ -r "${CATALOGFILE}" ]; then
+			CATALOGCONNECT=$(head -1 "${CATALOGFILE}")
+		else
+			print_msg "Catalog file ${CATALOGFILE} not readable. Working without Catalog!"
+		fi
+	fi
 
 	if [ -n "${CATALOGCONNECT}" ]; then
 		check_catalog

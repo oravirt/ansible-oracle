@@ -11,6 +11,7 @@ All other role variables from `oradb_rman` are deprecated and will be removed in
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [oradb_rman_autofs](#oradb_rman_autofs)
+  - [oradb_rman_catalog_dir](#oradb_rman_catalog_dir)
   - [oradb_rman_channel_disk_default](#oradb_rman_channel_disk_default)
   - [oradb_rman_controlfile_autobackup_disk_default](#oradb_rman_controlfile_autobackup_disk_default)
   - [oradb_rman_cron_logdir](#oradb_rman_cron_logdir)
@@ -44,6 +45,21 @@ Configure autofs for RMAN Backups?
 
 ```YAML
 oradb_rman_autofs: '{{ rmanautofs | default(false) }}'
+```
+
+### oradb_rman_catalog_dir
+
+Directory for the files with the connect string of the RMAN catalog
+(`rman_user` without `rman_wallet`).
+
+The files `<oracle_db_name>.conf` are readable by `oracle_user` only.
+`rman_backup.sh` reads the connect string with `--catalogfile`,
+the password is not part of the crontab.
+
+#### Default value
+
+```YAML
+oradb_rman_catalog_dir: '{{ oracle_base }}/rman/catalog'
 ```
 
 ### oradb_rman_channel_disk_default

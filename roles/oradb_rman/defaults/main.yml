@@ -32,6 +32,16 @@ oradb_rman_log_dir: "{{ rman_log_dir | default(odb.0.rman_log_dir | default(orac
 # @end
 oradb_rman_tns_admin: "{{ rman_tns_admin | default(oracle_base + '/rman/network/admin') }}"
 
+# @var oradb_rman_catalog_dir:description: >
+# Directory for the files with the connect string of the RMAN catalog
+# (`rman_user` without `rman_wallet`).
+#
+# The files `<oracle_db_name>.conf` are readable by `oracle_user` only.
+# `rman_backup.sh` reads the connect string with `--catalogfile`,
+# the password is not part of the crontab.
+# @end
+oradb_rman_catalog_dir: "{{ oracle_base }}/rman/catalog"
+
 # @var oradb_rman_wallet_loc:description: >
 # Directory for Oracle wallet.
 # @end
