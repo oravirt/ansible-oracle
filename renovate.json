@@ -184,6 +184,33 @@
       "matchStrings": [
         "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*[A-Z0-9_]+:\\s*['\"]?(?<currentValue>[\\w.-]+)"
       ]
+    },
+    {
+      "description": "Oracle Release Update in 'patch: RU:<version>' of autoupgrade_download_patches with a '# renovate: datasource=custom.oracle-ru-... depName=...' comment above (also commented out patch lines)",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)autoupgrade\\.ya?ml$/"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*#?\\s*patch:\\s*['\"]?RU:(?<currentValue>[0-9.]+)"
+      ],
+      "versioningTemplate": "loose"
     }
-  ]
+  ],
+  "customDatasources": {
+    "oracle-ru-19": {
+      "description": "Oracle 19c Release Update derived from the quarterly Critical Patch Updates in the Oracle Security Alerts feed: one RU per CPU, Jan 2019 = 19.2",
+      "defaultRegistryUrlTemplate": "https://www.oracle.com/ocom/groups/public/@otn/documents/webcontent/rss-otn-sec.xml",
+      "format": "plain",
+      "transformTemplates": [
+        "{ \"releases\": releases[$contains(version, /<guid[^>]*>CPU(Jan|Apr|Jul|Oct)20[0-9]{2}</)].( $m := $match(version, /CPU(Jan|Apr|Jul|Oct)(20[0-9]{2})/); $q := $lookup({\"Jan\": 0, \"Apr\": 1, \"Jul\": 2, \"Oct\": 3}, $m.groups[0]); $n := ($number($m.groups[1]) - 2019) * 4 + $q + 2; $n >= 2 ? { \"version\": \"19.\" & $string($n) } : undefined ) }"
+      ]
+    },
+    "oracle-ru-26": {
+      "description": "Oracle 26ai Release Update derived from the quarterly Critical Patch Updates in the Oracle Security Alerts feed: fixed prefix 23.26, one RU per CPU, Oct 2025 = 23.26.0",
+      "defaultRegistryUrlTemplate": "https://www.oracle.com/ocom/groups/public/@otn/documents/webcontent/rss-otn-sec.xml",
+      "format": "plain",
+      "transformTemplates": [
+        "{ \"releases\": releases[$contains(version, /<guid[^>]*>CPU(Jan|Apr|Jul|Oct)20[0-9]{2}</)].( $m := $match(version, /CPU(Jan|Apr|Jul|Oct)(20[0-9]{2})/); $q := $lookup({\"Jan\": 0, \"Apr\": 1, \"Jul\": 2, \"Oct\": 3}, $m.groups[0]); $n := ($number($m.groups[1]) - 2025) * 4 + $q - 3; $n >= 0 ? { \"version\": \"23.26.\" & $string($n) } : undefined ) }"
+      ]
+    }
+  }
 }
