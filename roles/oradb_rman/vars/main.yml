@@ -5,26 +5,24 @@
 # with loop_var odb => odb.0: entry of oracle_databases, odb.1: entry of rman_jobs
 _oradb_rman_rman_service_param: "{% if odb.1.service is defined %}--service {{ odb.1.service }}{% endif %}"
 _oradb_rman_checkmk_mkjob_string: "{% if oradb_rman_cron_mkjob | bool %}/usr/bin/mk-job rman_{{ odb.0.oracle_db_name }}_{{ odb.1.name }} {% endif %}"
-_oradb_rman_rmanbackuplogdir: "{% if odb.0.rman_log_dir is defined %}-l {{ odb.0.rman_log_dir }}{% endif %}"
+_oradb_rman_rman_role_param: "{% if odb.1.role is defined %}--role {{ odb.1.role }}{% endif %}"
 
 rman_retention_policy: "{{ odb.0.rman_retention_policy | default(oradb_rman_retention_policy_default) }}"
 rman_channel_disk: "{{ odb.0.rman_channel_disk | default(oradb_rman_channel_disk_default) }}"
 rman_controlfile_autobackup_disk: "{{ odb.0.rman_controlfile_autobackup_disk | default(oradb_rman_controlfile_autobackup_disk_default) }}"
 
-_oradb_rman_rmanbackupscriptdir: "{% if odb.0.rman_script_dir is defined %}-r {{ odb.0.rman_script_dir }}{% endif %}"
+# configuration file of rman_backup.sh: <ORACLE_BASE>/admin/<db_unique_name>/rman/rman_backup.cfg
+# odb: entry of oracle_databases or [entry of oracle_databases, entry of rman_jobs]
+_oradb_rman_db: "{{ odb.0 | default(odb) }}"
+_oradb_rman_cfg_dir: >-
+  {{ oracle_base }}/admin/{{ _oradb_rman_db.oracle_db_unique_name | default(_oradb_rman_db.oracle_db_name) }}/rman
 
-# File with the connect string for the RMAN catalog (rman_user without rman_wallet).
-# The password is not part of the crontab => rman_backup.sh --catalogfile
-_oradb_rman_catalog_file: "{{ oradb_rman_catalog_dir }}/{{ (odb.0 | default(odb)).oracle_db_name }}.conf"
-
-# catalog connect for the crontab:
-# - rman_wallet: -c /@<rman_tnsalias> (no password)
-# - rman_user:   --catalogfile <file> (password in a file readable by oracle_user only)
-_oradb_rman_rman_catalog_param: >-
-  {%- if odb.0.rman_wallet | default(false) | bool -%}
-    -c /@{{ odb.0.rman_tnsalias }}
-  {%- elif odb.0.rman_user is defined -%}
-    --catalogfile {{ _oradb_rman_catalog_file }}
+# RMAN_CATALOGCONNECT in rman_backup.cfg
+_oradb_rman_catalog_connect: >-
+  {%- if _oradb_rman_db.rman_wallet | default(false) | bool -%}
+    /@{{ _oradb_rman_db.rman_tnsalias }}
+  {%- elif _oradb_rman_db.rman_user is defined and _oradb_rman_db.rman_tnsalias is defined -%}
+    {{ _oradb_rman_db.rman_user }}/{{ dbpasswords[_oradb_rman_db.rman_tnsalias][_oradb_rman_db.rman_user] | default(_oradb_rman_db.rman_password) }}@{{ _oradb_rman_db.rman_tnsalias }}
   {%- endif -%}
 
 _oradb_rman_password: "{{ dbpasswords[odb.rman_tnsalias][odb.rman_user] | default(odb.rman_password) }}"

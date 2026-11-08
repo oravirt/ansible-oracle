@@ -12,7 +12,6 @@ All other role variables from `oradb_rman` are deprecated and will be removed in
 - [Default Variables](#default-variables)
   - [oradb_rman_assert_control_file_record_keep_time](#oradb_rman_assert_control_file_record_keep_time)
   - [oradb_rman_autofs](#oradb_rman_autofs)
-  - [oradb_rman_catalog_dir](#oradb_rman_catalog_dir)
   - [oradb_rman_channel_disk_default](#oradb_rman_channel_disk_default)
   - [oradb_rman_controlfile_autobackup_disk_default](#oradb_rman_controlfile_autobackup_disk_default)
   - [oradb_rman_cron_logdir](#oradb_rman_cron_logdir)
@@ -60,21 +59,6 @@ Configure autofs for RMAN Backups?
 
 ```YAML
 oradb_rman_autofs: '{{ rmanautofs | default(false) }}'
-```
-
-### oradb_rman_catalog_dir
-
-Directory for the files with the connect string of the RMAN catalog
-(`rman_user` without `rman_wallet`).
-
-The files `<oracle_db_name>.conf` are readable by `oracle_user` only.
-`rman_backup.sh` reads the connect string with `--catalogfile`,
-the password is not part of the crontab.
-
-#### Default value
-
-```YAML
-oradb_rman_catalog_dir: '{{ oracle_base }}/rman/catalog'
 ```
 
 ### oradb_rman_channel_disk_default
@@ -140,7 +124,7 @@ Lgofiledirectory for `rman_wrapper.sh`.
 #### Default value
 
 ```YAML
-oradb_rman_log_dir: "{{ rman_log_dir | default(odb.0.rman_log_dir | default(oracle_base + '/rman/log')) }}"
+oradb_rman_log_dir: "{{ rman_log_dir | default((odb.0 | default(odb)).rman_log_dir | default(oracle_base + '/rman/log')) }}"
 ```
 
 ### oradb_rman_retention_policy_default
@@ -160,7 +144,7 @@ Directory for `*.rman`-Files.
 #### Default value
 
 ```YAML
-oradb_rman_script_dir: "{{ rman_script_dir | default(odb.0.rman_script_dir | default(oracle_base + '/rman')) }}"
+oradb_rman_script_dir: "{{ rman_script_dir | default((odb.0 | default(odb)).rman_script_dir | default(oracle_base + '/rman')) }}"
 ```
 
 ### oradb_rman_tns_admin
@@ -220,6 +204,8 @@ oradb_rman_wallet_password: "{{ rman_wallet_password | default('oracleWallet1') 
 **_autofs_**
 
 **_notest_**
+
+**_rmancfg_**
 
 **_rmancopy_**
 

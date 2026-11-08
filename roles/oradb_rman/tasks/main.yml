@@ -280,35 +280,41 @@
   tags:
     - wallet
 
-# connect string for the RMAN catalog with rman_user (without wallet) for the crontab:
-# the password is stored in a file readable by oracle_user only (rman_backup.sh --catalogfile)
-- name: Create directory for RMAN catalog connect
+# Configuration file of rman_backup.sh: <ORACLE_BASE>/admin/<db_unique_name>/rman/rman_backup.cfg
+# RMAN_SCRIPTDIR, RMAN_LOGDIR, RMAN_TNS_ADMIN and RMAN_CATALOGCONNECT (password with rman_user)
+# => mode 0600, the crontab contains no password and no directories
+- name: Create directory for configuration of rman_backup.sh
   ansible.builtin.file:
-    path: "{{ oradb_rman_catalog_dir }}"
+    path: "{{ _oradb_rman_cfg_dir }}"
     state: directory
     owner: "{{ oracle_user }}"
-    mode: '0700'
-  when:
-    - oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_user', 'defined') | list | length > 0
-  tags:
-    - rmancron
-
-- name: Create file with RMAN catalog connect
-  ansible.builtin.copy:
-    content: "{{ odb.rman_user }}/{{ _oradb_rman_password }}@{{ odb.rman_tnsalias }}\n"
-    dest: "{{ _oradb_rman_catalog_file }}"
-    owner: "{{ oracle_user }}"
-    mode: '0600'
-  no_log: true
-  with_items:
-    - "{{ oracle_databases | selectattr('rman_tnsalias', 'defined') | selectattr('rman_user', 'defined') }}"
+    mode: '0755'
+  loop: "{{ oracle_databases }}"
   loop_control:
     loop_var: odb
     label: "oracle_db_name {{ odb.oracle_db_name | default('') }}"
   when:
-    - not odb.rman_wallet | default(false) | bool
+    - odb.rman_jobs is defined
   tags:
-    - rmancron
+    - rmancopy
+    - rmancfg
+
+- name: Configuration of rman_backup.sh
+  ansible.builtin.template:
+    src: rman_backup.cfg.j2
+    dest: "{{ _oradb_rman_cfg_dir }}/rman_backup.cfg"
+    owner: "{{ oracle_user }}"
+    mode: '0600'
+  no_log: true
+  loop: "{{ oracle_databases }}"
+  loop_control:
+    loop_var: odb
+    label: "oracle_db_name {{ odb.oracle_db_name | default('') }}"
+  when:
+    - odb.rman_jobs is defined
+  tags:
+    - rmancopy
+    - rmancfg
 
 - name: Register Database in RMAN Catalog
   become: true
@@ -336,7 +342,7 @@
 # It's also possible to execute the 1st Level0-Backup after setup, but be aware to configure the RMAN before starting a backup
 # The execution isn't done in async mode!
 # The task is only execute once on master_node when GI is installed!
-# no catalog connection, because setting initial parameters with catalog takes much more time
+# no catalog connection (--nocatalog), because setting initial parameters with catalog takes much more time
 # pipefail: a failed rman_backup.sh fails the task (tee would hide the return code)
 - name: Execute RMAN-Script at playbook
   # noqa no-changed-when
@@ -346,8 +352,8 @@
       {{ oracle_base }}/bin/rman_backup.sh
       -a {{ odb.1.name }}
       -s {{ odb.0.oracle_db_instance_name | default(odb.0.oracle_db_name) }}
-      -r {{ oradb_rman_script_dir }}
-      -l {{ oradb_rman_log_dir }} | tee -a {{ oradb_rman_cron_logdir }}/rman_{{ odb.1.name }}.log
+      --nocatalog
+      | tee -a {{ oradb_rman_cron_logdir }}/rman_{{ odb.1.name }}.log
     executable: /bin/bash
   environment:
     PATH: /bin:/usr/bin
@@ -384,17 +390,19 @@
   tags:
     - rmanexecute
 
-- name: Add Environment variables to /etc/cron.d
+# The directories are configured in rman_backup.cfg.
+# Old environment variables in the crontab would win over rman_backup.cfg => remove them
+- name: Remove environment variables from /etc/cron.d
   ansible.builtin.cron:
     cron_file: "{{ oradb_rman_cronfile }}"
     user: "{{ oracle_user }}"
     env: true
     name: "{{ item.name }}"
-    value: "{{ item.value }}"
+    state: absent
   with_items:
-    - {name: RMANLOGDIR, value: '{{ oradb_rman_log_dir }}'}
-    - {name: RMANSCRIPTDIR, value: '{{ oradb_rman_script_dir }}'}
-    - {name: RMANTNS_ADMIN, value: '{{ oradb_rman_tns_admin }}'}
+    - {name: RMANLOGDIR}
+    - {name: RMANSCRIPTDIR}
+    - {name: RMANTNS_ADMIN}
   tags:
     - rmancron
     - notest
@@ -416,9 +424,7 @@
       -a {{ odb.1.name }}
       -s {{ odb.0.oracle_db_instance_name | default(odb.0.oracle_db_name) }}
       {{ _oradb_rman_rman_service_param }}
-      {{ _oradb_rman_rman_catalog_param }}
-      {{ _oradb_rman_rmanbackuplogdir }}
-      {{ _oradb_rman_rmanbackupscriptdir }}
+      {{ _oradb_rman_rman_role_param }}
       >> {{ oradb_rman_cron_logdir }}/rman_{{ odb.0.oracle_db_name }}_{{ odb.1.name }}.log 2>&1
   with_subelements:
     - "{{ oracle_databases }}"

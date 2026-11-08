@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - "oradb_rman: rman_backup.sh reads the configuration file <ORACLE_ADMIN>/rman/rman_backup.cfg (KEY=VALUE, not sourced), order: parameter, environment, configuration file, default. ORACLE_ADMIN from --admin, the environment or <ORACLE_BASE>/admin/<db_unique_name> (db_unique_name from the running instance). -a is the only mandatory parameter, ORACLE_SID is read from the environment"
+  - "oradb_rman: rman_backup.sh --role PRIMARY|STANDBY executes the backup only for a database with this role (Data Guard), --nocatalog, new environment variables RMAN_SCRIPTDIR, RMAN_LOGDIR, RMAN_CATALOGCONNECT, RMAN_TARGETCONNECT, RMAN_SERVICE, RMAN_ROLE, RMAN_TNS_ADMIN (old names are still supported)"
+  - "oradb_rman: rman_backup.cfg per database in <ORACLE_BASE>/admin/<db_unique_name>/rman (mode 0600) with RMAN_SCRIPTDIR, RMAN_LOGDIR, RMAN_TNS_ADMIN and RMAN_CATALOGCONNECT => the crontab contains no password and no directories, new attribute role in rman_jobs (rman_backup.sh --role)"
+  - "oradb_rman: the environment variables RMANLOGDIR, RMANSCRIPTDIR and RMANTNS_ADMIN are removed from the crontab file, they would win over rman_backup.cfg"
