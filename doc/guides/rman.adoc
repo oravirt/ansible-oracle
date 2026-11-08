@@ -127,7 +127,8 @@ The role has no default for these variables, define them in the inventory when t
 |=======================
 |Name |Description
 |`parameter` |RMAN configuration: retention policy, controlfile autobackup, channel
-|`online_level0` |Online incremental level 0 backup, archive logs, `delete obsolete`
+|`parameter_standby` |Like `parameter` without `CONFIGURE RETENTION POLICY` (not configurable on a standby database), use it with `role: standby`
+|`online_level0` |Online incremental level 0 backup, archive logs, `delete obsolete <rman_retention_policy>`
 |`online_level1` |Online incremental level 1 backup, archive logs, `delete obsolete`
 |`offline_level0` |Offline level 0 backup: the database is restarted in `MOUNT`, opened afterwards
 |`archivelog` |Backup of the archive logs, deletes the archive logs backed up 1 time
@@ -149,7 +150,8 @@ oracle_databases:
     rman_tnsalias: RMANCAT
     rman_user: rman_db1
     rman_jobs:
-      - {name: parameter, immediate: true}
+      - {name: parameter, role: primary, immediate: true}
+      - {name: parameter_standby, role: standby, immediate: true}
       - {name: online_level0, role: standby, weekday: "0", hour: "01", minute: "10", day: "*"}
       - {name: online_level1, role: standby, weekday: "1-6", hour: "01", minute: "10", day: "*"}
       - {name: archivelog, weekday: "*", hour: "*", minute: "30", day: "*"}
@@ -306,8 +308,17 @@ All members of a Data Guard configuration get the same `rman_jobs`.
 
 - `role: standby`: backups of the database on the physical standby, the primary is not loaded
 - `role: primary`: backups on the primary only
-- without `role`: the job runs on every member, e.g. `parameter`: the `CONFIGURE` commands are stored
-  in the controlfile of each member and must be executed on all members
+- without `role`: the job runs on every member
+
+The `CONFIGURE` commands are stored in the controlfile of each member and must be executed on all members:
+
+- `parameter` with `role: primary`
+- `parameter_standby` with `role: standby`: without `CONFIGURE RETENTION POLICY`,
+  the retention policy is not configurable on a standby database
+
+`online_level0` uses `rman_retention_policy` in `delete obsolete`.
+Therefore it works on a standby database, whose controlfile (e.g. from RMAN `DUPLICATE`)
+does not contain the retention policy, and on a new primary after a switchover.
 
 After a switchover the backups follow the role automatically, the inventory is not changed.
 
@@ -317,8 +328,9 @@ After a switchover the backups follow the role automatically, the inventory is n
 oracle_databases:
   - oracle_db_name: DB1
     rman_jobs:
-      # no role: executed on every member during the playbook
-      - {name: parameter, immediate: true}
+      # executed during the playbook: parameter on the primary, parameter_standby on the standby
+      - {name: parameter, role: primary, immediate: true}
+      - {name: parameter_standby, role: standby, immediate: true}
       # role primary: crontab entry on every member, rman_backup.sh --role primary skips it on the standby
       - {name: online_level0, role: primary, weekday: "0", hour: "01", minute: "10", day: "*"}
       - {name: archivelog, role: primary, weekday: "*", hour: "*", minute: "30", day: "*"}

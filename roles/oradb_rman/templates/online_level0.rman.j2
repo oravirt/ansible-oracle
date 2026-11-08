@@ -9,5 +9,7 @@ run
 backup check logical incremental level 0 database filesperset 1;
 backup archivelog all not backed up 1 times filesperset 50;
 delete noprompt  archivelog all backed up 1 times to disk;
-delete noprompt obsolete;
+{# The retention policy is part of DELETE OBSOLETE: the controlfile of a standby database
+    (e.g. from RMAN DUPLICATE) does not contain the configured retention policy. #}
+delete noprompt obsolete{{ (' ' ~ rman_retention_policy) if rman_retention_policy | upper != 'NONE' else '' }};
 }

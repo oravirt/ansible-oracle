@@ -3,7 +3,7 @@
 # Backups are written to /u01/app/oracle/backup.
 # - assert control_file_record_keep_time (missing => the role fails)
 # - role: rman_backup.cfg (mode 0600), immediate execution of the job parameter,
-#   immediate job archivelog with role standby (skipped on the primary)
+#   immediate job parameter_standby with role standby (skipped on the primary)
 #   (the crontab entries are not created: molecule skips the tag notest of the cron tasks)
 # - rman_backup.sh: backup, RMAN failure (99), missing RMAN script (22), --role primary/standby,
 #   logfile per execution with symlink, ORACLE_ADMIN from db_unique_name,
@@ -30,10 +30,11 @@
       rman_channel_disk: "format '/u01/app/oracle/backup/%d_%T_%U'"
       rman_controlfile_autobackup_disk: "'/u01/app/oracle/backup/%d_%F'"
       rman_jobs:
-        - {name: parameter, immediate: true}
-        # disabled => no execution by cron (not created in molecule, tag notest)
+        - {name: parameter, role: primary, immediate: true}
         # immediate with role standby => rman_backup.sh --role standby skips the job on the primary
-        - {name: archivelog, role: standby, immediate: true, disabled: true, weekday: "*", hour: "*", minute: "30", day: "*"}
+        - {name: parameter_standby, role: standby, immediate: true}
+        # disabled => no execution by cron (not created in molecule, tag notest)
+        - {name: archivelog, role: primary, disabled: true, weekday: "*", hour: "*", minute: "30", day: "*"}
     _rm_keep_time:
       - {name: control_file_record_keep_time, value: '14', scope: both, state: present}
 
@@ -108,9 +109,9 @@
       failed: "{{ not (_rm_param_log.stat.islnk | default(false)) }}"
       msg: "symlink {{ _rm_log_dir }}/{{ mt_cdb }}_parameter.log: {{ _rm_param_log.stat.lnk_source | default('missing') }}"
 
-- name: oradb_rman | logfile of the immediate job archivelog (role standby)
+- name: oradb_rman | logfile of the immediate job parameter_standby (role standby)
   ansible.builtin.slurp:
-    src: "{{ _rm_log_dir }}/{{ mt_cdb }}_archivelog.log"
+    src: "{{ _rm_log_dir }}/{{ mt_cdb }}_parameter_standby.log"
   register: _rm_ps_log
   failed_when: false
 
@@ -179,6 +180,31 @@
         {{ _rm_log_text is not search('Configuration file: ' ~ _rm_cfg)
            or _rm_log_text is not search('Recovery Manager complete') }}
       msg: "{{ (_rm_log_text | split('\n'))[-6:] }}"
+
+# parameter_standby without --role: the RMAN script itself (CONFIGURE without retention policy)
+- name: oradb_rman | parameter_standby
+  ansible.builtin.include_tasks: oradb_rman_run.yml
+  vars:
+    _rm_id: parameter_standby
+    _rm_args: [-a, parameter_standby]
+    _rm_rc: 0
+    _rm_search: Recovery Manager complete
+
+- name: oradb_rman | RMAN script parameter_standby without retention policy
+  ansible.builtin.command:
+    cmd: "grep -ci '^CONFIGURE RETENTION POLICY' {{ _rm_script_dir }}/parameter_standby.rman"
+  register: _rm_ps_grep
+  changed_when: false
+  failed_when: false
+
+- name: oradb_rman | check RMAN script parameter_standby
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oradb_rman.parameter_standby_no_retention
+    mt_expect: ok
+    mt_res:
+      failed: "{{ _rm_ps_grep.stdout | trim != '0' }}"
+      msg: "RETENTION POLICY in {{ _rm_script_dir }}/parameter_standby.rman: {{ _rm_ps_grep.stdout }}"
 
 - name: oradb_rman | RMAN failure
   ansible.builtin.include_tasks: oradb_rman_run.yml
