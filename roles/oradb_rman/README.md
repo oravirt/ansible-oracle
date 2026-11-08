@@ -65,11 +65,13 @@ oradb_rman_autofs: '{{ rmanautofs | default(false) }}'
 
 Defines the format for disk target in RMAN-Templates from role.
 
+Used for `CONFIGURE CHANNEL DEVICE TYPE DISK <value>` => the value starts with `format`.
+
 #### Default value
 
 ```YAML
 oradb_rman_channel_disk_default: >-
-  {% set __channel_disk_default = "'/u10/rmanbackup/%d/%d_%T_%U'" -%}
+  {% set __channel_disk_default = "format '/u10/rmanbackup/%d/%d_%T_%U'" -%}
   {{ rman_channel_disk_default | default(__channel_disk_default) -}}
 ```
 
