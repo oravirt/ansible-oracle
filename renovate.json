@@ -4,7 +4,7 @@
   "branchPrefix": "pr/renovate/",
   "postUpgradeTasks": {
     "commands": [
-      "tools/renovate/changelog_fragment.sh '{{{depNameSanitized}}}' '{{{depName}}}' '{{{currentVersion}}}' '{{{newVersion}}}'"
+      "tools/renovate/changelog_fragment.sh '{{#if groupSlug}}{{{groupSlug}}}{{else}}{{{depNameSanitized}}}{{/if}}' '{{#if groupName}}{{{groupName}}}{{else}}{{{depName}}}{{/if}}' '{{{currentVersion}}}' '{{{newVersion}}}'"
     ],
     "fileFilters": ["changelogs/fragments/renovate-*.yml"]
   },
@@ -142,7 +142,7 @@
       "postUpgradeTasks": {
         "commands": [
           "tools/renovate/ocenv_update.sh '{{{newVersion}}}'",
-          "tools/renovate/changelog_fragment.sh '{{{depNameSanitized}}}' '{{{depName}}}' '{{{currentVersion}}}' '{{{newVersion}}}'"
+          "tools/renovate/changelog_fragment.sh '{{#if groupSlug}}{{{groupSlug}}}{{else}}{{{depNameSanitized}}}{{/if}}' '{{#if groupName}}{{{groupName}}}{{else}}{{{depName}}}{{/if}}' '{{{currentVersion}}}' '{{{newVersion}}}'"
         ],
         "fileFilters": [
           "roles/oradb_manage_db/files/ocenv",
