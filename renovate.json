@@ -134,6 +134,22 @@
       "matchManagers": ["gomod"],
       "matchDepTypes": ["golang"],
       "enabled": false
+    },
+    {
+      "description": "ocenv (roles/oradb_manage_db/files/ocenv) from opitzconsulting/oracle-scripts: the file is part of the collection, tools/renovate/ocenv_update.sh replaces it and updates tools/renovate/ocenv.version",
+      "matchDatasources": ["custom.ocenv"],
+      "separateMajorMinor": false,
+      "postUpgradeTasks": {
+        "commands": [
+          "tools/renovate/ocenv_update.sh '{{{newVersion}}}'",
+          "tools/renovate/changelog_fragment.sh '{{{depNameSanitized}}}' '{{{depName}}}' '{{{currentVersion}}}' '{{{newVersion}}}'"
+        ],
+        "fileFilters": [
+          "roles/oradb_manage_db/files/ocenv",
+          "tools/renovate/ocenv.version",
+          "changelogs/fragments/renovate-*.yml"
+        ]
+      }
     }
   ],
   "customManagers": [
@@ -189,6 +205,15 @@
       ]
     },
     {
+      "description": "ocenv from opitzconsulting/oracle-scripts: version is the committer date of the last commit of ocenv (see tools/renovate/ocenv.version)",
+      "customType": "regex",
+      "managerFilePatterns": ["/^tools/renovate/ocenv\\.version$/"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\nversion:\\s*(?<currentValue>[0-9.]+)"
+      ],
+      "versioningTemplate": "loose"
+    },
+    {
       "description": "Oracle Release Update in 'patch: RU:<version>' of autoupgrade_download_patches with a '# renovate: datasource=custom.oracle-ru-... depName=...' comment above (also commented out patch lines)",
       "customType": "regex",
       "managerFilePatterns": ["/(^|/)autoupgrade\\.ya?ml$/"],
@@ -199,6 +224,14 @@
     }
   ],
   "customDatasources": {
+    "ocenv": {
+      "description": "Commits of ocenv in opitzconsulting/oracle-scripts, version is the committer date in UTC (YYYY.MMDD.HHMMSS)",
+      "defaultRegistryUrlTemplate": "https://api.github.com/repos/opitzconsulting/oracle-scripts/commits?path=ocenv&sha=main&per_page=100",
+      "format": "json",
+      "transformTemplates": [
+        "{ \"releases\": [$.{ \"version\": $fromMillis($toMillis(commit.committer.date), '[Y0001].[M01][D01].[H01][m01][s01]'), \"releaseTimestamp\": commit.committer.date, \"changelogUrl\": html_url }] }"
+      ]
+    },
     "oracle-ru-19": {
       "description": "Oracle 19c Release Update derived from the quarterly Critical Patch Updates in the Oracle Security Alerts feed: one RU per CPU, Jan 2019 = 19.2",
       "defaultRegistryUrlTemplate": "https://www.oracle.com/ocom/groups/public/@otn/documents/webcontent/rss-otn-sec.xml",
