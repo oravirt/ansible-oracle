@@ -7,17 +7,21 @@ set -o pipefail
 # Creates an antsibull-changelog fragment for a dependency update.
 # Called by renovate as postUpgradeTasks (see renovate.json).
 #
-# Usage: changelog_fragment.sh <depNameSanitized> <depName> <currentVersion> <newVersion>
+# Grouped updates (groupName in renovate.json) pass groupSlug and groupName,
+# so all dependencies of a group write the same fragment: one entry per branch.
+# A leading "v" of the versions is removed (pre-commit and github tags vs. PyPI).
+#
+# Usage: changelog_fragment.sh <depNameSanitized|groupSlug> <depName|groupName> <currentVersion> <newVersion>
 
 if [ $# -ne 4 ] ; then
-  echo "Usage: $0 <depNameSanitized> <depName> <currentVersion> <newVersion>"
+  echo "Usage: $0 <depNameSanitized|groupSlug> <depName|groupName> <currentVersion> <newVersion>"
   exit 2
 fi
 
 dep_sanitized="$1"
 dep_name="$2"
-current_version="$3"
-new_version="$4"
+current_version="${3#v}"
+new_version="${4#v}"
 
 workdir=$(dirname "$0")
 cd "${workdir}/../.." || exit 1
