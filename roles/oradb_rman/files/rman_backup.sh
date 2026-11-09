@@ -100,7 +100,9 @@ function print_help() {
 	echo "Parameter             Environment / configuration file"
 	echo "-a/--action           -                    Name of the .rman-Script without extension (mandatory)"
 	echo "-s/--ORACLE_SID       ORACLE_SID           ORACLE_SID / DB_NAME (RAC) of Database"
-	echo "                                            Please use the DB_NAME from oratab in RAC-Environments!"
+	echo "                                            Please use the DB_UNIQUE_NAME in RAC-Environments!"
+	echo "                                            ORACLE_HOME: /etc/oratab, with Grid Infrastructure / Oracle Restart"
+	echo "                                            from the database resource ora.<ORACLE_SID>.db (crsctl)"
 	echo "--admin               ORACLE_ADMIN         Admin directory of the database"
 	echo "                                            Default: <ORACLE_BASE>/admin/<db_unique_name>"
 	echo "                                            db_unique_name from the running instance,"
@@ -261,23 +263,36 @@ setenv_oracle() {
 	# ORACLE_SID or DB_NAME (RAC) from command line, used for srvctl and the default directories
 	DB_NAME=${ORACLE_SID}
 
-	# getting ORACLE_HOME from oratab (1st entry)
-	ORACLE_HOME=$(grep "^${ORACLE_SID}:" "${ORATAB}" 2>/dev/null | head -1 | cut -d":" -f2)
+	# getting ORACLE_HOME
+	# - Grid Infrastructure / Oracle Restart: from the database resource (crsctl of crs_home).
+	#   /etc/oratab is not maintained correctly by the Clusterware => not used.
+	#   srvctl of the GI home does not work for databases of an older release.
+	# - otherwise: from oratab (1st entry)
+	OLRLOC=/etc/oracle/olr.loc
+	if [ -f "${OLRLOC}" ]; then
+		gi_home=$(sed -n 's/^crs_home=//p' "${OLRLOC}")
+		db_resource="ora.$(echo "${DB_NAME}" | tr '[:upper:]' '[:lower:]').db"
+		home_source="resource ${db_resource} (${gi_home}/bin/crsctl)"
+		ORACLE_HOME=$("${gi_home}/bin/crsctl" stat res "${db_resource}" -p 2>/dev/null | sed -n 's/^ORACLE_HOME=//p' | head -1)
+	else
+		home_source=${ORATAB}
+		ORACLE_HOME=$(grep "^${ORACLE_SID}:" "${ORATAB}" 2>/dev/null | head -1 | cut -d":" -f2)
+	fi
 
 	if [ -z "${ORACLE_HOME}" ]; then
-		print_msg "ORACLE_SID ${ORACLE_SID} not found in ${ORATAB}"
+		print_msg "ORACLE_HOME of ${ORACLE_SID} not found in ${home_source}"
 		abort_script 10
 	fi
 
 	if [ ! -d "${ORACLE_HOME}" ]; then
 		# ORACLE_HOME not existing => we need to exit the script!
-		print_msg "ORACLE_HOME ${ORACLE_HOME} from ${ORATAB} not found"
+		print_msg "ORACLE_HOME ${ORACLE_HOME} from ${home_source} not found"
 		abort_script 11
 	fi
 	export ORACLE_HOME
 
 	# we could be on Grid-Infrastructure
-	# => There is only an entry for the DB_NAME in oratab!
+	# => ORACLE_SID from the command line is the DB_UNIQUE_NAME
 	# => We need to find the right ORACLE_SID from Clusterware
 	local_only=''
 	OCRLOC=/etc/oracle/ocr.loc
