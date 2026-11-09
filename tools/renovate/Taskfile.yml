@@ -142,10 +142,15 @@ tasks:
       # no dependency dashboard (issues are disabled in the fork) - force overrides config:recommended
       # labels and milestone (L, M) for the PRs
       RENOVATE_FORCE: '{"dependencyDashboard": false{{if .LABELS}}, "labels": {{.LABELS}}{{end}}{{if .MILESTONE}}, "milestone": {{.MILESTONE}}{{end}}}'
-      # postUpgradeTasks in renovate.json: changelog fragment for antsibull-changelog
-      RENOVATE_ALLOWED_COMMANDS: '["^tools/renovate/changelog_fragment\\.sh "]'
+      # postUpgradeTasks in renovate.json: changelog fragment for antsibull-changelog, ocenv from oracle-scripts
+      RENOVATE_ALLOWED_COMMANDS: '["^tools/renovate/changelog_fragment\\.sh ", "^tools/renovate/ocenv_update\\.sh "]'
     cmds:
       - renovate{{if .DRY_RUN}} --dry-run={{.DRY_RUN}}{{end}}
+
+  ocenv:
+    desc: Check roles/oradb_manage_db/files/ocenv against the upstream blob in tools/renovate/ocenv.version
+    cmds:
+      - tools/renovate/ocenv_update.sh --check
 
   report:
     desc: Show updates from the last renovate run (ONLY_UPDATES=false shows all dependencies)
