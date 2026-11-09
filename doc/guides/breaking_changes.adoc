@@ -1062,7 +1062,7 @@ Changes in detail:
 
 - A listener with `home` is registered with the ORACLE_HOME of `home`.
   An existing listener resource in the GI home is modified with `srvctl modify listener -oraclehome <ORACLE_HOME of home>`.
-  The running listener keeps its ORACLE_HOME until the next restart of the listener.
+  A running listener is stopped before and started after the change, i.e. it runs from the new ORACLE_HOME.
 - A listener with `use_gi_home: true` stays in the GI / Oracle Restart home.
 
 Who is affected:
@@ -1073,12 +1073,11 @@ Who is affected:
 Required actions:
 
 . Use `use_gi_home: true` without `home` for a listener, which must stay in the GI / Oracle Restart home.
-. Check the ORACLE_HOME of the listener resources after the upgrade and restart a moved listener in a maintenance window:
+. Check the ORACLE_HOME of the listener resources before the upgrade.
+  `oradb_manage_db` restarts a moved listener, run it in a maintenance window:
 +
 ----
 srvctl config listener -listener <listener_name>
-srvctl stop listener -listener <listener_name>
-srvctl start listener -listener <listener_name>
 ----
 
 .Example

@@ -8,7 +8,8 @@ toc::[]
 
 == Out-of-Place Patching - Switch ORACLE_HOME
 
-IMPORTANT: Out-of-Place Patching is supported for Single Instance primary databases without Grid Infrastructure/Oracle Restart only. +
+IMPORTANT: Out-of-Place Patching is supported for Single Instance primary databases without Grid Infrastructure and with Oracle Restart. +
+RAC and RAC One Node are not supported. +
 The guide describes the concept, all dependencies and the gaps in the current implementation.
 
 Out-of-Place Patching switches a database from its current `ORACLE_HOME` to another, already installed and patched `ORACLE_HOME`.
@@ -151,17 +152,18 @@ The only requirement for the switch is an installed and fully patched `ORACLE_HO
 |Oracle Restart
 |Oracle Clusterware (OCR/OLR)
 |`srvctl modify database -db <db_unique_name> -oraclehome <new ORACLE_HOME>` +
-`/etc/oratab` is maintained by Oracle Clusterware.
+`/etc/oratab` is not maintained correctly by Oracle Clusterware.
+`ansible-oracle` writes the new `ORACLE_HOME` into `/etc/oratab` (flag `N`), but never reads it for the state of the database.
 |Oracle RAC
 |Oracle Clusterware (OCR)
-|Rolling switch node by node. Not covered in this guide yet.
+|Rolling switch node by node. Not supported.
 |=======================
 
 The following parts of `ansible-oracle` read the `ORACLE_HOME` from `/etc/oratab` and follow the switch automatically:
 
-- systemd service / `manage_oracle_rdbms_procs.sh` (start/stop of databases)
+- systemd service / `manage_oracle_rdbms_procs.sh` (start/stop of databases, without Grid Infrastructure only)
 - `ocenv` / `.profile_<ORACLE_SID>`
-- `rman_backup.sh` from role `oradb_rman`
+- `rman_backup.sh` from role `oradb_rman` (with Grid Infrastructure / Oracle Restart from the database resource, `crsctl`)
 
 ==== Stop and Start
 
@@ -319,9 +321,11 @@ No `stop_processes` needed, because no database is running from the new `ORACLE_
 |`state: absent` in `db_homes_installed`
 |Switch `ORACLE_HOME` of database
 |`oradb_manage_db` (`switch_home.yml`)
-|Change of `oracle_databases[].home`. Single Instance without GI only.
+|Change of `oracle_databases[].home`. Single Instance without GI and with Oracle Restart, not RAC.
 Stop from old `ORACLE_HOME`, copy of SPFile/PFile/password file (when the location differs), change of `/etc/oratab`,
 start from new `ORACLE_HOME`, `datapatch`.
+Oracle Restart: stop/start with `srvctl`, `srvctl modify database -oraclehome` (and `-spfile`/`-pwfile`, when copied),
+start with the start option of the resource, `datapatch` for the role `PRIMARY` only.
 Flag file `$ORACLE_BASE/switch_home_<SID>.pending` for an incomplete switch.
 |Switch `ORACLE_HOME` of listener
 |`oradb_manage_db` (`loop_listener_details.yml`)
@@ -329,6 +333,7 @@ Flag file `$ORACLE_BASE/switch_home_<SID>.pending` for an incomplete switch.
 |`/etc/oratab` without duplicate entries
 |`oradb_manage_db` (`manage-db.yml`)
 |`lineinfile` with `regexp` replaces the entry for the SID.
+With Grid Infrastructure / Oracle Restart the entry `<db_unique_name>:<ORACLE_HOME>:N` is written as well.
 |`ORACLE_HOME` without database
 |`orasw_meta`, `oraswdb_install`
 |An `ORACLE_HOME` in `db_homes_installed` without a database in `oracle_databases` is valid
@@ -420,7 +425,6 @@ oracle_databases:
 
 === Open questions
 
-- Support for Oracle Restart and RAC in the 1st implementation?
 - `oraswdb_install` derives the type of an `ORACLE_HOME` (SI or cluster installation) from the databases in `oracle_databases`.
   An `ORACLE_HOME` without database is installed as `SI`.
   A new RAC `ORACLE_HOME` needs the cluster installation before the switch

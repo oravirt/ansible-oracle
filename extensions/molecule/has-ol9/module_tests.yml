@@ -34,10 +34,11 @@ mt_all_modules:
   - oracle_db
   - oracle_pdb
 
-mt_oracle_home: /u01/app/oracle/product/19/db_19.33
+# ORACLE_HOME of DBHAS: oracle_dbhas_home from host_vars/has-ol9.yml (Out-of-Place Patching)
+mt_oracle_home: "{{ db_homes_config[oracle_dbhas_home]['oracle_home'] }}"
 mt_oracle_sid: DBHAS
 # read-only ORACLE_HOME: tnsnames.ora, sqlnet.ora are in ORACLE_BASE_HOME
-mt_tns_admin: /u01/app/oracle/homes/db1933giee/network/admin
+mt_tns_admin: "/u01/app/oracle/homes/{{ db_homes_config[oracle_dbhas_home]['oracle_home_name'] }}/network/admin"
 mt_cdb: DBHAS
 mt_pdb: ORCLPDB1
 mt_datafile_dir: +DATA

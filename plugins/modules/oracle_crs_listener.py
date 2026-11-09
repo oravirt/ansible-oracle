@@ -54,6 +54,8 @@ options:
       - C(srvctl add/modify listener) is executed with C(srvctl) of this ORACLE_HOME
         (C(srvctl) of the Grid Infrastructure home fails for an older database home
         with C(PRCN-3018)).
+      - A running listener is restarted from the new ORACLE_HOME, when I(oraclehome)
+        is changed and I(state=present) or I(state=started).
     type: str
     aliases: ['oracle_home']
   endpoints:
@@ -332,6 +334,14 @@ class OracleCrsListener(object):
         ):
             command.extend(['-oraclehome', oraclehome])
             modify = True
+            # The agent stops a listener with lsnrctl of the ORACLE_HOME of the
+            # resource. After the change of the ORACLE_HOME it does not stop the
+            # listener of the old ORACLE_HOME => stop before srvctl modify listener.
+            # The listener is started from the new ORACLE_HOME in ensure_state.
+            if self.is_running():
+                self.run_change_command(
+                    [self.srvctl, 'stop', 'listener', '-listener', self.name]
+                )
         if endpoints and normalize_endpoints(endpoints) != normalize_endpoints(
             self.current.get('ENDPOINTS')
         ):
@@ -339,6 +349,58 @@ class OracleCrsListener(object):
             modify = True
         if modify:
             self.run_change_command(command, env)
+
+    def process_home(self):
+        """ORACLE_HOME of the running tnslsnr process of the listener.
+
+        cmdline: <ORACLE_HOME>/bin/tnslsnr <listener_name> [-no_crs_notify] -inherit
+        Returns None, when no process is found.
+        """
+        for pid in os.listdir('/proc'):
+            if not pid.isdigit():
+                continue
+            try:
+                with open(os.path.join('/proc', pid, 'cmdline'), 'rb') as f:
+                    args = f.read().decode('utf-8', 'replace').split('\0')
+            except (IOError, OSError):
+                continue
+            if (
+                len(args) > 1
+                and args[0].endswith('/bin/tnslsnr')
+                and args[1].lower() == self.name.lower()
+            ):
+                return args[0][: -len('/bin/tnslsnr')]
+        return None
+
+    def stop_listener_other_home(self):
+        """Stop a listener process, which is running from a different ORACLE_HOME.
+
+        E.g. after an interrupted change of the ORACLE_HOME: the resource has the new
+        ORACLE_HOME, the process is running from the old ORACLE_HOME.
+        srvctl stop listener uses lsnrctl of the new ORACLE_HOME and does not stop it
+        => lsnrctl stop of the ORACLE_HOME of the process.
+        Returns True, when the listener was stopped.
+        """
+        current = self.get_listener()
+        home = self.module.params['oraclehome'] or current.get('ORACLE_HOME')
+        running_home = self.process_home()
+        if not running_home or self.same_home(running_home, home):
+            return False
+        lsnrctl = os.path.join(running_home, 'bin', 'lsnrctl')
+        if not os.access(lsnrctl, os.X_OK):
+            self.fail(
+                'Listener {0} is running from {1} instead of {2}, '
+                '{3} not found'.format(self.name, running_home, home, lsnrctl)
+            )
+        # lsnrctl must find listener.ora of the old ORACLE_HOME => no TNS_ADMIN
+        self.run_change_command(
+            ['env', '-u', 'TNS_ADMIN', lsnrctl, 'stop', self.name],
+            {
+                'ORACLE_HOME': running_home,
+                'LD_LIBRARY_PATH': os.path.join(running_home, 'lib'),
+            },
+        )
+        return True
 
     def is_running(self):
         command = [self.srvctl, 'status', 'listener', '-listener', self.name]
@@ -387,6 +449,11 @@ class OracleCrsListener(object):
                 [self.srvctl, 'stop', 'listener', '-listener', self.name]
             )
         elif state == 'started' and not running:
+            self.run_change_command(
+                [self.srvctl, 'start', 'listener', '-listener', self.name]
+            )
+        elif state == 'started' and self.stop_listener_other_home():
+            # listener was running from a different ORACLE_HOME
             self.run_change_command(
                 [self.srvctl, 'start', 'listener', '-listener', self.name]
             )

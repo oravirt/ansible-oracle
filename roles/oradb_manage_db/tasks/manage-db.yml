@@ -223,6 +223,22 @@
   become: true
   tags: update_oratab
 
+# Grid Infrastructure / Oracle Restart: the Clusterware does not maintain /etc/oratab correctly.
+# ansible-oracle writes the correct ORACLE_HOME, but never reads /etc/oratab for the state.
+# Entry: <db_unique_name> like the Clusterware, flag N (autostart by the Clusterware)
+- name: manage_db | Customize oratab for Grid Infrastructure / Oracle Restart
+  ansible.builtin.lineinfile:
+    dest: /etc/oratab
+    regexp: "^{{ odb.oracle_db_unique_name | default(odb.oracle_db_name) }}:"
+    line: "{{ odb.oracle_db_unique_name | default(odb.oracle_db_name) }}:{{ _oracle_home_db }}:N"
+    state: present
+  when:
+    - olrloc.stat.exists
+    - odb.state == 'present'
+  become: true
+  become_user: root
+  tags: update_oratab
+
 - ansible.builtin.debug:
     msg: "Removing DB - {{ odb.oracle_db_name }}, ORACLE_HOME - {{ _oracle_home_db }}"  # noqa name[missing]
   when:
