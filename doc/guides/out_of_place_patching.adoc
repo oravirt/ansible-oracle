@@ -185,6 +185,12 @@ The following parts of `ansible-oracle` read the `ORACLE_HOME` from `/etc/oratab
   Alternative: a central `TNS_ADMIN`.
 - `WALLET_LOCATION` or `ENCRYPTION_WALLET_LOCATION` in `sqlnet.ora` must not point into the old `ORACLE_HOME`.
 - TDE with the init parameter `WALLET_ROOT` is independent from the `ORACLE_HOME`.
+- `local_listener` must not be an alias from `tnsnames.ora` of the old `ORACLE_HOME`.
+  DBCA sets `local_listener` to `LISTENER_<DB_NAME>` and writes this alias into `tnsnames.ora` of the `ORACLE_HOME`.
+  The alias is missing in the new `ORACLE_HOME`, the instance does not register at the listener (`ORA-12514`).
+  `orasw_meta` requires `local_listener` with EZConnect in `init_parameters` of Single Instance databases,
+  e.g. `//localhost:1521` (see link:breaking_changes.adoc[breaking_changes.adoc]).
+  Other entries from DBCA in `tnsnames.ora` of the old `ORACLE_HOME` are not copied.
 
 ==== datapatch
 
@@ -331,6 +337,9 @@ Flag file `$ORACLE_BASE/switch_home_<SID>.pending` for an incomplete switch.
 |`orasw_meta` (`assert_sqlnet.yml`)
 |`home` in `listener_installed`, `sqlnet_installed` and `tnsnames_installed` must be in `db_homes_installed` without `state: absent`
 (unless `state: absent` or `use_gi_home: true` for the entry).
+|`local_listener` with EZConnect
+|`orasw_meta` (`assert_oracle_databases.yml`)
+|`local_listener` is mandatory in `init_parameters` of Single Instance databases with `state: present`.
 |=======================
 
 ==== Gaps

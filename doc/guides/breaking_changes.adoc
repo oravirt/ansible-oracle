@@ -102,6 +102,10 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<listener_installed with Grid Infrastructure / Oracle Restart: listener in its home>>
 |Grid Infrastructure / Oracle Restart *and* an entry in `listener_installed` with `home`
 |Use `use_gi_home: true` for a listener, which must stay in the GI / Oracle Restart home. Check the ORACLE_HOME of the listener resources (`srvctl config listener`)
+
+|<<local_listener in init_parameters of Single Instance databases>>
+|A Single Instance database (also with Oracle Restart) in `oracle_databases` with `state: present` has no `local_listener` in `init_parameters`
+|Add `local_listener` with EZConnect to `init_parameters`, e.g. `{name: local_listener, value: '//localhost:1521', scope: both, state: present}`. Emergency switch: `orasw_meta_assert_oracle_databases: false` (disables all asserts of `oracle_databases`)
 |===
 
 ==== Minimum ansible-core 2.16
@@ -1092,6 +1096,55 @@ listener_installed:
 ----
 
 See link:../../roles/oradb_manage_db/LISTENER.md[LISTENER.md].
+
+==== local_listener in init_parameters of Single Instance databases
+
+As of 5.0.0 the assert of `oracle_databases` in `orasw_meta` requires `local_listener` in `init_parameters`
+for every Single Instance database (with and without Oracle Restart) with `state: present`.
+RAC and RAC One Node databases are not checked, Clusterware sets `local_listener`.
+
+Why:
+
+DBCA sets `local_listener` to an alias, e.g. `LISTENER_<DB_NAME>`, and writes the alias into `tnsnames.ora`
+of the ORACLE_HOME (with Read-Only Oracle Homes in `$ORACLE_BASE/homes/<oracle_home_name>/network/admin`).
+After a switch of the ORACLE_HOME (Out-of-Place Patching, see link:out_of_place_patching.adoc[out_of_place_patching.adoc])
+the alias is missing in `tnsnames.ora` of the new ORACLE_HOME.
+The instance cannot resolve `local_listener` and does not register its services at the listener (`ORA-12514` for clients).
+An EZConnect address in `local_listener` needs no entry in `tnsnames.ora`.
+
+Who is affected:
+
+- Inventories with a Single Instance database in `oracle_databases` without `local_listener` in `init_parameters`.
+  The playbooks fail in the assert of `orasw_meta`:
++
+----
+local_listener is missing in init_parameters of <oracle_db_name>, ...
+----
+
+Required actions:
+
+. Add `local_listener` with EZConnect (`//<host>:<port>`) to `init_parameters` of the database.
+  `localhost` and the port of the listener avoid an extra entry in `tnsnames.ora`.
+. Add one address per listener, if the instance must register at more than one listener, e.g.
+  `'(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1523)))'`.
+. Existing databases: `oradb_manage_parameters` changes `local_listener` with `scope: both`,
+  the instance registers at the listener without restart.
+  The entries of DBCA in `tnsnames.ora` are not removed by `ansible-oracle`.
+
+NOTE: `localhost` requires a listener on the loopback address.
+A listener with the hostname in `HOST` listens on all addresses of the host, unless `IP=FIRST` is set in `listener.ora`.
+Use the hostname or the address of the listener otherwise, e.g. `//{{ ansible_hostname }}:1521`.
+
+.Example
+[source,yaml]
+----
+oracle_databases:
+  - oracle_db_name: DB1
+    oracle_db_type: SI
+    listener_port: 1521
+    init_parameters:
+      - {name: local_listener, value: '//localhost:1521', scope: both, state: present}
+----
 
 === Adding new breaking changes
 

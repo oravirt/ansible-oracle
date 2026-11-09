@@ -23,9 +23,14 @@
     mt_role_expect: "{{ 'failed' if _mp_expect == 'failed' else 'ok' }}"
     # orasw_meta asserts sga_target in init_parameters or oracle_db_mem_totalmb
     # (only used by dbca) => dummy oracle_db_mem_totalmb, only the test parameters are set
+    # orasw_meta asserts local_listener in init_parameters => local_listener of the inventory
     oracle_databases: >-
       {{ _mp_inventory_dbs | selectattr('oracle_db_name', 'equalto', mt_cdb)
-         | map('combine', {'init_parameters': _mp_cdb | default([]),
+         | map('combine', {'init_parameters': (_mp_inventory_dbs
+                                               | selectattr('oracle_db_name', 'equalto', mt_cdb)
+                                               | first).init_parameters | default([])
+                                              | selectattr('name', 'equalto', 'local_listener')
+                                              | list + _mp_cdb | default([]),
                            'oracle_db_mem_totalmb': 2048}) | list }}
     oracle_pdbs: >-
       {{ _mp_inventory_pdbs | selectattr('pdb_name', 'equalto', mt_pdb)

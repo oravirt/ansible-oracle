@@ -146,15 +146,45 @@
             - oracle_databases is defined
           register: assertoracle_databases
 
+        # The local_listener from DBCA is an alias in tnsnames.ora of the ORACLE_HOME.
+        # The alias is missing in a new ORACLE_HOME (Out-of-Place Patching)
+        # => the instance does not register at the listener.
+        # RAC/RAC One Node: Clusterware sets local_listener.
+        - name: assert local_listener in init_parameters of oracle_databases
+          ansible.builtin.assert:
+            quiet: true
+            fail_msg: >-
+              local_listener is missing in init_parameters of {{ ass_odb.oracle_db_name | default('') }},
+              e.g. {name: local_listener, value: '//localhost:1521', scope: both, state: present}.
+              See doc/guides/breaking_changes.adoc.
+            that:
+              - >-
+                ass_odb.state | default('present') == 'absent'
+                or ass_odb.oracle_db_type | default('SI') != 'SI'
+                or (ass_odb.init_parameters | default([])
+                    | selectattr('name', 'defined')
+                    | selectattr('name', 'match', '(?i)^local_listener$')
+                    | map(attribute='state', default='present')
+                    | reject('equalto', 'absent')
+                    | list | length > 0)
+          with_items:
+            - "{{ oracle_databases }}"
+          loop_control:
+            label: "{{ ass_odb.oracle_db_name | default('') }}"
+            loop_var: ass_odb
+          when:
+            - oracle_databases is defined
+          register: assertoracle_databases
+
       rescue:
 
         - name: assert failed assert oracle_databases
           ansible.builtin.debug:
-            msg: "{{ item.assertion }}"
+            msg: "{{ item.msg | default('') }} {{ item.assertion | default('') }}"
           with_items:
             - "{{ assertoracle_databases['results'] }}"
           loop_control:
-            label: "{{ item['dbc']['key'] | default('') }}"
+            label: "{{ item['ass_odb']['oracle_db_name'] | default('') }}"
           when:
             - assertoracle_databases.results is defined
             - item.failed is defined
