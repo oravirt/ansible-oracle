@@ -649,6 +649,7 @@ task renovate:docker    # container images only
 task renovate:galaxy    # collections in galaxy.yml and requirements.yml
 task renovate:report    # show the result of the last run again
 task renovate:validate  # validate renovate.json
+task renovate:ocenv     # check roles/oradb_manage_db/files/ocenv for local changes
 ----
 
 The report shows only dependencies with updates.
@@ -689,6 +690,23 @@ The versions of github actions (e.g. `ansible/ansible-lint`) and of `pip install
 The pre-commit hooks are looked up with GitHub tags, which needs a token.
 The local checks use the token from `gh auth token`, if `gh` is logged in.
 
+[[renovate-ocenv]]
+==== ocenv from oracle-scripts
+
+`roles/oradb_manage_db/files/ocenv` is a copy of `ocenv` from https://github.com/opitzconsulting/oracle-scripts/blob/main/ocenv[opitzconsulting/oracle-scripts].
+The file is part of the collection, so no online access is needed during the installation.
+
+IMPORTANT: Do not change `roles/oradb_manage_db/files/ocenv` in `ansible-oracle`.
+Changes are made in `oracle-scripts`, the file is replaced only by renovate.
+
+* The upstream repository has no releases. The version is the committer date of the last commit of `ocenv` in UTC (`YYYY.MMDD.HHMMSS`, custom datasource `ocenv` in `renovate.json`).
+* `tools/renovate/ocenv.version` holds the version, the upstream commit and the git blob sha of the file.
+* For an update renovate runs `tools/renovate/ocenv_update.sh` as `postUpgradeTasks`.
+  The script downloads `ocenv` of the matching upstream commit, compares `git hash-object` with the blob sha from GitHub and replaces the file.
+  `ocenv`, `tools/renovate/ocenv.version` and the changelog fragment are committed by renovate into the update branch.
+* The git blob sha is the same in `oracle-scripts` and `ansible-oracle`.
+  `task renovate:ocenv` compares the local file with the blob in `tools/renovate/ocenv.version` and fails after a local change, which would be overwritten by the next update.
+
 [[setup-gh]]
 === Setup gh for renovate
 
@@ -713,7 +731,7 @@ A token in `RENOVATE_TOKEN` is used instead, if it is set.
 
 renovate clones your fork from GitHub, creates a branch for each update and pushes it together with a Pull-Request into your fork.
 The configuration is taken from `renovate.json` in `FORK_BASE` of the fork, not from your working tree.
-`renovate.json` and `tools/renovate/changelog_fragment.sh` must be pushed into `FORK_BASE` before the first run.
+`renovate.json`, `tools/renovate/changelog_fragment.sh` and `tools/renovate/ocenv_update.sh` must be pushed into `FORK_BASE` before the first run.
 Without `renovate.json` renovate skips the fork (`disabled-no-config`).
 
 `FORK_REPO` is the fork on GitHub, `FORK_BASE` the branch for the updates (default: `master`).
