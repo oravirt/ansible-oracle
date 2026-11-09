@@ -140,8 +140,9 @@ tasks:
       # renovate skips forked repositories by default
       RENOVATE_FORK_PROCESSING: enabled
       # no dependency dashboard (issues are disabled in the fork) - force overrides config:recommended
+      # no hourly PR limit for manual runs (config:recommended: 2 PRs per hour)
       # labels and milestone (L, M) for the PRs
-      RENOVATE_FORCE: '{"dependencyDashboard": false{{if .LABELS}}, "labels": {{.LABELS}}{{end}}{{if .MILESTONE}}, "milestone": {{.MILESTONE}}{{end}}}'
+      RENOVATE_FORCE: '{"dependencyDashboard": false, "prHourlyLimit": 0{{if .LABELS}}, "labels": {{.LABELS}}{{end}}{{if .MILESTONE}}, "milestone": {{.MILESTONE}}{{end}}}'
       # postUpgradeTasks in renovate.json: changelog fragment for antsibull-changelog, ocenv from oracle-scripts
       RENOVATE_ALLOWED_COMMANDS: '["^tools/renovate/changelog_fragment\\.sh ", "^tools/renovate/ocenv_update\\.sh "]'
     cmds:
