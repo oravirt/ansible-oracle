@@ -753,6 +753,8 @@ Initialization parameters, managed by `oradb_manage_parameters` (also in `oracle
 | sid | instance name for the `SID` clause, default `*` (all instances). Case-sensitive, e.g. for `local_listener` per RAC instance. The instance does not need to run, then only the spfile is changed. |
 | dbca | `false`: not used during creation with dbca (only `oracle_databases`). Default `true`, `false` for entries with `sid` other than `*`. `dbca: true` with `sid` other than `*` is not allowed (dbca has no `SID` clause). |
 
+Single Instance databases (also with Oracle Restart) need `local_listener` in `init_parameters`, e.g. `{name: local_listener, value: '//localhost:1521', scope: both, state: present}`. The alias from DBCA in `tnsnames.ora` is missing after a switch of the ORACLE_HOME.
+
 #### Example usage
 
 ```YAML

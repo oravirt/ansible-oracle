@@ -150,6 +150,7 @@ oracle_databases:
     force_logging: false
     state: present
     init_parameters:
+      - {name: local_listener, value: '//localhost:1521', scope: both, state: present}
       - {name: db_create_file_dest, value: '+DATA', scope: both, state: present}
       - {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
       - {name: recyclebin, value: 'off', scope: spfile, state: present}

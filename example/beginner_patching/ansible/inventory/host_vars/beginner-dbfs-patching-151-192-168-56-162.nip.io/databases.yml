@@ -56,6 +56,7 @@ oracle_databases:
       - {name: users, size: 10M, autoextend: true, next: 50M, maxsize: 2G, content: permanent, state: present, bigfile: false}
       - {name: temp, size: 10M, autoextend: true, next: 50M, maxsize: 8G, content: permanent, state: present, bigfile: false}
     init_parameters:
+      - {name: local_listener, value: '//localhost:1521', scope: both, state: present}
       - {name: audit_trail, value: 'NONE', scope: spfile, state: present}
       - {name: processes, value: '800', scope: spfile, state: present, dbca: false}
       - {name: archive_lag_target, value: '900', scope: both, state: present}
