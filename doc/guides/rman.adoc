@@ -274,7 +274,7 @@ Manual executions are logged the same way as the cron jobs, the crontab redirect
 - The symlink points to the logfile of the last execution of the action (for monitoring and `tail`).
 - Messages before the logfile is opened (e.g. reading `rman_backup.cfg`) are written to the logfile afterwards.
 - Logfiles of the database and action older than `RMAN_LOG_RETENTION` days are removed.
-- Errors before the logfile is opened (e.g. ORACLE_SID not in `/etc/oratab`) and the major actions
+- Errors before the logfile is opened (e.g. ORACLE_HOME of the ORACLE_SID not found) and the major actions
   are logged in syslog (tag `rman_backup.sh`).
 - `<db_unique_name>` is the name of the directory `ORACLE_ADMIN`, when the instance is not running.
 
@@ -293,7 +293,7 @@ Different actions of a database run in parallel, e.g. `archivelog` during `onlin
 |Code |Description
 |0 |RMAN successful, or backup skipped (`--service` not running on this node, `--role` does not match)
 |1 |Wrong parameters, service not existing
-|10, 11, 12 |ORACLE_SID not in `/etc/oratab`, ORACLE_HOME or ORACLE_BASE not found
+|10, 11, 12 |ORACLE_HOME of the ORACLE_SID not found (`/etc/oratab`, with Grid Infrastructure / Oracle Restart the database resource `ora.<ORACLE_SID>.db` from `crsctl`), ORACLE_HOME or ORACLE_BASE not existing
 |13 |Database role could not be determined (`--role`, instance not mounted)
 |14 |`rman_backup.cfg` not readable
 |21, 22, 23 |Log directory, RMAN script or logfile not existing
