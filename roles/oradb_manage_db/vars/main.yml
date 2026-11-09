@@ -113,18 +113,54 @@ _oradb_manage_db_switch_oratab_line: >-
 _oradb_manage_db_switch_oratab_home: >-
   {{ (_oradb_manage_db_switch_oratab_line.split(':') + [''])[1] | regex_replace('/$', '') }}
 
+# Grid Infrastructure / Oracle Restart: /etc/oratab is not read => N (autostart by the Clusterware)
 _oradb_manage_db_switch_oratab_flag: >-
   {{ (_oradb_manage_db_switch_oratab_line.split(':') + ['', 'N'])[2] | default('N', true) }}
+
+# Grid Infrastructure: switch with srvctl for Oracle Restart only (RAC is not supported)
+_oradb_manage_db_switch_gi: "{{ _oradb_manage_db_switch_olrloc.stat.exists | default(false) }}"
+
+_oradb_manage_db_switch_supported: >-
+  {{ not _oradb_manage_db_switch_gi | bool or oracle_install_option_gi == 'HA_CONFIG' }}
+
+_oradb_manage_db_switch_db_unique_name: "{{ odb.oracle_db_unique_name | default(odb.oracle_db_name) }}"
+
+# Oracle Restart: values from srvctl config database (<key>: <value>)
+_oradb_manage_db_switch_srvctl_lines: "{{ (_oradb_manage_db_switch_srvctl.stdout | default('')).splitlines() }}"
+
+_oradb_manage_db_switch_srvctl_home: >-
+  {{ _oradb_manage_db_switch_srvctl_lines | select('match', 'Oracle home:') | first | default('')
+     | regex_replace('^Oracle home: *', '') | trim | regex_replace('/$', '') }}
+
+_oradb_manage_db_switch_srvctl_spfile: >-
+  {{ _oradb_manage_db_switch_srvctl_lines | select('match', 'Spfile:') | first | default('')
+     | regex_replace('^Spfile: *', '') | trim }}
+
+_oradb_manage_db_switch_srvctl_pwfile: >-
+  {{ _oradb_manage_db_switch_srvctl_lines | select('match', 'Password file:') | first | default('')
+     | regex_replace('^Password file: *', '') | trim }}
+
+# Without Grid Infrastructure: PRIMARY (physical standby is not supported)
+_oradb_manage_db_switch_role: >-
+  {{ _oradb_manage_db_switch_srvctl_lines | select('match', 'Database role:') | first
+     | default('Database role: PRIMARY')
+     | regex_replace('^Database role: *', '') | trim | upper }}
+
+# Registered ORACLE_HOME: /etc/oratab or Oracle Restart
+_oradb_manage_db_switch_registered_home: >-
+  {{ _oradb_manage_db_switch_srvctl_home
+     if _oradb_manage_db_switch_gi | bool
+     else _oradb_manage_db_switch_oratab_home }}
 
 # ORACLE_HOME of the running instance. Empty when the instance is not running.
 _oradb_manage_db_switch_running_home: >-
   {{ _oradb_manage_db_switch_running.stdout | default('') | trim }}
 
-# Active ORACLE_HOME: running instance or /etc/oratab
+# Active ORACLE_HOME: running instance or registered ORACLE_HOME
 _oradb_manage_db_switch_old_home: >-
   {{ _oradb_manage_db_switch_running_home
      if _oradb_manage_db_switch_running_home | length > 0
-     else _oradb_manage_db_switch_oratab_home }}
+     else _oradb_manage_db_switch_registered_home }}
 
 # Database is running from or registered with a different ORACLE_HOME
 _oradb_manage_db_switch_needs_switch: >-
@@ -138,10 +174,27 @@ _oradb_manage_db_switch_dbs_old: "{{ _oradb_manage_db_switch_orabaseconfig.resul
 
 _oradb_manage_db_switch_dbs_new: "{{ _oradb_manage_db_switch_orabaseconfig.results[1].stdout }}/dbs"
 
-_oradb_manage_db_switch_dbs_files:
-  - "spfile{{ _oradb_manage_db_switch_sid }}.ora"
-  - "init{{ _oradb_manage_db_switch_sid }}.ora"
-  - "orapw{{ _oradb_manage_db_switch_sid }}"
+# SPFile and password file of Oracle Restart in the old location are copied as well
+_oradb_manage_db_switch_dbs_files: >-
+  {{ (['spfile' ~ _oradb_manage_db_switch_sid ~ '.ora',
+       'init' ~ _oradb_manage_db_switch_sid ~ '.ora',
+       'orapw' ~ _oradb_manage_db_switch_sid]
+      + ([_oradb_manage_db_switch_srvctl_spfile, _oradb_manage_db_switch_srvctl_pwfile]
+         | select('match', _oradb_manage_db_switch_dbs_old ~ '/[^/]+$')
+         | map('basename') | list))
+     | unique }}
+
+# Oracle Restart: new SPFile/password file for srvctl modify database,
+# when it is registered in the old location. Empty otherwise.
+_oradb_manage_db_switch_srvctl_spfile_new: >-
+  {{ _oradb_manage_db_switch_dbs_new ~ '/' ~ (_oradb_manage_db_switch_srvctl_spfile | basename)
+     if _oradb_manage_db_switch_srvctl_spfile is match(_oradb_manage_db_switch_dbs_old ~ '/[^/]+$')
+     else '' }}
+
+_oradb_manage_db_switch_srvctl_pwfile_new: >-
+  {{ _oradb_manage_db_switch_dbs_new ~ '/' ~ (_oradb_manage_db_switch_srvctl_pwfile | basename)
+     if _oradb_manage_db_switch_srvctl_pwfile is match(_oradb_manage_db_switch_dbs_old ~ '/[^/]+$')
+     else '' }}
 
 _oradb_manage_db_switch_env_old:
   ORACLE_HOME: "{{ _oradb_manage_db_switch_old_home }}"

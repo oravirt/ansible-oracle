@@ -62,9 +62,26 @@ db_homes_config:
     readonly_home: true
     oracle_home_name: db1933giee
     opatch: []
+  # target ORACLE_HOME for Out-of-Place Patching (side_effect.yml)
+  db19-2-gi-ee:
+    version: 19.3.0.0
+    oracle_home: "/u01/app/oracle/product/19/db_19.32"
+    edition: EE
+    opatch_minversion: 12.2.0.1.52
+    imagename: db_home_19.32.zip
+    readonly_home: true
+    oracle_home_name: db1932giee
+    opatch: []
+
+# ORACLE_HOME of database DBHAS
+# side_effect.yml switches the database to db19-2-gi-ee (Out-of-Place Patching)
+oracle_dbhas_home: db19-gi-ee
 
 db_homes_installed:
   - home: db19-gi-ee
+    state: present
+    apply_patches: false
+  - home: db19-2-gi-ee
     state: present
     apply_patches: false
 
@@ -97,7 +114,7 @@ listener_installed:
     use_gi_home: true
     state: present
   - listener_name: LISTENER_DB_1523
-    home: db19-gi-ee
+    home: "{{ oracle_dbhas_home }}"
     state: present
 
 # tnsnames.ora, sqlnet.ora and wallet for the module tests (side_effect)
@@ -114,17 +131,17 @@ oracle_tnsnames_config:
 
 tnsnames_installed:
   - tnsname: "{{ oracle_pdbs[0]['pdb_name'] }}"
-    home: db19-gi-ee
+    home: "{{ oracle_dbhas_home }}"
     state: present
 
 sqlnet_installed:
-  - home: db19-gi-ee
+  - home: "{{ oracle_dbhas_home }}"
     sqlnet: sqlnetalias1
     state: present
 
 oracle_wallet_config:
   - name: wallet1
-    home: db19-gi-ee
+    home: "{{ oracle_dbhas_home }}"
     path: /u01/app/oracle/wallet
     state: present
     dbcredentials:
@@ -134,7 +151,7 @@ oracle_wallet_config:
         state: present
 
 oracle_databases:
-  - home: db19-gi-ee
+  - home: "{{ oracle_dbhas_home }}"
     oracle_db_name: DBHAS
     oracle_db_type: SI
     is_container: true
@@ -159,7 +176,7 @@ oracle_databases:
 
 oracle_pdbs:
   - cdb: DBHAS
-    home: db19-gi-ee
+    home: "{{ oracle_dbhas_home }}"
     pdb_name: ORCLPDB1
     listener_port: 1521
     state: present

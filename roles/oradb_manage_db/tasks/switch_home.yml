@@ -1,19 +1,23 @@
 ---
 # Out-of-Place Patching: switch the ORACLE_HOME of an existing database
 #
-# Supported: Single Instance without Grid Infrastructure/Oracle Restart
+# Supported: Single Instance without Grid Infrastructure and Oracle Restart (HA_CONFIG)
 #
 # The active ORACLE_HOME is taken from the running instance (/proc/<pid of pmon>/exe)
-# or from /etc/oratab when the instance is not running.
+# or from the registered ORACLE_HOME when the instance is not running:
+# - without Grid Infrastructure: /etc/oratab
+# - Oracle Restart: srvctl config database
 #
 # Steps:
 # - create flag file $ORACLE_BASE/switch_home_<SID>.pending
-# - stop database from old ORACLE_HOME
+# - stop database from old ORACLE_HOME (Oracle Restart: srvctl stop database)
 # - copy SPFile/PFile and password file, when the location differs
 #   (e.g. switch from a Read-Write to a Read-Only Oracle Home)
 # - change ORACLE_HOME in /etc/oratab
+#   Oracle Restart: srvctl modify database -oraclehome (and -spfile/-pwfile, when copied)
 # - start database from new ORACLE_HOME and open all PDBs
-# - execute datapatch
+#   Oracle Restart: srvctl start database with the start option of the database resource
+# - execute datapatch (primary database only)
 # - remove flag file
 #
 # /etc/oratab is changed before the start, so it always matches the running instance.
@@ -27,13 +31,34 @@
 
 - name: switch_home | Get state of ORACLE_HOME switch
   when:
-    - not _oradb_manage_db_switch_olrloc.stat.exists
+    - _oradb_manage_db_switch_supported | bool
   block:
     - name: switch_home | Read /etc/oratab
       ansible.builtin.slurp:
         src: /etc/oratab
       register: _oradb_manage_db_switch_oratab
       failed_when: false
+      when:
+        - not _oradb_manage_db_switch_gi | bool
+
+    # srvctl of the new ORACLE_HOME: srvctl config works for all ORACLE_HOMEs of the same release
+    # A database which is not registered (e.g. not created yet) => rc != 0 => no switch
+    - name: switch_home | Read configuration of database from Oracle Restart
+      ansible.builtin.command:
+        argv:
+          - "{{ _oradb_manage_db_switch_new_home }}/bin/srvctl"
+          - config
+          - database
+          - -db
+          - "{{ _oradb_manage_db_switch_db_unique_name }}"
+      environment: "{{ _oradb_manage_db_switch_env_new }}"
+      become: true
+      become_user: "{{ oracle_user }}"
+      register: _oradb_manage_db_switch_srvctl
+      changed_when: false
+      failed_when: false
+      when:
+        - _oradb_manage_db_switch_gi | bool
 
     - name: switch_home | Read ORACLE_HOME from running instance
       ansible.builtin.shell: |
@@ -46,6 +71,10 @@
         fi
       environment:
         ORACLE_SID: "{{ _oradb_manage_db_switch_sid }}"
+      # root: $ORACLE_HOME/bin/oracle is a setuid binary
+      # => /proc/<pid>/exe of the instance is not readable for the oracle user
+      become: true
+      become_user: root
       register: _oradb_manage_db_switch_running
       changed_when: false
 
@@ -56,7 +85,7 @@
 
 - name: switch_home | Switch ORACLE_HOME
   when:
-    - not _oradb_manage_db_switch_olrloc.stat.exists
+    - _oradb_manage_db_switch_supported | bool
     - _oradb_manage_db_switch_needs_switch | bool or _oradb_manage_db_switch_flag.stat.exists
   become: true
   become_user: "{{ oracle_user }}"
@@ -67,7 +96,8 @@
         msg:
           - "Database: {{ _oradb_manage_db_switch_sid }}"
           - "ORACLE_HOME of instance: {{ _oradb_manage_db_switch_running_home | default('', true) or 'not running' }}"
-          - "ORACLE_HOME in /etc/oratab: {{ _oradb_manage_db_switch_oratab_home }}"
+          - "registered ORACLE_HOME ({{ _oradb_manage_db_switch_gi | bool | ternary('Oracle Restart', '/etc/oratab') }}): {{ _oradb_manage_db_switch_registered_home }}"
+          - "database role: {{ _oradb_manage_db_switch_role }}"
           - "new ORACLE_HOME: {{ _oradb_manage_db_switch_new_home }}"
           - "incomplete switch: {{ _oradb_manage_db_switch_flag.stat.exists }}"
 
@@ -154,6 +184,21 @@
           changed_when: true
           when:
             - _oradb_manage_db_switch_running_home | length > 0
+            - not _oradb_manage_db_switch_gi | bool
+
+        - name: switch_home | Stop database from old ORACLE_HOME (Oracle Restart)
+          ansible.builtin.command:
+            argv:
+              - "{{ _oradb_manage_db_switch_old_home }}/bin/srvctl"
+              - stop
+              - database
+              - -db
+              - "{{ _oradb_manage_db_switch_db_unique_name }}"
+          environment: "{{ _oradb_manage_db_switch_env_old }}"
+          changed_when: true
+          when:
+            - _oradb_manage_db_switch_running_home | length > 0
+            - _oradb_manage_db_switch_gi | bool
 
         - name: switch_home | Check SPFile, PFile and password file in old location
           ansible.builtin.stat:
@@ -175,6 +220,24 @@
           when:
             - _oradb_manage_db_switch_dbs_old != _oradb_manage_db_switch_dbs_new
 
+        # srvctl of the new ORACLE_HOME
+        - name: switch_home | Change ORACLE_HOME in Oracle Restart
+          ansible.builtin.command:
+            argv: >-
+              {{ [_oradb_manage_db_switch_new_home ~ '/bin/srvctl', 'modify', 'database',
+                  '-db', _oradb_manage_db_switch_db_unique_name,
+                  '-oraclehome', _oradb_manage_db_switch_new_home]
+                 + ((_oradb_manage_db_switch_srvctl_spfile_new | length > 0)
+                    | ternary(['-spfile', _oradb_manage_db_switch_srvctl_spfile_new], []))
+                 + ((_oradb_manage_db_switch_srvctl_pwfile_new | length > 0)
+                    | ternary(['-pwfile', _oradb_manage_db_switch_srvctl_pwfile_new], [])) }}
+          environment: "{{ _oradb_manage_db_switch_env_new }}"
+          changed_when: true
+          when:
+            - _oradb_manage_db_switch_gi | bool
+
+        # also with Grid Infrastructure / Oracle Restart: the Clusterware does not maintain
+        # /etc/oratab correctly, DBAs expect the correct ORACLE_HOME (never read for the switch)
         - name: switch_home | Change ORACLE_HOME in /etc/oratab
           ansible.builtin.lineinfile:
             path: /etc/oratab
@@ -187,6 +250,8 @@
     # The instance is stopped after a switch or already running from the new ORACLE_HOME
     # after an incomplete switch.
     - name: switch_home | Start database from new ORACLE_HOME
+      when:
+        - not _oradb_manage_db_switch_gi | bool
       ansible.builtin.shell: |
         set -eu
         if pgrep -f "^ora_pmon_${ORACLE_SID}$" > /dev/null ; then
@@ -208,9 +273,45 @@
       register: _oradb_manage_db_switch_start
       changed_when: "'Database already running' not in _oradb_manage_db_switch_start.stdout"
 
+    # Oracle Restart starts the database with the start option of the database resource
+    # (e.g. mount for a physical standby database)
+    - name: switch_home | Start database from new ORACLE_HOME (Oracle Restart)
+      when:
+        - _oradb_manage_db_switch_gi | bool
+      block:
+        - name: switch_home | Start database from new ORACLE_HOME (Oracle Restart)
+          ansible.builtin.shell: |
+            set -eu
+            if pgrep -f "^ora_pmon_${ORACLE_SID}$" > /dev/null ; then
+              echo "Database already running"
+            else
+              "${ORACLE_HOME}/bin/srvctl" start database -db "${DB_UNIQUE_NAME}"
+            fi
+          environment: >-
+            {{ _oradb_manage_db_switch_env_new
+               | combine({'DB_UNIQUE_NAME': _oradb_manage_db_switch_db_unique_name}) }}
+          register: _oradb_manage_db_switch_start_gi
+          changed_when: "'Database already running' not in _oradb_manage_db_switch_start_gi.stdout"
+
+        - name: switch_home | Open all PDBs (Oracle Restart)
+          ansible.builtin.shell: |
+            set -eu
+            "${ORACLE_HOME}/bin/sqlplus" -S -L /nolog <<EOF
+            connect / as sysdba
+            whenever sqlerror exit failure
+            alter pluggable database all open;
+            EOF
+          environment: "{{ _oradb_manage_db_switch_env_new }}"
+          changed_when: false
+          when:
+            - odb.is_container | default(false)
+            - _oradb_manage_db_switch_role == 'PRIMARY'
+
     # The name of the logfile directory is known after the start of datapatch only:
     # $ORACLE_BASE/cfgtoollogs/sqlpatch/sqlpatch_<pid>_<timestamp>/
     - name: switch_home | Logfile of datapatch
+      when:
+        - _oradb_manage_db_switch_role == 'PRIMARY'
       ansible.builtin.debug:
         msg:
           - "datapatch could take some time to complete."
@@ -233,8 +334,13 @@
         port: "{{ _listener_port_cdb }}"
       environment: "{{ _oradb_manage_db_switch_env_new }}"
       register: _oradb_manage_db_switch_datapatch
+      # standby database: SQL changes are applied with Redo Apply from the primary database
+      when:
+        - _oradb_manage_db_switch_role == 'PRIMARY'
 
     - name: switch_home | datapatch output
+      when:
+        - _oradb_manage_db_switch_role == 'PRIMARY'
       ansible.builtin.debug:
         msg: "{{ _oradb_manage_db_switch_datapatch.msg | default('') }}"
 
