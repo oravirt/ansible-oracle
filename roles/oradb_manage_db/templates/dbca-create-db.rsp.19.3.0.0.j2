@@ -163,7 +163,7 @@ RACOneNodeServiceName={{ dbh.service_name }}
 # Default value : false
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-createAsContainerDatabase={% if dbh.is_container is defined %}{{ dbh.is_container }}{% endif %}
+createAsContainerDatabase={{ dbh.is_container | default(true) | bool | lower }}
 
 #-----------------------------------------------------------------------------
 # Name          : numberOfPDBs
@@ -173,7 +173,7 @@ createAsContainerDatabase={% if dbh.is_container is defined %}{{ dbh.is_containe
 # Default value : 0
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-numberOfPDBs={% if dbh.is_container and dbh.num_pdbs is defined %}{{ dbh.num_pdbs }}{%endif%}
+numberOfPDBs={% if dbh.is_container | default(true) | bool and dbh.num_pdbs is defined %}{{ dbh.num_pdbs }}{%endif%}
 
 #-----------------------------------------------------------------------------
 # Name          : pdbName
@@ -183,7 +183,7 @@ numberOfPDBs={% if dbh.is_container and dbh.num_pdbs is defined %}{{ dbh.num_pdb
 # Default value : None
 # Mandatory     : No
 #-----------------------------------------------------------------------------
-pdbName={% if dbh.is_container and dbh.pdb_prefix is defined %}{{ dbh.pdb_prefix }}{%endif%}
+pdbName={% if dbh.is_container | default(true) | bool and dbh.pdb_prefix is defined %}{{ dbh.pdb_prefix }}{%endif%}
 
 #-----------------------------------------------------------------------------
 # Name          : useLocalUndoForPDBs

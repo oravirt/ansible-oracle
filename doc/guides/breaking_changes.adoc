@@ -106,6 +106,18 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<local_listener in init_parameters of Single Instance databases>>
 |A Single Instance database (also with Oracle Restart) in `oracle_databases` with `state: present` has no `local_listener` in `init_parameters`
 |Add `local_listener` with EZConnect to `init_parameters`, e.g. `{name: local_listener, value: '//localhost:1521', scope: both, state: present}`. Emergency switch: `orasw_meta_assert_oracle_databases: false` (disables all asserts of `oracle_databases`)
+
+|<<oracle_databases: is_container and omf are true by default>>
+|A 19c database in `oracle_databases` without `is_container` (non-CDB) *or* without `omf` (created without OMF)
+|Set `is_container: false` for a new non-CDB. OMF is strongly recommended, `omf: false` needs an own DBCA template without OMF (`dbca_templatename`) and is not tested
+
+|<<oracle_databases: db_create_file_dest and db_recovery_file_dest in init_parameters>>
+|A database in `oracle_databases` with `state: present` *and* without `omf: false` *and* `db_create_file_dest` or `db_recovery_file_dest` is missing in `init_parameters`
+|Add `db_create_file_dest` and `db_recovery_file_dest` to `init_parameters`
+
+|<<oracle_databases: datafile_dest and recoveryfile_dest are deprecated>>
+|A database in `oracle_databases` with `datafile_dest` or `recoveryfile_dest`
+|Move the values to `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters` and remove `datafile_dest` and `recoveryfile_dest`. Different values fail in the assert
 |===
 
 ==== Minimum ansible-core 2.16
@@ -1143,6 +1155,136 @@ oracle_databases:
     listener_port: 1521
     init_parameters:
       - {name: local_listener, value: '//localhost:1521', scope: both, state: present}
+----
+
+==== oracle_databases: is_container and omf are true by default
+
+As of 5.0.0 the attributes `is_container` and `omf` of `oracle_databases` are `true` by default.
+They need not to be defined in `oracle_databases` anymore.
+
+Why:
+
+26ai supports only Container Databases and `ansible-oracle` uses Oracle Managed Files for tablespaces by default.
+The defaults simplify the inventory.
+
+Who is affected:
+
+- Inventories with a 19c database in `oracle_databases` without `is_container`.
+  Before 5.0.0 a non-CDB was created, now a CDB is created.
+  The tasks for PDBs (`oradb_manage_pdb`), the timezone upgrade (`oradb_tzupgrade`) and the switch of the ORACLE_HOME
+  treat the database as CDB.
+- Inventories with a database in `oracle_databases` without `omf`.
+  Before 5.0.0 dbca was called with `-useOMF false`, now with `-useOMF true`.
+  `omf` is used during the creation of a database with dbca only.
+
+Required actions:
+
+. Set `is_container: false` for a 19c non-CDB.
+. Use OMF for new databases. OMF is strongly recommended in `ansible-oracle`.
+. Without OMF: set `omf: false` *and* use an own DBCA template without OMF (`dbca_templatename`).
+  The DBCA templates of `ansible-oracle` are made for OMF. Databases without OMF are not tested anymore.
+
+.Example
+[source,yaml]
+----
+oracle_databases:
+  - oracle_db_name: DB1
+    home: db19-si-ee
+    is_container: false   # non-CDB, 19c only
+    # not recommended and not tested:
+    # omf: false          # dbca -useOMF false
+    # dbca_templatename: <own DBCA template without OMF>
+----
+
+==== oracle_databases: db_create_file_dest and db_recovery_file_dest in init_parameters
+
+As of 5.0.0 the assert of `oracle_databases` in `orasw_meta` requires `db_create_file_dest` and `db_recovery_file_dest`
+in `init_parameters` for every database with `state: present` and `omf: true` (default).
+
+Why:
+
+The parameters are needed in different situations, e.g. for dbca, standby databases (RMAN duplicate)
+and the directories of a new database.
+They are defined directly in `init_parameters` instead of deriving them from other variables.
+dbca uses the values for the datafile and recovery area destination.
+The global defaults `oracle_dbf_dir_fs`, `oracle_reco_dir_fs`, `oracle_dbf_dir_asm` and `oracle_reco_dir_asm`
+are only used without these `init_parameters` (only allowed with `omf: false` and an own DBCA template, not tested).
+
+Who is affected:
+
+- Inventories with a database in `oracle_databases` without `db_create_file_dest` or `db_recovery_file_dest`
+  in `init_parameters`. The playbooks fail in the assert of `orasw_meta`:
++
+----
+<oracle_db_name>: omf: true (default) needs db_create_file_dest and db_recovery_file_dest in init_parameters, ...
+----
+
+Required actions:
+
+. Add `db_create_file_dest` and `db_recovery_file_dest` to `init_parameters`.
+  Use the values of `datafile_dest` and `recoveryfile_dest`, if they are defined.
+. Existing databases: use the current values of the database (`show parameter db_create_file_dest`,
+  `show parameter db_recovery_file_dest`), otherwise `oradb_manage_parameters` changes them.
+. Define `db_recovery_file_dest_size` before `db_recovery_file_dest` in `init_parameters`
+  for existing databases without a recovery area (`ORA-19802`).
+
+.Example
+[source,yaml]
+----
+oracle_databases:
+  - oracle_db_name: DB1
+    init_parameters:
+      - {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
+      - {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
+      - {name: db_recovery_file_dest, value: '/u02/fra', scope: both, state: present}
+----
+
+==== oracle_databases: datafile_dest and recoveryfile_dest are deprecated
+
+As of 5.0.0 the attributes `datafile_dest` and `recoveryfile_dest` of `oracle_databases` are deprecated
+and will be removed in a future release. Use `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters` instead.
+`datafile_dest` in `oracle_pdbs` is not affected.
+
+Who is affected:
+
+- Inventories with `datafile_dest` or `recoveryfile_dest` in `oracle_databases`.
+  The assert of `orasw_meta` shows a warning (ignored failed task):
++
+----
+WARNING: datafile_dest and recoveryfile_dest in oracle_databases are deprecated and will be removed in a future release ...
+----
+- The playbooks fail in the assert of `orasw_meta`, if the values are different to `db_create_file_dest`
+  or `db_recovery_file_dest` in `init_parameters`:
++
+----
+<oracle_db_name>: datafile_dest (...) must be identical to db_create_file_dest (...) ...
+----
+
+Required actions:
+
+. Move the values to `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters`.
+. Remove `datafile_dest` and `recoveryfile_dest` from `oracle_databases`.
+
+.Before
+[source,yaml]
+----
+oracle_databases:
+  - oracle_db_name: DB1
+    is_container: true
+    datafile_dest: /u02/oradata
+    recoveryfile_dest: /u02/fra
+    init_parameters:
+      - {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
+----
+
+.After
+[source,yaml]
+----
+oracle_databases:
+  - oracle_db_name: DB1
+    init_parameters:
+      - {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
+      - {name: db_recovery_file_dest, value: '/u02/fra', scope: both, state: present}
 ----
 
 === Adding new breaking changes

@@ -29,7 +29,6 @@ oracle_databases:
   - home: *db_config_home
     oracle_db_name: &oracle_db_name DB1
     oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
-    is_container: true
     # characterset:
     # Example custom DBCA-Template, usable for CDB and nonCDB
     # dbca_templatename: 19c_custom_dbca.dbt
@@ -37,8 +36,6 @@ oracle_databases:
     oracle_database_type: MULTIPURPOSE
     redolog_size: 50M
     redolog_groups: 3
-    datafile_dest: /u02/oradata
-    recoveryfile_dest: /u02/fra
     listener_name: LISTENER
     listener_port: &cdb_listener_port 1521
     # *local_listener is used in initparam as an anchor
@@ -84,6 +81,7 @@ oracle_databases:
       # - {name: db_create_online_log_dest_2, value: '/u02/fra', scope: both, state: present}
       # file_dest_size in bytes in 12.1.0.2 due to bug in DBCA
       - {name: db_recovery_file_dest_size, value: '100G', scope: both, state: present, dbca: false}
+      - {name: db_recovery_file_dest, value: '/u02/fra', scope: both, state: present}
       - {name: open_cursors, value: '20000', scope: both, state: present, dbca: false}
       - {name: diagnostic_dest, value: '/u01/app/oracle', scope: both, state: present}
 

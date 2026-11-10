@@ -706,6 +706,27 @@ Defines the list of databases on a host.
 
 There are diffent sub list to define Profiles, Services, Tablespaces, Users ...
 
+*Attributes (selection)*
+
+| Attribute | Default | Description |
+| --- | --- | --- |
+| home | | key in `db_homes_config` (mandatory) |
+| oracle_db_name | | DB_NAME (mandatory) |
+| state | | `present` or `absent` (mandatory) |
+| is_container | `true` | create a Container Database. Only `true` is allowed for 26ai. Set `is_container: false` for a non-CDB with 19c. |
+| omf | `true` | Oracle Managed Files (dbca `-useOMF`). `omf: true` needs `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters`. OMF is strongly recommended. `omf: false` needs an own DBCA template without OMF (`dbca_templatename`) and is not tested. |
+| storage_type | `FS` | `FS` or `ASM` |
+| datafile_dest | | *deprecated*, will be removed. Use `db_create_file_dest` in `init_parameters`. Must be identical to `db_create_file_dest`, if both are defined. |
+| recoveryfile_dest | | *deprecated*, will be removed. Use `db_recovery_file_dest` in `init_parameters`. Must be identical to `db_recovery_file_dest`, if both are defined. |
+
+`db_create_file_dest` and `db_recovery_file_dest` in `init_parameters` are used by dbca
+for the datafile and recovery area destination and for standby databases.
+The global defaults `oracle_dbf_dir_fs`, `oracle_reco_dir_fs`, `oracle_dbf_dir_asm`
+and `oracle_reco_dir_asm` are only used without these `init_parameters` (only allowed with `omf: false`).
+
+IMPORTANT! OMF is strongly recommended in ansible-oracle. Databases without OMF are not tested.
+Use an own DBCA template without OMF (`dbca_templatename`) for `omf: false`.
+
 *Sub-Sections*
 
 _statspack_
@@ -786,7 +807,6 @@ oracle_databases:
   - home: 19300-base
     oracle_db_name: orcl
     oracle_db_type: SI
-    is_container: true
     storage_type: FS
     oracle_database_type: MULTIPURPOSE
     redolog_size: 100M
@@ -828,6 +848,7 @@ oracle_databases:
       - {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
       - {name: db_create_online_log_dest_1, value: '/u02/oradata', scope: both, state: present}
       - {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
+      - {name: db_recovery_file_dest, value: '/u02/fra', scope: both, state: present}
     profiles:
       - name: DEFAULT
         state: present
@@ -849,7 +870,9 @@ oracle_dbf_dir_asm: +DATA
 
 ### oracle_dbf_dir_fs
 
-Global default for `db_create_file_dest`in DBCA.
+Global default for the datafile destination in DBCA with `storage_type: FS`.
+
+Only used without `db_create_file_dest` in `init_parameters` of `oracle_databases`.
 
 #### Default value
 

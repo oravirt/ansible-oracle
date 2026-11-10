@@ -1,7 +1,7 @@
 ---
 - name: Loop over oracle_databases
   ansible.builtin.include_tasks: >-
-    {{ odb.is_container | default(false) | ternary('cdb', 'non_cdb') }}.yml
+    {{ odb.is_container | default(true) | ternary('cdb', 'non_cdb') }}.yml
   with_items:
     - "{{ oracle_databases }}"
   when: odb.state | lower == 'present'

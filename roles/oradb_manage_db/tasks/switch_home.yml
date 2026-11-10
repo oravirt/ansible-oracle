@@ -265,7 +265,7 @@
         -- after connect: glogin.sql fails on an idle instance
         whenever sqlerror exit failure
         ${startup}
-        {% if odb.is_container | default(false) %}
+        {% if odb.is_container | default(true) %}
         alter pluggable database all open;
         {% endif %}
         EOF
@@ -304,7 +304,7 @@
           environment: "{{ _oradb_manage_db_switch_env_new }}"
           changed_when: false
           when:
-            - odb.is_container | default(false)
+            - odb.is_container | default(true)
             - _oradb_manage_db_switch_role == 'PRIMARY'
 
     # The name of the logfile directory is known after the start of datapatch only:

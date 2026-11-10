@@ -12,13 +12,10 @@ oracle_database_db1:
   oracle_db_unique_name: "{{ db1_unique_name }}"
   standby_config: DG1
   oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
-  is_container: true                                   # 26ai supports only container databases
   storage_type: FS                                     # Database storage to be used. ASM or FS.
   oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
   redolog_size: 75M
   redolog_groups: 3
-  datafile_dest: /u02/oradata
-  recoveryfile_dest: /u02/fra
   # mandatory for Data Guard: static listener entry <db_unique_name>_DGMGRL
   listener_name: LISTENER
   listener_port: &cdb_listener_port 1521
@@ -52,6 +49,7 @@ oracle_database_db1:
     - {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
     - {name: db_create_online_log_dest_1, value: '/u02/oradata', scope: both, state: present}
     - {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
+    - {name: db_recovery_file_dest, value: '/u02/fra', scope: both, state: present}
     # Data Guard Broker: configuration files outside of ORACLE_HOME (read-only ORACLE_HOME => ORACLE_BASE/dbs),
     # dg_broker_start below the file parameters: the files cannot be changed while the broker is running
     - {name: dg_broker_config_file1, value: '/u01/app/oracle/dbs/dr1{{ db1_unique_name }}.dat', scope: both, state: present, dbca: false}

@@ -28,13 +28,10 @@
       - home: db19-si-ee
         oracle_db_name: &oracle_db_name DB1
         oracle_db_type: SI
-        is_container: true
         storage_type: FS
         oracle_database_type: MULTIPURPOSE
         redolog_size: 50M
         redolog_groups: 3
-        datafile_dest: /u01/app/oracle/oradata
-        recoveryfile_dest: /u01/app/oracle//fra
         listener_name: LISTENER
         listener_port: &cdb_listener_port 1521
         archivelog: false
@@ -67,6 +64,7 @@
           - {name: local_listener, value: '//localhost:1521', scope: both, state: present}
           # needed by oradb_manage_tablespace without explicit datafiles
           - {name: db_create_file_dest, value: '/u01/app/oracle/oradata', scope: both, state: present}
+          - {name: db_recovery_file_dest, value: '/u01/app/oracle//fra', scope: both, state: present}
           - {name: recyclebin, value: 'off', scope: spfile, state: present}
           - {name: sga_target, value: '1808M', scope: spfile, state: present}
 

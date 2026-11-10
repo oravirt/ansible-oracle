@@ -6,13 +6,10 @@ oracle_database_db1:
   home: &db_config_home db26_si_ee
   oracle_db_name: &oracle_db_name DB1
   oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
-  is_container: true                                   # 26ai supports only container databases
   storage_type: FS                                     # Database storage to be used. ASM or FS.
   oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
   redolog_size: 75M
   redolog_groups: 3
-  datafile_dest: /u02/oradata
-  recoveryfile_dest: /u02/fra
   listener_name: LISTENER                              # This home will have a listener configured
   listener_port: &cdb_listener_port 1521
   # *local_listener is used in initparam as an achor
@@ -45,6 +42,7 @@ oracle_database_db1:
     - {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
     - {name: db_create_online_log_dest_1, value: '/u02/oradata', scope: both, state: present}
     - {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
+    - {name: db_recovery_file_dest, value: '/u02/fra', scope: both, state: present}
 
   profiles:
     - name: DEFAULT
