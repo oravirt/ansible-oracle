@@ -8,10 +8,17 @@
 #   task module-test S=has-ol9 M=oracle_asmdg
 #   task login S=default H=ol9
 #   task exec H=dbfs-ol9 U=oracle
+#   task regression:final J=6   (regression tests with report, see Taskfile.regression.yml)
 #
 # MOLECULE_SW_DIR (local directory mounted as /vagrant) is read from the
 # environment or from .env.yml in this directory.
 version: '3'
+
+includes:
+  # regression tests with report: task molecule:regression:<preset>
+  regression:
+    taskfile: Taskfile.regression.yml
+    dir: .
 
 vars:
   S: '{{.S | default "default"}}'
