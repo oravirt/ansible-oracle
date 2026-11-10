@@ -33,16 +33,15 @@ _oradb_standby_primary_member: >-
 # db_create_file_dest for the controlfile of the standby database
 _oradb_standby_file_dest: >-
   {{ (odb.init_parameters | default([]) | selectattr('name', 'equalto', 'db_create_file_dest')
-      | map(attribute='value') | list + [odb.datafile_dest | default('')]) | first }}
+      | map(attribute='value') | list + ['']) | first }}
 # file destinations of the database (OMF, FRA) and audit_file_dest, diagnostic_dest
 # for the message of a failed DUPLICATE (the directories are created by orasw_meta/standby_prepare.yml)
 _oradb_standby_directories: >-
-  {{ ([odb.datafile_dest | default(''), odb.recoveryfile_dest | default('')]
-      + (odb.init_parameters | default([])
-         | selectattr('name', 'defined')
-         | selectattr('name', 'match', '^(db_create_file_dest|db_create_online_log_dest_[0-9]+|db_recovery_file_dest'
-                                       ~ '|audit_file_dest|diagnostic_dest)$')
-         | map(attribute='value', default='') | map('string') | list))
+  {{ odb.init_parameters | default([])
+     | selectattr('name', 'defined')
+     | selectattr('name', 'match', '^(db_create_file_dest|db_create_online_log_dest_[0-9]+|db_recovery_file_dest'
+                                   ~ '|audit_file_dest|diagnostic_dest)$')
+     | map(attribute='value', default='') | map('string')
      | select | map('trim') | select | unique | list }}
 
 _oradb_standby_control_file: >-

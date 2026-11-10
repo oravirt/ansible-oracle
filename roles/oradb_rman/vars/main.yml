@@ -14,6 +14,16 @@ rman_controlfile_autobackup_disk: "{{ odb.0.rman_controlfile_autobackup_disk | d
 # configuration file of rman_backup.sh: <ORACLE_BASE>/admin/<db_unique_name>/rman/rman_backup.cfg
 # odb: entry of oracle_databases or [entry of oracle_databases, entry of rman_jobs]
 _oradb_rman_db: "{{ odb.0 | default(odb) }}"
+# db_create_file_dest from init_parameters (snapshot controlfile in parameter_rac / parameter_fra_disk)
+_oradb_rman_db_create_file_dest: >-
+  {%- set ns = namespace(v='') -%}
+  {%- for p in _oradb_rman_db.init_parameters | default([]) -%}
+  {%-   if ns.v == '' and p.name | default('') | lower == 'db_create_file_dest'
+          and p.state | default('present') != 'absent' and p.sid | default('*') == '*' -%}
+  {%-     set ns.v = p.value | default('') | string -%}
+  {%-   endif -%}
+  {%- endfor -%}
+  {{ ns.v }}
 _oradb_rman_cfg_dir: >-
   {{ oracle_base }}/admin/{{ _oradb_rman_db.oracle_db_unique_name | default(_oradb_rman_db.oracle_db_name) }}/rman
 

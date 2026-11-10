@@ -54,7 +54,6 @@ There are a lot of variables who are used by `orasw_meta`
   - [oracle_asm_disk_string](#oracle_asm_disk_string)
   - [oracle_base](#oracle_base)
   - [oracle_databases](#oracle_databases)
-  - [oracle_dbf_dir_asm](#oracle_dbf_dir_asm)
   - [oracle_dbf_dir_fs](#oracle_dbf_dir_fs)
   - [oracle_ee_options_112](#oracle_ee_options_112)
   - [oracle_ee_options_121](#oracle_ee_options_121)
@@ -71,7 +70,6 @@ There are a lot of variables who are used by `orasw_meta`
   - [oracle_opatch_patch](#oracle_opatch_patch)
   - [oracle_pdbs](#oracle_pdbs)
   - [oracle_profile_template](#oracle_profile_template)
-  - [oracle_reco_dir_asm](#oracle_reco_dir_asm)
   - [oracle_reco_dir_fs](#oracle_reco_dir_fs)
   - [oracle_stage_remote](#oracle_stage_remote)
   - [oracle_sw_patches](#oracle_sw_patches)
@@ -714,15 +712,21 @@ There are diffent sub list to define Profiles, Services, Tablespaces, Users ...
 | oracle_db_name | | DB_NAME (mandatory) |
 | state | | `present` or `absent` (mandatory) |
 | is_container | `true` | create a Container Database. Only `true` is allowed for 26ai. Set `is_container: false` for a non-CDB with 19c. |
-| omf | `true` | Oracle Managed Files (dbca `-useOMF`). `omf: true` needs `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters`. OMF is strongly recommended. `omf: false` needs an own DBCA template without OMF (`dbca_templatename`) and is not tested. |
-| storage_type | `FS` | `FS` or `ASM` |
-| datafile_dest | | *deprecated*, will be removed. Use `db_create_file_dest` in `init_parameters`. Must be identical to `db_create_file_dest`, if both are defined. |
-| recoveryfile_dest | | *deprecated*, will be removed. Use `db_recovery_file_dest` in `init_parameters`. Must be identical to `db_recovery_file_dest`, if both are defined. |
+| omf | `true` | Oracle Managed Files (dbca `-useOMF`). `omf: true` needs `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters`. OMF is strongly recommended. `omf: false` is only allowed with `storage_type: FS`, needs an own DBCA template without OMF (`dbca_templatename`) and is not tested. |
+| storage_type | `FS` | `FS` or `ASM`. `ASM` requires `omf: true`. |
 
-`db_create_file_dest` and `db_recovery_file_dest` in `init_parameters` are used by dbca
-for the datafile and recovery area destination and for standby databases.
-The global defaults `oracle_dbf_dir_fs`, `oracle_reco_dir_fs`, `oracle_dbf_dir_asm`
-and `oracle_reco_dir_asm` are only used without these `init_parameters` (only allowed with `omf: false`).
+`datafile_dest` and `recoveryfile_dest` are removed from `oracle_databases` (assert fails),
+they are replaced by `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters`.
+
+File destinations in dbca:
+
+| omf | storage_type | datafile destination | recovery area destination |
+| --- | --- | --- | --- |
+| `true` (default) | `FS` or `ASM` | `db_create_file_dest` in `init_parameters` | `db_recovery_file_dest` in `init_parameters` |
+| `false` | `FS` | `oracle_dbf_dir_fs` | `oracle_reco_dir_fs` |
+| `false` | `ASM` | not allowed (assert fails) | |
+
+The values in `init_parameters` are also used for standby databases (RMAN duplicate) and `oradb_rman`.
 
 IMPORTANT! OMF is strongly recommended in ansible-oracle. Databases without OMF are not tested.
 Use an own DBCA template without OMF (`dbca_templatename`) for `omf: false`.
@@ -860,19 +864,11 @@ oracle_databases:
         update_password: always
 ```
 
-### oracle_dbf_dir_asm
-
-#### Default value
-
-```YAML
-oracle_dbf_dir_asm: +DATA
-```
-
 ### oracle_dbf_dir_fs
 
-Global default for the datafile destination in DBCA with `storage_type: FS`.
+Datafile destination in DBCA for databases with `omf: false` (only `storage_type: FS`).
 
-Only used without `db_create_file_dest` in `init_parameters` of `oracle_databases`.
+Databases with `omf: true` (default) use `db_create_file_dest` from `init_parameters`.
 
 #### Default value
 
@@ -1153,15 +1149,11 @@ This variable is only used when `deploy_ocenv: false`. The default is `true`.
 oracle_profile_template: dotprofile-home.j2
 ```
 
-### oracle_reco_dir_asm
-
-#### Default value
-
-```YAML
-oracle_reco_dir_asm: +FRA
-```
-
 ### oracle_reco_dir_fs
+
+Recovery area destination in DBCA for databases with `omf: false` (only `storage_type: FS`).
+
+Databases with `omf: true` (default) use `db_recovery_file_dest` from `init_parameters`.
 
 #### Default value
 
@@ -1396,7 +1388,6 @@ use_proxy: false
 - (bug): Check if shell_ps1 is used for oracle and grid
 - (bug): Check when shell_aliases is used in ansible-oracle and change description
 - (bug): check if assert for deploy_ocenv + ocenv_bashrc_init is existing
-- (information): variable description is missing
 - (information): variable description is missing
 - (information): variable description is missing
 - (information): db_homes_installed not used for a long time...

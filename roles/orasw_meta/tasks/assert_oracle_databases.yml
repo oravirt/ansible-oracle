@@ -145,14 +145,14 @@
             - oracle_databases is defined
           register: assertoracle_databases
 
-        # datafile_dest and recoveryfile_dest are deprecated
-        # => warning only, the assert does not fail.
-        - name: assert deprecated datafile_dest and recoveryfile_dest in oracle_databases
+        # datafile_dest and recoveryfile_dest are removed
+        # => replaced by db_create_file_dest and db_recovery_file_dest in init_parameters
+        - name: assert removed datafile_dest and recoveryfile_dest in oracle_databases
           ansible.builtin.assert:
             quiet: true
             fail_msg: >-
-              WARNING: datafile_dest and recoveryfile_dest in oracle_databases are deprecated
-              and will be removed in a future release (database {{ ass_odb.oracle_db_name | default('') }}).
+              {{ ass_odb.oracle_db_name | default('') }}:
+              datafile_dest and recoveryfile_dest in oracle_databases are removed.
               Use db_create_file_dest and db_recovery_file_dest in init_parameters instead.
               See doc/guides/breaking_changes.adoc.
             that:
@@ -165,8 +165,28 @@
             loop_var: ass_odb
           when:
             - oracle_databases is defined
-          register: _orasw_meta_assert_deprecated_dest
-          ignore_errors: true
+          register: assertoracle_databases
+
+        # ASM without OMF makes no sense in practice
+        - name: assert omf with storage_type ASM in oracle_databases
+          ansible.builtin.assert:
+            quiet: true
+            fail_msg: >-
+              {{ ass_odb.oracle_db_name | default('') }}:
+              omf: false is not allowed with storage_type: ASM.
+              See doc/guides/breaking_changes.adoc.
+            that:
+              - >-
+                ass_odb.omf | default(true) | bool
+                or ass_odb.storage_type | default('FS') | upper != 'ASM'
+          with_items:
+            - "{{ oracle_databases }}"
+          loop_control:
+            label: "{{ ass_odb.oracle_db_name | default('') }}"
+            loop_var: ass_odb
+          when:
+            - oracle_databases is defined
+          register: assertoracle_databases
 
         # omf: true (default) needs db_create_file_dest and db_recovery_file_dest
         # in init_parameters (needed e.g. for standby databases and Out-of-Place Patching).
@@ -185,56 +205,6 @@
                 or not ass_odb.omf | default(true) | bool
                 or (_ass_create_file_dest | length > 0
                     and _ass_recovery_file_dest | length > 0)
-          vars:
-            _ass_create_file_dest: >-
-              {%- set ns = namespace(v='') -%}
-              {%- for p in ass_odb.init_parameters | default([]) -%}
-              {%-   if ns.v == '' and p.name | default('') | lower == 'db_create_file_dest'
-                      and p.state | default('present') != 'absent' and p.sid | default('*') == '*' -%}
-              {%-     set ns.v = p.value | default('') | string -%}
-              {%-   endif -%}
-              {%- endfor -%}
-              {{ ns.v }}
-            _ass_recovery_file_dest: >-
-              {%- set ns = namespace(v='') -%}
-              {%- for p in ass_odb.init_parameters | default([]) -%}
-              {%-   if ns.v == '' and p.name | default('') | lower == 'db_recovery_file_dest'
-                      and p.state | default('present') != 'absent' and p.sid | default('*') == '*' -%}
-              {%-     set ns.v = p.value | default('') | string -%}
-              {%-   endif -%}
-              {%- endfor -%}
-              {{ ns.v }}
-          with_items:
-            - "{{ oracle_databases }}"
-          loop_control:
-            label: "{{ ass_odb.oracle_db_name | default('') }}"
-            loop_var: ass_odb
-          when:
-            - oracle_databases is defined
-          register: assertoracle_databases
-
-        # deprecated datafile_dest and recoveryfile_dest must be identical
-        # to db_create_file_dest and db_recovery_file_dest in init_parameters.
-        - name: assert datafile_dest and recoveryfile_dest identical to init_parameters of oracle_databases
-          ansible.builtin.assert:
-            quiet: true
-            fail_msg: >-
-              {{ ass_odb.oracle_db_name | default('') }}:
-              datafile_dest ({{ ass_odb.datafile_dest | default('-') }})
-              must be identical to db_create_file_dest ({{ _ass_create_file_dest | default('-', true) }})
-              and recoveryfile_dest ({{ ass_odb.recoveryfile_dest | default('-') }})
-              must be identical to db_recovery_file_dest ({{ _ass_recovery_file_dest | default('-', true) }})
-              in init_parameters. Remove datafile_dest and recoveryfile_dest (deprecated).
-              See doc/guides/breaking_changes.adoc.
-            that:
-              - >-
-                ass_odb.datafile_dest is not defined
-                or _ass_create_file_dest | length == 0
-                or ass_odb.datafile_dest | string == _ass_create_file_dest
-              - >-
-                ass_odb.recoveryfile_dest is not defined
-                or _ass_recovery_file_dest | length == 0
-                or ass_odb.recoveryfile_dest | string == _ass_recovery_file_dest
           vars:
             _ass_create_file_dest: >-
               {%- set ns = namespace(v='') -%}
