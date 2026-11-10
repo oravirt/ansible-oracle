@@ -1,0 +1,10 @@
+---
+breaking_changes:
+  - "oradb_manage_db: is_container in oracle_databases is true by default. A 19c database without is_container is created as CDB, set is_container: false for a non-CDB (see doc/guides/breaking_changes.adoc)"
+  - "oradb_manage_db: omf in oracle_databases is true by default. dbca is called with -useOMF true. OMF is strongly recommended, databases without OMF are not tested anymore. omf: false needs an own DBCA template without OMF (dbca_templatename) (see doc/guides/breaking_changes.adoc)"
+  - "orasw_meta: the assert of oracle_databases requires db_create_file_dest and db_recovery_file_dest in init_parameters for databases with state present and omf: true (default) (see doc/guides/breaking_changes.adoc)"
+deprecated_features:
+  - "orasw_meta: datafile_dest and recoveryfile_dest in oracle_databases are deprecated and will be removed. The assert shows a warning, use db_create_file_dest and db_recovery_file_dest in init_parameters. Different values in datafile_dest/recoveryfile_dest and init_parameters fail in the assert (see doc/guides/breaking_changes.adoc)"
+minor_changes:
+  - "oradb_manage_db: dbca uses db_create_file_dest and db_recovery_file_dest from init_parameters for the datafile and recovery area destination"
+  - "orasw_meta: omf, is_container, datafile_dest and recoveryfile_dest documented for oracle_databases"

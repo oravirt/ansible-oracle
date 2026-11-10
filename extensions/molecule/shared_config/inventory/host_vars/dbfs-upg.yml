@@ -53,13 +53,10 @@ oracle_databases:
   - home: "{{ oracle_db1_home }}"
     oracle_db_name: DB1
     oracle_db_type: SI
-    is_container: true
     storage_type: FS
     oracle_database_type: MULTIPURPOSE
     redolog_size: 50M
     redolog_groups: 3
-    datafile_dest: /u01/app/oracle/oradata
-    recoveryfile_dest: /u01/app/oracle/fra
     listener_name: LISTENER
     listener_port: 1521
     archivelog: false
@@ -69,6 +66,7 @@ oracle_databases:
     init_parameters:
       - {name: local_listener, value: '//localhost:1521', scope: both, state: present}
       - {name: db_create_file_dest, value: '/u01/app/oracle/oradata', scope: both, state: present}
+      - {name: db_recovery_file_dest, value: '/u01/app/oracle/fra', scope: both, state: present}
       - {name: db_create_online_log_dest_1, value: '/u01/app/oracle/oradata', scope: both, state: present}
       - {name: recyclebin, value: 'off', scope: spfile, state: present}
       - {name: pga_aggregate_target, value: '128M', scope: both, state: present}
@@ -77,13 +75,10 @@ oracle_databases:
   - home: "{{ oracle_db2_home }}"
     oracle_db_name: DB2
     oracle_db_type: SI
-    is_container: true
     storage_type: FS
     oracle_database_type: MULTIPURPOSE
     redolog_size: 50M
     redolog_groups: 3
-    datafile_dest: /u01/app/oracle/oradata
-    recoveryfile_dest: /u01/app/oracle/fra
     listener_name: LISTENER
     listener_port: 1521
     archivelog: false
@@ -93,6 +88,7 @@ oracle_databases:
     init_parameters:
       - {name: local_listener, value: '//localhost:1521', scope: both, state: present}
       - {name: db_create_file_dest, value: '/u01/app/oracle/oradata', scope: both, state: present}
+      - {name: db_recovery_file_dest, value: '/u01/app/oracle/fra', scope: both, state: present}
       - {name: db_create_online_log_dest_1, value: '/u01/app/oracle/oradata', scope: both, state: present}
       - {name: recyclebin, value: 'off', scope: spfile, state: present}
       - {name: pga_aggregate_target, value: '128M', scope: both, state: present}

@@ -6,13 +6,10 @@ oracle_database_dbr1:
   home: &db_config_home db19-gi-ee
   oracle_db_name: &oracle_db_name DBR1
   oracle_db_type: RAC                                   # Type of database (RAC,RACONENODE,SI)
-  is_container: true
   storage_type: ASM                                     # Database storage to be used. ASM or FS.
   oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
   redolog_size: 75M
   redolog_groups: 3
-  datafile_dest: +DATA
-  recoveryfile_dest: +FRA
   # listener_name: LISTENER                            # This home will have a listener configured
   listener_port: &cdb_listener_port 1521
   # *local_listener is used in initparam as an achor
@@ -62,6 +59,7 @@ oracle_database_dbr1:
     - {name: db_create_online_log_dest_1, value: '+DATA', scope: both, state: present}
     # file_dest_size in bytes in 12.1.0.2 due to bug in DBCA
     - {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
+    - {name: db_recovery_file_dest, value: '+FRA', scope: both, state: present}
 
   profiles:
     - name: DEFAULT

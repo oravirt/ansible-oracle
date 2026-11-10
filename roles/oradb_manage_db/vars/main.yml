@@ -26,12 +26,40 @@ _oradb_manage_db_init_params_list: "{%- if odb.init_parameters is defined -%}\
                     {%- endif -%}"
 
 # used in DBCA Responsefiles
-_oradb_manage_db_datafile_dest: "{% if odb.storage_type | upper == 'FS' %}{{ oracle_dbf_dir_fs }}\
+# db_create_file_dest / db_recovery_file_dest from init_parameters,
+# otherwise the global default for storage_type.
+# datafile_dest / recoveryfile_dest in oracle_databases are deprecated,
+# orasw_meta asserts the same values as in init_parameters.
+_oradb_manage_db_init_param_create_file_dest: >-
+  {%- set ns = namespace(v='') -%}
+  {%- for p in odb.init_parameters | default([]) -%}
+  {%-   if ns.v == '' and p.name | default('') | lower == 'db_create_file_dest'
+          and p.state | default('present') != 'absent' and p.sid | default('*') == '*' -%}
+  {%-     set ns.v = p.value | default('') | string -%}
+  {%-   endif -%}
+  {%- endfor -%}
+  {{ ns.v }}
+
+_oradb_manage_db_init_param_recovery_file_dest: >-
+  {%- set ns = namespace(v='') -%}
+  {%- for p in odb.init_parameters | default([]) -%}
+  {%-   if ns.v == '' and p.name | default('') | lower == 'db_recovery_file_dest'
+          and p.state | default('present') != 'absent' and p.sid | default('*') == '*' -%}
+  {%-     set ns.v = p.value | default('') | string -%}
+  {%-   endif -%}
+  {%- endfor -%}
+  {{ ns.v }}
+
+_oradb_manage_db_datafile_dest: "{% if _oradb_manage_db_init_param_create_file_dest | length > 0 %}\
+                {{- _oradb_manage_db_init_param_create_file_dest }}\
+                {%- elif odb.storage_type | default('FS') | upper == 'FS' %}{{ oracle_dbf_dir_fs }}\
                 {%- elif odb.storage_type | upper == 'ASM' %}{{ oracle_dbf_dir_asm }}\
                 {%- endif %}"
 
 # used in DBCA Responsefiles
-_oradb_manage_db_recoveryfile_dest: "{% if odb.storage_type | upper == 'FS' %}{{ oracle_reco_dir_fs }}\
+_oradb_manage_db_recoveryfile_dest: "{% if _oradb_manage_db_init_param_recovery_file_dest | length > 0 %}\
+                    {{- _oradb_manage_db_init_param_recovery_file_dest }}\
+                    {%- elif odb.storage_type | default('FS') | upper == 'FS' %}{{ oracle_reco_dir_fs }}\
                     {%- elif odb.storage_type | upper == 'ASM' %}{{ oracle_reco_dir_asm }}\
                     {%- endif %}"
 

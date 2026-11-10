@@ -154,13 +154,10 @@ oracle_databases:
   - home: "{{ oracle_dbhas_home }}"
     oracle_db_name: DBHAS
     oracle_db_type: SI
-    is_container: true
     storage_type: ASM
     oracle_database_type: MULTIPURPOSE
     redolog_size: 50M
     redolog_groups: 3
-    datafile_dest: +DATA
-    recoveryfile_dest: +FRA
     listener_port: 1521
     archivelog: false
     flashback: false
@@ -170,6 +167,7 @@ oracle_databases:
       - {name: local_listener, value: '//localhost:1521', scope: both, state: present}
       - {name: db_create_file_dest, value: '+DATA', scope: both, state: present}
       - {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
+      - {name: db_recovery_file_dest, value: '+FRA', scope: both, state: present}
       - {name: recyclebin, value: 'off', scope: spfile, state: present}
       - {name: pga_aggregate_target, value: '128M', scope: both, state: present}
       - {name: sga_target, value: '1808M', scope: spfile, state: present}

@@ -109,8 +109,7 @@
               - db_homes_config[ass_odb.home] is defined
               - db_homes_config[ass_odb.home]['version'] is version('21.3.0.0', '<')
                 or (db_homes_config[ass_odb.home]['version'] is version('21.3.0.0', '>=')
-                    and ass_odb.is_container is defined
-                    and ass_odb.is_container | bool
+                    and ass_odb.is_container | default(true) | bool
                   )
               - ass_odb.init_parameters | default([]) | type_debug == 'list'
               # dbca has no SID clause => init_parameters for one instance only after dbca
@@ -137,6 +136,124 @@
                   and ass_odb.init_parameters | default([]) | list
                        | selectattr ('name', 'equalto', 'sga_target') | list | length > 0
                 )
+          with_items:
+            - "{{ oracle_databases }}"
+          loop_control:
+            label: "{{ ass_odb.oracle_db_name | default('') }}"
+            loop_var: ass_odb
+          when:
+            - oracle_databases is defined
+          register: assertoracle_databases
+
+        # datafile_dest and recoveryfile_dest are deprecated
+        # => warning only, the assert does not fail.
+        - name: assert deprecated datafile_dest and recoveryfile_dest in oracle_databases
+          ansible.builtin.assert:
+            quiet: true
+            fail_msg: >-
+              WARNING: datafile_dest and recoveryfile_dest in oracle_databases are deprecated
+              and will be removed in a future release (database {{ ass_odb.oracle_db_name | default('') }}).
+              Use db_create_file_dest and db_recovery_file_dest in init_parameters instead.
+              See doc/guides/breaking_changes.adoc.
+            that:
+              - ass_odb.datafile_dest is not defined
+              - ass_odb.recoveryfile_dest is not defined
+          with_items:
+            - "{{ oracle_databases }}"
+          loop_control:
+            label: "{{ ass_odb.oracle_db_name | default('') }}"
+            loop_var: ass_odb
+          when:
+            - oracle_databases is defined
+          register: _orasw_meta_assert_deprecated_dest
+          ignore_errors: true
+
+        # omf: true (default) needs db_create_file_dest and db_recovery_file_dest
+        # in init_parameters (needed e.g. for standby databases and Out-of-Place Patching).
+        - name: assert db_create_file_dest and db_recovery_file_dest in init_parameters of oracle_databases
+          ansible.builtin.assert:
+            quiet: true
+            fail_msg: >-
+              {{ ass_odb.oracle_db_name | default('') }}:
+              omf: true (default) needs db_create_file_dest and db_recovery_file_dest in init_parameters,
+              e.g. {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
+              and {name: db_recovery_file_dest, value: '/u02/fra', scope: both, state: present}.
+              See doc/guides/breaking_changes.adoc.
+            that:
+              - >-
+                ass_odb.state | default('present') == 'absent'
+                or not ass_odb.omf | default(true) | bool
+                or (_ass_create_file_dest | length > 0
+                    and _ass_recovery_file_dest | length > 0)
+          vars:
+            _ass_create_file_dest: >-
+              {%- set ns = namespace(v='') -%}
+              {%- for p in ass_odb.init_parameters | default([]) -%}
+              {%-   if ns.v == '' and p.name | default('') | lower == 'db_create_file_dest'
+                      and p.state | default('present') != 'absent' and p.sid | default('*') == '*' -%}
+              {%-     set ns.v = p.value | default('') | string -%}
+              {%-   endif -%}
+              {%- endfor -%}
+              {{ ns.v }}
+            _ass_recovery_file_dest: >-
+              {%- set ns = namespace(v='') -%}
+              {%- for p in ass_odb.init_parameters | default([]) -%}
+              {%-   if ns.v == '' and p.name | default('') | lower == 'db_recovery_file_dest'
+                      and p.state | default('present') != 'absent' and p.sid | default('*') == '*' -%}
+              {%-     set ns.v = p.value | default('') | string -%}
+              {%-   endif -%}
+              {%- endfor -%}
+              {{ ns.v }}
+          with_items:
+            - "{{ oracle_databases }}"
+          loop_control:
+            label: "{{ ass_odb.oracle_db_name | default('') }}"
+            loop_var: ass_odb
+          when:
+            - oracle_databases is defined
+          register: assertoracle_databases
+
+        # deprecated datafile_dest and recoveryfile_dest must be identical
+        # to db_create_file_dest and db_recovery_file_dest in init_parameters.
+        - name: assert datafile_dest and recoveryfile_dest identical to init_parameters of oracle_databases
+          ansible.builtin.assert:
+            quiet: true
+            fail_msg: >-
+              {{ ass_odb.oracle_db_name | default('') }}:
+              datafile_dest ({{ ass_odb.datafile_dest | default('-') }})
+              must be identical to db_create_file_dest ({{ _ass_create_file_dest | default('-', true) }})
+              and recoveryfile_dest ({{ ass_odb.recoveryfile_dest | default('-') }})
+              must be identical to db_recovery_file_dest ({{ _ass_recovery_file_dest | default('-', true) }})
+              in init_parameters. Remove datafile_dest and recoveryfile_dest (deprecated).
+              See doc/guides/breaking_changes.adoc.
+            that:
+              - >-
+                ass_odb.datafile_dest is not defined
+                or _ass_create_file_dest | length == 0
+                or ass_odb.datafile_dest | string == _ass_create_file_dest
+              - >-
+                ass_odb.recoveryfile_dest is not defined
+                or _ass_recovery_file_dest | length == 0
+                or ass_odb.recoveryfile_dest | string == _ass_recovery_file_dest
+          vars:
+            _ass_create_file_dest: >-
+              {%- set ns = namespace(v='') -%}
+              {%- for p in ass_odb.init_parameters | default([]) -%}
+              {%-   if ns.v == '' and p.name | default('') | lower == 'db_create_file_dest'
+                      and p.state | default('present') != 'absent' and p.sid | default('*') == '*' -%}
+              {%-     set ns.v = p.value | default('') | string -%}
+              {%-   endif -%}
+              {%- endfor -%}
+              {{ ns.v }}
+            _ass_recovery_file_dest: >-
+              {%- set ns = namespace(v='') -%}
+              {%- for p in ass_odb.init_parameters | default([]) -%}
+              {%-   if ns.v == '' and p.name | default('') | lower == 'db_recovery_file_dest'
+                      and p.state | default('present') != 'absent' and p.sid | default('*') == '*' -%}
+              {%-     set ns.v = p.value | default('') | string -%}
+              {%-   endif -%}
+              {%- endfor -%}
+              {{ ns.v }}
           with_items:
             - "{{ oracle_databases }}"
           loop_control:
