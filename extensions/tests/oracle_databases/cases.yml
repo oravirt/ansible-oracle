@@ -1,0 +1,168 @@
+---
+# Test cases for test_oracle_databases.yml
+#
+# id:     name of the test case
+# dbs:    list of databases, combined with _base_db (home h26, DB1, FS, SI, state present)
+#         params: init_parameters in addition to local_listener
+# expect: ok | failed (asserts of orasw_meta)
+# dest:   {df, rf} - datafile / recovery area destination for dbca of the first database (optional)
+# rsp:    expected values in the dbca response file of the first database (optional)
+
+_p_create: &p_create {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
+_p_reco: &p_reco {name: db_recovery_file_dest, value: '/u02/fra', scope: both, state: present}
+_p_size: &p_size {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
+
+tc_cases:
+  # ---------- omf: true (default) ----------
+  - id: omf_default_params_ok
+    dbs: [{params: [*p_create, *p_size, *p_reco]}]
+    expect: ok
+    dest: {df: /u02/oradata, rf: /u02/fra}
+    rsp: {createAsContainerDatabase: 'true', datafileDestination: /u02/oradata, recoveryAreaDestination: /u02/fra}
+
+  - id: omf_true_explicit_params_ok
+    dbs: [{omf: true, params: [*p_create, *p_reco]}]
+    expect: ok
+
+  - id: omf_string_yes_params_missing
+    dbs: [{omf: 'yes', params: [*p_create]}]
+    expect: failed
+
+  - id: omf_default_no_params
+    dbs: [{}]
+    expect: failed
+
+  - id: omf_default_recovery_missing
+    dbs: [{params: [*p_create, *p_size]}]
+    expect: failed
+
+  - id: omf_default_create_missing
+    dbs: [{params: [*p_size, *p_reco]}]
+    expect: failed
+
+  - id: omf_default_param_state_absent
+    dbs: [{params: [*p_create, {name: db_recovery_file_dest, value: '/u02/fra', state: absent}]}]
+    expect: failed
+
+  - id: omf_default_param_only_for_sid
+    dbs: [{params: [*p_create, {name: db_recovery_file_dest, value: '/u02/fra', sid: DB1, dbca: false}]}]
+    expect: failed
+
+  - id: omf_default_param_uppercase
+    dbs:
+      - params:
+          - {name: DB_CREATE_FILE_DEST, value: '/data/db1'}
+          - {name: DB_RECOVERY_FILE_DEST, value: '/fra/db1'}
+    expect: ok
+    dest: {df: /data/db1, rf: /fra/db1}
+
+  - id: omf_default_asm_26ai
+    dbs:
+      - storage_type: ASM
+        params:
+          - {name: db_create_file_dest, value: '+DATA1'}
+          - {name: db_recovery_file_dest, value: '+RECO1'}
+    expect: ok
+    dest: {df: '+DATA1', rf: '+RECO1'}
+    # storageType and diskGroupName are empty in the 26ai response file (not checked)
+    rsp: {datafileDestination: '+DATA1', recoveryAreaDestination: '+RECO1', recoveryGroupName: '+RECO1'}
+
+  - id: omf_default_asm_19c
+    dbs:
+      - home: h19
+        storage_type: ASM
+        params:
+          - {name: db_create_file_dest, value: '+DATA1'}
+          - {name: db_recovery_file_dest, value: '+RECO1'}
+    expect: ok
+    rsp: {storageType: ASM, diskGroupName: '+DATA1', recoveryGroupName: '+RECO1'}
+
+  - id: omf_default_state_absent_no_params
+    dbs: [{state: absent}]
+    expect: ok
+
+  # ---------- omf: false (FS only, own DBCA template, not tested in molecule) ----------
+  - id: omf_false_no_params
+    dbs: [{omf: false}]
+    expect: ok
+    dest: {df: /u02/oradata/, rf: /u02/fra/}
+    rsp: {datafileDestination: /u02/oradata/, recoveryAreaDestination: /u02/fra/}
+
+  - id: omf_false_string_no_params
+    dbs: [{omf: 'false'}]
+    expect: ok
+    dest: {df: /u02/oradata/, rf: /u02/fra/}
+
+  - id: omf_false_params_ignored_for_dbca
+    dbs: [{omf: false, params: [*p_create, *p_reco]}]
+    expect: ok
+    dest: {df: /u02/oradata/, rf: /u02/fra/}
+
+  - id: omf_false_asm
+    dbs: [{omf: false, storage_type: ASM}]
+    expect: failed
+
+  - id: omf_false_asm_state_absent
+    dbs: [{omf: false, storage_type: ASM, state: absent}]
+    expect: failed
+
+  # ---------- removed datafile_dest / recoveryfile_dest ----------
+  - id: removed_datafile_dest
+    dbs: [{datafile_dest: /u02/oradata, params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: removed_recoveryfile_dest
+    dbs: [{recoveryfile_dest: /u02/fra, params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: removed_dest_with_omf_false
+    dbs: [{omf: false, datafile_dest: /u03/oradata, recoveryfile_dest: /u03/fra}]
+    expect: failed
+
+  - id: removed_dest_state_absent
+    dbs: [{state: absent, datafile_dest: /u02/oradata}]
+    expect: failed
+
+  # ---------- is_container ----------
+  - id: is_container_default_26ai
+    dbs: [{params: [*p_create, *p_reco]}]
+    expect: ok
+    rsp: {createAsContainerDatabase: 'true'}
+
+  - id: is_container_false_26ai
+    dbs: [{is_container: false, params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: is_container_default_19c
+    dbs: [{home: h19, params: [*p_create, *p_reco]}]
+    expect: ok
+    rsp: {createAsContainerDatabase: 'true'}
+
+  - id: is_container_false_19c
+    dbs: [{home: h19, is_container: false, params: [*p_create, *p_reco]}]
+    expect: ok
+    rsp: {createAsContainerDatabase: 'false', numberOfPDBs: '', pdbName: ''}
+
+  - id: is_container_true_19c_pdb
+    dbs: [{home: h19, is_container: true, num_pdbs: 1, pdb_prefix: PDB, params: [*p_create, *p_reco]}]
+    expect: ok
+    rsp: {createAsContainerDatabase: 'true', numberOfPDBs: '1', pdbName: PDB}
+
+  # ---------- several databases ----------
+  - id: multi_db_one_bad
+    dbs:
+      - {params: [*p_create, *p_reco]}
+      - {oracle_db_name: DB2, params: [*p_create]}
+    expect: failed
+
+  - id: multi_db_removed_dest_second
+    dbs:
+      - {params: [*p_create, *p_reco]}
+      - {oracle_db_name: DB2, datafile_dest: /u02/oradata, params: [*p_create, *p_reco]}
+    expect: failed
+
+  - id: multi_db_fs_and_asm_ok
+    dbs:
+      - {omf: false}
+      - {oracle_db_name: DB2, storage_type: ASM, params: [{name: db_create_file_dest, value: '+DATA'}, {name: db_recovery_file_dest, value: '+FRA'}]}
+    expect: ok

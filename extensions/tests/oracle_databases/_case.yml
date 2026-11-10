@@ -1,0 +1,68 @@
+---
+# One test case (loop_var tc), results in tc_results.
+- name: "{{ tc.id }} | reset results"
+  ansible.builtin.set_fact:
+    _tc_assert: unknown
+    _tc_dbs: >-
+      {%- set ns = namespace(l=[]) -%}
+      {%- for d in tc.dbs -%}
+      {%-   set ns.l = ns.l + [_base_db
+                               | combine(d | dict2items | rejectattr('key', 'equalto', 'params') | items2dict)
+                               | combine({'init_parameters': _base_params + d.params | default([])})] -%}
+      {%- endfor -%}
+      {{ ns.l }}
+
+- name: "{{ tc.id }} | asserts of orasw_meta"
+  block:
+    # include_tasks instead of include_role: no role dependencies (orahost_meta)
+    - name: "{{ tc.id }} | asserts of orasw_meta"
+      ansible.builtin.include_tasks: "{{ _repo_roles }}/orasw_meta/tasks/assert_oracle_databases.yml"
+      vars:
+        oracle_databases: "{{ _tc_dbs }}"
+
+    - name: "{{ tc.id }} | assert passed"
+      ansible.builtin.set_fact:
+        _tc_assert: ok
+  rescue:
+    - name: "{{ tc.id }} | assert failed"
+      ansible.builtin.set_fact:
+        _tc_assert: failed
+
+- name: "{{ tc.id }} | check assert"
+  ansible.builtin.set_fact:
+    tc_results: >-
+      {{ tc_results + [{'id': tc.id ~ '.assert',
+                        'status': 'passed' if _tc_assert == tc.expect else 'failed',
+                        'msg': tc.id ~ ': assert expected ' ~ tc.expect ~ ', got ' ~ _tc_assert}] }}
+
+- name: "{{ tc.id }} | check destinations for dbca"
+  vars:
+    odb: "{{ _tc_dbs[0] }}"
+    _got: "{{ {'df': _oradb_manage_db_datafile_dest, 'rf': _oradb_manage_db_recoveryfile_dest} }}"
+  ansible.builtin.set_fact:
+    tc_results: >-
+      {{ tc_results + [{'id': tc.id ~ '.dest',
+                        'status': 'passed' if _got == tc.dest else 'failed',
+                        'msg': tc.id ~ ': destinations expected ' ~ tc.dest ~ ', got ' ~ _got}] }}
+  when: tc.dest is defined
+
+- name: "{{ tc.id }} | check dbca response file"
+  vars:
+    odb: "{{ _tc_dbs[0] }}"
+    _rsp_file: >-
+      {{ _repo_roles }}/oradb_manage_db/templates/dbca-create-db.rsp.{{ db_homes_config[odb.home].version }}.j2
+    _rsp: >-
+      {%- set ns = namespace(d={}) -%}
+      {%- for l in lookup('ansible.builtin.template', _rsp_file, template_vars={'dbh': odb}).split('\n') -%}
+      {%-   if l is match('^[A-Za-z]+=') -%}
+      {%-     set ns.d = ns.d | combine({l.split('=', 1)[0]: l.split('=', 1)[1]}) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ ns.d }}
+    _got: "{{ dict(tc.rsp.keys() | zip(tc.rsp.keys() | map('extract', _rsp))) }}"
+  ansible.builtin.set_fact:
+    tc_results: >-
+      {{ tc_results + [{'id': tc.id ~ '.rsp',
+                        'status': 'passed' if _got == tc.rsp else 'failed',
+                        'msg': tc.id ~ ': dbca rsp expected ' ~ tc.rsp ~ ', got ' ~ _got}] }}
+  when: tc.rsp is defined

@@ -1121,6 +1121,27 @@ A check from these lists that passes is reported as `KNOWN BUGS NOT REPRODUCED` 
 * Not tested: `oracle_asmvol` (no ADVM/ACFS in a container), `oracle_ldapuser` (LDAP), `oracle_opatch`, `oracle_gi_facts`, `oracle_sqldba` (no python-oracledb).
 
 [[claude-aotest]]
+=== Controller-only tests of oracle_databases
+
+`task test:oracle_databases` (in `extensions/`) tests combinations of attributes in `oracle_databases`
+on localhost without container, VM or database (about 20 seconds):
+
+- asserts of `orasw_meta` (`assert_oracle_databases.yml`): `omf`, `is_container`, `storage_type`,
+  `db_create_file_dest` / `db_recovery_file_dest` in `init_parameters`,
+  removed `datafile_dest` / `recoveryfile_dest`
+- destinations for dbca from `oradb_manage_db/vars/main.yml`
+- values in the dbca response file (19.3.0.0, 26.1.0.0), e.g. `createAsContainerDatabase`
+
+The test cases are in `extensions/tests/oracle_databases/cases.yml`
+(`expect: ok|failed`, optional `warn`, `dest` and `rsp`).
+The playbook fails at the end with a list of all failed checks.
+
+.Run without Taskfile
+[source,bash]
+----
+ansible-playbook -i localhost, extensions/tests/oracle_databases/test_oracle_databases.yml
+----
+
 === Regression tests
 
 `task molecule:regression:<preset>` runs several scenarios with a report per run
