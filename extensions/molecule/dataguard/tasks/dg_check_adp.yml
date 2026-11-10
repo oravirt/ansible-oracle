@@ -1,6 +1,7 @@
 ---
 # RMAN ARCHIVELOG DELETION POLICY of a member (configured by oradb_standby on every member).
 # v$rman_configuration contains only values, which are not the default (NONE).
+# The value starts with 'TO ' (e.g. 'TO APPLIED ON ALL STANDBY') => removed for the comparison.
 # Input: dg_adp_ci (connect identifier of the member)
 #        expected value: archivelog_deletion_policy of db_standby_config (inventory)
 - name: Archivelog deletion policy of {{ dg_adp_ci }}
@@ -8,7 +9,8 @@
   vars:
     dg_sql_ci: "{{ dg_adp_ci }}"
     dg_sql: >-
-      select 'ADP=' || value from v$rman_configuration where name = 'ARCHIVELOG DELETION POLICY';
+      select 'ADP=' || regexp_replace(value, '^TO +') from v$rman_configuration
+      where name = 'ARCHIVELOG DELETION POLICY';
 
 - name: Assert archivelog deletion policy of {{ dg_adp_ci }}
   ansible.builtin.assert:
