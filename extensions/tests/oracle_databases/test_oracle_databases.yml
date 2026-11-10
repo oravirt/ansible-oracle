@@ -1,0 +1,98 @@
+---
+# Controller-only tests for oracle_databases (no target host, no database):
+# - asserts of orasw_meta (assert_oracle_databases.yml)
+# - destinations for dbca from oradb_manage_db/vars/main.yml
+# - dbca response file (19.3.0.0 / 26.1.0.0) for is_container and destinations
+# - snapshot controlfile in the oradb_rman templates parameter_rac / parameter_fra_disk
+#
+# Usage: ansible-playbook extensions/tests/oracle_databases/test_oracle_databases.yml
+#        (or: task test:oracle_databases in extensions/)
+# The test cases are in cases.yml.
+- name: Test oracle_databases variable combinations
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - cases.yml
+  vars:
+    _repo_roles: "{{ playbook_dir }}/../../../roles"
+    # used by orasw_meta / oradb_manage_db
+    orasw_meta_assert_oracle_databases: true
+    assert_db_homes_config: true
+    db_homes_config:
+      h19: {oracle_home: /u01/app/oracle/product/19/db1, version: '19.3.0.0', edition: EE}
+      h26: {oracle_home: /u01/app/oracle/product/26/db1, version: '26.1.0.0', edition: EE}
+    oracle_dbf_dir_fs: /u02/oradata/
+    oracle_reco_dir_fs: /u02/fra/
+    # stubs for the dbca response files
+    dbca_templatename: General_Purpose.dbc
+    dbpasswords: {}
+    default_dbpass: Oracle_4U
+    _oraswgi_meta_configure_cluster: false
+    oracle_gi_cluster_type: STANDARD
+    oracle_install_option_gi: ''
+    # base of every database in a test case
+    _base_db:
+      home: h26
+      oracle_db_name: DB1
+      state: present
+      oracle_db_type: SI
+      storage_type: FS
+      oracle_db_mem_totalmb: 1024
+      oracle_database_type: MULTIPURPOSE
+      service_name: DB1_SRV
+    _base_params:
+      - {name: local_listener, value: '//localhost:1521', scope: both, state: present}
+    tc_results: []
+
+  tasks:
+    - name: Load variables of oradb_manage_db (destinations for dbca)
+      ansible.builtin.include_vars:
+        file: "{{ _repo_roles }}/oradb_manage_db/vars/main.yml"
+
+    - name: Run test cases
+      ansible.builtin.include_tasks: _case.yml
+      loop: "{{ tc_cases }}"
+      loop_control:
+        loop_var: tc
+        label: "{{ tc.id }}"
+
+    - name: Load variables of oradb_rman
+      ansible.builtin.include_vars:
+        file: "{{ _repo_roles }}/oradb_rman/vars/main.yml"
+
+    - name: Check snapshot controlfile in oradb_rman templates
+      vars:
+        odb:
+          - oracle_db_name: DB1
+            init_parameters: [{name: db_create_file_dest, value: '+DATA', scope: both, state: present}]
+          - {name: "{{ item.name }}"}
+        _line: >-
+          {{ lookup('ansible.builtin.template', _repo_roles ~ '/oradb_rman/templates/' ~ item.name ~ '.rman.j2',
+                    template_vars={'odb': odb, 'rman_retention_policy': 'x', 'rman_controlfile_autobackup_disk': 'x',
+                                   'rman_device_type_disk': 'x', 'rman_channel_disk': 'x'})
+             | regex_search('^CONFIGURE SNAPSHOT CONTROLFILE.*$', multiline=True) | default('', true) }}
+      ansible.builtin.set_fact:
+        tc_results: >-
+          {{ tc_results + [{'id': 'oradb_rman.' ~ item.name,
+                            'status': 'passed' if _line == item.expect else 'failed',
+                            'msg': 'oradb_rman ' ~ item.name ~ ': expected ' ~ item.expect ~ ', got ' ~ _line}] }}
+      loop:
+        - name: parameter_fra_disk
+          expect: "CONFIGURE SNAPSHOT CONTROLFILE NAME TO '+DATA/DB1/snapcf_DB1.f';"
+        - name: parameter_rac
+          expect: "CONFIGURE SNAPSHOT CONTROLFILE NAME TO '+DATA/%d/snapcf_PLANETP1.f'; # default"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg: >-
+          {{ tc_results | selectattr('status', 'equalto', 'passed') | list | length }} passed,
+          {{ tc_results | selectattr('status', 'equalto', 'failed') | list | length }} failed
+          of {{ tc_results | length }} checks
+
+    - name: Failed checks
+      ansible.builtin.fail:
+        msg: "{{ tc_results | selectattr('status', 'equalto', 'failed') | map(attribute='msg') | list }}"
+      when: tc_results | selectattr('status', 'equalto', 'failed') | list | length > 0
