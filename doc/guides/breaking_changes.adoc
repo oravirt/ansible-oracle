@@ -115,9 +115,13 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |A database in `oracle_databases` with `state: present` *and* without `omf: false` *and* `db_create_file_dest` or `db_recovery_file_dest` is missing in `init_parameters`
 |Add `db_create_file_dest` and `db_recovery_file_dest` to `init_parameters`
 
-|<<oracle_databases: datafile_dest and recoveryfile_dest are deprecated>>
+|<<oracle_databases: datafile_dest and recoveryfile_dest are removed>>
 |A database in `oracle_databases` with `datafile_dest` or `recoveryfile_dest`
-|Move the values to `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters` and remove `datafile_dest` and `recoveryfile_dest`. Different values fail in the assert
+|Move the values to `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters` and remove `datafile_dest` and `recoveryfile_dest`
+
+|<<oracle_databases: omf false not allowed with ASM, oracle_dbf_dir_asm and oracle_reco_dir_asm removed>>
+|A database in `oracle_databases` with `storage_type: ASM` and `omf: false`, *or* `oracle_dbf_dir_asm` / `oracle_reco_dir_asm` are set in the inventory
+|Use OMF with ASM (`db_create_file_dest` and `db_recovery_file_dest` in `init_parameters`), remove `oracle_dbf_dir_asm` and `oracle_reco_dir_asm`
 |===
 
 ==== Minimum ansible-core 2.16
@@ -1207,8 +1211,8 @@ The parameters are needed in different situations, e.g. for dbca, standby databa
 and the directories of a new database.
 They are defined directly in `init_parameters` instead of deriving them from other variables.
 dbca uses the values for the datafile and recovery area destination.
-The global defaults `oracle_dbf_dir_fs`, `oracle_reco_dir_fs`, `oracle_dbf_dir_asm` and `oracle_reco_dir_asm`
-are only used without these `init_parameters` (only allowed with `omf: false` and an own DBCA template, not tested).
+The global defaults `oracle_dbf_dir_fs` and `oracle_reco_dir_fs` are only used with `omf: false`
+(only `storage_type: FS`, own DBCA template, not tested).
 
 Who is affected:
 
@@ -1222,7 +1226,7 @@ Who is affected:
 Required actions:
 
 . Add `db_create_file_dest` and `db_recovery_file_dest` to `init_parameters`.
-  Use the values of `datafile_dest` and `recoveryfile_dest`, if they are defined.
+  Use the values of `datafile_dest` and `recoveryfile_dest`, if they were defined.
 . Existing databases: use the current values of the database (`show parameter db_create_file_dest`,
   `show parameter db_recovery_file_dest`), otherwise `oradb_manage_parameters` changes them.
 . Define `db_recovery_file_dest_size` before `db_recovery_file_dest` in `init_parameters`
@@ -1239,31 +1243,26 @@ oracle_databases:
       - {name: db_recovery_file_dest, value: '/u02/fra', scope: both, state: present}
 ----
 
-==== oracle_databases: datafile_dest and recoveryfile_dest are deprecated
+==== oracle_databases: datafile_dest and recoveryfile_dest are removed
 
-As of 5.0.0 the attributes `datafile_dest` and `recoveryfile_dest` of `oracle_databases` are deprecated
-and will be removed in a future release. Use `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters` instead.
+As of 5.0.0 the attributes `datafile_dest` and `recoveryfile_dest` of `oracle_databases` are removed.
+They are redundant to `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters`.
 `datafile_dest` in `oracle_pdbs` is not affected.
 
 Who is affected:
 
 - Inventories with `datafile_dest` or `recoveryfile_dest` in `oracle_databases`.
-  The assert of `orasw_meta` shows a warning (ignored failed task):
+  The playbooks fail in the assert of `orasw_meta`:
 +
 ----
-WARNING: datafile_dest and recoveryfile_dest in oracle_databases are deprecated and will be removed in a future release ...
-----
-- The playbooks fail in the assert of `orasw_meta`, if the values are different to `db_create_file_dest`
-  or `db_recovery_file_dest` in `init_parameters`:
-+
-----
-<oracle_db_name>: datafile_dest (...) must be identical to db_create_file_dest (...) ...
+<oracle_db_name>: datafile_dest and recoveryfile_dest in oracle_databases are removed. ...
 ----
 
 Required actions:
 
 . Move the values to `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters`.
 . Remove `datafile_dest` and `recoveryfile_dest` from `oracle_databases`.
+. Databases with `omf: false`: the destinations are `oracle_dbf_dir_fs` and `oracle_reco_dir_fs` (global per host).
 
 .Before
 [source,yaml]
@@ -1285,6 +1284,43 @@ oracle_databases:
     init_parameters:
       - {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
       - {name: db_recovery_file_dest, value: '/u02/fra', scope: both, state: present}
+----
+
+==== oracle_databases: omf false not allowed with ASM, oracle_dbf_dir_asm and oracle_reco_dir_asm removed
+
+As of 5.0.0 the assert of `oracle_databases` in `orasw_meta` fails for a database with `storage_type: ASM` and `omf: false`.
+ASM without OMF makes no sense in practice.
+The variables `oracle_dbf_dir_asm` and `oracle_reco_dir_asm` are removed,
+the disk groups are taken from `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters`.
+
+`oradb_rman`: the templates `parameter_rac` and `parameter_fra_disk` use `db_create_file_dest` from `init_parameters`
+for the snapshot controlfile instead of `oracle_dbf_dir_asm`.
+Before, `parameter_fra_disk` created a wrong name with two `+` (`++DATA`).
+
+Who is affected:
+
+- Inventories with a database with `storage_type: ASM` and `omf: false`. The playbooks fail in the assert of `orasw_meta`:
++
+----
+<oracle_db_name>: omf: false is not allowed with storage_type: ASM. ...
+----
+- Inventories with `oracle_dbf_dir_asm` or `oracle_reco_dir_asm`. The variables have no effect anymore.
+
+Required actions:
+
+. Remove `omf: false` from ASM databases and add `db_create_file_dest` and `db_recovery_file_dest` to `init_parameters`.
+. Remove `oracle_dbf_dir_asm` and `oracle_reco_dir_asm` from the inventory.
+
+.Example
+[source,yaml]
+----
+oracle_databases:
+  - oracle_db_name: DB1
+    storage_type: ASM
+    init_parameters:
+      - {name: db_create_file_dest, value: '+DATA', scope: both, state: present}
+      - {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
+      - {name: db_recovery_file_dest, value: '+FRA', scope: both, state: present}
 ----
 
 === Adding new breaking changes

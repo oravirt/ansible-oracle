@@ -20,8 +20,7 @@
     # file destinations (OMF, FRA), audit_file_dest, diagnostic_dest
     # and the directories of dg_broker_config_file1/2 from init_parameters (state present)
     _orasw_meta_standby_prepare_dirs: >-
-      {%- set __d = [odb.datafile_dest | default(''), odb.recoveryfile_dest | default('')]
-                    + orasw_meta_standby_prepare_dirs | default([]) -%}
+      {%- set __d = [] + orasw_meta_standby_prepare_dirs | default([]) -%}
       {%- for ip in odb.init_parameters | default([])
             if ip.name is defined and ip.value is defined
                and ip.state | default('present') == 'present' -%}
