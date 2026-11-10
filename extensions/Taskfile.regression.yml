@@ -1,0 +1,107 @@
+# Taskfile.regression.yml - regression tests of the molecule scenarios
+#
+# Every run writes test-runs/<date>-<time>_<commit>[-dirty]/ with one logfile per scenario
+# and step, steps.jsonl, the results of the module tests and summary.md.
+# test-runs/latest points to the last run.
+#
+# Usage (from the repository root, from extensions/ without the prefix 'molecule:'):
+#   task molecule:regression:final                 destroy, converge, module-test of all scenarios
+#   task molecule:regression:full                  like final + idempotence
+#   task molecule:regression:retest                module-test in the existing containers
+#   task molecule:regression:retest S=has-ol9 M=oracle_crs_listener
+#   task molecule:regression:idempotence           idempotence + module-test in the existing containers
+#   task molecule:regression:run S=dbfs T=converge,module-test J=1
+#   task molecule:regression:report                summary.md of the last run (RUN=<run-id>)
+#   task molecule:regression:list                  last runs with their result
+#
+# Variables:
+#   S  scenarios (comma separated), default dbfs,dbfs-sh,has-ol9,dataguard
+#   J  scenarios in parallel, default 6
+#   M  module tests (MODULE_TESTS), default all
+version: '3'
+
+vars:
+  # S=default comes from the molecule Taskfile (global variable) => all scenarios
+  S: >-
+    {{if or (not .S) (eq .S "default")}}dbfs,dbfs-sh,has-ol9,dataguard{{else}}{{.S}}{{end}}
+  J: '{{.J | default "6"}}'
+  ARGS: >-
+    -s {{.S}} -j {{.J}}{{if .M}} -m {{.M}}{{end}}
+
+env:
+  ANSIBLE_FORCE_COLOR: 'false'
+
+tasks:
+  default:
+    cmds:
+      - task --list
+    silent: true
+
+  _check-sw-dir:
+    internal: true
+    dir: "{{.TASKFILE_DIR}}"
+    preconditions:
+      - sh: >-
+          [ -n "${MOLECULE_SW_DIR:-}" ]
+          || grep -q '^MOLECULE_SW_DIR:' .env.yml 2>/dev/null
+        msg: "MOLECULE_SW_DIR is not set. Export it or add it to extensions/.env.yml"
+
+  final:
+    desc: "New environments: destroy, converge, module-test (S=, J=, M=)"
+    dir: "{{.TASKFILE_DIR}}"
+    deps: [_check-sw-dir]
+    cmds:
+      - tools/regression.sh {{.ARGS}} -t destroy,converge,module-test
+
+  full:
+    desc: "New environments: destroy, converge, idempotence, module-test (S=, J=, M=)"
+    dir: "{{.TASKFILE_DIR}}"
+    deps: [_check-sw-dir]
+    cmds:
+      - tools/regression.sh {{.ARGS}} -t destroy,converge,idempotence,module-test
+
+  retest:
+    desc: "Existing environments: module-test only, e.g. after a code change (S=, J=, M=)"
+    dir: "{{.TASKFILE_DIR}}"
+    deps: [_check-sw-dir]
+    cmds:
+      - tools/regression.sh {{.ARGS}} -t module-test
+
+  idempotence:
+    desc: "Existing environments: idempotence and module-test (S=, J=, M=)"
+    dir: "{{.TASKFILE_DIR}}"
+    deps: [_check-sw-dir]
+    cmds:
+      - tools/regression.sh {{.ARGS}} -t idempotence,module-test
+
+  run:
+    desc: >-
+      Free combination of steps (T=destroy,create,converge,idempotence,module-test,verify;
+      S=, J=, M=)
+    dir: "{{.TASKFILE_DIR}}"
+    deps: [_check-sw-dir]
+    requires:
+      vars: [T]
+    cmds:
+      - tools/regression.sh {{.ARGS}} -t {{.T}}
+
+  report:
+    desc: "Create and show summary.md of a run (RUN=<run-id>, default latest)"
+    dir: "{{.TASKFILE_DIR}}"
+    cmds:
+      - python3 tools/regression_report.py test-runs/{{.RUN | default "latest"}}
+
+  list:
+    desc: "Last runs with the number of failed steps (N=<count>, default 10)"
+    dir: "{{.TASKFILE_DIR}}"
+    silent: true
+    cmds:
+      - |
+        [ -d test-runs ] || { echo "no runs in test-runs/"; exit 0; }
+        for d in $(ls -1d test-runs/2* 2>/dev/null | sort -r | head -{{.N | default "10"}}); do
+          steps=$(cat "$d/steps.jsonl" 2>/dev/null | wc -l)
+          failed=$(grep -vc '"rc": 0,' "$d/steps.jsonl" 2>/dev/null || true)
+          state=running
+          if grep -q '^END=' "$d/run.env"; then state=finished; fi
+          printf '%-40s %-8s steps: %3s  failed: %3s\n' "$(basename "$d")" "$state" "$steps" "${failed:-0}"
+        done

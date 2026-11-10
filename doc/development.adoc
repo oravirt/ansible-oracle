@@ -1121,6 +1121,49 @@ A check from these lists that passes is reported as `KNOWN BUGS NOT REPRODUCED` 
 * Not tested: `oracle_asmvol` (no ADVM/ACFS in a container), `oracle_ldapuser` (LDAP), `oracle_opatch`, `oracle_gi_facts`, `oracle_sqldba` (no python-oracledb).
 
 [[claude-aotest]]
+=== Regression tests
+
+`task molecule:regression:<preset>` runs several scenarios with a report per run
+(`extensions/Taskfile.regression.yml`, `extensions/tools/regression.sh`).
+
+- The collection is installed once before all scenarios.
+- The scenarios run in parallel (`J`, default 6), the steps of a scenario one after the other.
+- A failed `create` or `converge` skips the remaining steps of the scenario.
+
+.Presets
+[options="header",cols="2,3"]
+|=======================
+|Task |Steps
+|`molecule:regression:final` |destroy, converge, module-test
+|`molecule:regression:full` |destroy, converge, idempotence, module-test
+|`molecule:regression:retest` |module-test in the existing containers
+|`molecule:regression:idempotence` |idempotence, module-test in the existing containers
+|`molecule:regression:run T=<steps>` |free combination of destroy, create, converge, idempotence, module-test, verify
+|`molecule:regression:report RUN=<run-id>` |create and show `summary.md` (default: last run)
+|`molecule:regression:list` |last runs with the number of failed steps
+|=======================
+
+Variables: `S` scenarios (comma separated, default `dbfs,dbfs-sh,has-ol9,dataguard`),
+`J` scenarios in parallel, `M` module tests (`MODULE_TESTS`).
+
+Every run creates `extensions/test-runs/<date>-<time>_<commit>[-dirty]/` (not in git),
+`extensions/test-runs/latest` points to the last run:
+
+[options="header",cols="1,3"]
+|=======================
+|File |Content
+|`run.env` |commit, branch, parameters, start and end
+|`git-status.txt` |uncommitted changes of the tested code
+|`steps.jsonl` |one JSON line per finished step: scenario, step, rc, duration, logfile
+|`<scenario>-<step>.log` |output of molecule without colors
+|`module_tests/<scenario>.json` |result of the module tests (`MODULE_TESTS_LABEL=<run-id>`)
+|`summary.md` |report: scenario x step, module tests, changed tasks of idempotence, errors of failed steps
+|=======================
+
+`summary.md` is updated after every step and can be read while the run is in progress.
+Failures with `fatal:` are shown first, failures of loop items (`failed: [host] (item=...)`)
+are often rescued negative tests.
+
 === Run molecule tests with Claude Code
 
 `tools/claude/skills/aotest` contains the skill `/aotest` for https://claude.com/claude-code[Claude Code].
