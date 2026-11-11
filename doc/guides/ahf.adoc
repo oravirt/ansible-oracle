@@ -481,6 +481,48 @@ The role replaces it (`ahffi importcert`, Fleet Insights is restarted):
   (default: hostname and FQDN). The clients must use one of these names in `ahf_fleet_insights_url`.
 * `ahf_fi_cert_file` / `ahf_fi_cert_key_file`: own certificate, e.g. from an internal CA.
 
+===== Login to the web interface
+
+The URL of the web interface is shown by `ahffi info` (`Application URL`), e.g. `https://ahffi.example.com:5005/ahfservice`.
+
+.Default login of the installer
+[options="header,footer"]
+|=======================
+|User |Password |Remark
+|`fleet_admin` |`welcome1` |UI administrator with access to the data of the whole fleet. The password must be changed at the first login.
+|=======================
+
+IMPORTANT: Change the password of `fleet_admin` immediately after the installation.
+The generic registration user (`ahf_fi_registration_user`) is only used by the AHF clients for the registration and the upload,
+not for the web interface.
+
+NOTE: In the molecule scenario `ahf` the web interface is published on the host: `https://localhost:5005/ahfservice`.
+
+====== Reset the password of fleet_admin
+
+Oracle documents no reset of a forgotten password of `fleet_admin`.
+The UI users are stored in the table `AHFFI_USERS` of the repository schema (`ahf_fi_db_user`).
+The installer writes the hash of the default password `welcome1` into this table (`install_ahf_service.sh`, variable `ahffi_admin_default`).
+Setting this hash again resets the password to `welcome1`, the new password is set at the next login.
+
+WARNING: This procedure is derived from the installer of AHF Fleet Insights 25.2.1 and is not documented by Oracle.
+
+.Reset the password of fleet_admin to welcome1 (as `ahf_fi_install_user` on the Fleet Insights server)
+----
+cd <ahf_fi_install_dir>
+HASH=$(sed -n 's/^ahffi_admin_default="\(.*\)"/\1/p' install_ahf_service.sh)
+
+sqlplus <ahf_fi_db_user>@//<ahf_fi_db_host>:<ahf_fi_db_port>/<ahf_fi_db_service> <<EOF
+update ahffi_users
+   set user_password = '${HASH}', status = 'ENABLED', update_date = sysdate
+ where user_id = 'fleet_admin';
+commit;
+EOF
+----
+
+NOTE: The installer sets the default password, when the hash in `AHFFI_USERS` differs from it (`register_admin_user`).
+Check the password of `fleet_admin` after a patch of Fleet Insights.
+
 ===== Registration of the clients
 
 .Register the database servers
@@ -519,6 +561,12 @@ ansible-playbook -i inventory/ opitzconsulting.ansible_oracle.ahf -e hostgroup=d
 The URL is the URL of `ahffi info` without `/ahfservice`.
 `ahf_fleet_insights_force_register: true` registers again, e.g. after a password change.
 `ahf_fleet_insights_client: false` deregisters a client registered by the role.
+
+===== Check the upload on the client
+
+`ahf configuration check --type fleet-insights` tests the upload of a client into Fleet Insights.
+The commands for the clients and the Fleet Insights server, the manual start of a collection with upload
+and the known errors are described in <<Troubleshooting>>.
 
 ==== Alternative: static web server with AHF Insights
 
@@ -573,13 +621,187 @@ for Compliance results only. It is not supported by `ansible-oracle`.
 
 === Troubleshooting
 
-.Useful commands
+The commands are executed as `root` on the database server (`/opt/oracle.ahf/bin` with the default `ahf_loc`)
+and as `ahf_fi_install_user` in `ahf_fi_install_dir` on the Fleet Insights server.
+
+==== Database server (AHF client)
+
+===== Status
+
+.Status of AHF on the database server
 [options="header,footer"]
 |=======================
 |Command |Description
-|`ahfctl statusahf` |Status of TFA and the Compliance scheduler
-|`ahf software get-version --component all` |Installed versions
-|`tfactl print config` |Settings of TFA
-|`orachk -autostatus` |Status of the Compliance scheduler
-|`ahffi status` / `ahffi info` |Status and registration command of AHF Fleet Insights (in `ahf_fi_install_dir`)
+|`ahfctl statusahf` |Status of TFA (PID, port, version) and the Compliance scheduler
+|`ahf software get-version --component all` |Installed versions of AHF, TFA and Compliance
+|`tfactl print config` |Settings of TFA (`ahf_tfa_settings`)
+|`tfactl print directories` |Trace directories discovered by TFA, e.g. `CRS`, `ASM`, `RDBMS` with Oracle Restart
+|`ahfctl getresourcelimit` |CPU and memory limits of TFA
+|`orachk -get all -id all` |Compliance autoruns with `AUTORUN_SCHEDULE` and `COLLECTION_RETENTION` (`ahf_compliance_settings`)
+|`cat /opt/oracle.ahf.ansible.json` |Settings and registration applied by the role `ahf` (`ahf_ansible_state_file`)
+|=======================
+
+===== Connection to Fleet Insights
+
+.Test the upload into Fleet Insights
+----
+ahf configuration check --type fleet-insights
+----
+
+The command uploads a test file (`TestUploadFile.txt`) into Fleet Insights and checks the complete path including the certificate:
+
+* `Parameters for 'odbda' are configured correctly` (rc 0): the upload works.
+* `Parameters are not configured correctly to upload` (rc 1): the upload fails.
+  The message has no details, check the known errors below.
+  After a new installation or a new certificate of Fleet Insights, run the role `ahf` again - it registers the client again,
+  when the certificate has changed. `ahf_fleet_insights_force_register: true` registers again in any case.
+
+The client has no log of its uploads. Failed uploads of Compliance results are kept and can be uploaded again:
+
+.Failed uploads of Compliance results
+----
+orachk -checkservicefaileduploads    # list failed uploads
+orachk -uploadservicefailed          # upload them again
+----
+
+===== Collect data and upload it immediately
+
+The registered client uploads Compliance results and TFA collections automatically.
+For a check in the web interface, a collection can be started manually:
+
+.Compliance check with upload (profile `ahf`: about 1 minute)
+----
+orachk -usediscovery -profile ahf -showpass -tag manual_check -readenvconfig
+----
+
+The output ends with `<name> successfully uploaded to Autonomous Health Framework Service`.
+Other profiles (`orachk -profile -h`), e.g. `dba` or `clusterware`, take longer. Without `-profile`, all checks are executed.
+
+.TFA collection of the last hour with upload
+----
+tfactl diagcollect -last 1h -silent
+----
+
+`-silent` starts the collection in the background without questions.
+Without it, `tfactl diagcollect` asks for an event or an event time (e.g. on hosts with Grid Infrastructure).
+The status is shown by `tfactl print actions` and `tfactl print collections`.
+
+===== Logs and directories
+
+.Logs on the database server (default `ahf_loc` / `ahf_data_dir`)
+[options="header,footer"]
+|=======================
+|Path |Content
+|`/opt/oracle.ahf/data/<host>/diag` |Logs of AHF (requested by Oracle Support for `AHF-00005`)
+|`/opt/oracle.ahf/data/<host>/orachk/user_root/output` |Compliance results (`orachk_<host>_<date>_<tag>.zip`, HTML report)
+|`/opt/oracle.ahf/data/repository` |TFA collections and Insights reports
+|`/opt/oracle.ahf/data/ahf/diag/ahf` |Log of the installation (`ahf_install_*.log`)
+|=======================
+
+===== Known errors
+
+.Known errors on the database server
+[options="header,footer"]
+|=======================
+|Message |Cause |Solution
+|`AHF-00014: AHF Data Location ... is not owned by root in directory hierarchy`
+|`ahf_data_dir` below a directory of `oracle_user`, e.g. `oracle_base` or `/u01`
+|`ahf_data_dir` in a path owned by `root` (default `/opt`)
+|`AHF-00026: Perl is not owned by root`
+|`ahf_setup` uses the Perl of the GI-Home (Oracle Restart, RAC)
+|`ahf_perl_home: /usr` (default)
+|`AHF-00074: Required Perl Modules not found`
+|only `perl-interpreter` is installed
+|package `perl` (`ahf_packages`)
+|`No scheduler for any ID`
+|`ahfctl stopahf -compliance` removed the autoruns
+|`ahf_compliance_autostart: true`, the role recreates them with `orachk -autostart`
+|`AUTORUN_SCHEDULE is a mandatory field to setup autorun entries`
+|`orachk -set` without `AUTORUN_SCHEDULE` or with an unknown autorun ID
+|the role adds the current schedule, the ID is used without `orachk.`
+|`CERTIFICATE_VERIFY_FAILED ... self-signed certificate`
+|certificate of Fleet Insights is unknown to the client
+|`ahf_fleet_insights_public_cert`
+|`CERTIFICATE_VERIFY_FAILED ... Hostname mismatch`
+|certificate of Fleet Insights without SAN or the URL uses another name
+|`ahf_fi_cert_generate` / `ahf_fi_cert_names` on the server, a name of the SAN in `ahf_fleet_insights_url`
+|`AHF-07275: Restrict the certificate file to the owner only`
+|certificate file readable by others
+|mode `0600` (done by the role)
+|`AHF-02119: ... the REST Agent was not started`
+|registration without OS user for the REST access
+|`ahf_fleet_insights_os_user` (default `oracle_user`)
+|=======================
+
+==== AHF Fleet Insights server
+
+===== Status
+
+.Status of Fleet Insights (as `ahf_fi_install_user` in `ahf_fi_install_dir`)
+[options="header,footer"]
+|=======================
+|Command |Description
+|`./ahffi status` |Status of the web application and the collection processing engine
+|`./ahffi info` |URL of the web interface and registration command for the clients
+|`./ahffi version` |Installed version
+|`./ahffi diagnose` |Diagnostics of Fleet Insights
+|`./ahffi start` / `./ahffi stop` / `./ahffi restart` |Start and stop of all processes
+|`crontab -l` |Cron entries, which start and monitor the processes (no systemd unit)
+|`ss -ltnp \| grep 5005` |Nginx listens on `ahf_fi_port`
+|=======================
+
+.Certificate of Fleet Insights (CN and SAN)
+----
+echo | openssl s_client -connect <host>:5005 2>/dev/null | openssl x509 -noout -subject -ext subjectAltName -dates
+----
+
+===== Uploads of the clients
+
+The access log of Nginx shows the registrations and uploads of all clients:
+
+.Registrations and uploads in the access log
+----
+LOG=<ahf_fi_install_dir>/ahf_service/third_party/nginx/logs/access.log
+grep '"POST /ahfservice/register' $LOG                    # registrations
+grep '"PUT /ahfservice/v1/collectionstorage' $LOG         # uploads
+----
+
+The uploads contain the hostname of the client in the path, e.g.
+`.../collections/tfa/<host>/orachk_<host>_<date>_<tag>.zip` (Compliance results),
+`.../PERIODICPERFDATA_srdc_insights_collection_...zip` (Insights data) and `checkserviceupload_*.txt` / `TestUploadFile.txt` (tests).
+
+===== Logs and directories
+
+.Logs on the Fleet Insights server
+[options="header,footer"]
+|=======================
+|Path |Content
+|`<ahf_fi_install_dir>/ahf_service/log/manage_app.log` |Start, stop, status and `importcert`
+|`<ahf_fi_install_dir>/ahf_service/third_party/nginx/logs/access.log` |Requests of the browsers and the clients
+|`<ahf_fi_install_dir>/ahf_service/third_party/nginx/logs/error.log` |Errors of Nginx
+|`<ahf_fi_install_dir>/ahf_service/certs/cert.pem` |Certificate of the web interface
+|`<ahf_fi_stage_dir>/tmp/ahf_fleet_insights_log` |Log of the installation (removed with the stage directory after the installation)
+|=======================
+
+===== Known errors
+
+.Known errors on the Fleet Insights server
+[options="header,footer"]
+|=======================
+|Message |Cause |Solution
+|`Path to Java, 'JAVA_HOME' must be a valid directory`
+|`ahf_fi_java_home` does not exist. The Oracle JDK RPM installs into a directory with the full version
+|`ahf_fi_java_home: ""` (default): the role uses the newest `/usr/lib/jvm/jdk-*-oracle-x64`
+|`The installer will fail if run with root privileges`
+|installation as `root`
+|`ahf_fi_install_user` (default `oracle_user`)
+|web interface not reachable after a reboot
+|processes are started by cron, `crond` is not running
+|`systemctl enable --now crond`, `./ahffi start` (the role starts Fleet Insights, when it is not running)
+|clients fail with `Hostname mismatch`
+|certificate of the installer has no SAN
+|`ahf_fi_cert_generate: true` (default), `ahf_fi_cert_names`
+|login with `fleet_admin` not possible
+|password forgotten
+|see <<Reset the password of fleet_admin>>
 |=======================

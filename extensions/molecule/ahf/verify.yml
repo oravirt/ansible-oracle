@@ -66,3 +66,14 @@
         that:
           - _verify_tables.stdout is search('TABLES=[1-9]')
         fail_msg: "{{ _verify_tables.stdout }}"
+
+    - name: Test upload into AHF Fleet Insights
+      ansible.builtin.command: /opt/oracle.ahf/bin/ahf configuration check --type fleet-insights
+      register: _verify_upload
+      changed_when: false
+
+    - name: Assert upload into AHF Fleet Insights
+      ansible.builtin.assert:
+        that:
+          - "'configured correctly' in _verify_upload.stdout"
+        fail_msg: "{{ _verify_upload.stdout_lines }}"
