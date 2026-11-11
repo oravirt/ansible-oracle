@@ -55,8 +55,44 @@ _oraswdb_install_oracle_directories:
   - {name: "{{ oracle_base }}/cfgtoollogs/netca", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: '0775'}
   - {name: "{{ oracle_user_home }}/{{ scripts_folder }}", owner: "{{ oracle_user }}", group: "{{ oracle_group }}", mode: '0775'}
 
-# choptcheck is a dummy for 'creates' during chopt-task to force an execution
-_oraswdb_install_choptcheck: "{% if oraswdb_install_forcechopt | bool %}dochopt{% endif %}"
+# Remap of oracle_ee_options (chopt names, state) and
+# oracle_all_editions_options_state (enabled) into one list of linkable options:
+# {option, enabled, make_target, match_file, enabled_matches}
+# make_target, match_file and enabled_matches are missing for unknown options
+# => assert in install-home-db.yml
+_oraswdb_install_link_options: >-
+  {%- set __opts = [] -%}
+  {%- if db_homes_config[dbh.home]['edition'] == 'EE'
+        and disable_ee_options | bool
+        and oracle_ee_options is defined -%}
+  {%-   for o in oracle_ee_options | default([], true) -%}
+  {%-     set __def = (o.option in _oracle_ee_options_valid[db_version] | default([]))
+                      | ternary(_oracle_ee_options_link[o.option] | default({}), {}) -%}
+  {%-     set _ = __opts.append(__def
+                    | combine({'option': o.option, 'enabled': o.state | bool})) -%}
+  {%-   endfor -%}
+  {%- endif -%}
+  {%- if set_oracle_all_editions_options_state | bool -%}
+  {%-   for o in oracle_all_editions_options_state | default([], true) -%}
+  {%-     set __def = oracle_all_editions_options[db_version][o.option] | default({}) -%}
+  {%-     set _ = __opts.append({'make_target': o.option}
+                    | combine(__def)
+                    | combine({'option': o.option, 'enabled': o.enabled | bool})) -%}
+  {%-   endfor -%}
+  {%- endif -%}
+  {{- __opts -}}
+
+# make targets (<target>_on|off) for all options not in intended state.
+# oraswdb_install_forcechopt: true => all options are linked again.
+_oraswdb_install_link_targets: >-
+  {%- set __t = [] -%}
+  {%- for r in _oraswdb_install_link_state.results | default([]) -%}
+  {%-   set __is_enabled = r.rc == 0 -%}
+  {%-   if oraswdb_install_forcechopt | bool or __is_enabled != r.ae_option.enabled -%}
+  {%-     set _ = __t.append(r.ae_option.make_target ~ '_' ~ (r.ae_option.enabled | ternary('on', 'off'))) -%}
+  {%-   endif -%}
+  {%- endfor -%}
+  {{- __t -}}
 
 _oraswdb_install_dbh_stat: >-
   {{ stat_dbh_installed.results

@@ -30,6 +30,8 @@ This will create issues and problems in `ansible-oracle` and is not supported.
   - [_oracle_db_instance_name](#_oracle_db_instance_name)
   - [_oracle_db_unique_name](#_oracle_db_unique_name)
   - [_oracle_ee_opiton_dict](#_oracle_ee_opiton_dict)
+  - [_oracle_ee_options_link](#_oracle_ee_options_link)
+  - [_oracle_ee_options_valid](#_oracle_ee_options_valid)
   - [_oracle_env](#_oracle_env)
   - [_oracle_env_pdb](#_oracle_env_pdb)
   - [_oracle_home_db](#_oracle_home_db)
@@ -333,6 +335,62 @@ _oracle_ee_opiton_dict:
   19.3.0.0: '{{ oracle_ee_options_193 }}'
   21.3.0.0: '{{ oracle_ee_options_213 }}'
   26.1.0.0: '{{ oracle_ee_options_261 }}'
+```
+
+### _oracle_ee_options_link
+
+This is an internal variable in `ansible-oracle`.
+
+Maps the chopt option names from `oracle_ee_options_*` to the make target
+in `$ORACLE_HOME/rdbms/lib/ins_rdbms.mk` (suffixed by _on/_off) and
+to the object in `libknlopt.a`, which is present when the option is enabled.
+All options are linked by one make call with a single `ioracle` at the end.
+
+_IMPORTANT_
+
+Do not set this variable in inventory, set_fact ...!
+
+#### Default value
+
+```YAML
+_oracle_ee_options_link:
+  oaa:
+    make_target: dm
+    match_file: rdbms/lib/libknlopt.a
+    enabled_matches: \bdmwdm\.
+  olap:
+    make_target: olap
+    match_file: rdbms/lib/libknlopt.a
+    enabled_matches: \bxsyeolap\.
+  partitioning:
+    make_target: part
+    match_file: rdbms/lib/libknlopt.a
+    enabled_matches: \bkkpoban\.
+  rat:
+    make_target: rat
+    match_file: rdbms/lib/libknlopt.a
+    enabled_matches: \bkecwr\.
+```
+
+### _oracle_ee_options_valid
+
+This is an internal variable in `ansible-oracle`.
+
+Options from `_oracle_ee_options_link`, which are valid for a release.
+Same as the options in `$ORACLE_HOME/bin/chopt.ini`.
+26ai has no oaa and olap anymore.
+
+_IMPORTANT_
+
+Do not set this variable in inventory, set_fact ...!
+
+#### Default value
+
+```YAML
+_oracle_ee_options_valid:
+  19.3.0.0: [oaa, olap, partitioning, rat]
+  21.3.0.0: [oaa, olap, partitioning, rat]
+  26.1.0.0: [partitioning, rat]
 ```
 
 ### _oracle_env
