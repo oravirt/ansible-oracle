@@ -24,7 +24,7 @@ tc_cases:
     dbs: [{params: [*p_create, *p_size, *p_reco]}]
     expect: ok
     dest: {df: /u02/oradata, rf: /u02/fra}
-    rsp: {createAsContainerDatabase: 'true', datafileDestination: /u02/oradata, recoveryAreaDestination: /u02/fra}
+    rsp: {createAsContainerDatabase: 'true', storageType: FS, datafileDestination: /u02/oradata, recoveryAreaDestination: /u02/fra}
 
   - id: omf_true_explicit_params_ok
     dbs: [{omf: true, params: [*p_create, *p_reco]}]
@@ -70,8 +70,7 @@ tc_cases:
           - {name: db_recovery_file_dest, value: '+RECO1'}
     expect: ok
     dest: {df: '+DATA1', rf: '+RECO1'}
-    # storageType and diskGroupName are empty in the 26ai response file (not checked)
-    rsp: {datafileDestination: '+DATA1', recoveryAreaDestination: '+RECO1', recoveryGroupName: '+RECO1'}
+    rsp: {storageType: ASM, datafileDestination: '+DATA1', diskGroupName: '+DATA1', recoveryAreaDestination: '+RECO1', recoveryGroupName: '+RECO1'}
 
   - id: omf_default_asm_19c
     dbs:
