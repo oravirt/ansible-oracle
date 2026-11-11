@@ -1,0 +1,48 @@
+@startuml
+!include <C4/C4_Component>
+
+LAYOUT_TOP_DOWN()
+
+AddContainerTag("ahf", $bgColor="#2E7D32", $borderColor="#1B5E20", $legendText="AHF software (root)")
+AddContainerTag("ahfdata", $bgColor="#66BB6A", $borderColor="#2E7D32", $legendText="AHF data (local)")
+AddContainerTag("fleet", $bgColor="#E65100", $borderColor="#BF360C", $legendText="AHF Fleet Insights (non-root)")
+AddContainerTag("oradb", $legendText="Database")
+AddContainerTag("media", $bgColor="#757575", $borderColor="#424242", $legendText="Installation Media")
+AddContainerTag("ansible", $bgColor="DarkBlue", $legendText="Ansible")
+
+Person(admin, "Administrator")
+Person(user, "DBA / Support", "Browser")
+System_Ext(mos, "My Oracle Support", "AHF-LINUX_v*.zip (Doc ID 2550798.1)\nAHFFI-LINUX_v*.zip (Doc ID 3043060.1)")
+
+System_Boundary(controller, "Ansible Controller") {
+  Container(ansible, "Ansible", "playbooks/ahf.yml\nplaybooks/ahf_fleet_insights.yml", $tags="ansible")
+  Container(autoupgrade, "AutoUpgrade", "role autoupgrade\npatch: AHF", $tags="ansible")
+  Container(swrepo, "Software Repository", "oracle_sw_source_local\nor oracle_stage_remote (NFS)", $tags="media")
+}
+
+System_Boundary(dbserver, "Database Server (1..n) - role ahf") {
+  Container(ahf, "AHF", "/opt/oracle.ahf (ahf_loc)\nTFA daemon (systemd oracle-tfa)\nCompliance scheduler (orachk)", $tags="ahf")
+  ContainerDb(ahfrepo, "AHF Repository", "/opt/oracle.ahf/data (ahf_data_dir)\nTFA collections, Compliance results,\nInsights reports - local filesystem, no NFS", $tags="ahfdata")
+  ContainerDb(db, "Oracle Database", "monitored database(s)\nalert log, trace files", $tags="oradb")
+}
+
+System_Boundary(fleetserver, "AHF Fleet Insights Server - role ahf_fleet_insights") {
+  Container(ahffi, "AHF Fleet Insights", "{{ oracle_base }}/ahffi (ahf_fi_install_dir)\nweb application, embedded Nginx\nHTTPS port 5005, processes started by cron", $tags="fleet")
+  ContainerDb(fidb, "Repository Database", "Oracle Database 19c or newer\ne.g. PDB, schema AHFFI\nuploaded data of all clients", $tags="oradb")
+}
+
+Rel_Down(admin, ansible, "ansible-playbook")
+Rel(autoupgrade, mos, "download AHF")
+Rel(autoupgrade, swrepo, "")
+Rel_Down(ansible, ahf, "ssh: install, upgrade,\ntfactl/orachk settings,\nregistration")
+Rel_Down(ansible, ahffi, "ssh: install, patch")
+Rel(swrepo, ahf, "AHF-LINUX_v*.zip")
+Rel(swrepo, ahffi, "AHFFI-LINUX_v*.zip")
+Rel(db, ahf, "diagnostics")
+Rel(ahf, ahfrepo, "write")
+Rel_Right(ahf, ahffi, "HTTPS upload (push)\nCompliance results, TFA collections")
+Rel(ahffi, fidb, "SQL*Net")
+Rel_Up(user, ahffi, "HTTPS :5005\nno connection to the database servers")
+
+SHOW_LEGEND()
+@enduml

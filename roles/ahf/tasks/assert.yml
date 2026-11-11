@@ -1,0 +1,105 @@
+---
+- name: assert | Check variables
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - ahf_state in ['present', 'absent']
+      - ahf_install_mode in ['root', 'extract']
+      - ahf_loc is match('^/')
+      - ahf_data_dir is match('^/')
+      - ahf_tfa_settings is mapping
+      - ahf_compliance_settings is mapping
+      - ahf_compliance_settings.values() | reject('mapping') | list | length == 0
+      - ahf_installer_archive | length > 0 or _ahf_media_source != 'www'
+    fail_msg: >-
+      Check ahf_state, ahf_install_mode, ahf_loc, ahf_data_dir (absolute paths),
+      ahf_tfa_settings (dictionary), ahf_compliance_settings (dictionary of autorun IDs with dictionaries).
+      ahf_installer_archive is mandatory for installation media from oracle_sw_source_www.
+
+- name: assert | Check variables for AHF Fleet Insights
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _ahf_root | bool
+      - ahf_fleet_insights_url is match('^https://')
+      - ahf_fleet_insights_user | length > 0
+      - ahf_fleet_insights_password | length > 0
+    fail_msg: >-
+      AHF Fleet Insights client requires ahf_install_mode: root,
+      ahf_fleet_insights_url (https://...), ahf_fleet_insights_user and ahf_fleet_insights_password.
+  when: ahf_fleet_insights_client | bool
+
+- name: assert | Install packages for AHF
+  ansible.builtin.package:
+    name: "{{ ahf_packages }}"
+  become: true
+  when:
+    - _ahf_root | bool
+    - ahf_manage_packages | bool
+
+# modules from AHF-00074 of ahf_setup
+- name: assert | Check Perl
+  ansible.builtin.command: >-
+    {{ (ahf_perl_home + '/bin/perl') if ahf_perl_home | length > 0 else 'perl' }}
+    -e 'use Data::Dumper; use Digest::MD5; use File::Copy; use File::Find; use FindBin;
+    use Math::BigInt; use Net::Ping; print "$]\n"'
+  register: _ahf_perl
+  changed_when: false
+  failed_when: false
+
+- name: assert | Assert Perl
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _ahf_perl.rc == 0
+    fail_msg: >-
+      AHF requires Perl 5.10 or newer with Data::Dumper, Digest::MD5, File::Copy, File::Find,
+      FindBin, Math::BigInt and Net::Ping (package perl): {{ _ahf_perl.stderr | default('') }}
+
+# AHF-00026: Perl is not owned by root
+- name: assert | Check owner of Perl
+  ansible.builtin.stat:
+    path: "{{ ahf_perl_home }}/bin/perl"
+    get_checksum: false
+  register: _ahf_perl_stat
+  when:
+    - _ahf_root | bool
+    - ahf_perl_home | length > 0
+
+- name: assert | Assert owner of Perl
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _ahf_perl_stat.stat.pw_name == 'root'
+    fail_msg: >-
+      {{ ahf_perl_home }}/bin/perl must be owned by root for ahf_install_mode root (AHF-00026).
+  when:
+    - _ahf_root | bool
+    - ahf_perl_home | length > 0
+
+- name: assert | Check owner of ahf_loc and ahf_data_dir
+  ansible.builtin.stat:
+    path: "{{ ahfp }}"
+    get_checksum: false
+  loop: "{{ _ahf_root_paths }}"
+  loop_control:
+    loop_var: ahfp
+  register: _ahf_loc_stat
+  when: _ahf_root | bool
+
+# root executes the binaries => nobody else may be able to replace a directory in the path.
+# ahf_setup checks the data directory as well (AHF-00014).
+- name: assert | Assert owner of ahf_loc and ahf_data_dir
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - not ahfs.stat.exists or (ahfs.stat.uid == 0 and not ahfs.stat.woth and not ahfs.stat.wgrp)
+    fail_msg: >-
+      {{ ahfs.ahfp }} must be owned by root and must not be writable for group/others,
+      because AHF is executed by root (ahf_setup: AHF-00014 for the data directory).
+      Use another ahf_loc / ahf_data_dir (default: /opt), not below oracle_base or /u01.
+  loop: "{{ _ahf_loc_stat.results | default([]) }}"
+  loop_control:
+    loop_var: ahfs
+    label: "{{ ahfs.ahfp }}"
+  when: _ahf_root | bool

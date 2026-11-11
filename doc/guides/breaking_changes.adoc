@@ -138,6 +138,10 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<oracle_databases: no memory_target and memory_max_target with Hugepages>>
 |A database in `oracle_databases` with `state: present` *and* `memory_target` or `memory_max_target` in `init_parameters` *and* `configure_hugepages` is not `false`
 |Replace `memory_target` / `memory_max_target` by `sga_target` and `pga_aggregate_target` (`state: absent` for the old parameters), or set `configure_hugepages: false`
+
+|<<Role oraswahf_install replaced by ahf>>
+|Own playbooks use the role `oraswahf_install`
+|Use the new role `ahf` (playbook `opitzconsulting.ansible_oracle.ahf`)
 |===
 
 ==== Minimum ansible-core 2.16
@@ -1508,6 +1512,35 @@ oracle_databases:
       - {name: sga_target, value: '2G', scope: spfile, state: present}
       - {name: pga_aggregate_target, value: '512M', scope: both, state: present}
 ----
+
+==== Role oraswahf_install replaced by ahf
+
+The role `oraswahf_install` was an empty placeholder for the installation of Oracle Autonomous Health Framework (AHF) - it had no tasks and no variables.
+It is removed and replaced by the new role `ahf`, which installs, upgrades and configures AHF.
+The central web interface AHF Fleet Insights is installed with the new role `ahf_fleet_insights`.
+
+NOTE: AHF is not installed by `oraswahf_install`, existing installations are not affected.
+Only playbooks, which reference the role, fail with `the role 'oraswahf_install' was not found`.
+
+.Before: own playbook
+[source,yaml]
+----
+- hosts: dbfs
+  become: true
+  roles:
+    - opitzconsulting.ansible_oracle.oraswahf_install
+----
+
+.After: own playbook or `playbooks/ahf.yml`
+[source,yaml]
+----
+- hosts: dbfs
+  become: true
+  roles:
+    - opitzconsulting.ansible_oracle.ahf
+----
+
+The variables and the decisions for an installation are described in link:ahf.adoc[Oracle Autonomous Health Framework (AHF)].
 
 === Adding new breaking changes
 

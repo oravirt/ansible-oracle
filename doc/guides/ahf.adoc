@@ -1,0 +1,585 @@
+:toc:
+:toc-placement!:
+:toclevels: 4
+toc::[]
+
+:sectnums:
+:sectnumlevels: 4
+
+== Oracle Autonomous Health Framework (AHF)
+
+IMPORTANT: The roles `ahf` and `ahf_fleet_insights` are under development and _experimental_. +
+Breaking changes can happen at any time and are not always documented
+(e.g. in link:breaking_changes.adoc[Breaking Changes - Upgrade Guide]).
+
+Oracle Autonomous Health Framework (AHF) bundles the diagnostic and health check tools of Oracle:
+
+- Trace File Analyzer (TFA): collection of diagnostic data for Service Requests, automatic collections after incidents
+- Compliance checks with `orachk` (`exachk` on Engineered Systems)
+- AHF Insights: offline HTML reports about the state of the server and the databases
+- OS Watcher, Cluster Health Monitor and Cluster Health Advisor (Grid Infrastructure)
+
+AHF is not needed in every environment. This guide helps with the decisions for an installation
+and describes the usage in `ansible-oracle`:
+
+- Role `ahf`: installation, upgrade and configuration of AHF on the database servers
+- Role `ahf_fleet_insights`: AHF Fleet Insights as central web interface for many database servers
+
+The variables are described in link:../../roles/ahf/README.md[roles/ahf/README.md]
+and link:../../roles/ahf_fleet_insights/README.md[roles/ahf_fleet_insights/README.md].
+
+=== Architecture overview
+:puml: http://www.plantuml.com/plantuml/proxy?src=https://raw.githubusercontent.com/oravirt/ansible-oracle/master/doc
+
+image::{puml}/guides/ahf.puml[Architecture]
+
+The role `ahf` installs AHF on every database server.
+The role `ahf_fleet_insights` is optional and installs the central web interface AHF Fleet Insights on a separate server.
+AHF works without Fleet Insights - the data is then evaluated locally on each database server.
+
+.Data storage
+[options="header,footer"]
+|=======================
+|Location |Content |Owner |Remark
+|`ahf_loc` (`/opt/oracle.ahf`) on the database server
+|AHF software: TFA, `orachk`, `ahfctl`
+|`root`
+|Replaced by an upgrade. No data.
+|`ahf_data_dir` (`/opt/oracle.ahf/data`) on the database server
+|AHF repository: TFA collections, Compliance results, Insights reports, logs of AHF
+|`root`
+|Primary storage of the data. Local filesystem (no NFS), size limit with `reposizeMB`, purge with `minfileagetopurge`.
+|`ahf_ansible_state_file` (`/opt/oracle.ahf.ansible.json`) on the database server
+|Settings applied by the role `ahf`
+|`root`
+|Detection of changed settings, see <<Settings>>.
+|`ahf_fi_install_dir` (`{{ oracle_base }}/ahffi`) on the Fleet Insights server
+|Fleet Insights software, embedded Nginx, logs, processing of uploads
+|`ahf_fi_install_user`
+|Plan 4 GB per registered cluster.
+|Repository database (19c or newer)
+|Uploaded data of all clients: Compliance results and TFA collections
+|schema `AHFFI`
+|Central copy for the evaluation. Available when a database server is down.
+|=======================
+
+The data flows in one direction only: from the database servers to Fleet Insights (push over HTTPS).
+The local AHF repository stays the primary storage - a database server keeps working when Fleet Insights is not reachable.
+Fleet Insights needs no access to the database servers, neither for the collection nor for the evaluation in the browser.
+
+NOTE: The diagram is rendered by plantuml.com from the `master` branch on GitHub.
+Changes of `doc/guides/ahf.puml` are visible after the merge.
+
+=== When is AHF useful?
+
+.Use cases for AHF
+[options="header,footer"]
+|=======================
+|Situation |Recommendation
+|Grid Infrastructure (RAC, Oracle Restart)
+|AHF is recommended. Oracle Support requests TFA collections for most Service Requests. GI contains an older TFA - a current AHF replaces it.
+|Single instance on filesystem with Oracle Support contract
+|Useful for faster Service Requests (`tfactl diagcollect`) and regular Compliance checks.
+|Many database servers
+|AHF with AHF Fleet Insights gives a central view of the Compliance results and the collections.
+|Test/development VMs, short-lived environments
+|Normally not needed. The TFA daemon and the Compliance scheduler need CPU, memory and disk space.
+|=======================
+
+=== Decisions before the installation
+
+==== root or non-root installation
+
+.Installation modes (`ahf_install_mode`)
+[options="header,footer"]
+|=======================
+|Feature |`root` (default) |`extract` (non-root)
+|User for the installation |`root` |`oracle_user`
+|TFA daemon (systemd), automatic collections |yes |no
+|Compliance scheduler (`ahfctl startahf -compliance`) |yes |no
+|Access to OS logs (`/var/log/messages`) |yes |no
+|AHF Fleet Insights client |yes |no
+|Default `ahf_loc` / `ahf_data_dir` |`/opt` |`oracle_base`
+|Recommended by Oracle |yes |only when `root` is not possible
+|=======================
+
+==== Installation directory and data directory
+
+`ahf_setup` creates `oracle.ahf` below `ahf_loc` (software) and `oracle.ahf/data` below `ahf_data_dir`
+(repository with collections, Compliance results and Insights reports).
+
+.Default directories
+[options="header,footer"]
+|=======================
+|Variable |Default |Reason
+|`ahf_loc` |`/opt` => `/opt/oracle.ahf` |Default of Oracle. The binaries are executed by `root`.
+|`ahf_data_dir` |`ahf_loc` => `/opt/oracle.ahf/data` |Default of Oracle. At least 5 GB, 10 GB recommended.
+|=======================
+
+IMPORTANT: With `ahf_install_mode: root` every directory in the path of `ahf_loc` *and* `ahf_data_dir`
+must be owned by `root`. `ahf_setup` rejects a data directory in a path of another owner
+(`AHF-00014: AHF Data Location ... is not owned by root in directory hierarchy`). +
+A directory below `oracle_base` or below a mount point of `host_fs_layout` (e.g. `/u01`, owned by `oracle_user` by default)
+is not possible: `oracle_user` could rename or replace a directory in the path and get the binaries executed by `root`.
+The role checks the owner of all directories of `ahf_loc` and `ahf_data_dir` before the installation.
+
+The software and the data need about 10 GB in `/opt/oracle.ahf`.
+Use a logical volume of its own for `/opt/oracle.ahf`, owned by `root`, when the root filesystem has not enough space.
+A full AHF repository does not fill the root filesystem then.
+
+.Logical volume of its own for AHF (role `orahost`)
+----
+host_fs_layout:
+  - vgname: vgora
+    state: present
+    filesystem:
+      - { mntp: /u01, lvname: lvorabase, lvsize: 25G, fstype: xfs }
+      - { mntp: /opt/oracle.ahf, lvname: lvahf, lvsize: 10G, fstype: xfs, owner: root, group: root, mode: "0755" }
+    disk:
+      - { device: /dev/sdb, pvname: /dev/sdb1 }
+----
+
+NOTE: The installer appends `oracle.ahf` to `ahf_loc` and `oracle.ahf/data` to `ahf_data_dir`.
+With the defaults, software and data are both in `/opt/oracle.ahf` and therefore on this logical volume.
+
+==== Resource requirements
+
+The values are from the documentation of Oracle and measured in the molecule scenario `ahf`
+(AHF 26.10.2, AHF Fleet Insights 25.2.1, freshly installed, idle, 8 CPUs).
+
+.Database server (role `ahf`)
+[options="header,footer"]
+|=======================
+|Resource |Value |Source
+|Disk: software `/opt/oracle.ahf` |1.2 GB |measured
+|Disk: data `/opt/oracle.ahf/data` |at least 5 GB, 10 GB recommended. Grows with collections and Compliance results, limit with `reposizeMB` |Oracle
+|Memory: TFA daemon |about 170 MB RSS (Java with `-Xmx256m`) |measured
+|CPU: TFA daemon |limit by default: the lower of 4 CPUs or 75% of the CPUs (`ahfctl getresourcelimit`: `cpu 4.0`) |Oracle, measured
+|Compliance checks (`orachk`) |only during the scheduled runs (default: daily 02:03, Sunday 03:03) |not measured
+|=======================
+
+.AHF Fleet Insights server (role `ahf_fleet_insights`)
+[options="header,footer"]
+|=======================
+|Resource |Value |Source
+|CPU / memory |4 cores, 16 GB RAM (minimum recommendation) |Oracle
+|Memory idle |about 2.5 GB RSS (34 processes) |measured
+|Disk: software `ahf_fi_install_dir` |0.8 GB |measured
+|Disk: data |4 GB per registered cluster |Oracle
+|Repository database |separate database (19c or newer), e.g. Oracle Database Free: about 2.2 GB memory |measured
+|=======================
+
+The CPU and memory of TFA can be limited with `ahfctl setresourcelimit`
+(only on Linux with a root installation):
+
+.Limit TFA to 2 CPUs and 1 GB memory
+----
+ahfctl setresourcelimit -value 2
+ahfctl setresourcelimit -resource kmem -value 1024
+ahfctl getresourcelimit
+----
+
+NOTE: The documentation of Oracle has different ranges for the memory limit in different releases.
+Check the allowed values with the installed release. The role `ahf` does not manage the limits.
+
+==== Which components should be active?
+
+.Components and variables
+[options="header,footer"]
+|=======================
+|Component |Variable |Default |Recommendation
+|TFA daemon |`ahf_tfa_enabled` |`true` |Active for GI and production. Disable on small test systems - `tfactl` stays usable on-demand.
+|Automatic diagnostic collections |`ahf_tfa_settings.autodiagcollect` |Oracle: `OFF` |`ON` for production with Service Requests. Needs space in the repository.
+|Compliance scheduler (`orachk`) |`ahf_compliance_autostart` |`false` |Active, when the results are evaluated (mail or AHF Fleet Insights).
+|AHF Insights |`ahf_tfa_settings.autoinsights` |Oracle: `ON` |Insights are created with collections. Usable for the static web server (see below).
+|AHF Fleet Insights client |`ahf_fleet_insights_client` |`false` |Active, when an AHF Fleet Insights server exists.
+|=======================
+
+.Minimal installation: TFA on-demand only
+----
+ahf_tfa_enabled: false
+ahf_compliance_autostart: false
+----
+
+.Full installation for production
+----
+ahf_tfa_enabled: true
+ahf_tfa_settings:
+  autodiagcollect: "ON"
+  reposizeMB: 10240
+  ahfnotificationaddress: dba@example.com
+ahf_compliance_autostart: true
+ahf_compliance_settings:
+  autostart_client:
+    COLLECTION_RETENTION: 30
+ahf_fleet_insights_client: true
+ahf_fleet_insights_url: https://ahffi.example.com:5005
+ahf_fleet_insights_user: ahfclient
+ahf_fleet_insights_password: "{{ vault_ahf_fleet_insights_password }}"
+----
+
+==== systemd, cron or nothing?
+
+The role creates no cron jobs or systemd units for AHF:
+
+- The TFA daemon is started by AHF itself (`oracle-tfa.service` / `init.tfa`).
+- The Compliance checks have their own scheduler (`ahfctl startahf -compliance`).
+  Oracle recommends the scheduler instead of cron. The schedule is changed with `AUTORUN_SCHEDULE`
+  of an autorun ID in `ahf_compliance_settings`.
+- AHF Fleet Insights clients upload their data automatically.
+- The AHF Fleet Insights server starts and monitors its processes with cron entries of `ahf_fi_install_user` -
+  created by the installer.
+
+A systemd timer is only needed for the static web server without AHF Fleet Insights (see below).
+
+=== Installation media
+
+AHF should be up to date. Oracle releases a new version every quarter.
+
+.Sources of the installation media
+[options="header,footer"]
+|=======================
+|Source |Filename |Remark
+|AutoUpgrade (role `autoupgrade`) |name from My Oracle Support |`AHF` in `autoupgrade_download_patches` - always the latest version
+|My Oracle Support Doc ID 2550798.1 / patch 30166242 |`AHF-LINUX_v<version>.zip` or `p30166242_*.zip` |manual download into the software repository
+|=======================
+
+.Download AHF with AutoUpgrade into the software repository
+----
+autoupgrade_download_patches:
+  - target_version: 26
+    patch: AHF
+    platform: LINUX.X64
+----
+
+----
+ansible-playbook -i inventory/ opitzconsulting.ansible_oracle.autoupgrade_download_patches
+----
+
+The role `ahf` uses the newest file (modification time) matching `ahf_installer_patterns`
+in `oracle_sw_source_local` (Ansible controller) or `oracle_stage_remote` (`oracle_sw_copy: false`, e.g. NFS).
+A fixed file is set with `ahf_installer_archive`.
+
+The version is taken from the filename `AHF-LINUX_v<version>.zip`.
+Patch 30166242 is extracted to find the version of the inner `AHF-LINUX_v<version>.zip`.
+Set `ahf_installer_version`, when the version is not part of the filename.
+
+NOTE: AHF can upgrade itself (`ahfctl setupgrade -autoupgrade on -swstage <dir>`).
+This is not used by `ansible-oracle`. An upgrade with the role is reproducible, uses the software repository
+and the signature check, and is executed at a planned time.
+
+=== Installation and configuration with role `ahf`
+
+Requirements:
+
+- Perl 5.10 or newer with all core modules - the package `perl`, `perl-interpreter` alone is not enough
+  (`AHF-00074: Required Perl Modules not found`).
+  The role installs `perl`, `openssl` and `unzip` (`ahf_packages`, `ahf_manage_packages`).
+- Python module `pexpect` on the database server for the registration in AHF Fleet Insights
+
+The role executes these steps:
+
+. Check of variables, Perl and the owner of `ahf_loc`
+. Installation with `ahf_setup -silent -local` when AHF is missing, or upgrade when the installation media is newer (`ahf_upgrade`)
+. Check of the signature of `ahf_setup` (`ahf_verify_signature`)
+. Start/stop of TFA and the Compliance scheduler, `tfactl set` and `orachk -set` for changed settings
+. Registration or deregistration in AHF Fleet Insights
+
+.Install AHF on all database servers
+----
+ansible-playbook -i inventory/ opitzconsulting.ansible_oracle.ahf -e hostgroup=dbfs
+----
+
+==== Settings
+
+`ahf_tfa_settings` is executed with `tfactl set <key>=<value>`,
+`ahf_compliance_settings` with `orachk -set "<key>=<value>;..." -id <autorun ID>` - one call per autorun ID.
+`orachk -set` requires `AUTORUN_SCHEDULE` in every call: the role adds the current schedule, when it is not part of the settings.
+
+The Compliance settings are stored per autorun ID by AHF.
+The autoruns exist only with a running Compliance scheduler: `ahfctl stopahf -compliance` removes them,
+`ahfctl startahf -compliance` does not recreate them. The role creates the default autoruns of Oracle with
+`orachk -autostart`, when they are missing, and applies `ahf_compliance_settings` again.
+`ahf_compliance_settings` requires `ahf_compliance_autostart: true`.
+
+A new installation has two autorun IDs (`orachk -get all -id all` shows them with the prefix `orachk.`):
+
+.Autoruns of a new installation (AHF 26.10)
+[options="header,footer"]
+|=======================
+|Autorun ID |`AUTORUN_SCHEDULE` |Checks |`COLLECTION_RETENTION`
+|`autostart_client_oratier1` |`3 2 * * 1,2,3,4,5,6` (Monday - Saturday 02:03) |profile `oratier1` |7 days
+|`autostart_client` |`3 3 * * 0` (Sunday 03:03) |all checks |14 days
+|=======================
+
+.Daily checks at 01:30 and a longer retention of the weekly results
+----
+ahf_compliance_settings:
+  autostart_client_oratier1:
+    AUTORUN_SCHEDULE: "30 1 * * 1-6"
+  autostart_client:
+    COLLECTION_RETENTION: 30
+----
+
+The role stores the applied settings in `ahf_ansible_state_file` (`/opt/oracle.ahf.ansible.json`).
+A setting is executed only, when it differs from the last run.
+Manual changes with `tfactl` are not detected. `-e ahf_settings_force=true` executes all settings again.
+
+NOTE: Removing a key from `ahf_tfa_settings` does not reset the setting in AHF.
+Set the default value of Oracle instead.
+
+==== Cluster
+
+The role installs AHF with `-local` on each host of the play.
+Execute `tfactl syncnodes` once after the installation on all nodes of a cluster.
+An existing TFA of Grid Infrastructure is upgraded by `ahf_setup`.
+
+`ahf_setup` uses the Perl of the Grid Infrastructure home on hosts with Oracle Restart or RAC.
+This Perl is owned by the GI owner and is rejected for a root installation
+(`AHF-00026: Perl is not owned by root`).
+The role passes the Perl of the OS with `-perlhome /usr` (`ahf_perl_home`) and checks its owner.
+
+==== Uninstall
+
+.Uninstall AHF
+----
+ansible-playbook -i inventory/ opitzconsulting.ansible_oracle.ahf -e hostgroup=dbfs -e ahf_state=absent
+----
+
+The repository in `ahf_data_dir` is kept. `ahf_uninstall_delete_repo: true` removes it.
+
+=== Central evaluation of many servers
+
+==== Architecture
+
+The data stays on the database servers and is pushed to a central server:
+
+- The AHF repository is a local directory on the database server.
+  An NFS share for the repository is not needed - a hanging NFS server has no impact on the database server.
+- The database servers send their data to the central server (push).
+  The central server needs no access to the database servers - neither for the collection
+  nor for the evaluation.
+- The data is available on the central server, when the database server is down.
+
+A pull from the central server (e.g. `rsync` over SSH from each database server) is possible as well,
+but requires access of the central server to all database servers.
+
+==== AHF Fleet Insights
+
+AHF Fleet Insights is the web interface of Oracle for many AHF clients (My Oracle Support Doc ID 3043060.1).
+
+- Registered clients upload Compliance results (`orachk`) and TFA collections automatically.
+- The data is stored in a repository database (Oracle Database 19c or newer).
+  Oracle AI Database 26ai needs no additional license for the repository.
+- The web application (with an embedded Nginx) runs as non-root user on port `ahf_fi_port` (5005) with HTTPS.
+- Requirements: Oracle Linux / RHEL 8 or newer (x86_64), Java 22 or newer, Oracle Instant Client (Basic, SQL*Plus),
+  4 cores, 16 GB RAM and 4 GB disk space per registered cluster.
+- Clients need AHF 24.9 or newer.
+
+IMPORTANT: The Oracle documentation describes the registration for clusters ("AHF Client must be running on a cluster"),
+but describes the fleet as "database clusters or single-instance systems".
+Check the registration of single instance servers before planning AHF Fleet Insights for them.
+
+===== Repository database
+
+Fleet Insights needs a schema user in the repository database, before the role `ahf_fleet_insights` is executed.
+The role does not create it.
+The installation media contains the script `create_db_user.sql` (in `ahf_fleet_setup_onprem.zip`)
+with placeholders for the password and the tablespace:
+
+.create_db_user.sql of AHFFI-LINUX_v25.2.1.zip
+----
+CREATE USER AHFFI IDENTIFIED BY <password> DEFAULT TABLESPACE <tablespace>;
+GRANT CREATE SESSION TO AHFFI;
+GRANT CONNECT, RESOURCE TO AHFFI;
+GRANT CREATE TABLE TO AHFFI;
+GRANT INSERT ANY TABLE TO AHFFI;
+alter user AHFFI quota unlimited on <tablespace>;
+----
+
+Optionally, the repository database and the user are managed with `ansible-oracle`, e.g. a PDB
+in `oracle_pdbs` with the user in `users` (role `oradb_manage_users`).
+The password is taken from `dbpasswords` like for every other user.
+
+.Schema user for Fleet Insights in a PDB of ansible-oracle
+----
+oracle_pdbs:
+  - cdb: DB1
+    home: db26-si-ee
+    pdb_name: AHFFI
+    pdbadmin_user: PDBADMIN
+    listener_port: 1521
+    state: present
+    users:
+      - schema: AHFFI
+        state: present
+        default_tablespace: USERS
+        grants:
+          - create session
+          - connect
+          - resource
+          - create table
+          - insert any table
+        quotas:
+          - tablespace: USERS
+            size: unlimited
+
+dbpasswords:
+  DB1:
+    AHFFI:
+      AHFFI: "{{ vault_ahf_fi_db_password }}"
+
+ahf_fi_db_service: AHFFI
+ahf_fi_db_user: AHFFI
+ahf_fi_db_password: "{{ vault_ahf_fi_db_password }}"
+----
+
+NOTE: Check the grants of `create_db_user.sql` of a new release of Fleet Insights.
+The molecule scenario `ahf` creates the user directly with SQL*Plus in an Oracle Database Free container.
+
+===== Installation
+
+.Inventory for AHF Fleet Insights
+----
+ahf_fi_db_host: ahffi.example.com
+ahf_fi_db_port: 1521
+ahf_fi_db_service: ahffi.example.com
+ahf_fi_db_user: AHFFI
+ahf_fi_db_password: "{{ vault_ahf_fi_db_password }}"
+ahf_fi_registration_user: ahfclient
+ahf_fi_registration_password: "{{ vault_ahf_fleet_insights_password }}"
+----
+
+.Install AHF Fleet Insights
+----
+ansible-playbook -i inventory/ opitzconsulting.ansible_oracle.ahf_fleet_insights -e hostgroup=ahffi
+----
+
+The role:
+
+. installs `cronie`, `iproute`, `hostname`, the Oracle JDK and Oracle Instant Client (`ahf_fi_packages`)
+. installs Fleet Insights with `ahf_fleet_setup -quiet <properties>` as `ahf_fi_install_user`
+  and creates the registration user, or patches an existing installation when the installation media is newer
+. opens `ahf_fi_port` in firewalld
+. starts Fleet Insights (`ahffi start`), when `ahffi status` does not report it as running, and waits
+  for the web application on `ahf_fi_port` (`ahf_fi_start_timeout`)
+. provides the public certificate as fact `ahf_fi_public_cert` and optionally as file on the
+  Ansible controller (`ahf_fi_public_cert_fetch`)
+. shows `ahffi status` and the registration command from `ahffi info`
+
+The properties file with the passwords is removed after the installation.
+
+Fleet Insights has no systemd unit. Its processes are started by cron entries of `ahf_fi_install_user`,
+created by the installer - `crond` must be running.
+
+The installer creates a self-signed certificate with the hostname as CN, but without Subject Alternative Name (SAN).
+AHF clients (AHF 26.x, Python 3.13) check only the SAN and reject it with
+`CERTIFICATE_VERIFY_FAILED ... Hostname mismatch, certificate is not valid for '<host>'`.
+The role replaces it (`ahffi importcert`, Fleet Insights is restarted):
+
+* `ahf_fi_cert_generate: true` (default): self-signed certificate with the SAN `ahf_fi_cert_names`
+  (default: hostname and FQDN). The clients must use one of these names in `ahf_fleet_insights_url`.
+* `ahf_fi_cert_file` / `ahf_fi_cert_key_file`: own certificate, e.g. from an internal CA.
+
+===== Registration of the clients
+
+.Register the database servers
+----
+ahf_fleet_insights_client: true
+ahf_fleet_insights_url: https://ahffi.example.com:5005
+ahf_fleet_insights_user: ahfclient
+ahf_fleet_insights_password: "{{ vault_ahf_fleet_insights_password }}"
+# self-signed certificate of Fleet Insights (ahf_fi_public_cert_fetch of role ahf_fleet_insights)
+ahf_fleet_insights_public_cert: "{{ lookup('ansible.builtin.file', inventory_dir + '/files/ahffi_cert.pem') }}"
+----
+
+The client checks the certificate of Fleet Insights.
+With the self-signed certificate of the installer the registration fails with `CERTIFICATE_VERIFY_FAILED`,
+unless the certificate is passed with `ahf_fleet_insights_public_cert` (`ahf configuration set --public-cert`).
+Fetch it with `ahf_fi_public_cert_fetch` while installing Fleet Insights:
+
+.Fetch the certificate to the Ansible controller
+----
+ahf_fi_public_cert_fetch: "{{ inventory_dir }}/files/ahffi_cert.pem"
+----
+
+The URL must use a name of the SAN of the certificate (`ahf_fi_cert_names`).
+The certificate file on the client must be readable by the owner only (`AHF-07275`), the role writes it with mode `0600`.
+
+The registration asks twice for the password of the registration user, the role answers it with `ansible.builtin.expect`
+(Python module `pexpect` on the database server).
+It is executed with `--os-user {{ oracle_user }}` (`ahf_fleet_insights_os_user`).
+Without an OS user for the REST access, the registration fails with
+`AHF-02119: Fleet Insights configuration succeeded, but the REST Agent was not started`.
+
+----
+ansible-playbook -i inventory/ opitzconsulting.ansible_oracle.ahf -e hostgroup=dbfs
+----
+
+The URL is the URL of `ahffi info` without `/ahfservice`.
+`ahf_fleet_insights_force_register: true` registers again, e.g. after a password change.
+`ahf_fleet_insights_client: false` deregisters a client registered by the role.
+
+==== Alternative: static web server with AHF Insights
+
+This variant is not implemented in `ansible-oracle`. It is an option for environments without a repository database.
+
+AHF Insights reports are offline HTML reports (zip file with `index.html`) - they need no server component.
+
+. A systemd timer on the database server creates a report and copies it to the web server:
++
+----
+# /etc/systemd/system/ahf-insights-push.service
+[Unit]
+Description=Create AHF Insights report and push it to the web server
+
+[Service]
+Type=oneshot
+ExecStart=/opt/oracle.ahf/bin/ahf analysis create --type insights --last 24h
+ExecStart=/usr/bin/rsync -a --include='*/' --include='*insights*.zip' --exclude='*' \
+  /u01/app/oracle/ahf/oracle.ahf/data/repository/ ahfpush@web.example.com:
+----
++
+----
+# /etc/systemd/system/ahf-insights-push.timer
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+----
+. The SSH key of the database server is restricted to a directory on the web server with `rrsync`
+  (`command="rrsync -wo /srv/ahf/<host>"` in `authorized_keys`).
+. The web server (Nginx/httpd) extracts the reports (e.g. with a systemd path unit) and serves the directories as static files.
+
+A systemd timer is preferred to cron: random delay (`RandomizedDelaySec`), catch-up after downtime (`Persistent`)
+and the output in the journal.
+
+.Comparison of the variants
+[options="header,footer"]
+|=======================
+|Criteria |AHF Fleet Insights |Static web server
+|Product |Oracle, supported |own solution
+|Data |Compliance results and TFA collections, aggregated |single Insights reports per host and day
+|Requirements |repository database, Java, Instant Client, 16 GB RAM |web server, SSH/rsync
+|Transport |HTTPS by the AHF client |rsync over SSH
+|Overview of the fleet |yes |no - one report per host
+|=======================
+
+The Health Check Collection Manager (APEX application for `orachk -setdbupload`) is an older alternative
+for Compliance results only. It is not supported by `ansible-oracle`.
+
+=== Troubleshooting
+
+.Useful commands
+[options="header,footer"]
+|=======================
+|Command |Description
+|`ahfctl statusahf` |Status of TFA and the Compliance scheduler
+|`ahf software get-version --component all` |Installed versions
+|`tfactl print config` |Settings of TFA
+|`orachk -autostatus` |Status of the Compliance scheduler
+|`ahffi status` / `ahffi info` |Status and registration command of AHF Fleet Insights (in `ahf_fi_install_dir`)
+|=======================

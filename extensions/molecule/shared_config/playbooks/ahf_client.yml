@@ -1,0 +1,50 @@
+---
+# AHF as client of AHF Fleet Insights (scenarios dbfs, has-ol9)
+# Requires ahf_download.yml and ahf_fleet_connect.yml (molecule_ahffi_available).
+#
+# Variables:
+#   molecule_ahf_collect  create one TFA collection for the upload into Fleet Insights (default: true)
+
+# ansible.builtin.expect for the registration in Fleet Insights
+- name: Install pexpect for AHF
+  hosts: all
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Install pexpect
+      ansible.builtin.package:
+        name: python3-pexpect
+      when: molecule_ahffi_available | bool
+
+- name: Converge AHF
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.ahf
+  vars:
+    oracle_sw_copy: false
+    oracle_stage_remote: /u01/stage/download
+    # registration only, when Fleet Insights is reachable
+    ahf_fleet_insights_client: "{{ molecule_ahffi_available | bool }}"
+    ahf_fleet_insights_public_cert: "{{ molecule_ahffi_public_cert | default('') }}"
+
+# Only once (marker file) => no change in the idempotence check
+- name: TFA collection for AHF Fleet Insights
+  hosts: all
+  gather_facts: false
+  become: true
+  tasks:
+    # -silent: background collection without questions
+    # (without it, tfactl asks for an event or event time, e.g. with GI)
+    - name: Create TFA collection
+      ansible.builtin.shell: >-
+        /opt/oracle.ahf/bin/tfactl diagcollect -last 1h -silent
+        && touch /opt/oracle.ahf.molecule_collect
+      args:
+        creates: /opt/oracle.ahf.molecule_collect
+      register: _mol_collect
+      when:
+        - molecule_ahffi_available | bool
+        - molecule_ahf_collect | default(true) | bool
+
+    - name: Result of TFA collection
+      ansible.builtin.debug:
+        var: _mol_collect.stdout_lines
+      when: _mol_collect.stdout_lines is defined

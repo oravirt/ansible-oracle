@@ -1,0 +1,225 @@
+---
+# The applied settings are stored in ahf_ansible_state_file.
+# A setting is executed only, when it differs from the last run => idempotent
+# without parsing the output of tfactl/orachk.
+- name: configure | Check state file
+  ansible.builtin.stat:
+    path: "{{ ahf_ansible_state_file }}"
+    get_checksum: false
+  become: true
+  register: _ahf_state_stat
+
+- name: configure | Read state file
+  ansible.builtin.slurp:
+    src: "{{ ahf_ansible_state_file }}"
+  become: true
+  register: _ahf_state_slurp
+  when: _ahf_state_stat.stat.exists
+
+- name: configure | Set state of last run
+  ansible.builtin.set_fact:
+    _ahf_state_old: >-
+      {{ (_ahf_state_slurp.content | b64decode | from_json)
+         if _ahf_state_stat.stat.exists and not ahf_settings_force | bool
+         else {} }}
+
+- name: configure | Assert compliance scheduler
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _ahf_root | bool or not ahf_compliance_autostart | bool
+    fail_msg: ahf_compliance_autostart requires ahf_install_mode root.
+
+- name: configure | TFA settings
+  ansible.builtin.command:
+    argv:
+      - "{{ _ahf_bin }}/tfactl"
+      - set
+      - "{{ ahfs.key }}={{ ahfs.value }}"
+  become: true
+  loop: "{{ ahf_tfa_settings | dict2items }}"
+  loop_control:
+    loop_var: ahfs
+    label: "{{ ahfs.key }}={{ ahfs.value }}"
+  changed_when: true
+  when:
+    - _ahf_root | bool
+    - (_ahf_state_old.tfa_settings | default({}))[ahfs.key] | default(None) | string != ahfs.value | string
+
+- name: configure | TFA daemon
+  when: _ahf_root | bool
+  block:
+    - name: configure | Check TFA daemon
+      ansible.builtin.command: pgrep -f TFAMain
+      register: _ahf_tfa_running
+      changed_when: false
+      failed_when: false
+
+    - name: configure | Enable automatic start of TFA
+      ansible.builtin.command:
+        argv: ["{{ _ahf_bin }}/tfactl", enable]
+      become: true
+      changed_when: true
+      when:
+        - ahf_tfa_enabled | bool
+        - not (_ahf_state_old.tfa_enabled | default(false)) | bool
+
+    - name: configure | Start TFA
+      ansible.builtin.command:
+        argv: ["{{ _ahf_bin }}/ahfctl", startahf, -tfa]
+      become: true
+      changed_when: true
+      when:
+        - ahf_tfa_enabled | bool
+        - _ahf_tfa_running.rc != 0
+
+    - name: configure | Stop TFA
+      ansible.builtin.command:
+        argv: ["{{ _ahf_bin }}/ahfctl", stopahf, -tfa]
+      become: true
+      changed_when: true
+      when:
+        - not ahf_tfa_enabled | bool
+        - _ahf_tfa_running.rc == 0
+
+    - name: configure | Disable automatic start of TFA
+      ansible.builtin.command:
+        argv: ["{{ _ahf_bin }}/tfactl", disable]
+      become: true
+      changed_when: true
+      when:
+        - not ahf_tfa_enabled | bool
+        - (_ahf_state_old.tfa_enabled | default(true)) | bool
+
+- name: configure | Start compliance scheduler
+  ansible.builtin.command:
+    argv: ["{{ _ahf_bin }}/ahfctl", startahf, -compliance]
+  become: true
+  register: _ahf_compliance_started
+  changed_when: true
+  when:
+    - _ahf_root | bool
+    - ahf_compliance_autostart | bool
+    - not (_ahf_state_old.compliance_autostart | default(false)) | bool
+
+- name: configure | Stop compliance scheduler
+  ansible.builtin.command:
+    argv: ["{{ _ahf_bin }}/ahfctl", stopahf, -compliance]
+  become: true
+  changed_when: true
+  when:
+    - _ahf_root | bool
+    - not ahf_compliance_autostart | bool
+    - (_ahf_state_old.compliance_autostart | default(true)) | bool
+
+# 'ahfctl startahf -compliance' does not recreate autoruns removed by 'stopahf -compliance'
+# => 'orachk -autostart' creates the default autoruns of Oracle (non-interactive)
+- name: configure | Check Compliance autoruns
+  ansible.builtin.command:
+    argv: ["{{ _ahf_bin }}/orachk", -get, all, -id, all]
+  become: true
+  register: _ahf_compliance_autoruns
+  changed_when: false
+  failed_when: false
+  when:
+    - _ahf_root | bool
+    - ahf_compliance_autostart | bool
+
+- name: configure | Create default Compliance autoruns
+  ansible.builtin.shell: "{{ _ahf_bin }}/orachk -autostart < /dev/null"
+  become: true
+  register: _ahf_compliance_autorun_create
+  changed_when: true
+  when:
+    - _ahf_root | bool
+    - ahf_compliance_autostart | bool
+    - _ahf_compliance_autoruns.stdout is search('No scheduler for any ID')
+
+# The autoruns exist only with a running Compliance scheduler:
+# 'ahfctl stopahf -compliance' removes them (orachk -get: 'No scheduler for any ID').
+# => settings after the start of the scheduler and only with ahf_compliance_autostart
+- name: configure | Info about Compliance settings without scheduler
+  ansible.builtin.debug:
+    msg: >-
+      ahf_compliance_settings are ignored, because the Compliance scheduler is not started
+      (ahf_compliance_autostart: false).
+  when:
+    - not ahf_compliance_autostart | bool
+    - ahf_compliance_settings | length > 0
+
+# Compliance settings per autorun ID.
+# orachk -set needs AUTORUN_SCHEDULE in every call and the ID without the prefix 'orachk.'
+# (orachk -get shows 'orachk.autostart_client', -id expects 'autostart_client').
+# An unknown ID creates a new autorun => all settings of an ID are set with one call.
+- name: configure | Read Compliance autoruns
+  ansible.builtin.command:
+    argv:
+      - "{{ _ahf_bin }}/orachk"
+      - -get
+      - all
+      - -id
+      - "{{ ahfc.key | regex_replace('^orachk\\.', '') }}"
+  become: true
+  become_user: "{{ _ahf_become_user }}"
+  loop: "{{ ahf_compliance_settings | dict2items }}"
+  loop_control:
+    loop_var: ahfc
+    label: "{{ ahfc.key }}"
+  register: _ahf_compliance_get
+  changed_when: false
+  failed_when: false
+  when:
+    - ahf_compliance_autostart | bool
+    # a (re)started scheduler has the default autoruns of Oracle => apply all settings
+    - >-
+      ((_ahf_state_old.compliance_settings | default({}))[ahfc.key] | default({}) | to_json(sort_keys=True))
+      != (ahfc.value | to_json(sort_keys=True))
+      or _ahf_compliance_started is changed
+      or _ahf_compliance_autorun_create is changed
+
+- name: configure | Compliance settings
+  ansible.builtin.command:
+    argv:
+      - "{{ _ahf_bin }}/orachk"
+      - -set
+      - "{{ _ahf_compliance_new.items() | map('join', '=') | join(';') }}"
+      - -id
+      - "{{ ahfr.ahfc.key | regex_replace('^orachk\\.', '') }}"
+  become: true
+  become_user: "{{ _ahf_become_user }}"
+  vars:
+    _ahf_compliance_schedule: >-
+      {{ (ahfr.stdout | regex_replace('\x1b\[[0-9;]*m', '')
+          | regex_search('AUTORUN_SCHEDULE\s*=\s*(.*)', '\1') or [''])[0] | trim }}
+    _ahf_compliance_new: >-
+      {{ ({'AUTORUN_SCHEDULE': _ahf_compliance_schedule} if _ahf_compliance_schedule | length > 0 else {})
+         | combine(ahfr.ahfc.value) }}
+  loop: "{{ _ahf_compliance_get.results | rejectattr('skipped', 'defined') | list }}"
+  loop_control:
+    loop_var: ahfr
+    label: "{{ ahfr.ahfc.key }}: {{ ahfr.ahfc.value }}"
+  register: _ahf_compliance_set
+  changed_when: true
+  failed_when: >-
+    _ahf_compliance_set.rc != 0
+    or 'AUTORUN_SCHEDULE' not in _ahf_compliance_new
+    or ahfr.rc != 0
+
+- name: configure | AHF Fleet Insights client
+  ansible.builtin.include_tasks: fleet_insights_client.yml
+  when: _ahf_root | bool
+
+- name: configure | Write state file
+  ansible.builtin.copy:
+    dest: "{{ ahf_ansible_state_file }}"
+    content: >-
+      {{ {
+           'tfa_enabled': ahf_tfa_enabled | bool,
+           'tfa_settings': ahf_tfa_settings,
+           'compliance_autostart': ahf_compliance_autostart | bool,
+           'compliance_settings': ahf_compliance_settings,
+           'fleet_insights': _ahf_fleet_insights_state | default({}),
+         } | to_nice_json }}
+    owner: "{{ _ahf_become_user }}"
+    mode: "0600"
+  become: true

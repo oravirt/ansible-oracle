@@ -1,0 +1,68 @@
+---
+- name: Verify
+  hosts: ahf_server
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Status of AHF
+      ansible.builtin.command: /opt/oracle.ahf/bin/ahfctl statusahf
+      register: _verify_ahf
+      changed_when: false
+
+    - name: Show status of AHF
+      ansible.builtin.debug:
+        var: _verify_ahf.stdout_lines
+
+    - name: Check TFA daemon
+      ansible.builtin.command: pgrep -f TFAMain
+      changed_when: false
+
+    - name: Status of AHF Fleet Insights
+      ansible.builtin.command:
+        argv: [/u01/app/oracle/ahffi/ahffi, status]
+        chdir: /u01/app/oracle/ahffi
+      become: true
+      become_user: oracle
+      register: _verify_ahffi
+      changed_when: false
+
+    - name: Show status of AHF Fleet Insights
+      ansible.builtin.debug:
+        var: _verify_ahffi.stdout_lines
+
+    - name: Assert status of AHF Fleet Insights
+      ansible.builtin.assert:
+        that:
+          - _verify_ahffi.stdout is search('Fleet Insights (server )?is running')
+
+    - name: Check web application of AHF Fleet Insights
+      ansible.builtin.uri:
+        url: "https://{{ molecule_ahffi_host }}:{{ molecule_ahffi_port }}/ahfservice"
+        validate_certs: false
+        status_code: [200, 301, 302, 401]
+
+    - name: Check registration in state file of role ahf
+      ansible.builtin.slurp:
+        src: /opt/oracle.ahf.ansible.json
+      register: _verify_state
+
+    - name: Assert registration in state file of role ahf
+      ansible.builtin.assert:
+        that:
+          - (_verify_state.content | b64decode | from_json).fleet_insights.url is match('^https://')
+
+    - name: Tables in repository of AHF Fleet Insights
+      ansible.builtin.shell: |
+        set -o pipefail
+        printf "set heading off feedback off pagesize 0\nselect 'TABLES=' || count(*) from dba_tables where owner = upper('%s');\n" \
+          "{{ ahf_fi_db_user }}" | /usr/lib/oracle/23/client64/bin/sqlplus -S -L \
+          "system/{{ molecule_ahffi_system_password }}@//{{ ahf_fi_db_host }}:{{ ahf_fi_db_port }}/{{ ahf_fi_db_service }}" | tr -d ' '
+      register: _verify_tables
+      changed_when: false
+      no_log: true
+
+    - name: Assert tables in repository of AHF Fleet Insights
+      ansible.builtin.assert:
+        that:
+          - _verify_tables.stdout is search('TABLES=[1-9]')
+        fail_msg: "{{ _verify_tables.stdout }}"

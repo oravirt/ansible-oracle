@@ -12,7 +12,7 @@
 #   task test:oracle_databases  (controller-only tests of oracle_databases, no VM)
 #
 # MOLECULE_SW_DIR (local directory mounted as /vagrant) is read from the
-# environment or from .env.yml in this directory.
+# environment or from .env (KEY=VALUE) in this directory (tools/load_env.sh).
 version: '3'
 
 includes:
@@ -23,12 +23,13 @@ includes:
 
 vars:
   S: '{{.S | default "default"}}'
-  SW_SCENARIOS: dbfs dbfs-ol9 dbfs-ol10 dataguard has-ol9 download golden
+  SW_SCENARIOS: dbfs dbfs-ol9 dbfs-ol10 dataguard has-ol9 download golden ahf
   IMAGES: >-
     quay.io/rendanic/docker-ol8-ansible:latest
     quay.io/rendanic/docker-ol9-ansible:latest
     quay.io/rendanic/docker-ol10-ansible:latest
     geerlingguy/docker-opensuseleap15-ansible:latest
+    docker.io/gvenzl/oracle-free:23-slim-faststart
 
 env:
   ANSIBLE_FORCE_COLOR: 'true'
@@ -44,7 +45,7 @@ tasks:
     desc: Show status of all scenarios
     dir: "{{.TASKFILE_DIR}}"
     cmds:
-      - molecule list
+      - tools/molecule.sh list
 
   pull:
     desc: Pull container images (molecule has a 15s timeout for pulling)
@@ -56,7 +57,7 @@ tasks:
     desc: Reinstall the collection from this repository (needed after role changes without version change)
     dir: "{{.TASKFILE_DIR}}"
     cmds:
-      - ansible-galaxy collection install --force ..
+      - tools/collection_install.sh
 
   _check-sw-dir:
     internal: true
@@ -64,8 +65,8 @@ tasks:
     preconditions:
       - sh: >-
           [ -n "${MOLECULE_SW_DIR:-}" ]
-          || grep -q '^MOLECULE_SW_DIR:' .env.yml 2>/dev/null
-        msg: "MOLECULE_SW_DIR is not set. Export it or add it to extensions/.env.yml"
+          || grep -q '^MOLECULE_SW_DIR=' .env 2>/dev/null
+        msg: "MOLECULE_SW_DIR is not set. Export it or add it to extensions/.env"
 
   _molecule:
     internal: true
@@ -73,7 +74,7 @@ tasks:
     deps:
       - task: '{{if has .S (splitList " " .SW_SCENARIOS)}}_check-sw-dir{{else}}_noop{{end}}'
     cmds:
-      - molecule {{.CMD}} -s {{.S}} {{.CLI_ARGS}}
+      - tools/molecule.sh {{.CMD}} -s {{.S}} {{.CLI_ARGS}}
 
   _noop:
     internal: true
@@ -90,7 +91,7 @@ tasks:
     dir: "{{.TASKFILE_DIR}}"
     cmds:
       # molecule installs the collection only when the version changed => install the current code
-      - '[ "{{.C}}" = "false" ] || ansible-galaxy collection install --force ..'
+      - '[ "{{.C}}" = "false" ] || tools/collection_install.sh'
       - task: _molecule
         vars: {CMD: converge, S: '{{.S}}'}
 
@@ -113,8 +114,8 @@ tasks:
     cmds:
       # side-effect does not install the collection => install the current code
       # C=false skips the installation (go-task 3.45 has no if: for commands)
-      - '[ "{{.C}}" = "false" ] || ansible-galaxy collection install --force ..'
-      - molecule side-effect -s {{if eq .S "default"}}dbfs{{else}}{{.S}}{{end}} {{.CLI_ARGS}}
+      - '[ "{{.C}}" = "false" ] || tools/collection_install.sh'
+      - tools/molecule.sh side-effect -s {{if eq .S "default"}}dbfs{{else}}{{.S}}{{end}} {{.CLI_ARGS}}
 
   idempotence:
     desc: "Run converge again and check for changes (S=<scenario>)"
@@ -143,7 +144,7 @@ tasks:
     dir: "{{.TASKFILE_DIR}}"
     cmds:
       # molecule installs the collection only when the version changed => install the current code
-      - '[ "{{.C}}" = "false" ] || ansible-galaxy collection install --force ..'
+      - '[ "{{.C}}" = "false" ] || tools/collection_install.sh'
       - task: _molecule
         vars: {CMD: test, S: '{{.S}}'}
 
@@ -157,14 +158,14 @@ tasks:
     desc: Destroy instances of all scenarios
     dir: "{{.TASKFILE_DIR}}"
     cmds:
-      - molecule destroy --all
+      - tools/molecule.sh destroy --all
 
   login:
     desc: "Open a shell in an instance (S=<scenario>, H=<host> for scenarios with more than one instance)"
     dir: "{{.TASKFILE_DIR}}"
     interactive: true
     cmds:
-      - molecule login -s {{.S}} {{if .H}}-h {{.H}}{{end}}
+      - tools/molecule.sh login -s {{.S}} {{if .H}}-h {{.H}}{{end}}
 
   exec:
     desc: "docker exec bash in a molecule container (H=<container>, U=<user>, e.g. U=oracle)"
@@ -192,9 +193,9 @@ tasks:
     dir: "{{.TASKFILE_DIR}}"
     preconditions:
       - sh: >-
-          { [ -n "${MOS_LOGIN:-}" ] || grep -q '^MOS_LOGIN:' .env.yml 2>/dev/null; }
-          && { [ -n "${MOS_PASSWORD:-}" ] || grep -q '^MOS_PASSWORD:' .env.yml 2>/dev/null; }
-        msg: "Set MOS_LOGIN and MOS_PASSWORD in the environment or in extensions/.env.yml"
+          { [ -n "${MOS_USERNAME:-}" ] || grep -q '^MOS_USERNAME=' .env 2>/dev/null; }
+          && { [ -n "${MOS_PASSWORD:-}" ] || grep -q '^MOS_PASSWORD=' .env 2>/dev/null; }
+        msg: "Set MOS_USERNAME and MOS_PASSWORD in the environment or in extensions/.env"
     cmds:
       - task: _molecule
         vars: {CMD: test, S: download}

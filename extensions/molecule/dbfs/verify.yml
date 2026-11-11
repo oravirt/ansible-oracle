@@ -1,10 +1,30 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
 - name: Verify
   hosts: all
   gather_facts: false
+  become: true
   tasks:
-    - name: Example assertion
-      ansible.builtin.assert:
-        that: true
+    - name: Status of AHF
+      ansible.builtin.command: /opt/oracle.ahf/bin/ahfctl statusahf
+      register: _verify_ahf
+      changed_when: false
+
+    - name: Show status of AHF
+      ansible.builtin.debug:
+        var: _verify_ahf.stdout_lines
+
+    - name: Check TFA daemon
+      ansible.builtin.command: pgrep -f TFAMain
+      changed_when: false
+
+    # registered only, when AHF Fleet Insights of the scenario ahf was reachable during converge
+    - name: Read state file of role ahf
+      ansible.builtin.slurp:
+        src: /opt/oracle.ahf.ansible.json
+      register: _verify_state
+
+    - name: Registration in AHF Fleet Insights
+      ansible.builtin.debug:
+        msg: >-
+          {{ (_verify_state.content | b64decode | from_json).fleet_insights
+             | default('not registered (scenario ahf not running during converge)', true) }}

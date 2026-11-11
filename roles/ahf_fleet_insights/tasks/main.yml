@@ -1,0 +1,252 @@
+---
+- name: ahf_fleet_insights | Check variables
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - ahf_fi_install_user != 'root'
+      - ahf_fi_db_service | length > 0
+      - ahf_fi_db_password | length > 0
+      - ahf_fi_port | int >= 1024
+      - ahf_fi_port | int <= 49151
+      - ahf_fi_installer_archive | length > 0 or _ahf_fi_media_source != 'www'
+    fail_msg: >-
+      Check ahf_fi_install_user (not root), ahf_fi_db_service, ahf_fi_db_password,
+      ahf_fi_port (1024 - 49151). ahf_fi_installer_archive is mandatory for oracle_sw_source_www.
+
+- name: ahf_fleet_insights | Install packages
+  when: ahf_fi_manage_packages | bool
+  become: true
+  block:
+    - name: ahf_fleet_insights | Configure repository for Instant Client
+      ansible.builtin.yum_repository:
+        name: ol{{ ansible_distribution_major_version }}_instantclient
+        description: Oracle Instant Client for Oracle Linux {{ ansible_distribution_major_version }}
+        file: external_repos
+        baseurl: "{{ ahf_fi_instantclient_repo }}"
+        gpgcheck: false
+      when: ahf_fi_instantclient_repo | length > 0
+
+    - name: ahf_fleet_insights | Install packages
+      ansible.builtin.dnf:
+        name: "{{ ahf_fi_packages }}"
+        state: present
+        disable_gpg_check: true
+
+    # Fleet Insights starts and monitors its processes with cron
+    - name: ahf_fleet_insights | Start crond
+      ansible.builtin.service:
+        name: crond
+        state: started
+        enabled: true
+
+- name: ahf_fleet_insights | Search Oracle JDK
+  ansible.builtin.find:
+    paths: /usr/lib/jvm
+    patterns: jdk-*-oracle-x64
+    file_type: directory
+  register: _ahf_fi_jdk_find
+  when: ahf_fi_java_home | length == 0
+
+- name: ahf_fleet_insights | Set Java home
+  ansible.builtin.set_fact:
+    _ahf_fi_java_home: >-
+      {{ ahf_fi_java_home if ahf_fi_java_home | length > 0
+         else (_ahf_fi_jdk_find.files | map(attribute='path')
+               | community.general.version_sort | last | default('')) }}
+
+- name: ahf_fleet_insights | Check Java version
+  ansible.builtin.command:
+    argv: ["{{ _ahf_fi_java_home }}/bin/java", -version]
+  register: _ahf_fi_java_version
+  changed_when: false
+  failed_when: false
+
+# java -version writes to stderr: 'java version "25.0.5" ...'
+- name: ahf_fleet_insights | Assert Java version
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _ahf_fi_java_version.rc == 0
+      - ((_ahf_fi_java_version.stderr | regex_search('version "[0-9]+') | default('', true)) | regex_replace('[^0-9]', '') | int) >= 22
+    fail_msg: >-
+      Fleet Insights requires Java 22 or newer (ahf_fi_java_home, ahf_fi_packages).
+      Java home: '{{ _ahf_fi_java_home }}': {{ _ahf_fi_java_version.stderr | default(_ahf_fi_java_version.msg | default('')) }}
+
+- name: ahf_fleet_insights | Check existing installation
+  ansible.builtin.stat:
+    path: "{{ _ahf_fi_ahffi }}"
+    get_checksum: false
+  register: _ahf_fi_stat
+
+- name: ahf_fleet_insights | Get installed version
+  ansible.builtin.command:
+    argv: ["{{ _ahf_fi_ahffi }}", version]
+    chdir: "{{ ahf_fi_install_dir }}"
+  become: true
+  become_user: "{{ ahf_fi_install_user }}"
+  register: _ahf_fi_version_res
+  changed_when: false
+  failed_when: false
+  when: _ahf_fi_stat.stat.exists
+
+- name: ahf_fleet_insights | Search installation media on Ansible controller
+  ansible.builtin.find:
+    paths: "{{ oracle_sw_source_local }}"
+    patterns: AHFFI-LINUX_v*.zip
+  delegate_to: localhost
+  become: false
+  register: _ahf_fi_find_controller
+  when:
+    - ahf_fi_installer_archive | length == 0
+    - _ahf_fi_media_source == 'controller'
+
+- name: ahf_fleet_insights | Search installation media on target host
+  ansible.builtin.find:
+    paths: "{{ oracle_stage_remote }}"
+    patterns: AHFFI-LINUX_v*.zip
+  register: _ahf_fi_find_remote
+  when:
+    - ahf_fi_installer_archive | length == 0
+    - _ahf_fi_media_source == 'remote'
+
+- name: ahf_fleet_insights | Set installation media
+  ansible.builtin.set_fact:
+    _ahf_fi_installed_version: >-
+      {{ (_ahf_fi_version_res.stdout | default('') | regex_search('([0-9]+\.[0-9]+\.[0-9]+)', '\1') or ['']) | first }}
+    _ahf_fi_archive: >-
+      {{ ahf_fi_installer_archive if ahf_fi_installer_archive | length > 0
+         else ((_ahf_fi_find_controller.files | default([]) + _ahf_fi_find_remote.files | default([]))
+               | sort(attribute='mtime') | map(attribute='path') | map('basename') | last | default('')) }}
+
+- name: ahf_fleet_insights | Set version of installation media
+  ansible.builtin.set_fact:
+    _ahf_fi_media_version: "{{ (_ahf_fi_archive | regex_search(_ahf_fi_version_regex, '\\1') or ['']) | first }}"
+
+- name: ahf_fleet_insights | Check for installation
+  ansible.builtin.set_fact:
+    _ahf_fi_run_setup: >-
+      {{ _ahf_fi_archive | length > 0
+         and (not _ahf_fi_stat.stat.exists
+              or (ahf_fi_upgrade | bool
+                  and _ahf_fi_media_version | length > 0
+                  and _ahf_fi_installed_version | length > 0
+                  and _ahf_fi_media_version is version(_ahf_fi_installed_version, '>'))) }}
+
+- name: ahf_fleet_insights | Assert installation media
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _ahf_fi_archive | length > 0
+    fail_msg: >-
+      No installation media AHFFI-LINUX_v*.zip found. Download it from
+      My Oracle Support (Doc ID 3043060.1) or set ahf_fi_installer_archive.
+  when: not _ahf_fi_stat.stat.exists
+
+- name: ahf_fleet_insights | Info about installation
+  ansible.builtin.debug:
+    msg: >-
+      installed: {{ _ahf_fi_installed_version if _ahf_fi_stat.stat.exists else 'no' }},
+      media: {{ _ahf_fi_archive }} ({{ _ahf_fi_media_version or 'unknown' }}),
+      setup: {{ _ahf_fi_run_setup }}
+
+- name: ahf_fleet_insights | Install or patch Fleet Insights
+  ansible.builtin.include_tasks: install.yml
+  when: _ahf_fi_run_setup | bool
+
+- name: ahf_fleet_insights | Open port in firewalld
+  when: ahf_fi_firewall | bool
+  become: true
+  block:
+    - name: ahf_fleet_insights | Check firewalld
+      ansible.builtin.service_facts:
+
+    - name: ahf_fleet_insights | Open port
+      ansible.posix.firewalld:
+        port: "{{ ahf_fi_port }}/tcp"
+        permanent: true
+        immediate: true
+        state: enabled
+      when: (ansible_facts.services['firewalld.service'].state | default('')) == 'running'
+
+# Fleet Insights has no systemd unit - the processes are started by cron entries of
+# ahf_fi_install_user. Start it, when it is not running (e.g. after a reboot).
+- name: ahf_fleet_insights | Status of Fleet Insights
+  ansible.builtin.command:
+    argv: ["{{ _ahf_fi_ahffi }}", status]
+    chdir: "{{ ahf_fi_install_dir }}"
+  become: true
+  become_user: "{{ ahf_fi_install_user }}"
+  register: _ahf_fi_status
+  changed_when: false
+  failed_when: false
+
+- name: ahf_fleet_insights | Start Fleet Insights
+  ansible.builtin.command:
+    argv: ["{{ _ahf_fi_ahffi }}", start]
+    chdir: "{{ ahf_fi_install_dir }}"
+  become: true
+  become_user: "{{ ahf_fi_install_user }}"
+  register: _ahf_fi_start
+  changed_when: true
+  # 'Fleet Insights server is running' (25.2), docs: 'Fleet Insights is running'
+  when: _ahf_fi_status.stdout is not search('Fleet Insights (server )?is running')
+
+- name: ahf_fleet_insights | Wait for the web application
+  ansible.builtin.uri:
+    url: "https://localhost:{{ ahf_fi_port }}/ahfservice"
+    validate_certs: false
+    status_code: [200, 301, 302, 401]
+  register: _ahf_fi_web
+  until: _ahf_fi_web is succeeded
+  retries: "{{ (ahf_fi_start_timeout | int / 10) | round(0, 'ceil') | int }}"
+  delay: 10
+
+- name: ahf_fleet_insights | Status of Fleet Insights after the start
+  ansible.builtin.command:
+    argv: ["{{ _ahf_fi_ahffi }}", status]
+    chdir: "{{ ahf_fi_install_dir }}"
+  become: true
+  become_user: "{{ ahf_fi_install_user }}"
+  register: _ahf_fi_status_started
+  changed_when: false
+  when: _ahf_fi_start is not skipped
+
+- name: ahf_fleet_insights | Certificate of Fleet Insights
+  ansible.builtin.include_tasks: certificate.yml
+  when: ahf_fi_cert_generate | bool or ahf_fi_cert_file | length > 0
+
+# the clients need the certificate for the registration
+# (role ahf: ahf_fleet_insights_public_cert, ahf configuration set --public-cert)
+- name: ahf_fleet_insights | Read public certificate
+  ansible.builtin.slurp:
+    src: "{{ ahf_fi_install_dir }}/ahf_service/certs/cert.pem"
+  become: true
+  register: _ahf_fi_cert
+
+- name: ahf_fleet_insights | Set public certificate
+  ansible.builtin.set_fact:
+    ahf_fi_public_cert: "{{ _ahf_fi_cert.content | b64decode }}"
+
+- name: ahf_fleet_insights | Fetch public certificate to the Ansible controller
+  ansible.builtin.copy:
+    content: "{{ ahf_fi_public_cert }}"
+    dest: "{{ ahf_fi_public_cert_fetch }}"
+    mode: "0644"
+  delegate_to: localhost
+  become: false
+  when: ahf_fi_public_cert_fetch | length > 0
+
+- name: ahf_fleet_insights | Show status and registration command
+  ansible.builtin.command:
+    argv: ["{{ _ahf_fi_ahffi }}", info]
+    chdir: "{{ ahf_fi_install_dir }}"
+  become: true
+  become_user: "{{ ahf_fi_install_user }}"
+  register: _ahf_fi_info
+  changed_when: false
+
+- name: ahf_fleet_insights | Status and registration command
+  ansible.builtin.debug:
+    msg: >-
+      {{ (_ahf_fi_status_started if _ahf_fi_status_started is not skipped else _ahf_fi_status).stdout_lines
+         + _ahf_fi_info.stdout_lines }}

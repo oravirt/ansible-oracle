@@ -1,0 +1,51 @@
+---
+# @meta description: >
+# _Experimental_: the role is under development. Breaking changes can happen at any time
+# and are not always documented.
+#
+# Install and configure Oracle Autonomous Health Framework (AHF)
+# on database servers.
+#
+# The role installs AHF from the installation media in the software repository
+# (`AHF-LINUX_v<version>.zip` or patch 30166242 downloaded with AutoUpgrade),
+# upgrades an existing installation when a newer version is found,
+# activates or deactivates the components of AHF and registers the server
+# as client of AHF Fleet Insights (role `ahf_fleet_insights`).
+#
+# | Task file | Description |
+# | --- | --- |
+# | `main.yml` | Install, configure and register (or uninstall with `ahf_state: absent`) |
+# | `assert.yml` | Packages, check variables, Perl and owner of `ahf_loc` / `ahf_data_dir` |
+# | `install.yml` | Install or upgrade AHF |
+# | `configure.yml` | Components and settings of TFA / Compliance (orachk) |
+# | `fleet_insights_client.yml` | Register/deregister AHF Fleet Insights |
+# | `uninstall.yml` | Uninstall AHF |
+#
+# See `doc/guides/ahf.adoc` for decisions about the installation.
+# @end
+# @meta author: [Thorsten Bruhns]
+galaxy_info:
+  role_name: ahf
+  author: Thorsten Bruhns
+  description: Install and configure Oracle Autonomous Health Framework
+  company: OPITZ CONSULTING
+
+  license: license (MIT)
+
+  min_ansible_version: 2.16.0
+
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+        - "10"
+
+  galaxy_tags:
+    - database
+    - oracle
+    - ahf
+
+dependencies:
+  - role: orahost_meta
+  - role: orasw_meta

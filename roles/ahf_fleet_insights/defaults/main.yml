@@ -1,0 +1,197 @@
+---
+# @var ahf_fi_installer_archive:description: >
+# Filename of the installation media in the software repository
+# (My Oracle Support Doc ID 3043060.1).
+#
+# Empty (default): the newest file matching `AHFFI-LINUX_v*.zip` is used from
+# `oracle_sw_source_local` on the Ansible controller or from `oracle_stage_remote`
+# (`oracle_sw_copy: false`). Must be set for `oracle_sw_source_www`.
+# @end
+# @var ahf_fi_installer_archive:example: >
+# ahf_fi_installer_archive: AHFFI-LINUX_v25.2.0.zip
+# @end
+ahf_fi_installer_archive: ""
+
+# @var ahf_fi_upgrade:description: >
+# Patch an existing installation, when the installation media has a newer version.
+# @end
+ahf_fi_upgrade: true
+
+# @var ahf_fi_verify_signature:description: >
+# Verify the signature of the installation media with `openssl`.
+# @end
+ahf_fi_verify_signature: true
+
+# @var ahf_fi_install_user:description: >
+# OS user for the installation and the processes of Fleet Insights.
+# The installer fails with `root`.
+# @end
+ahf_fi_install_user: "{{ oracle_user }}"
+
+# @var ahf_fi_install_dir:description: >
+# Installation directory of Fleet Insights (`INSTALL_DIR`).
+# Plan 4 GB per registered cluster.
+# @end
+ahf_fi_install_dir: "{{ oracle_base }}/ahffi"
+
+# @var ahf_fi_stage_dir:description: >
+# Directory on the target host for the installation media.
+# The directory is removed after the installation, because the
+# properties file contains passwords.
+# @end
+ahf_fi_stage_dir: "{{ oracle_stage }}/ahffi"
+
+# @var ahf_fi_port:description: >
+# Port of the web application (`WEBAPP_PORT`, 1024 - 49151).
+# Must be reachable from all AHF clients and the browsers.
+# @end
+ahf_fi_port: 5005
+
+# @var ahf_fi_start_timeout:description: >
+# Seconds to wait for the web application on `ahf_fi_port` after the installation or start.
+# The role starts Fleet Insights (`ahffi start`), when `ahffi status` does not report it as running.
+# @end
+ahf_fi_start_timeout: 300
+
+# @var ahf_fi_cert_generate:description: >
+# Create a self-signed certificate with Subject Alternative Names (`ahf_fi_cert_names`)
+# and import it with `ahffi importcert`.
+#
+# The certificate of the installer has no Subject Alternative Name. The AHF clients
+# (AHF 26.x) check only the SAN and reject it with
+# `CERTIFICATE_VERIFY_FAILED ... Hostname mismatch`.
+# Ignored, when `ahf_fi_cert_file` is set.
+# @end
+ahf_fi_cert_generate: true
+
+# @var ahf_fi_cert_names:description: >
+# DNS names for the Subject Alternative Name of the generated certificate.
+# The clients must use one of them in `ahf_fleet_insights_url`.
+# The first name is the CN.
+# @end
+ahf_fi_cert_names: "{{ [ansible_hostname, ansible_fqdn] | unique }}"
+
+# @var ahf_fi_cert_days:description: >
+# Validity of the generated certificate in days.
+# @end
+ahf_fi_cert_days: 730
+
+# @var ahf_fi_cert_file:description: >
+# Own certificate (PEM) for Fleet Insights on the Ansible controller, e.g. from an internal CA.
+# Imported with `ahffi importcert` together with `ahf_fi_cert_key_file`.
+# Empty: `ahf_fi_cert_generate` is used.
+# @end
+ahf_fi_cert_file: ""
+
+# @var ahf_fi_cert_key_file:description: >
+# Private key (PEM) of `ahf_fi_cert_file` on the Ansible controller.
+# @end
+ahf_fi_cert_key_file: ""
+
+# @var ahf_fi_public_cert_fetch:description: >
+# Path on the Ansible controller for the public certificate of Fleet Insights
+# (`<ahf_fi_install_dir>/ahf_service/certs/cert.pem`, self-signed by the installer).
+# The AHF clients need it for the registration (role `ahf`: `ahf_fleet_insights_public_cert`).
+# The certificate is also available as fact `ahf_fi_public_cert`.
+# Empty: the certificate is not fetched.
+# @end
+# @var ahf_fi_public_cert_fetch:example: >
+# ahf_fi_public_cert_fetch: "{{ inventory_dir }}/files/ahffi_cert.pem"
+# @end
+ahf_fi_public_cert_fetch: ""
+
+# @var ahf_fi_firewall:description: >
+# Open `ahf_fi_port` in firewalld, when firewalld is running.
+# @end
+ahf_fi_firewall: true
+
+# @var ahf_fi_db_host:description: >
+# Hostname of the repository database (`DB_HOST`). Oracle Database 19c or newer.
+# @end
+ahf_fi_db_host: "{{ inventory_hostname }}"
+
+# @var ahf_fi_db_port:description: >
+# Listener port of the repository database (`DB_PORT`).
+# @end
+ahf_fi_db_port: 1521
+
+# @var ahf_fi_db_service:description: >
+# Service name of the repository database (`DB_SERVICE`).
+# @end
+ahf_fi_db_service: ""
+
+# @var ahf_fi_db_user:description: >
+# Schema user in the repository database (`DB_USER`).
+# Create it with `create_db_user.sql` from the installation media.
+# @end
+ahf_fi_db_user: AHFFI
+
+# @var ahf_fi_db_password:description: >
+# Password of `ahf_fi_db_user` (`DB_PASSWORD`). Use Ansible Vault.
+# @end
+ahf_fi_db_password: ""
+
+# @var ahf_fi_db_wallet:description: >
+# Wallet for the connection to the repository database (`DB_WALLET`).
+# @end
+ahf_fi_db_wallet: ""
+
+# @var ahf_fi_registration_user:description: >
+# Generic registration user for the AHF clients (`GENERIC_REGISTRATION_USER`).
+# Created by the installer, when user and password are set.
+# @end
+ahf_fi_registration_user: ""
+
+# @var ahf_fi_registration_password:description: >
+# Password of `ahf_fi_registration_user` (`GENERIC_REGISTRATION_PASSWORD`).
+# At least 8 characters with a digit, a special character and an uppercase letter.
+# Use Ansible Vault.
+# @end
+ahf_fi_registration_password: ""
+
+# @var ahf_fi_clamscan:description: >
+# Path to `clamscan` for a virus scan of the uploaded collections (`CLAMSCAN`).
+# Increases the processing time.
+# @end
+ahf_fi_clamscan: ""
+
+# @var ahf_fi_manage_packages:description: >
+# Install the required packages (`ahf_fi_packages`) and the yum repository
+# for Oracle Instant Client (`ahf_fi_instantclient_repo`).
+# @end
+ahf_fi_manage_packages: true
+
+# @var ahf_fi_instantclient_repo:description: >
+# Yum repository for Oracle Instant Client on Oracle Linux.
+# Empty: no repository is configured.
+# @end
+ahf_fi_instantclient_repo: >-
+  https://yum.oracle.com/repo/OracleLinux/OL{{ ansible_distribution_major_version }}/oracle/instantclient23/x86_64/
+
+# @var ahf_fi_packages:description: >
+# Packages for Fleet Insights: cronie, iproute, hostname, Java 22 or newer and
+# Oracle Instant Client Basic + SQL*Plus.
+#
+# The Oracle JDK is used under the Oracle No-Fee Terms and Conditions (NFTC).
+# @end
+ahf_fi_packages:
+  - cronie
+  - iproute
+  - hostname
+  - https://download.oracle.com/java/25/latest/jdk-25_linux-x64_bin.rpm
+  - oracle-instantclient-basic
+  - oracle-instantclient-sqlplus
+
+# @var ahf_fi_java_home:description: >
+# Java home (Java 22 or newer) for Fleet Insights (`JAVA_HOME`).
+#
+# Empty (default): the newest Oracle JDK in `/usr/lib/jvm/jdk-*-oracle-x64` is used.
+# The Oracle JDK RPM installs into a directory with the full version,
+# e.g. `/usr/lib/jvm/jdk-25.0.5.0.3-oracle-x64`, which changes with every update.
+# @end
+ahf_fi_java_home: ""
+
+# @var ahf_fi_instant_client:description: >
+# Directory of Oracle Instant Client (`INSTANT_CLIENT`).
+# @end
+ahf_fi_instant_client: /usr/lib/oracle/23/client64

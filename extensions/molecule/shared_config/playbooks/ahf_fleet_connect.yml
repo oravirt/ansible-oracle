@@ -1,0 +1,68 @@
+---
+# Connect the containers of a scenario to AHF Fleet Insights of the scenario ahf
+#
+# 1. Ansible controller: docker network connect <molecule_ahf_network> <container>
+#    (the network is created by the scenario ahf)
+# 2. container: check https://<molecule_ahffi_host>:<molecule_ahffi_port>/ahfservice
+#    => molecule_ahffi_available, used for ahf_fleet_insights_client
+# 3. public certificate of Fleet Insights (self-signed) from the container ahf
+#    => molecule_ahffi_public_cert, used for ahf_fleet_insights_public_cert
+#
+# Without the scenario ahf, AHF is installed without the registration in Fleet Insights.
+- name: Connect container to the network of AHF Fleet Insights
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Check network of AHF Fleet Insights
+      ansible.builtin.command:
+        argv: [docker, network, inspect, "{{ molecule_ahf_network }}", --format, "{{ '{{' }}json .Containers{{ '}}' }}"]
+      delegate_to: localhost
+      register: _mol_network
+      changed_when: false
+      failed_when: false
+
+    - name: Connect container to the network
+      ansible.builtin.command:
+        argv: [docker, network, connect, "{{ molecule_ahf_network }}", "{{ inventory_hostname }}"]
+      delegate_to: localhost
+      changed_when: true
+      when:
+        - _mol_network.rc == 0
+        - (_mol_network.stdout | from_json | default({}, true)).values() | map(attribute='Name')
+          | select('equalto', inventory_hostname) | list | length == 0
+
+- name: Check AHF Fleet Insights
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Check web application of AHF Fleet Insights
+      ansible.builtin.uri:
+        url: "https://{{ molecule_ahffi_host }}:{{ molecule_ahffi_port }}/ahfservice"
+        validate_certs: false
+        status_code: [200, 301, 302, 401]
+        timeout: 10
+      register: _mol_ahffi_check
+      failed_when: false
+
+    - name: Read public certificate of AHF Fleet Insights
+      ansible.builtin.command:
+        argv: [docker, exec, "{{ molecule_ahffi_host }}", cat, /u01/app/oracle/ahffi/ahf_service/certs/cert.pem]
+      delegate_to: localhost
+      register: _mol_ahffi_cert
+      changed_when: false
+      failed_when: false
+
+    - name: Set availability of AHF Fleet Insights
+      ansible.builtin.set_fact:
+        molecule_ahffi_available: >-
+          {{ _mol_ahffi_check.status | default(-1) in [200, 301, 302, 401]
+             and _mol_ahffi_cert.rc == 0 }}
+        molecule_ahffi_public_cert: "{{ _mol_ahffi_cert.stdout | default('') }}"
+
+    - name: Warn about missing AHF Fleet Insights
+      ansible.builtin.debug:
+        msg: >-
+          AHF Fleet Insights is not reachable ({{ _mol_ahffi_check.msg | default('') }}).
+          Start the scenario ahf first (task converge S=ahf).
+          AHF is installed without the registration in Fleet Insights.
+      when: not molecule_ahffi_available | bool

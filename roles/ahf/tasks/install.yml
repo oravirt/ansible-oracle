@@ -1,0 +1,286 @@
+---
+- name: install | Check existing installation
+  ansible.builtin.stat:
+    path: "{{ _ahf_bin }}"
+    get_checksum: false
+  register: _ahf_bin_stat
+
+- name: install | Get installed version
+  ansible.builtin.shell: >-
+    {{ _ahf_bin }}/ahf software get-version --component ahf 2>/dev/null
+    || {{ _ahf_bin }}/ahfctl version 2>/dev/null
+    || {{ _ahf_bin }}/tfactl -version
+  become: true
+  become_user: "{{ _ahf_become_user }}"
+  register: _ahf_version_res
+  changed_when: false
+  failed_when: false
+  when: _ahf_bin_stat.stat.exists
+
+- name: install | Set installed version
+  ansible.builtin.set_fact:
+    _ahf_installed: "{{ _ahf_bin_stat.stat.exists }}"
+    _ahf_installed_version: >-
+      {{ (_ahf_version_res.stdout | default('') | regex_search('AHF version:\s*([0-9]+(\.[0-9]+)+)', '\1')
+          or _ahf_version_res.stdout | default('') | regex_search('([0-9]+\.[0-9]+\.[0-9]+)', '\1')
+          or ['']) | first }}
+
+- name: install | Search installation media
+  when: ahf_installer_archive | length == 0
+  block:
+    - name: install | Search installation media on Ansible controller
+      ansible.builtin.find:
+        paths: "{{ oracle_sw_source_local }}"
+        patterns: "{{ ahf_installer_patterns }}"
+        file_type: any
+      delegate_to: localhost
+      become: false
+      register: _ahf_find_controller
+      when: _ahf_media_source == 'controller'
+
+    - name: install | Search installation media on target host
+      ansible.builtin.find:
+        paths: "{{ oracle_stage_remote }}"
+        patterns: "{{ ahf_installer_patterns }}"
+        file_type: any
+      register: _ahf_find_remote
+      when: _ahf_media_source == 'remote'
+
+- name: install | Set installation media
+  ansible.builtin.set_fact:
+    _ahf_archive: >-
+      {{ ahf_installer_archive if ahf_installer_archive | length > 0
+         else ((_ahf_find_controller.files | default([]) + _ahf_find_remote.files | default([]))
+               | sort(attribute='mtime') | map(attribute='path') | map('basename') | last | default('')) }}
+
+- name: install | Assert installation media
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _ahf_archive | length > 0
+    fail_msg: >-
+      No AHF installation media ({{ ahf_installer_patterns | join(', ') }}) found in
+      {{ oracle_stage_remote if _ahf_media_source == 'remote' else oracle_sw_source_local }}.
+      Download AHF with AutoUpgrade (AHF in autoupgrade_download_patches) or from
+      My Oracle Support (Doc ID 2550798.1) or set ahf_installer_archive.
+  when: not _ahf_installed | bool
+
+- name: install | Info about installation media
+  ansible.builtin.debug:
+    msg: >-
+      installed: {{ _ahf_installed_version if _ahf_installed | bool else 'no' }},
+      media: {{ _ahf_archive if _ahf_archive | length > 0 else 'not found' }}
+      ({{ ahf_installer_version or (_ahf_archive | regex_search(_ahf_version_regex, '\1') or ['unknown']) | first }})
+
+# version from filename - patch 30166242 has no version in the filename => extract it
+- name: install | Set version from filename
+  ansible.builtin.set_fact:
+    _ahf_media_version: >-
+      {{ ahf_installer_version or (_ahf_archive | regex_search(_ahf_version_regex, '\1') or ['']) | first }}
+
+- name: install | Check for installation
+  ansible.builtin.set_fact:
+    _ahf_need_media: >-
+      {{ _ahf_archive | length > 0
+         and (not _ahf_installed | bool
+              or (ahf_upgrade | bool
+                  and (_ahf_media_version | length == 0
+                       or _ahf_installed_version | length == 0
+                       or _ahf_media_version is version(_ahf_installed_version, '>')))) }}
+
+- name: install | Install or upgrade AHF
+  when: _ahf_need_media | bool
+  vars:
+    _ahf_archive_path: >-
+      {{ (oracle_stage_remote + '/' + _ahf_archive) if _ahf_media_source == 'remote'
+         else (ahf_stage_dir + '/' + _ahf_archive) }}
+  block:
+    - name: install | Create stage directory
+      ansible.builtin.file:
+        path: "{{ ahfd }}"
+        state: directory
+        mode: "0755"
+      become: true
+      become_user: "{{ _ahf_become_user }}"
+      loop:
+        - "{{ ahf_stage_dir }}"
+        - "{{ ahf_stage_dir }}/extract"
+        - "{{ ahf_stage_dir }}/setup"
+      loop_control:
+        loop_var: ahfd
+
+    - name: install | Transfer installation media (controller)
+      ansible.builtin.copy:
+        src: "{{ oracle_sw_source_local }}/{{ _ahf_archive }}"
+        dest: "{{ ahf_stage_dir }}/{{ _ahf_archive }}"
+        mode: "0644"
+      become: true
+      become_user: "{{ _ahf_become_user }}"
+      when: _ahf_media_source == 'controller'
+
+    - name: install | Transfer installation media (www)
+      ansible.builtin.get_url:
+        url: "{{ oracle_sw_source_www }}/{{ _ahf_archive }}"
+        dest: "{{ ahf_stage_dir }}/{{ _ahf_archive }}"
+        mode: "0644"
+        client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
+        client_key: "{{ get_url_ssl_client_key | default(omit) }}"
+      environment: "{{ proxy_env }}"
+      become: true
+      become_user: "{{ _ahf_become_user }}"
+      when: _ahf_media_source == 'www'
+
+    - name: install | Extract installation media
+      ansible.builtin.unarchive:
+        src: "{{ _ahf_archive_path }}"
+        dest: "{{ ahf_stage_dir }}/extract"
+        remote_src: true
+      become: true
+      become_user: "{{ _ahf_become_user }}"
+
+    # patch 30166242 could contain AHF-LINUX_v<version>.zip
+    - name: install | Search AHF-LINUX_v*.zip in installation media
+      ansible.builtin.find:
+        paths: "{{ ahf_stage_dir }}/extract"
+        patterns: AHF-LINUX_v*.zip
+        recurse: true
+      register: _ahf_find_inner
+
+    - name: install | Extract AHF-LINUX_v*.zip
+      ansible.builtin.unarchive:
+        src: "{{ _ahf_find_inner.files[0].path }}"
+        dest: "{{ ahf_stage_dir }}/setup"
+        remote_src: true
+      become: true
+      become_user: "{{ _ahf_become_user }}"
+      when: _ahf_find_inner.matched > 0
+
+    - name: install | Search ahf_setup
+      ansible.builtin.find:
+        paths: "{{ ahf_stage_dir }}/{{ 'setup' if _ahf_find_inner.matched > 0 else 'extract' }}"
+        patterns: ahf_setup
+        recurse: true
+      register: _ahf_find_setup
+
+    - name: install | Assert ahf_setup
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _ahf_find_setup.matched == 1
+        fail_msg: "ahf_setup not found in {{ _ahf_archive }}"
+
+    - name: install | Set version of installation media
+      ansible.builtin.set_fact:
+        _ahf_setup: "{{ _ahf_find_setup.files[0].path }}"
+        _ahf_media_version: >-
+          {{ ahf_installer_version
+             or (_ahf_archive | regex_search(_ahf_version_regex, '\1') or [''])[0]
+             or ((_ahf_find_inner.files | map(attribute='path') | first | default(''))
+                 | regex_search(_ahf_version_regex, '\1') or [''])[0] }}
+
+    - name: install | Set installation
+      ansible.builtin.set_fact:
+        _ahf_run_setup: >-
+          {{ not _ahf_installed | bool
+             or (_ahf_media_version | length > 0
+                 and _ahf_installed_version | length > 0
+                 and _ahf_media_version is version(_ahf_installed_version, '>')) }}
+
+    - name: install | Warn about unknown version
+      ansible.builtin.debug:
+        msg: >-
+          Version of {{ _ahf_archive }} or of the installation is unknown
+          (media: '{{ _ahf_media_version }}', installed: '{{ _ahf_installed_version }}').
+          No upgrade - set ahf_installer_version.
+      when:
+        - _ahf_installed | bool
+        - _ahf_media_version | length == 0 or _ahf_installed_version | length == 0
+
+    - name: install | Verify signature of ahf_setup
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - dgst
+          - -sha256
+          - -verify
+          - "{{ _ahf_setup | dirname }}/oracle-tfa.pub"
+          - -signature
+          - "{{ _ahf_setup }}.dat"
+          - "{{ _ahf_setup }}"
+      register: _ahf_signature
+      changed_when: false
+      failed_when: "'Verified OK' not in _ahf_signature.stdout"
+      when:
+        - _ahf_run_setup | bool
+        - ahf_verify_signature | bool
+
+    - name: install | Create directories
+      ansible.builtin.file:
+        path: "{{ ahfd }}"
+        state: directory
+        owner: "{{ _ahf_become_user }}"
+        mode: "0755"
+      become: true
+      loop: "{{ [ahf_loc, ahf_data_dir] | unique }}"
+      loop_control:
+        loop_var: ahfd
+      when:
+        - _ahf_run_setup | bool
+        - not _ahf_installed | bool
+
+    - name: install | Check free space in ahf_data_dir
+      ansible.builtin.command:
+        argv: [df, -Pm, "{{ ahf_data_dir }}"]
+      register: _ahf_df
+      changed_when: false
+      when:
+        - _ahf_run_setup | bool
+        - not _ahf_installed | bool
+
+    - name: install | Assert free space in ahf_data_dir
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - (_ahf_df.stdout_lines[-1].split()[3] | int) >= (ahf_data_dir_min_free_mb | int)
+        fail_msg: >-
+          {{ ahf_data_dir }} has {{ _ahf_df.stdout_lines[-1].split()[3] }} MB free space.
+          AHF requires {{ ahf_data_dir_min_free_mb }} MB (ahf_data_dir_min_free_mb).
+      when:
+        - _ahf_run_setup | bool
+        - not _ahf_installed | bool
+
+    # -data_dir is mandatory for -silent, but only for a new installation
+    - name: install | Run ahf_setup
+      ansible.builtin.shell: >-
+        umask 022 &&
+        {{ _ahf_setup | quote }} -silent
+        {{ '-extract' if not _ahf_root | bool else '-local' }}
+        {% if ahf_perl_home | length > 0 %}
+        -perlhome {{ ahf_perl_home | quote }}
+        {% endif %}
+        {% if not _ahf_installed | bool or not _ahf_root | bool %}
+        -ahf_loc {{ ahf_loc | quote }}
+        {% endif %}
+        {% if not _ahf_installed | bool %}
+        -data_dir {{ ahf_data_dir | quote }}
+        {% endif %}
+        {{ ahf_setup_extra_args | map('quote') | join(' ') }}
+      args:
+        chdir: "{{ _ahf_setup | dirname }}"
+      become: true
+      become_user: "{{ _ahf_become_user }}"
+      register: _ahf_setup_res
+      changed_when: true
+      when: _ahf_run_setup | bool
+
+    - name: install | Result of ahf_setup
+      ansible.builtin.debug:
+        var: _ahf_setup_res.stdout_lines
+      when: _ahf_run_setup | bool
+
+  always:
+    - name: install | Remove stage directory
+      ansible.builtin.file:
+        path: "{{ ahf_stage_dir }}"
+        state: absent
+      become: true

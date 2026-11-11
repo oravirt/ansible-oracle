@@ -192,3 +192,16 @@
 
 - name: Converge manage_db
   ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db
+
+# AHF with Oracle Restart: download with AutoUpgrade (JDK of the GI-Home), role ahf,
+# registered in AHF Fleet Insights of the scenario ahf (network molecule-ahf)
+- name: Download AHF
+  ansible.builtin.import_playbook: ../shared_config/playbooks/ahf_download.yml
+  vars:
+    molecule_ahf_java_home: "{{ oracle_home_gi }}/jdk"
+
+- name: Connect to AHF Fleet Insights
+  ansible.builtin.import_playbook: ../shared_config/playbooks/ahf_fleet_connect.yml
+
+- name: Converge AHF
+  ansible.builtin.import_playbook: ../shared_config/playbooks/ahf_client.yml

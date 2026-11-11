@@ -826,18 +826,19 @@ The following scenarios are existing in the `ansible-oracle profect.
 [options="header" cols="1,4" valign="top"]
 |=======================
 |Stage |Description
-| dbfs | Full stage for installation of RDBMS 19c + Patching and create database. Requires installation media in /vagrant on local host.
+| dbfs | Full stage for installation of RDBMS 19c + Patching and create database, AHF registered as client in AHF Fleet Insights of the scenario `ahf` (see <<ahf-tests>>). Requires installation media in /vagrant on local host.
 | dbfs-ol9 | Full stage for installation of RDBMS 19c + Patching on OL9 and create database. Requires installation media in /vagrant on local host.
 | dbfs-ol10 | Same as `dbfs` on OL10: Oracle AI Database 26ai with module tests. Requires installation media in /vagrant on local host.
 | dataguard | Data Guard on OL10 with Oracle AI Database 26ai: 2 containers `dataguard-1` (primary) and `dataguard-2` (standby created by `oradb_standby`), broker configuration `DG1`. Side-effect: switchover tests, see <<dataguard-tests>>. Requires installation media in /vagrant on local host.
 | default | Stage for testing common and orahost roles with different Distributions.
 | download | Download Patches from support.oracle.com for dbfs stage.
 | golden | Create Golden-Image for installation from dbfs.
+| ahf | AHF Fleet Insights with repository in a container with Oracle Database Free and AHF registered as client: 2 containers `ahf` and `ahf-db`, network `molecule-ahf`. Requires a MOS login (downloads) and `AHFFI-LINUX_v*.zip`, see <<ahf-tests>>.
 |=======================
 
 === Directory for installation media and patches
 
-The scenarios `dbfs`, `dbfs-ol9`, `dbfs-ol10`, `dataguard`, `download` and `golden` mount a local directory as `/vagrant` into the container.
+The scenarios `dbfs`, `dbfs-ol9`, `dbfs-ol10`, `dataguard`, `download`, `golden` and `ahf` mount a local directory as `/vagrant` into the container.
 The local directory must be defined by `MOLECULE_SW_DIR`, there is no default. The path inside the container is always `/vagrant`.
 
 .Set the directory as environment variable
@@ -845,10 +846,18 @@ The local directory must be defined by `MOLECULE_SW_DIR`, there is no default. T
 export MOLECULE_SW_DIR=/mnt/d/ORACLE/sw/linux64
 ----
 
-.or permanently in `extensions/.env.yml` (ignored by git)
+.or permanently in `extensions/.env` (ignored by git)
 ----
-MOLECULE_SW_DIR: /mnt/d/ORACLE/sw/linux64
+MOLECULE_SW_DIR=/mnt/d/ORACLE/sw/linux64
 ----
+
+`extensions/.env` contains `KEY=VALUE` lines in shell syntax (no YAML).
+It is loaded by the Taskfile and `tools/regression.sh` with `tools/load_env.sh`.
+Variables already set in the environment have precedence over the file.
+
+IMPORTANT: `molecule` itself does not read `extensions/.env`.
+Use `task`, the wrapper `tools/molecule.sh` (e.g. `tools/molecule.sh test -s dbfs`)
+or load the file into the shell with `set -a; . ./.env; set +a` before calling `molecule` directly.
 
 === Taskfile
 
@@ -870,6 +879,15 @@ task collection                # reinstall collection after role changes
 The dependency step of molecule installs the collection only when the version in `galaxy.yml` has changed.
 Without the installation, changes in `plugins/` or `roles/` are not used.
 `C=false` skips the installation.
+
+Several molecule runs may run in parallel, but the installation must not replace the collection
+while another run uses it (missing files in the running scenario).
+A lock file (`tools/lock.sh`, default `${TMPDIR:-/tmp}/ansible-oracle-molecule.lock`) prevents this:
+
+* `tools/molecule.sh` holds a shared lock during the molecule run (not for `login` and `list`).
+* `tools/collection_install.sh` needs an exclusive lock and fails immediately, when another run is active.
+  Start the second run with `C=false`.
+* `tools/regression.sh` installs the collection with the exclusive lock and keeps a shared lock for its scenarios.
 
 The tasks are also available from the repository root as `task molecule:<task>`.
 
@@ -894,24 +912,24 @@ IMPORTANT: Make sure that /vagrant has enough free space for installation media 
 
 .set environment variables for support.oracle.com login
 ----
-export MOS_LOGIN=Username
+export MOS_USERNAME=Username
 export MOS_PASSWORD=verySecret
 ----
 
-.or store them in `extensions/.env.yml` (ignored by git)
+.or store them in `extensions/.env` (ignored by git)
 ----
-MOS_LOGIN: Username
-MOS_PASSWORD: 'verySecret'
+MOS_USERNAME=Username
+MOS_PASSWORD='verySecret'
 ----
 
-Environment variables have precedence over `extensions/.env.yml`.
-Quote the password with `'` when it contains special characters like `:`, `#` or `"`.
-Restrict the access to the file with `chmod 600 extensions/.env.yml`.
+Environment variables have precedence over `extensions/.env`.
+Quote the password with `'` when it contains special characters of the shell like a blank, `$`, `#`, `"` or `;`.
+Restrict the access to the file with `chmod 600 extensions/.env`.
 
 .Start download
 ----
 cd extensions
-molecule test -s download
+tools/molecule.sh test -s download
 ----
 
 `molecule test` does the full test of the scenario.
@@ -941,6 +959,73 @@ Executing a full test with `molicule test -s golden` will destroy an existing in
 cd extensions
 molecule test -s golden
 ----
+
+[[ahf-tests]]
+=== Oracle Autonomous Health Framework (AHF)
+
+The roles of link:guides/ahf.adoc[Oracle Autonomous Health Framework (AHF)] are tested in three scenarios.
+The scenario `ahf` is the AHF Fleet Insights server, `dbfs` and `has-ol9` are clients and upload their data into it.
+
+AHF is downloaded with AutoUpgrade in all of them (`extensions/molecule/shared_config/playbooks/ahf_download.yml`):
+latest `autoupgrade.jar` from Oracle, AHF with `target_version: 19`, `platform: LINUX.X64`, `patch: AHF` into `/u01/stage/download` in the container.
+The MOS login is taken from `MOS_USERNAME` / `MOS_PASSWORD` or `extensions/.env` like in the scenario `download`.
+
+.Scenarios for AHF
+[options="header" cols="1,2,3"]
+|=======================
+|Scenario |Installation media |Test
+|`ahf`
+|AHF: AutoUpgrade. +
+AHF Fleet Insights: `AHFFI-LINUX_v*.zip` from `MOLECULE_SW_DIR` or download from My Oracle Support
+(`molecule_ahffi_file`, `molecule_ahffi_aru` in `host_vars/ahf.yml`, Doc ID 3043060.1)
+|Containers `ahf` (Fleet Insights, AHF client) and `ahf-db` (repository database, image `gvenzl/oracle-free:23-slim-faststart`, no Ansible),
+network `molecule-ahf`. +
+prepare: downloads, Oracle Instant Client, schema user `AHFFI` in `FREEPDB1` of `ahf-db` with the grants of `create_db_user.sql` +
+converge: role `ahf_fleet_insights` (certificate with SAN), role `ahf` registered in Fleet Insights +
+idempotence: second run without changes +
+verify: `ahfctl statusahf`, TFA daemon, `ahffi status`, web application on port 5005, registration, tables of `AHFFI`
+|`has-ol9`
+|AHF: AutoUpgrade (Java: JDK of the GI-Home)
+|AHF with Oracle Restart 26ai, ASM and a 19c database, client of Fleet Insights. +
+converge (after `manage_db`): role `ahf` with Compliance scheduler, registration in Fleet Insights +
+verify: `ahfctl statusahf`, TFA daemon, CRS/ASM/RDBMS discovered by TFA (`tfactl print directories`), Compliance autoruns, registration
+|`dbfs`
+|AHF: AutoUpgrade (Java: JDK of the DB-Home)
+|AHF with a 26ai Single Instance, client of Fleet Insights (`extensions/molecule/dbfs/ahf.yml`, after `manage_db`). +
+verify: `ahfctl statusahf`, TFA daemon, registration
+|=======================
+
+The clients use the shared playbooks in `extensions/molecule/shared_config/playbooks`:
+
+* `ahf_fleet_connect.yml`: connects the container to the network `molecule-ahf` (`docker network connect` on the Ansible controller),
+  checks `https://ahf:5005/ahfservice` and reads the certificate of Fleet Insights from the container `ahf`.
+* `ahf_client.yml`: role `ahf` and one TFA collection (`tfactl diagcollect -last 1h`) for the upload.
+  Without a reachable Fleet Insights, AHF is installed without the registration (warning).
+
+.Run the scenarios
+----
+cd extensions
+task converge S=ahf                # Fleet Insights server first
+task verify S=ahf
+task converge S=has-ol9 C=false    # clients, C=false while another run is active
+task verify S=has-ol9
+task converge S=dbfs C=false
+task verify S=dbfs
+----
+
+Notes:
+
+* The variables are in `extensions/molecule/shared_config/inventory/host_vars/ahf.yml` (server)
+  and `group_vars/all/ahf.yml` (URL, network and registration user for all scenarios).
+* The downloads are executed by `prepare` of `ahf` only once after `create`. They are repeated after `destroy`.
+* Fleet Insights needs Internet access for the Oracle JDK and Oracle Instant Client (`yum.oracle.com`, `download.oracle.com`).
+* `molecule_ahf_collect: false` skips the TFA collection of the clients.
+* Oracle recommends 16 GB RAM for Fleet Insights. The containers `ahf` and `ahf-db` need about 5 GB in idle state.
+* The data in Fleet Insights is checked in the web interface, there is no automatic check of the uploaded data.
+* The web interface is published on the host: `https://localhost:5005/ahfservice`
+  (another port with `MOLECULE_AHF_PORT`, the mapping is created with the container).
+  For a container created without the mapping:
+  `docker run -d --name ahf-proxy --network molecule-ahf -p 5005:5005 docker.io/alpine/socat tcp-listen:5005,fork,reuseaddr tcp-connect:ahf:5005`
 
 [[dataguard-tests]]
 === Data Guard tests

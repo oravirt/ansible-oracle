@@ -122,7 +122,6 @@ beginner-dbfs-151-192-168-56-161.nip.io : ok=254  changed=119  unreachable=0    
 
 
 ## ideas
-- orachk installation (AHF). and run at the end and produce HTML report
 - update sql developer version
 - install dbsat
 - install db diff

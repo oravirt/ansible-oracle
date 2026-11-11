@@ -29,6 +29,12 @@ TOOLS_DIR=$(cd "$(dirname "$0")" && pwd)
 EXT_DIR=$(dirname "${TOOLS_DIR}")
 REPO_DIR=$(dirname "${EXT_DIR}")
 
+# MOLECULE_SW_DIR, MOS_USERNAME, ... from extensions/.env (environment has precedence)
+# shellcheck source-path=SCRIPTDIR source=load_env.sh
+. "${TOOLS_DIR}/load_env.sh"
+# shellcheck source-path=SCRIPTDIR source=lock.sh
+. "${TOOLS_DIR}/lock.sh"
+
 SCENARIOS=dbfs,dbfs-sh,has-ol9,dataguard
 STEPS=destroy,converge,module-test
 JOBS=6
@@ -137,11 +143,18 @@ run_scenario() {
 trap 'echo "interrupted"; kill 0' INT TERM
 
 echo "Run ${RUN_ID}: ${RUN_DIR}"
+# exclusive lock for the installation, then shared lock for the molecule runs (tools/lock.sh)
+exec 9>"${MOLECULE_LOCK}"
+if ! flock -x -n 9; then
+  echo "Another molecule run uses the installed collection (lock ${MOLECULE_LOCK})." >&2
+  exit 1
+fi
 echo "Install collection"
 if ! ansible-galaxy collection install --force .. > "${RUN_DIR}/collection-install.log" 2>&1; then
   echo "Installation of the collection failed, see ${RUN_DIR}/collection-install.log" >&2
   exit 1
 fi
+flock -s 9
 
 for s in ${SCENARIOS//,/ }; do
   while [ "$(jobs -rp | wc -l)" -ge "${JOBS}" ]; do
