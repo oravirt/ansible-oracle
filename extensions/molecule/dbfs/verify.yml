@@ -28,3 +28,17 @@
         msg: >-
           {{ (_verify_state.content | b64decode | from_json).fleet_insights
              | default('not registered (scenario ahf not running during converge)', true) }}
+
+    # test upload into Fleet Insights (uploads TestUploadFile.txt), only when registered
+    - name: Test upload into AHF Fleet Insights
+      ansible.builtin.command: /opt/oracle.ahf/bin/ahf configuration check --type fleet-insights
+      register: _verify_upload
+      changed_when: false
+      when: (_verify_state.content | b64decode | from_json).fleet_insights | default({}) | length > 0
+
+    - name: Assert upload into AHF Fleet Insights
+      ansible.builtin.assert:
+        that:
+          - "'configured correctly' in _verify_upload.stdout"
+        fail_msg: "{{ _verify_upload.stdout_lines | default([]) }}"
+      when: _verify_upload is not skipped

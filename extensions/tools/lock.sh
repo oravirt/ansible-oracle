@@ -4,5 +4,7 @@
 # - molecule runs (tools/molecule.sh, tools/regression.sh) hold a shared lock
 # - the installation of the collection (tools/collection_install.sh) needs an exclusive lock
 # => the collection is not replaced while a molecule run uses it
-MOLECULE_LOCK="${MOLECULE_LOCK:-${TMPDIR:-/tmp}/ansible-oracle-molecule.lock}"
+# in the checkout, not in TMPDIR: nix-shell sets an own TMPDIR per shell
+# => all shells of the same checkout use the same lock file
+MOLECULE_LOCK="${MOLECULE_LOCK:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.molecule.lock}"
 export MOLECULE_LOCK

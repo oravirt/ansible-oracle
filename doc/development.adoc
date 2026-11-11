@@ -882,7 +882,7 @@ Without the installation, changes in `plugins/` or `roles/` are not used.
 
 Several molecule runs may run in parallel, but the installation must not replace the collection
 while another run uses it (missing files in the running scenario).
-A lock file (`tools/lock.sh`, default `${TMPDIR:-/tmp}/ansible-oracle-molecule.lock`) prevents this:
+A lock file (`tools/lock.sh`, default `extensions/.molecule.lock` in the checkout, the same for all shells) prevents this:
 
 * `tools/molecule.sh` holds a shared lock during the molecule run (not for `login` and `list`).
 * `tools/collection_install.sh` needs an exclusive lock and fails immediately, when another run is active.
