@@ -83,3 +83,23 @@
                         'status': 'passed' if _got == tc.rsp else 'failed',
                         'msg': tc.id ~ ': dbca rsp expected ' ~ tc.rsp ~ ', got ' ~ _got}] }}
   when: tc.rsp is defined
+
+- name: "{{ tc.id }} | check keys not set in dbca response file"
+  vars:
+    odb: "{{ _tc_dbs[0] }}"
+    _rsp_file: >-
+      {{ _repo_roles }}/oradb_manage_db/templates/dbca-create-db.rsp.{{ db_homes_config[odb.home].version }}.j2
+    _got: >-
+      {%- set ns = namespace(l=[]) -%}
+      {%- for l in lookup('ansible.builtin.template', _rsp_file, template_vars={'dbh': odb}).split('\n') -%}
+      {%-   if l is match('^[A-Za-z]+=') and l.split('=', 1)[0] in tc.rsp_absent -%}
+      {%-     set ns.l = ns.l + [l] -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ ns.l }}
+  ansible.builtin.set_fact:
+    tc_results: >-
+      {{ tc_results + [{'id': tc.id ~ '.rsp_absent',
+                        'status': 'passed' if _got | length == 0 else 'failed',
+                        'msg': tc.id ~ ': dbca rsp must not contain ' ~ tc.rsp_absent ~ ', got ' ~ _got}] }}
+  when: tc.rsp_absent is defined
