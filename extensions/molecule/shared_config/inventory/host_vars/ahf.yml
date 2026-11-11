@@ -1,0 +1,37 @@
+---
+# Scenario ahf: AHF Fleet Insights with repository in container ahf-db (Oracle Database Free)
+# and AHF registered as client. dbfs and has-ol9 upload their data into it.
+#
+# prepare:  download of AHF (AutoUpgrade) and AHF Fleet Insights (My Oracle Support)
+#           into /u01/stage/download, schema user in ahf-db
+# converge: roles ahf_fleet_insights and ahf
+
+# installation media on the target host
+# (group_vars/all/oracle_db.yml sets oracle_sw_copy: true)
+oracle_sw_copy: false
+oracle_stage_remote: /u01/stage/download
+
+# AHF Fleet Insights from My Oracle Support (Doc ID 3043060.1):
+# https://updates.oracle.com/Orion/Services/download/<file>?aru=<aru>&patch_file=<file>
+# AHFFI-LINUX_v*.zip in MOLECULE_SW_DIR (/vagrant) is used, when it exists.
+molecule_ahffi_file: AHFFI-LINUX_v25.2.1.zip
+molecule_ahffi_aru: 28242811
+
+# repository database (container ahf-db, image gvenzl/oracle-free)
+molecule_ahffi_system_password: Molecule_Sys_2026
+ahf_fi_db_host: ahf-db
+ahf_fi_db_port: 1521
+ahf_fi_db_service: FREEPDB1
+ahf_fi_db_user: AHFFI
+ahf_fi_db_password: Ahffi_Molecule_2026
+# no firewalld in the container
+ahf_fi_firewall: false
+
+# AHF client on the Fleet Insights server
+ahf_fleet_insights_client: true
+ahf_tfa_settings:
+  autodiagcollect: "OFF"
+ahf_compliance_autostart: true
+ahf_compliance_settings:
+  autostart_client:
+    COLLECTION_RETENTION: 10

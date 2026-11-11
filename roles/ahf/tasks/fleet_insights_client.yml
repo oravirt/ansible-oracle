@@ -1,0 +1,91 @@
+---
+- name: fleet_insights_client | Set registration
+  ansible.builtin.set_fact:
+    _ahf_fleet_insights_old: "{{ _ahf_state_old.fleet_insights | default({}) }}"
+    _ahf_fleet_insights_cert_file: "{{ ahf_loc }}/oracle.ahf.fleet_insights.pem"
+    # the checksum of the certificate triggers a new registration after a change
+    _ahf_fleet_insights_new: >-
+      {{ {'url': ahf_fleet_insights_url, 'user': ahf_fleet_insights_user,
+          'os_user': ahf_fleet_insights_os_user,
+          'cert': ahf_fleet_insights_public_cert | hash('sha256') if ahf_fleet_insights_public_cert | length > 0 else ''}
+         if ahf_fleet_insights_client | bool else {} }}
+
+- name: fleet_insights_client | Check version of AHF
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _ahf_installed_version | length == 0 or _ahf_installed_version is version('24.9', '>=')
+    fail_msg: "AHF Fleet Insights requires AHF 24.9 or newer (installed: {{ _ahf_installed_version }})."
+  when: ahf_fleet_insights_client | bool
+
+- name: fleet_insights_client | Public certificate of Fleet Insights
+  ansible.builtin.copy:
+    content: "{{ ahf_fleet_insights_public_cert }}"
+    dest: "{{ _ahf_fleet_insights_cert_file }}"
+    owner: root
+    # AHF-07275: Restrict the certificate file to the owner only
+    mode: "0600"
+  become: true
+  when:
+    - ahf_fleet_insights_client | bool
+    - ahf_fleet_insights_public_cert | length > 0
+
+# The password is requested twice interactively by the ahf command
+# ('Enter ODBDA registration user password', 'Re-enter ...')
+- name: fleet_insights_client | Register client
+  ansible.builtin.expect:
+    command: >-
+      {{ _ahf_bin }}/ahf configuration set --type fleet-insights
+      --user-name {{ ahf_fleet_insights_user | quote }}
+      --url {{ ahf_fleet_insights_url | quote }}
+      {% if ahf_fleet_insights_public_cert | length > 0 %}
+      --public-cert {{ _ahf_fleet_insights_cert_file | quote }}
+      {% endif %}
+      {% if ahf_fleet_insights_os_user | length > 0 %}
+      --os-user {{ ahf_fleet_insights_os_user | quote }}
+      {% endif %}
+    responses:
+      (?i)password: "{{ ahf_fleet_insights_password }}"
+    timeout: "{{ ahf_command_timeout }}"
+  become: true
+  no_log: true
+  register: _ahf_fleet_insights_register
+  failed_when: false
+  when:
+    - ahf_fleet_insights_client | bool
+    - _ahf_fleet_insights_old != _ahf_fleet_insights_new or ahf_fleet_insights_force_register | bool
+
+# no_log hides the output => show the result without the password
+- name: fleet_insights_client | Result of registration
+  ansible.builtin.debug:
+    msg: "{{ _ahf_fleet_insights_register.stdout_lines | default([]) }}"
+  when: _ahf_fleet_insights_register is not skipped
+
+- name: fleet_insights_client | Assert registration
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _ahf_fleet_insights_register.rc | default(1) == 0
+    fail_msg: >-
+      Registration in AHF Fleet Insights failed (rc {{ _ahf_fleet_insights_register.rc | default('-') }}),
+      see the result above. CERTIFICATE_VERIFY_FAILED: set ahf_fleet_insights_public_cert.
+  when: _ahf_fleet_insights_register is not skipped
+
+# deregister only, when the client has been registered by this role
+- name: fleet_insights_client | Deregister client
+  ansible.builtin.command:
+    argv:
+      - "{{ _ahf_bin }}/ahf"
+      - configuration
+      - unset
+      - --type
+      - fleet-insights
+  become: true
+  changed_when: true
+  when:
+    - not ahf_fleet_insights_client | bool
+    - _ahf_fleet_insights_old | length > 0
+
+- name: fleet_insights_client | Set state of registration
+  ansible.builtin.set_fact:
+    _ahf_fleet_insights_state: "{{ _ahf_fleet_insights_new }}"

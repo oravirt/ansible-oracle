@@ -1,0 +1,48 @@
+---
+# @meta description: >
+# _Experimental_: the role is under development. Breaking changes can happen at any time
+# and are not always documented.
+#
+# Install Oracle AHF Fleet Insights as central web interface for the
+# evaluation of AHF data (Compliance results, TFA collections, Insights)
+# from many database servers.
+#
+# The AHF clients (role `ahf` with `ahf_fleet_insights_client: true`) upload
+# their data to Fleet Insights. The database servers are not contacted
+# for the evaluation.
+#
+# Fleet Insights requires a repository database (19c or newer) with the
+# schema user from `create_db_user.sql` of the installation media.
+#
+# Fleet Insights has no systemd unit, its processes are started by cron entries of
+# `ahf_fi_install_user`. The role starts Fleet Insights (`ahffi start`), when it is not running,
+# and waits for the web application on `ahf_fi_port`.
+#
+# See `doc/guides/ahf.adoc`.
+# @end
+# @meta author: [Thorsten Bruhns]
+galaxy_info:
+  role_name: ahf_fleet_insights
+  author: Thorsten Bruhns
+  description: Install Oracle AHF Fleet Insights
+  company: OPITZ CONSULTING
+
+  license: license (MIT)
+
+  min_ansible_version: 2.16.0
+
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+        - "10"
+
+  galaxy_tags:
+    - database
+    - oracle
+    - ahf
+
+dependencies:
+  - role: orahost_meta
+  - role: orasw_meta

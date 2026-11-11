@@ -43,8 +43,8 @@ tasks:
     preconditions:
       - sh: >-
           [ -n "${MOLECULE_SW_DIR:-}" ]
-          || grep -q '^MOLECULE_SW_DIR:' .env.yml 2>/dev/null
-        msg: "MOLECULE_SW_DIR is not set. Export it or add it to extensions/.env.yml"
+          || grep -q '^MOLECULE_SW_DIR=' .env 2>/dev/null
+        msg: "MOLECULE_SW_DIR is not set. Export it or add it to extensions/.env"
 
   final:
     desc: "New environments: destroy, converge, module-test (S=, J=, M=)"

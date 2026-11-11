@@ -1,10 +1,59 @@
 ---
-# This is an example playbook to execute Ansible tests.
-
 - name: Verify
   hosts: all
   gather_facts: false
+  become: true
   tasks:
-    - name: Example assertion
+    - name: Status of AHF
+      ansible.builtin.command: /opt/oracle.ahf/bin/ahfctl statusahf
+      register: _verify_ahf
+      changed_when: false
+
+    - name: Show status of AHF
+      ansible.builtin.debug:
+        var: _verify_ahf.stdout_lines
+
+    - name: Check TFA daemon
+      ansible.builtin.command: pgrep -f TFAMain
+      changed_when: false
+
+    # Oracle Restart: TFA discovers GI-Home, ASM and the databases
+    # => trace directories with the components CRS, ASM and RDBMS
+    - name: Trace directories discovered by TFA
+      ansible.builtin.command: /opt/oracle.ahf/bin/tfactl print directories
+      register: _verify_directories
+      changed_when: false
+
+    - name: Show trace directories discovered by TFA
+      ansible.builtin.debug:
+        var: _verify_directories.stdout_lines
+
+    - name: Assert Oracle Restart, ASM and database discovered by TFA
       ansible.builtin.assert:
-        that: true
+        that:
+          - _verify_directories.stdout is search('CRS')
+          - _verify_directories.stdout is search('ASM')
+          - _verify_directories.stdout is search('RDBMS')
+
+    - name: Compliance autoruns
+      ansible.builtin.command: /opt/oracle.ahf/bin/orachk -get all -id all
+      register: _verify_autoruns
+      changed_when: false
+
+    - name: Assert compliance settings
+      ansible.builtin.assert:
+        that:
+          - _verify_autoruns.stdout is search('COLLECTION_RETENTION = 10')
+        fail_msg: "{{ _verify_autoruns.stdout_lines }}"
+
+    # registered only, when AHF Fleet Insights of the scenario ahf was reachable during converge
+    - name: Read state file of role ahf
+      ansible.builtin.slurp:
+        src: /opt/oracle.ahf.ansible.json
+      register: _verify_state
+
+    - name: Registration in AHF Fleet Insights
+      ansible.builtin.debug:
+        msg: >-
+          {{ (_verify_state.content | b64decode | from_json).fleet_insights
+             | default('not registered (scenario ahf not running during converge)', true) }}

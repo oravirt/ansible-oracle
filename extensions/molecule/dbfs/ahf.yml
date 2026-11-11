@@ -1,0 +1,18 @@
+---
+# AHF in scenario dbfs (imported by converge.yml after manage_db)
+#
+# 1. download of AHF with AutoUpgrade (JDK of the DB-Home)
+# 2. connect the container to AHF Fleet Insights of the scenario ahf (network molecule-ahf)
+# 3. role ahf, registered in Fleet Insights when it is reachable
+# 4. TFA collection => upload into Fleet Insights (molecule_ahf_collect)
+
+- name: Download AHF
+  ansible.builtin.import_playbook: ../shared_config/playbooks/ahf_download.yml
+  vars:
+    molecule_ahf_java_home: /u01/app/oracle/product/26/db_26.1/jdk
+
+- name: Connect to AHF Fleet Insights
+  ansible.builtin.import_playbook: ../shared_config/playbooks/ahf_fleet_connect.yml
+
+- name: Converge AHF
+  ansible.builtin.import_playbook: ../shared_config/playbooks/ahf_client.yml

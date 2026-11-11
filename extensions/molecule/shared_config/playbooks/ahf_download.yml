@@ -1,0 +1,88 @@
+---
+# Download of AHF with AutoUpgrade into the container (scenarios ahf, has-ol9)
+#
+# - latest autoupgrade.jar from Oracle into oracle_stage
+# - AHF (target_version 19, LINUX.X64, patch AHF) into molecule_ahf_download_dir
+# - MOS credentials: MOS_USERNAME / MOS_PASSWORD (group_vars/all/mos.yml)
+#
+# Variables:
+#   molecule_ahf_download_hosts  hosts of the play, default all
+#   molecule_ahf_download_dir  target directory, default /u01/stage/download
+#   molecule_ahf_java_home     Java for AutoUpgrade, e.g. the JDK of an ORACLE_HOME.
+#                              Empty (default): java-21-openjdk is installed.
+- name: Download AHF with AutoUpgrade
+  hosts: "{{ molecule_ahf_download_hosts | default('all') }}"
+  gather_facts: true
+  any_errors_fatal: true
+  become: true
+  vars:
+    # AutoUpgrade on the target host, installation media in the container
+    autoupgrade_run_local: false
+    oracle_sw_copy: false
+    autoupgrade_java_home: "{{ molecule_ahf_java_home | default('') }}"
+    autoupgrade_download_latest: true
+    autoupgrade_jar_filesource: "{{ oracle_stage }}/autoupgrade.jar"
+    autoupgrade_download_dir: "{{ molecule_ahf_download_dir | default('/u01/stage/download') }}"
+    autoupgrade_download_use_oracle_sw_patches: false
+    autoupgrade_download_patches:
+      - target_version: 19
+        platform: LINUX.X64
+        patch: AHF
+  tasks:
+    - name: Assert credentials
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - mos_login | length > 0
+          - mos_password | length > 0
+        fail_msg: >-
+          Set MOS_USERNAME and MOS_PASSWORD in shell environment or in extensions/.env.
+
+    - name: Install Java for AutoUpgrade
+      ansible.builtin.package:
+        name: java-21-openjdk
+      when: autoupgrade_java_home | length == 0
+
+    # keystore.yml uses ansible.builtin.expect
+    - name: Install pexpect for AutoUpgrade keystore
+      ansible.builtin.package:
+        name: python3-pexpect
+
+    - name: Create oracle_stage and download directory
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ oracle_user }}"
+        group: "{{ oracle_group }}"
+        mode: "0755"
+      loop:
+        - "{{ oracle_stage }}"
+        - "{{ autoupgrade_download_dir }}"
+
+    - name: Install autoupgrade.jar
+      ansible.builtin.import_role:
+        name: opitzconsulting.ansible_oracle.autoupgrade
+        tasks_from: install.yml
+
+    - name: Download AHF
+      ansible.builtin.import_role:
+        name: opitzconsulting.ansible_oracle.autoupgrade
+        tasks_from: download_patches.yml
+
+    - name: Search downloaded AHF
+      ansible.builtin.find:
+        paths: "{{ autoupgrade_download_dir }}"
+        patterns: [AHF-LINUX_v*.zip, p30166242_*.zip]
+      register: _ahf_download_find
+
+    - name: Show download directory
+      ansible.builtin.command: ls -l {{ autoupgrade_download_dir }}
+      register: _ahf_download_ls
+      changed_when: false
+
+    - name: Assert downloaded AHF
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _ahf_download_find.matched > 0
+        fail_msg: "No AHF installation media found: {{ _ahf_download_ls.stdout_lines }}"

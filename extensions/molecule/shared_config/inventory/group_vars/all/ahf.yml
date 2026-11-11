@@ -1,0 +1,15 @@
+---
+# AHF Fleet Insights in the scenario ahf (container ahf, repository database in container ahf-db)
+# The scenarios dbfs and has-ol9 upload their data into it:
+# their container is connected to the docker network molecule_ahf_network
+# (shared_config/playbooks/ahf_fleet_connect.yml).
+molecule_ahf_network: molecule-ahf
+molecule_ahffi_host: ahf
+molecule_ahffi_port: 5005
+
+# generic registration user of Fleet Insights (server: ahf_fi_*, clients: ahf_fleet_insights_*)
+ahf_fi_registration_user: ahfclient
+ahf_fi_registration_password: Molecule#Reg2026
+ahf_fleet_insights_url: "https://{{ molecule_ahffi_host }}:{{ molecule_ahffi_port }}"
+ahf_fleet_insights_user: "{{ ahf_fi_registration_user }}"
+ahf_fleet_insights_password: "{{ ahf_fi_registration_password }}"

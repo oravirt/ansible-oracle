@@ -1,0 +1,28 @@
+---
+- name: uninstall | Check existing installation
+  ansible.builtin.stat:
+    path: "{{ _ahf_bin }}/ahfctl"
+    get_checksum: false
+  register: _ahf_ahfctl_stat
+
+- name: uninstall | Uninstall AHF
+  ansible.builtin.command:
+    argv: >-
+      {{ [_ahf_bin + '/ahfctl', 'uninstall', '-silent']
+         + (['-deleterepo'] if ahf_uninstall_delete_repo | bool else []) }}
+  become: true
+  become_user: "{{ _ahf_become_user }}"
+  register: _ahf_uninstall_res
+  changed_when: true
+  when: _ahf_ahfctl_stat.stat.exists
+
+- name: uninstall | Result of uninstall
+  ansible.builtin.debug:
+    var: _ahf_uninstall_res.stdout_lines
+  when: _ahf_ahfctl_stat.stat.exists
+
+- name: uninstall | Remove state file
+  ansible.builtin.file:
+    path: "{{ ahf_ansible_state_file }}"
+    state: absent
+  become: true

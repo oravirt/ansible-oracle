@@ -1,0 +1,99 @@
+---
+# The installer creates a self-signed certificate without Subject Alternative Name (SAN).
+# AHF clients check only the SAN => replace it with a certificate with SAN or an own certificate.
+# 'ahffi importcert' restarts Fleet Insights.
+- name: certificate | Certificate with SAN or own certificate
+  become: true
+  become_user: "{{ ahf_fi_install_user }}"
+  vars:
+    _ahf_fi_cert_dir: "{{ ahf_fi_install_dir }}/ansible_cert"
+    _ahf_fi_cert_current: "{{ ahf_fi_install_dir }}/ahf_service/certs/cert.pem"
+    _ahf_fi_cert_own: "{{ ahf_fi_cert_file | length > 0 }}"
+  block:
+    - name: certificate | Read current certificate
+      ansible.builtin.command:
+        argv: [openssl, x509, -in, "{{ _ahf_fi_cert_current }}", -noout, -fingerprint, -sha256, -ext, subjectAltName]
+      register: _ahf_fi_cert_info
+      changed_when: false
+      failed_when: false
+
+    - name: certificate | Fingerprint of own certificate
+      ansible.builtin.command:
+        argv: [openssl, x509, -in, "{{ ahf_fi_cert_file }}", -noout, -fingerprint, -sha256]
+      delegate_to: localhost
+      become: false
+      register: _ahf_fi_cert_own_info
+      changed_when: false
+      when: _ahf_fi_cert_own | bool
+
+    # own certificate: different fingerprint, generated: a name is missing in the SAN
+    - name: certificate | Check for import
+      ansible.builtin.set_fact:
+        _ahf_fi_cert_import: >-
+          {{ (_ahf_fi_cert_own_info.stdout | default('') | trim) not in _ahf_fi_cert_info.stdout
+             if _ahf_fi_cert_own | bool
+             else (ahf_fi_cert_names | map('regex_replace', '^', 'DNS:')
+                   | reject('in', _ahf_fi_cert_info.stdout) | list | length > 0) }}
+
+    - name: certificate | Import certificate
+      when: _ahf_fi_cert_import | bool
+      block:
+        - name: certificate | Create directory
+          ansible.builtin.file:
+            path: "{{ _ahf_fi_cert_dir }}"
+            state: directory
+            mode: "0700"
+
+        - name: certificate | Copy own certificate and key
+          ansible.builtin.copy:
+            src: "{{ item.src }}"
+            dest: "{{ _ahf_fi_cert_dir }}/{{ item.dest }}"
+            mode: "0600"
+          loop:
+            - {src: "{{ ahf_fi_cert_file }}", dest: cert.pem}
+            - {src: "{{ ahf_fi_cert_key_file }}", dest: key.pem}
+          loop_control:
+            label: "{{ item.dest }}"
+          when: _ahf_fi_cert_own | bool
+
+        - name: certificate | Create self-signed certificate with SAN
+          ansible.builtin.command:
+            argv:
+              - openssl
+              - req
+              - -x509
+              - -newkey
+              - rsa:4096
+              - -nodes
+              - -keyout
+              - "{{ _ahf_fi_cert_dir }}/key.pem"
+              - -out
+              - "{{ _ahf_fi_cert_dir }}/cert.pem"
+              - -days
+              - "{{ ahf_fi_cert_days | string }}"
+              - -subj
+              - "/CN={{ ahf_fi_cert_names[0] }}"
+              - -addext
+              - "subjectAltName={{ ahf_fi_cert_names | map('regex_replace', '^', 'DNS:') | join(',') }}"
+          changed_when: true
+          when: not _ahf_fi_cert_own | bool
+
+        - name: certificate | Import certificate into Fleet Insights
+          ansible.builtin.command:
+            argv:
+              - "{{ _ahf_fi_ahffi }}"
+              - importcert
+              - -cert
+              - "{{ _ahf_fi_cert_dir }}/cert.pem"
+              - -key
+              - "{{ _ahf_fi_cert_dir }}/key.pem"
+            chdir: "{{ ahf_fi_install_dir }}"
+          register: _ahf_fi_importcert
+          changed_when: true
+          failed_when: "_ahf_fi_importcert.rc != 0 or 'Successfully imported' not in _ahf_fi_importcert.stdout"
+
+      always:
+        - name: certificate | Remove directory with the private key
+          ansible.builtin.file:
+            path: "{{ _ahf_fi_cert_dir }}"
+            state: absent

@@ -1,0 +1,101 @@
+---
+- name: install | Install or patch Fleet Insights
+  become: true
+  become_user: "{{ ahf_fi_install_user }}"
+  vars:
+    _ahf_fi_archive_path: >-
+      {{ (oracle_stage_remote + '/' + _ahf_fi_archive) if _ahf_fi_media_source == 'remote'
+         else (ahf_fi_stage_dir + '/' + _ahf_fi_archive) }}
+    _ahf_fi_setup_dir: "{{ ahf_fi_stage_dir }}/setup"
+  block:
+    - name: install | Create directories
+      ansible.builtin.file:
+        path: "{{ ahfd }}"
+        state: directory
+        mode: "0700"
+      loop:
+        - "{{ ahf_fi_stage_dir }}"
+        - "{{ ahf_fi_stage_dir }}/extract"
+        - "{{ ahf_fi_stage_dir }}/setup"
+        - "{{ ahf_fi_stage_dir }}/tmp"
+        - "{{ ahf_fi_install_dir }}"
+      loop_control:
+        loop_var: ahfd
+
+    - name: install | Transfer installation media (controller)
+      ansible.builtin.copy:
+        src: "{{ oracle_sw_source_local }}/{{ _ahf_fi_archive }}"
+        dest: "{{ ahf_fi_stage_dir }}/{{ _ahf_fi_archive }}"
+        mode: "0644"
+      when: _ahf_fi_media_source == 'controller'
+
+    - name: install | Transfer installation media (www)
+      ansible.builtin.get_url:
+        url: "{{ oracle_sw_source_www }}/{{ _ahf_fi_archive }}"
+        dest: "{{ ahf_fi_stage_dir }}/{{ _ahf_fi_archive }}"
+        mode: "0644"
+        client_cert: "{{ get_url_ssl_client_cert | default(omit) }}"
+        client_key: "{{ get_url_ssl_client_key | default(omit) }}"
+      environment: "{{ proxy_env }}"
+      when: _ahf_fi_media_source == 'www'
+
+    # README.txt, ahf_fleet_setup_onprem.zip, ahf_fleet_setup_onprem.dat, oracle-ahffi.pub
+    - name: install | Extract installation media
+      ansible.builtin.unarchive:
+        src: "{{ _ahf_fi_archive_path }}"
+        dest: "{{ ahf_fi_stage_dir }}/extract"
+        remote_src: true
+
+    - name: install | Verify signature of installation media
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - dgst
+          - -sha256
+          - -verify
+          - oracle-ahffi.pub
+          - -signature
+          - ahf_fleet_setup_onprem.dat
+          - ahf_fleet_setup_onprem.zip
+        chdir: "{{ ahf_fi_stage_dir }}/extract"
+      register: _ahf_fi_signature
+      changed_when: false
+      failed_when: "'Verified OK' not in _ahf_fi_signature.stdout"
+      when: ahf_fi_verify_signature | bool
+
+    - name: install | Extract ahf_fleet_setup_onprem.zip
+      ansible.builtin.unarchive:
+        src: "{{ ahf_fi_stage_dir }}/extract/ahf_fleet_setup_onprem.zip"
+        dest: "{{ _ahf_fi_setup_dir }}"
+        remote_src: true
+
+    - name: install | Create properties file
+      ansible.builtin.template:
+        src: properties.txt.j2
+        dest: "{{ ahf_fi_stage_dir }}/ahffi.properties"
+        mode: "0600"
+      no_log: true
+      when: not _ahf_fi_stat.stat.exists
+
+    # new installation: -quiet <properties>, patch: -quiet without properties
+    - name: install | Run ahf_fleet_setup
+      ansible.builtin.command:
+        argv: >-
+          {{ ['./ahf_fleet_setup', '-quiet']
+             + ([ahf_fi_stage_dir + '/ahffi.properties'] if not _ahf_fi_stat.stat.exists else []) }}
+        chdir: "{{ _ahf_fi_setup_dir }}"
+      environment:
+        AHFFI_TMP_DIR: "{{ ahf_fi_stage_dir }}/tmp"
+      register: _ahf_fi_setup_res
+      changed_when: true
+
+    - name: install | Result of ahf_fleet_setup
+      ansible.builtin.debug:
+        var: _ahf_fi_setup_res.stdout_lines
+
+  always:
+    # the properties file contains passwords
+    - name: install | Remove stage directory
+      ansible.builtin.file:
+        path: "{{ ahf_fi_stage_dir }}"
+        state: absent

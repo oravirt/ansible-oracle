@@ -1,0 +1,31 @@
+---
+_ahf_root: "{{ ahf_install_mode == 'root' }}"
+_ahf_home: "{{ ahf_loc }}/oracle.ahf"
+_ahf_bin: "{{ _ahf_home }}/bin"
+
+# user for ahf_setup and the AHF commands
+_ahf_become_user: "{{ 'root' if _ahf_root | bool else oracle_user }}"
+
+# all directories of ahf_loc and ahf_data_dir: /opt/app => ['/opt', '/opt/app']
+# root installation: all of them must be owned by root (AHF-00014 for the data directory)
+_ahf_root_paths: >-
+  {%- set ns = namespace(dirs=[]) -%}
+  {%- for p in [ahf_loc, ahf_data_dir] -%}
+  {%-   set ns2 = namespace(path='') -%}
+  {%-   for d in (p | trim('/')).split('/') if d | length > 0 -%}
+  {%-     set ns2.path = ns2.path ~ '/' ~ d -%}
+  {%-     if ns2.path not in ns.dirs -%}{%- set ns.dirs = ns.dirs + [ns2.path] -%}{%- endif -%}
+  {%-   endfor -%}
+  {%- endfor -%}
+  {{ ns.dirs }}
+
+# AHF-LINUX_v26.10.0.zip => 26.10.0
+_ahf_version_regex: 'AHF-LINUX_v([0-9]+(\.[0-9]+)+)'
+
+# where is the media?
+# controller: oracle_sw_source_local + oracle_sw_copy
+# www:        oracle_sw_source_www + oracle_sw_copy
+# remote:     oracle_stage_remote on target host (oracle_sw_copy: false, e.g. NFS)
+_ahf_media_source: >-
+  {{ 'remote' if not oracle_sw_copy | bool
+     else ('controller' if is_sw_source_local | bool else 'www') }}

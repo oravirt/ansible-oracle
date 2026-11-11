@@ -1,0 +1,60 @@
+---
+# AHF and AHF Fleet Insights (roles ahf, ahf_fleet_insights)
+#
+# instances:   ahf     - AHF Fleet Insights and AHF client (Oracle Linux 9)
+#              ahf-db  - repository database (Oracle Database Free, image without Ansible)
+#              network molecule-ahf: dbfs and has-ol9 are connected to it and upload
+#              their data into Fleet Insights (shared_config/playbooks/ahf_fleet_connect.yml)
+# prepare:     oracle user, download of AHF with AutoUpgrade and of AHF Fleet Insights
+#              from My Oracle Support (MOS_USERNAME / MOS_PASSWORD), Instant Client,
+#              schema user in the repository database (create_db_user.sql)
+# converge:    role ahf_fleet_insights, role ahf registered in Fleet Insights
+# verify:      AHF, Fleet Insights, registration, repository
+dependency:
+  name: galaxy
+  enabled: true
+
+driver:
+  name: docker
+platforms:
+  - name: ahf
+    image: "${MOLECULE_IMAGE:-quay.io/rendanic/docker-ol9-ansible:latest}"
+    pre_build_image: true
+    # The following 4 lines are needed only for making systemd work
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - ${MOLECULE_SW_DIR}:/vagrant:ro
+    cgroupns_mode: host
+    privileged: true
+    # web interface of Fleet Insights for the browser on the host: https://localhost:5005/ahfservice
+    published_ports:
+      - "${MOLECULE_AHF_PORT:-5005}:5005"
+    groups:
+      - ahf_server
+    docker_networks:
+      - name: molecule-ahf
+    networks:
+      - name: molecule-ahf
+
+  # repository database of Fleet Insights - not managed by Ansible (no Python in the image)
+  - name: ahf-db
+    image: "${MOLECULE_AHF_DB_IMAGE:-docker.io/gvenzl/oracle-free:23-slim-faststart}"
+    pre_build_image: true
+    env:
+      ORACLE_PASSWORD: Molecule_Sys_2026
+    groups:
+      - ahf_repository
+    networks:
+      - name: molecule-ahf
+
+verifier:
+  name: ansible
+
+provisioner:
+  name: ansible
+  inventory:
+    links:
+      # MOS credentials (group_vars/all), variables of host ahf (host_vars/ahf.yml)
+      group_vars: ../shared_config/inventory/group_vars/
+      host_vars: ../shared_config/inventory/host_vars/

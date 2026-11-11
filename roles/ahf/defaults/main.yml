@@ -1,0 +1,280 @@
+---
+# @var ahf_state:description: >
+# `present`: install, upgrade and configure AHF.
+#
+# `absent`: uninstall AHF (`ahfctl uninstall -silent`).
+# @end
+ahf_state: present
+
+# @var ahf_install_mode:description: >
+# `root` (default): Installation as `root` with TFA daemon (systemd),
+# automatic diagnostic collections, Compliance scheduler and
+# AHF Fleet Insights client. Recommended by Oracle.
+#
+# `extract`: Installation as `oracle_user` with `ahf_setup -extract`.
+# No daemon, no automatic collections, only on-demand usage of
+# `orachk` / `tfactl` as `oracle_user`. Settings for TFA and AHF Fleet Insights
+# are ignored.
+# @end
+ahf_install_mode: root
+
+# @var ahf_loc:description: >
+# Parent directory of the AHF installation.
+# `ahf_setup` creates `oracle.ahf` below this directory.
+#
+# For `ahf_install_mode: root` all directories in this path must be owned by `root`,
+# because the AHF binaries are executed by `root`. A directory below `oracle_base`
+# is owned by `oracle_user`, who could replace the binaries.
+# This is checked by the role.
+# @end
+ahf_loc: "{{ '/opt' if ahf_install_mode == 'root' else oracle_base }}"
+
+# @var ahf_data_dir:description: >
+# Parent directory of the AHF repository (collections, Insights reports, Compliance results).
+# `ahf_setup` creates `oracle.ahf/data` below this directory.
+#
+# Oracle requires at least 5 GB, 10 GB are recommended.
+#
+# For `ahf_install_mode: root` all directories in this path must be owned by `root`
+# (`ahf_setup` fails with `AHF-00014`). A directory below `oracle_base` or a mount point
+# owned by `oracle_user` (e.g. `/u01`) is not possible.
+# The default is `ahf_loc` (`/opt/oracle.ahf/data`), the default location of Oracle.
+# Use a filesystem of its own for `/opt/oracle.ahf` with enough space.
+# @end
+ahf_data_dir: "{{ ahf_loc }}"
+
+# @var ahf_data_dir_min_free_mb:description: >
+# Minimum free space in MB in `ahf_data_dir` for a new installation.
+# @end
+ahf_data_dir_min_free_mb: 5120
+
+# @var ahf_installer_archive:description: >
+# Filename of the AHF installation media in the software repository.
+#
+# Empty (default): the newest file (modification time) matching `ahf_installer_patterns`
+# is used from `oracle_sw_source_local` on the Ansible controller
+# (`is_sw_source_local: true`, `oracle_sw_copy: true`) or from `oracle_stage_remote`
+# on the target host (`oracle_sw_copy: false`).
+# Must be set for `is_sw_source_local: false` (`oracle_sw_source_www`).
+# @end
+# @var ahf_installer_archive:example: >
+# ahf_installer_archive: AHF-LINUX_v26.10.0.zip
+# @end
+ahf_installer_archive: ""
+
+# @var ahf_installer_patterns:description: >
+# Filename patterns for the search of the installation media (`ahf_installer_archive: ""`).
+#
+# `AHF-LINUX_v*.zip` is the name of the media in My Oracle Support (Doc ID 2550798.1).
+# `p30166242_*.zip` is the patch "DOWNLOAD LATEST AHF" - e.g. downloaded by
+# AutoUpgrade with `AHF` in `autoupgrade_download_patches`.
+# @end
+ahf_installer_patterns:
+  - AHF-LINUX_v*.zip
+  - p30166242_*.zip
+
+# @var ahf_installer_version:description: >
+# Version of the installation media, e.g. `26.10.0`.
+#
+# Normally the version is taken from the filename `AHF-LINUX_v<version>.zip`
+# (also inside of patch 30166242). Set it, when the filename does not contain the version.
+# @end
+ahf_installer_version: ""
+
+# @var ahf_upgrade:description: >
+# Upgrade an existing installation, when the installation media has a newer version.
+# @end
+ahf_upgrade: true
+
+# @var ahf_verify_signature:description: >
+# Verify the signature of `ahf_setup` with `openssl` and the public key
+# from the installation media before the installation.
+# @end
+ahf_verify_signature: true
+
+# @var ahf_stage_dir:description: >
+# Directory on the target host for the extraction of the installation media.
+# The directory is removed after the installation.
+# @end
+ahf_stage_dir: "{{ oracle_stage }}/ahf"
+
+# @var ahf_manage_packages:description: >
+# Install `ahf_packages` (`ahf_install_mode: root` only).
+# @end
+ahf_manage_packages: true
+
+# @var ahf_packages:description: >
+# Packages for AHF. The package `perl` contains all Perl modules required by AHF
+# (e.g. `File::Copy`, `FindBin`, `Math::BigInt`, `Net::Ping`, `AHF-00074`).
+# `perl-interpreter` alone is not enough.
+# @end
+ahf_packages:
+  - perl
+  - openssl
+  - unzip
+
+# @var ahf_perl_home:description: >
+# Perl for AHF (`ahf_setup -perlhome`), `<ahf_perl_home>/bin/perl` is used.
+#
+# `ahf_install_mode: root` requires a Perl owned by `root` (`AHF-00026`).
+# Without `-perlhome`, `ahf_setup` uses the Perl of the Grid Infrastructure home on hosts
+# with Oracle Restart/RAC, which is owned by the GI owner => the default is the Perl of the OS.
+# Empty: `ahf_setup` selects the Perl.
+# @end
+ahf_perl_home: /usr
+
+# @var ahf_setup_extra_args:description: >
+# Additional parameters for `ahf_setup`.
+#
+# `-local` is always added for `ahf_install_mode: root`.
+# AHF is installed on each host of the play. Use `tfactl syncnodes` for clusters.
+# @end
+# @var ahf_setup_extra_args:example: >
+# ahf_setup_extra_args:
+#   - -tmp_loc
+#   - /var/tmp
+# @end
+ahf_setup_extra_args: []
+
+# @var ahf_tfa_enabled:description: >
+# Start and enable the TFA daemon (`ahf_install_mode: root` only).
+#
+# `false` stops the daemon and disables the automatic start.
+# The software stays installed and can be used on-demand.
+# @end
+ahf_tfa_enabled: true
+
+# @var ahf_tfa_settings:description: >
+# Settings for TFA - executed as `tfactl set <key>=<value>`
+# (`ahf_install_mode: root` only).
+#
+# A setting is executed only, when it differs from the last run of the role.
+# The applied settings are stored in `ahf_ansible_state_file`.
+# Manual changes are not detected - use `ahf_settings_force: true`.
+# @end
+# @var ahf_tfa_settings:example: >
+# ahf_tfa_settings:
+#   autodiagcollect: "OFF"
+#   reposizeMB: 10240
+#   minfileagetopurge: 48
+#   ahfnotificationaddress: dba@example.com
+# @end
+ahf_tfa_settings: {}
+
+# @var ahf_compliance_autostart:description: >
+# Start the scheduler for Compliance checks (`ahfctl startahf -compliance`).
+#
+# Default schedule of Oracle (autorun IDs, `orachk -get all -id all`):
+#
+# | Autorun ID | AUTORUN_SCHEDULE | Checks | COLLECTION_RETENTION |
+# | --- | --- | --- | --- |
+# | `autostart_client_oratier1` | `3 2 * * 1,2,3,4,5,6` | profile `oratier1` | 7 days |
+# | `autostart_client` | `3 3 * * 0` | all | 14 days |
+#
+# Change it with `ahf_compliance_settings`.
+# @end
+ahf_compliance_autostart: false
+
+# @var ahf_compliance_settings:description: >
+# Requires `ahf_compliance_autostart: true`: the autoruns exist only with a running
+# Compliance scheduler (`ahfctl stopahf -compliance` removes them).
+#
+# Settings of the Compliance autoruns per autorun ID - executed as
+# `orachk -set "<key>=<value>;..." -id <autorun ID>`.
+# Same behavior as `ahf_tfa_settings`, the settings of an ID are compared as a whole.
+#
+# The settings are stored per autorun ID by AHF (e.g. `AUTORUN_SCHEDULE`, `AUTORUN_FLAGS`,
+# `COLLECTION_RETENTION`). Show them with `orachk -get all -id all`.
+# The ID is used with or without the prefix `orachk.` shown by `orachk -get`.
+#
+# `orachk -set` requires `AUTORUN_SCHEDULE` (cron expression with 5 fields) in every call.
+# The role adds the current value, when it is not part of the settings.
+# A new autorun ID needs `AUTORUN_SCHEDULE` and `AUTORUN_FLAGS`.
+# Values must not contain `;`.
+# @end
+# @var ahf_compliance_settings:example: >
+# ahf_compliance_settings:
+#   autostart_client_oratier1:
+#     AUTORUN_SCHEDULE: "3 2 * * 1-6"
+#     COLLECTION_RETENTION: 7
+#   autostart_client:
+#     COLLECTION_RETENTION: 30
+# @end
+ahf_compliance_settings: {}
+
+# @var ahf_settings_force:description: >
+# Execute all settings and component states, even when they are unchanged
+# since the last run of the role.
+# @end
+ahf_settings_force: false
+
+# @var ahf_fleet_insights_client:description: >
+# Register the host as client of AHF Fleet Insights (`ahf configuration set --type fleet-insights`).
+# The client uploads Compliance results and TFA collections automatically.
+#
+# `false` deregisters a client, which was registered by this role.
+#
+# Requires AHF 24.9 or newer and `ahf_install_mode: root`.
+# Oracle documents the registration for clusters - check single instance environments.
+# @end
+ahf_fleet_insights_client: false
+
+# @var ahf_fleet_insights_url:description: >
+# Registration URL of AHF Fleet Insights.
+# Shown by `ahffi info` on the Fleet Insights server - without `/ahfservice`.
+# @end
+# @var ahf_fleet_insights_url:example: >
+# ahf_fleet_insights_url: https://ahffi.example.com:5005
+# @end
+ahf_fleet_insights_url: ""
+
+# @var ahf_fleet_insights_user:description: >
+# Generic registration user of AHF Fleet Insights.
+# @end
+ahf_fleet_insights_user: ""
+
+# @var ahf_fleet_insights_password:description: >
+# Password of `ahf_fleet_insights_user`. Use Ansible Vault.
+# @end
+ahf_fleet_insights_password: ""
+
+# @var ahf_fleet_insights_public_cert:description: >
+# Public certificate (PEM) of AHF Fleet Insights for the registration
+# (`ahf configuration set --public-cert`).
+# Needed for the self-signed certificate created by the installer of Fleet Insights,
+# otherwise the registration fails with `CERTIFICATE_VERIFY_FAILED`.
+# Role `ahf_fleet_insights` provides it as fact `ahf_fi_public_cert` or as file (`ahf_fi_public_cert_fetch`).
+# @end
+# @var ahf_fleet_insights_public_cert:example: >
+# ahf_fleet_insights_public_cert: "{{ lookup('ansible.builtin.file', inventory_dir + '/files/ahffi_cert.pem') }}"
+# @end
+ahf_fleet_insights_public_cert: ""
+
+# @var ahf_fleet_insights_os_user:description: >
+# OS user for the REST access of Fleet Insights (`ahf configuration set --os-user`).
+# Without it the registration reports `AHF-02119: ... the REST Agent was not started`
+# (no local AHF user with the role `rest-server`).
+# Empty: `--os-user` is not used.
+# @end
+ahf_fleet_insights_os_user: "{{ oracle_user }}"
+
+# @var ahf_fleet_insights_force_register:description: >
+# Register again, even when URL and user are unchanged - e.g. after a password change.
+# @end
+ahf_fleet_insights_force_register: false
+
+# @var ahf_uninstall_delete_repo:description: >
+# Delete the repository in `ahf_data_dir` during the uninstall (`-deleterepo`).
+# @end
+ahf_uninstall_delete_repo: false
+
+# @var ahf_ansible_state_file:description: >
+# File with the settings applied by the role. Used to detect changes in
+# `ahf_tfa_settings`, `ahf_compliance_settings` and the registration of AHF Fleet Insights.
+# @end
+ahf_ansible_state_file: "{{ ahf_loc }}/oracle.ahf.ansible.json"
+
+# @var ahf_command_timeout:description: >
+# Timeout in seconds for interactive commands (registration of AHF Fleet Insights).
+# @end
+ahf_command_timeout: 300

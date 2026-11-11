@@ -4,6 +4,9 @@
 # converge:    ORACLE_HOME 26ai, CDB DB1 with PDB ORCLPDB, wallet with ORCLPDB_SYSTEM
 # side_effect: module tests (extensions/molecule/shared_config/module_tests)
 #
+#              AHF registered in AHF Fleet Insights of the scenario ahf
+#              (extensions/molecule/dbfs/ahf.yml)
+#
 # The 19c patching tests are done in dbfs-ol9.
 # Only one CDB with one PDB to keep the converge as short as possible.
 
@@ -83,3 +86,10 @@ oracle_pdbs:
     listener_port: 1521
     state: present
     datafile_dest: /u01/app/oracle/oradata
+# AHF (role ahf), client of AHF Fleet Insights in the scenario ahf (group_vars/all/ahf.yml)
+ahf_tfa_settings:
+  autodiagcollect: "OFF"
+ahf_compliance_autostart: true
+ahf_compliance_settings:
+  autostart_client:
+    COLLECTION_RETENTION: 10

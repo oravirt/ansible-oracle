@@ -1,0 +1,17 @@
+---
+- name: ahf | Check variables and host
+  ansible.builtin.include_tasks: assert.yml
+  when: ahf_state == 'present'
+
+- name: ahf | Install or upgrade AHF
+  ansible.builtin.include_tasks: install.yml
+  when: ahf_state == 'present'
+
+# includes fleet_insights_client.yml
+- name: ahf | Configure AHF
+  ansible.builtin.include_tasks: configure.yml
+  when: ahf_state == 'present'
+
+- name: ahf | Uninstall AHF
+  ansible.builtin.include_tasks: uninstall.yml
+  when: ahf_state == 'absent'

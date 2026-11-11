@@ -1,0 +1,174 @@
+---
+- name: Prepare
+  hosts: ahf_server
+  gather_facts: true
+  any_errors_fatal: true
+  become: true
+  tasks:
+    - name: Create group oinstall
+      ansible.builtin.group:
+        name: oinstall
+        gid: 54321
+
+    - name: Create user oracle
+      ansible.builtin.user:
+        name: oracle
+        uid: 54321
+        group: oinstall
+
+    - name: Create oracle_base and oracle_stage
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: oracle
+        group: oinstall
+        mode: "0775"
+      loop:
+        - /u01/app/oracle
+        - /u01/stage
+
+- name: Download AHF
+  ansible.builtin.import_playbook: ../shared_config/playbooks/ahf_download.yml
+  vars:
+    molecule_ahf_download_hosts: ahf_server
+
+- name: Download AHF Fleet Insights
+  hosts: ahf_server
+  gather_facts: false
+  any_errors_fatal: true
+  become: true
+  vars:
+    _mol_download_dir: /u01/stage/download
+  tasks:
+    - name: Search AHFFI-LINUX_v*.zip in MOLECULE_SW_DIR
+      ansible.builtin.find:
+        paths: /vagrant
+        patterns: AHFFI-LINUX_v*.zip
+      register: _mol_ahffi_vagrant
+
+    - name: Copy AHFFI-LINUX_v*.zip from MOLECULE_SW_DIR
+      ansible.builtin.copy:
+        src: "{{ item.path }}"
+        dest: "{{ _mol_download_dir }}/"
+        remote_src: true
+        owner: oracle
+        mode: "0644"
+      loop: "{{ _mol_ahffi_vagrant.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+
+    - name: Check downloaded AHF Fleet Insights
+      ansible.builtin.stat:
+        path: "{{ _mol_download_dir }}/{{ molecule_ahffi_file }}"
+        get_checksum: false
+      register: _mol_ahffi_stat
+
+    # same login as role orasw_download_patches
+    - name: Download AHF Fleet Insights from My Oracle Support
+      when:
+        - _mol_ahffi_vagrant.matched == 0
+        - not _mol_ahffi_stat.stat.exists
+      block:
+        - name: Login to My Oracle Support
+          ansible.builtin.uri:
+            url: https://updates.oracle.com/Orion/Services/download
+            url_username: "{{ mos_login }}"
+            url_password: "{{ mos_password }}"
+            force_basic_auth: true
+            http_agent: "Wget/1.14 (linux-gnu)"
+            return_content: true
+          no_log: true
+          register: _mol_mos
+
+        - name: Download AHF Fleet Insights
+          ansible.builtin.get_url:
+            url: >-
+              https://updates.oracle.com/Orion/Services/download/{{ molecule_ahffi_file
+              }}?aru={{ molecule_ahffi_aru }}&patch_file={{ molecule_ahffi_file }}
+            dest: "{{ _mol_download_dir }}/{{ molecule_ahffi_file }}"
+            http_agent: "Wget/1.14 (linux-gnu)"
+            headers:
+              Cookie: "{{ _mol_mos.cookies_string }}"
+              Accept: application/zip
+            owner: oracle
+            mode: "0644"
+            timeout: 600
+
+- name: Schema user for AHF Fleet Insights
+  hosts: ahf_server
+  gather_facts: false
+  any_errors_fatal: true
+  become: true
+  vars:
+    _mol_sqlplus: /usr/lib/oracle/23/client64/bin/sqlplus
+    _mol_connect: "system/{{ molecule_ahffi_system_password }}@//{{ ahf_fi_db_host }}:{{ ahf_fi_db_port }}/{{ ahf_fi_db_service }}"
+  tasks:
+    - name: Configure repository for Instant Client
+      ansible.builtin.yum_repository:
+        name: ol{{ ansible_distribution_major_version | default('9') }}_instantclient
+        description: Oracle Instant Client
+        file: external_repos
+        baseurl: https://yum.oracle.com/repo/OracleLinux/OL9/oracle/instantclient23/x86_64/
+        gpgcheck: false
+
+    - name: Install Instant Client with SQL*Plus and unzip
+      ansible.builtin.package:
+        name:
+          - oracle-instantclient-basic
+          - oracle-instantclient-sqlplus
+          - unzip
+
+    # the image with faststart needs about 1 minute for the start of the database
+    - name: Wait for repository database
+      ansible.builtin.shell: |
+        set -o pipefail
+        echo "select 'DB_OPEN' from dual;" | {{ _mol_sqlplus }} -S -L "{{ _mol_connect }}"
+      register: _mol_db
+      until: "'DB_OPEN' in _mol_db.stdout"
+      retries: 60
+      delay: 10
+      changed_when: false
+      no_log: true
+
+    - name: Check schema user
+      ansible.builtin.shell: |
+        set -o pipefail
+        printf "set heading off feedback off pagesize 0\nselect 'USERS=' || count(*) from dba_users where username = upper('%s');\n" \
+          "{{ ahf_fi_db_user }}" | {{ _mol_sqlplus }} -S -L "{{ _mol_connect }}" | tr -d ' '
+      register: _mol_user
+      changed_when: false
+      failed_when: "'USERS=' not in _mol_user.stdout"
+      no_log: true
+
+    # grants of create_db_user.sql of the installation media (AHFFI-LINUX_v25.2.1.zip)
+    - name: Create schema user
+      ansible.builtin.shell: |
+        set -o pipefail
+        {{ _mol_sqlplus }} -S -L "{{ _mol_connect }}" <<EOF
+        whenever sqlerror exit failure
+        create user {{ ahf_fi_db_user }} identified by "{{ ahf_fi_db_password }}" default tablespace users;
+        grant create session to {{ ahf_fi_db_user }};
+        grant connect, resource to {{ ahf_fi_db_user }};
+        grant create table to {{ ahf_fi_db_user }};
+        grant insert any table to {{ ahf_fi_db_user }};
+        alter user {{ ahf_fi_db_user }} quota unlimited on users;
+        EOF
+      register: _mol_create_user
+      changed_when: true
+      failed_when: false
+      no_log: true
+      when: "'USERS=0' in _mol_user.stdout"
+
+    # no_log hides the passwords => show the output separately
+    - name: Result of the creation of the schema user
+      ansible.builtin.debug:
+        var: _mol_create_user.stdout_lines
+      when: _mol_create_user is not skipped
+
+    - name: Assert creation of the schema user
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _mol_create_user.rc == 0
+        fail_msg: "Creation of the schema user failed with rc {{ _mol_create_user.rc }}"
+      when: _mol_create_user is not skipped
