@@ -279,6 +279,56 @@
             - oracle_databases is defined
           register: assertoracle_databases
 
+        # control_management_pack_access documents the licensed Management Packs.
+        # EE: mandatory, NONE, DIAGNOSTIC or DIAGNOSTIC+TUNING
+        #     DIAGNOSTIC needs a license for the Diagnostics Pack,
+        #     DIAGNOSTIC+TUNING for the Diagnostics and Tuning Pack.
+        # SE/SE2: optional (Management Packs are not available), must be NONE if defined.
+        # ansible-oracle has no switches for licensed options yet.
+        - name: assert control_management_pack_access in init_parameters of oracle_databases
+          ansible.builtin.assert:
+            quiet: true
+            fail_msg: >-
+              {{ ass_odb.oracle_db_name | default('') }}:
+              control_management_pack_access in init_parameters
+              {{ _ass_cmpa_rule }}
+              (current value: '{{ _ass_cmpa }}'),
+              e.g. {name: control_management_pack_access, value: 'NONE', scope: both, state: present}.
+              Important: DIAGNOSTIC requires a license for the Diagnostics Pack,
+              DIAGNOSTIC+TUNING for the Diagnostics and Tuning Pack. Use NONE without these licenses.
+              Check if further settings are needed for your licensed options.
+              See doc/guides/breaking_changes.adoc.
+            that:
+              - >-
+                ass_odb.state | default('present') == 'absent'
+                or (_ass_edition == 'EE'
+                    and _ass_cmpa | upper in ['NONE', 'DIAGNOSTIC', 'DIAGNOSTIC+TUNING'])
+                or (_ass_edition != 'EE'
+                    and _ass_cmpa | upper in ['', 'NONE'])
+          vars:
+            _ass_edition: >-
+              {{ db_homes_config[ass_odb.home]['edition'] | default('EE') | upper }}
+            _ass_cmpa_rule: >-
+              {{ 'must be one of NONE, DIAGNOSTIC or DIAGNOSTIC+TUNING and is mandatory for Enterprise Edition'
+                 if _ass_edition == 'EE' else 'must be NONE for Standard Edition 2 (optional)' }}
+            _ass_cmpa: >-
+              {%- set ns = namespace(v='') -%}
+              {%- for p in ass_odb.init_parameters | default([]) -%}
+              {%-   if ns.v == '' and p.name | default('') | lower == 'control_management_pack_access'
+                      and p.state | default('present') != 'absent' and p.sid | default('*') == '*' -%}
+              {%-     set ns.v = p.value | default('') | string | trim -%}
+              {%-   endif -%}
+              {%- endfor -%}
+              {{ ns.v }}
+          with_items:
+            - "{{ oracle_databases }}"
+          loop_control:
+            label: "{{ ass_odb.oracle_db_name | default('') }}"
+            loop_var: ass_odb
+          when:
+            - oracle_databases is defined
+          register: assertoracle_databases
+
         # The local_listener from DBCA is an alias in tnsnames.ora of the ORACLE_HOME.
         # The alias is missing in a new ORACLE_HOME (Out-of-Place Patching)
         # => the instance does not register at the listener.

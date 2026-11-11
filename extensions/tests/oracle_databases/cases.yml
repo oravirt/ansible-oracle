@@ -5,6 +5,7 @@
 # dbs:    list of databases, combined with _base_db (home h26, DB1, FS, SI, state present)
 #         params: init_parameters in addition to local_listener and max_pdbs
 #         max_pdbs: value of max_pdbs in init_parameters (default '3', null: not defined)
+#         cmpa: value of control_management_pack_access in init_parameters (default 'NONE', null: not defined)
 # expect: ok | failed (asserts of orasw_meta)
 # dest:   {df, rf} - datafile / recovery area destination for dbca of the first database (optional)
 # rsp:    expected values in the dbca response file of the first database (optional)
@@ -229,4 +230,75 @@ tc_cases:
     dbs:
       - {params: [*p_create, *p_reco]}
       - {oracle_db_name: DB2, max_pdbs: null, params: [*p_create, *p_reco]}
+    expect: failed
+
+  # ---------- control_management_pack_access (license) ----------
+  - id: cmpa_ee_missing
+    dbs: [{cmpa: null, params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: cmpa_ee_missing_19c_non_cdb
+    dbs: [{home: h19, is_container: false, cmpa: null, params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: cmpa_ee_missing_state_absent
+    dbs: [{state: absent, cmpa: null}]
+    expect: ok
+
+  - id: cmpa_ee_param_state_absent
+    dbs: [{cmpa: null, params: [*p_create, *p_reco, {name: control_management_pack_access, value: 'NONE', state: absent}]}]
+    expect: failed
+
+  - id: cmpa_ee_only_for_sid
+    dbs: [{cmpa: null, params: [*p_create, *p_reco, {name: control_management_pack_access, value: 'NONE', sid: DB1, dbca: false}]}]
+    expect: failed
+
+  - id: cmpa_ee_diagnostic
+    dbs: [{cmpa: DIAGNOSTIC, params: [*p_create, *p_reco]}]
+    expect: ok
+
+  - id: cmpa_ee_diagnostic_tuning
+    dbs: [{cmpa: 'DIAGNOSTIC+TUNING', params: [*p_create, *p_reco]}]
+    expect: ok
+
+  - id: cmpa_ee_uppercase_name_lowercase_value
+    dbs: [{cmpa: null, params: [*p_create, *p_reco, {name: CONTROL_MANAGEMENT_PACK_ACCESS, value: 'diagnostic+tuning'}]}]
+    expect: ok
+
+  - id: cmpa_ee_tuning_only
+    dbs: [{cmpa: TUNING, params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: cmpa_ee_empty
+    dbs: [{cmpa: '', params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: cmpa_se2_missing
+    dbs: [{home: h26se2, cmpa: null, params: [*p_create, *p_reco]}]
+    expect: ok
+
+  - id: cmpa_se2_invalid
+    dbs: [{home: h19se2, cmpa: 'ALL', params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: cmpa_se2_none_lowercase
+    dbs: [{home: h26se2, cmpa: 'none', params: [*p_create, *p_reco]}]
+    expect: ok
+
+  - id: cmpa_se2_diagnostic
+    dbs: [{home: h26se2, cmpa: DIAGNOSTIC, params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: cmpa_se2_diagnostic_tuning
+    dbs: [{home: h19se2, cmpa: 'DIAGNOSTIC+TUNING', params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: cmpa_se2_empty
+    dbs: [{home: h26se2, cmpa: '', params: [*p_create, *p_reco]}]
+    expect: ok
+
+  - id: multi_db_cmpa_second_missing
+    dbs:
+      - {params: [*p_create, *p_reco]}
+      - {oracle_db_name: DB2, cmpa: null, params: [*p_create, *p_reco]}
     expect: failed

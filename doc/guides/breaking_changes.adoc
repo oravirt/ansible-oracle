@@ -126,6 +126,10 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<oracle_databases: max_pdbs in init_parameters of Container Databases>>
 |A Container Database (`is_container: true`, default) in `oracle_databases` with `state: present` *and* `max_pdbs` is missing in `init_parameters` or greater than 3 (SE2) / 1024 (EE)
 |Add `max_pdbs` with the number of PDBs allowed by your license to `init_parameters`, e.g. `{name: max_pdbs, value: '3', scope: both, state: present}`. EE: more than 3 PDBs only with a license for the Multitenant Option
+
+|<<oracle_databases: control_management_pack_access in init_parameters of Enterprise Edition databases>>
+|A database of an Enterprise Edition home in `oracle_databases` with `state: present` *and* `control_management_pack_access` is missing in `init_parameters` or has a value other than `NONE`, `DIAGNOSTIC` or `DIAGNOSTIC+TUNING`, *or* a database of a Standard Edition 2 home with a value other than `NONE`
+|Add `control_management_pack_access` with the value allowed by your license to `init_parameters`, e.g. `{name: control_management_pack_access, value: 'NONE', scope: both, state: present}`
 |===
 
 ==== Minimum ansible-core 2.16
@@ -1373,6 +1377,59 @@ oracle_databases:
   - oracle_db_name: DB1
     init_parameters:
       - {name: max_pdbs, value: '3', scope: both, state: present}
+----
+
+==== oracle_databases: control_management_pack_access in init_parameters of Enterprise Edition databases
+
+As of 5.0.0 the assert of `oracle_databases` in `orasw_meta` fails for a database
+of an Enterprise Edition home (`edition: EE` in `db_homes_config`) with `state: present`
+without `control_management_pack_access` in `init_parameters` (without `sid` or `sid: '*'`).
+`control_management_pack_access` defines explicitly which Management Packs are licensed.
+Without the parameter, the Oracle default for Enterprise Edition is `DIAGNOSTIC+TUNING`,
+which needs a license for the Diagnostics and Tuning Pack.
+
+[cols="1,3",options="header"]
+|===
+|Value |License
+|`NONE`
+|no Management Pack
+|`DIAGNOSTIC`
+|Diagnostics Pack
+|`DIAGNOSTIC+TUNING`
+|Diagnostics Pack and Tuning Pack
+|===
+
+The parameter is optional for Standard Edition 2. If it is defined, the value must be `NONE`,
+the Management Packs are not available for Standard Edition 2.
+
+IMPORTANT: Set the value according to your license.
+The Management Packs are options of the Enterprise Edition.
+`ansible-oracle` has no switches for licensed options yet.
+Check if further settings are needed for your licensed options.
+
+Who is affected:
+
+- Inventories with a database of an Enterprise Edition home without `control_management_pack_access` in `init_parameters`,
+  *or* with another value than `NONE`, `DIAGNOSTIC` or `DIAGNOSTIC+TUNING`.
+- Inventories with a database of a Standard Edition 2 home with `control_management_pack_access` other than `NONE`.
+  The playbooks fail in the assert of `orasw_meta`:
++
+----
+<oracle_db_name>: control_management_pack_access in init_parameters must be one of NONE, DIAGNOSTIC or DIAGNOSTIC+TUNING and is mandatory for Enterprise Edition ...
+----
+
+Required actions:
+
+. Add `control_management_pack_access` with the value allowed by your license to `init_parameters`.
+  For an existing database, `oradb_manage_parameters` changes the parameter to the value from the inventory.
+
+.Example
+[source,yaml]
+----
+oracle_databases:
+  - oracle_db_name: DB1
+    init_parameters:
+      - {name: control_management_pack_access, value: 'NONE', scope: both, state: present}
 ----
 
 === Adding new breaking changes

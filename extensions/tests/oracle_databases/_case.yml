@@ -9,9 +9,12 @@
       {#- max_pdbs: '3' by default, case key max_pdbs overrides the value, null removes it -#}
       {%-   set mp = d.max_pdbs if 'max_pdbs' in d else '3' -%}
       {%-   set mp_params = [] if mp is none else [{'name': 'max_pdbs', 'value': mp, 'scope': 'both', 'state': 'present'}] -%}
+      {#- control_management_pack_access: 'NONE' by default, case key cmpa overrides the value, null removes it -#}
+      {%-   set cm = d.cmpa if 'cmpa' in d else 'NONE' -%}
+      {%-   set cm_params = [] if cm is none else [{'name': 'control_management_pack_access', 'value': cm, 'scope': 'both', 'state': 'present'}] -%}
       {%-   set ns.l = ns.l + [_base_db
-                               | combine(d | dict2items | rejectattr('key', 'in', ['params', 'max_pdbs']) | items2dict)
-                               | combine({'init_parameters': _base_params + mp_params + d.params | default([])})] -%}
+                               | combine(d | dict2items | rejectattr('key', 'in', ['params', 'max_pdbs', 'cmpa']) | items2dict)
+                               | combine({'init_parameters': _base_params + mp_params + cm_params + d.params | default([])})] -%}
       {%- endfor -%}
       {{ ns.l }}
 
