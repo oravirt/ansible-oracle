@@ -233,6 +233,52 @@
             - oracle_databases is defined
           register: assertoracle_databases
 
+        # max_pdbs documents the number of PDBs allowed by the license.
+        # SE/SE2: max. 3 PDBs
+        # EE: max. 1024 PDBs - only with a license for the Multitenant Option,
+        #     max. 3 PDBs without. ansible-oracle has no switch for licensed
+        #     options yet => the assert allows up to 1024 for EE.
+        - name: assert max_pdbs in init_parameters of oracle_databases
+          ansible.builtin.assert:
+            quiet: true
+            fail_msg: >-
+              {{ ass_odb.oracle_db_name | default('') }}:
+              is_container: true (default) needs max_pdbs in init_parameters
+              with an integer value <= {{ _ass_max_pdbs_limit }}
+              for edition {{ _ass_edition }}
+              (current value: '{{ _ass_max_pdbs }}'),
+              e.g. {name: max_pdbs, value: '3', scope: both, state: present}.
+              Important: EE allows more than 3 PDBs only with a license
+              for the Multitenant Option.
+              See doc/guides/breaking_changes.adoc.
+            that:
+              - >-
+                ass_odb.state | default('present') == 'absent'
+                or not ass_odb.is_container | default(true) | bool
+                or (_ass_max_pdbs is match('^[0-9]+$')
+                    and _ass_max_pdbs | int <= _ass_max_pdbs_limit | int)
+          vars:
+            _ass_edition: >-
+              {{ db_homes_config[ass_odb.home]['edition'] | default('EE') | upper }}
+            _ass_max_pdbs_limit: "{{ 1024 if _ass_edition == 'EE' else 3 }}"
+            _ass_max_pdbs: >-
+              {%- set ns = namespace(v='') -%}
+              {%- for p in ass_odb.init_parameters | default([]) -%}
+              {%-   if ns.v == '' and p.name | default('') | lower == 'max_pdbs'
+                      and p.state | default('present') != 'absent' and p.sid | default('*') == '*' -%}
+              {%-     set ns.v = p.value | default('') | string | trim -%}
+              {%-   endif -%}
+              {%- endfor -%}
+              {{ ns.v }}
+          with_items:
+            - "{{ oracle_databases }}"
+          loop_control:
+            label: "{{ ass_odb.oracle_db_name | default('') }}"
+            loop_var: ass_odb
+          when:
+            - oracle_databases is defined
+          register: assertoracle_databases
+
         # The local_listener from DBCA is an alias in tnsnames.ora of the ORACLE_HOME.
         # The alias is missing in a new ORACLE_HOME (Out-of-Place Patching)
         # => the instance does not register at the listener.
