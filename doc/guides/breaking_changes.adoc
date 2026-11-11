@@ -122,6 +122,10 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<oracle_databases: omf false not allowed with ASM, oracle_dbf_dir_asm and oracle_reco_dir_asm removed>>
 |A database in `oracle_databases` with `storage_type: ASM` and `omf: false`, *or* `oracle_dbf_dir_asm` / `oracle_reco_dir_asm` are set in the inventory
 |Use OMF with ASM (`db_create_file_dest` and `db_recovery_file_dest` in `init_parameters`), remove `oracle_dbf_dir_asm` and `oracle_reco_dir_asm`
+
+|<<oracle_databases: max_pdbs in init_parameters of Container Databases>>
+|A Container Database (`is_container: true`, default) in `oracle_databases` with `state: present` *and* `max_pdbs` is missing in `init_parameters` or greater than 3 (SE2) / 1024 (EE)
+|Add `max_pdbs` with the number of PDBs allowed by your license to `init_parameters`, e.g. `{name: max_pdbs, value: '3', scope: both, state: present}`. EE: more than 3 PDBs only with a license for the Multitenant Option
 |===
 
 ==== Minimum ansible-core 2.16
@@ -1321,6 +1325,54 @@ oracle_databases:
       - {name: db_create_file_dest, value: '+DATA', scope: both, state: present}
       - {name: db_recovery_file_dest_size, value: '10G', scope: both, state: present, dbca: false}
       - {name: db_recovery_file_dest, value: '+FRA', scope: both, state: present}
+----
+
+==== oracle_databases: max_pdbs in init_parameters of Container Databases
+
+As of 5.0.0 the assert of `oracle_databases` in `orasw_meta` fails for a Container Database
+(`is_container: true`, default as of 5.0.0) with `state: present`
+without `max_pdbs` in `init_parameters` (without `sid` or `sid: '*'`).
+`max_pdbs` defines explicitly how many PDBs are allowed by the license.
+The value must be an integer:
+
+[cols="1,1,3",options="header"]
+|===
+|Edition (`db_homes_config`) |Maximum `max_pdbs` |Remark
+|`SE2` (`SE`)
+|3
+|
+|`EE`
+|1024
+|More than 3 PDBs require a license for the Multitenant Option!
+|===
+
+IMPORTANT: Enterprise Edition without a license for the Multitenant Option allows only 3 PDBs, like Standard Edition 2.
+`ansible-oracle` has no switch for licensed options yet, so the assert allows up to 1024 PDBs for `EE`.
+Check your license before you set `max_pdbs` greater than 3.
+
+Who is affected:
+
+- Inventories with a Container Database without `max_pdbs` in `init_parameters`,
+  *or* with a value greater than 3 (`SE2`) or 1024 (`EE`).
+  This includes 19c databases without `is_container`, which are Container Databases as of 5.0.0.
+  The playbooks fail in the assert of `orasw_meta`:
++
+----
+<oracle_db_name>: is_container: true (default) needs max_pdbs in init_parameters with an integer value <= <limit> for edition <edition> ...
+----
+
+Required actions:
+
+. Add `max_pdbs` with the number of PDBs allowed by your license to `init_parameters`.
+  `max_pdbs` is set by dbca for a new database and changed by `oradb_manage_parameters` for an existing database.
+
+.Example
+[source,yaml]
+----
+oracle_databases:
+  - oracle_db_name: DB1
+    init_parameters:
+      - {name: max_pdbs, value: '3', scope: both, state: present}
 ----
 
 === Adding new breaking changes

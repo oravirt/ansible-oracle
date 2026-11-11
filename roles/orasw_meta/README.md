@@ -715,6 +715,10 @@ There are diffent sub list to define Profiles, Services, Tablespaces, Users ...
 | omf | `true` | Oracle Managed Files (dbca `-useOMF`). `omf: true` needs `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters`. OMF is strongly recommended. `omf: false` is only allowed with `storage_type: FS`, needs an own DBCA template without OMF (`dbca_templatename`) and is not tested. |
 | storage_type | `FS` | `FS` or `ASM`. `ASM` requires `omf: true`. |
 
+Container Databases (`is_container: true`, default) need `max_pdbs` in `init_parameters` (assert)
+with the number of PDBs allowed by the license: max. 3 for `SE2`, max. 1024 for `EE`.
+IMPORTANT! `EE` allows more than 3 PDBs only with a license for the Multitenant Option.
+
 `datafile_dest` and `recoveryfile_dest` are removed from `oracle_databases` (assert fails),
 they are replaced by `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters`.
 

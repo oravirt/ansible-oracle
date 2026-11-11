@@ -3,7 +3,8 @@
 #
 # id:     name of the test case
 # dbs:    list of databases, combined with _base_db (home h26, DB1, FS, SI, state present)
-#         params: init_parameters in addition to local_listener
+#         params: init_parameters in addition to local_listener and max_pdbs
+#         max_pdbs: value of max_pdbs in init_parameters (default '3', null: not defined)
 # expect: ok | failed (asserts of orasw_meta)
 # dest:   {df, rf} - datafile / recovery area destination for dbca of the first database (optional)
 # rsp:    expected values in the dbca response file of the first database (optional)
@@ -166,3 +167,66 @@ tc_cases:
       - {omf: false}
       - {oracle_db_name: DB2, storage_type: ASM, params: [{name: db_create_file_dest, value: '+DATA'}, {name: db_recovery_file_dest, value: '+FRA'}]}
     expect: ok
+
+  # ---------- max_pdbs (license) ----------
+  - id: max_pdbs_missing
+    dbs: [{max_pdbs: null, params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: max_pdbs_missing_no_container_19c
+    dbs: [{home: h19, is_container: false, max_pdbs: null, params: [*p_create, *p_reco]}]
+    expect: ok
+
+  - id: max_pdbs_missing_state_absent
+    dbs: [{state: absent, max_pdbs: null}]
+    expect: ok
+
+  - id: max_pdbs_param_state_absent
+    dbs: [{max_pdbs: null, params: [*p_create, *p_reco, {name: max_pdbs, value: '3', state: absent}]}]
+    expect: failed
+
+  - id: max_pdbs_only_for_sid
+    dbs: [{max_pdbs: null, params: [*p_create, *p_reco, {name: max_pdbs, value: '3', sid: DB1, dbca: false}]}]
+    expect: failed
+
+  - id: max_pdbs_uppercase_int
+    dbs: [{max_pdbs: null, params: [*p_create, *p_reco, {name: MAX_PDBS, value: 5}]}]
+    expect: ok
+
+  - id: max_pdbs_not_numeric
+    dbs: [{max_pdbs: 'abc', params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: max_pdbs_negative
+    dbs: [{max_pdbs: '-1', params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: max_pdbs_ee_1024
+    dbs: [{max_pdbs: '1024', params: [*p_create, *p_reco]}]
+    expect: ok
+
+  - id: max_pdbs_ee_1025
+    dbs: [{max_pdbs: '1025', params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: max_pdbs_se2_3_26ai
+    dbs: [{home: h26se2, params: [*p_create, *p_reco]}]
+    expect: ok
+
+  - id: max_pdbs_se2_4_26ai
+    dbs: [{home: h26se2, max_pdbs: '4', params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: max_pdbs_se2_4_19c
+    dbs: [{home: h19se2, max_pdbs: 4, params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: max_pdbs_se2_missing_no_container_19c
+    dbs: [{home: h19se2, is_container: false, max_pdbs: null, params: [*p_create, *p_reco]}]
+    expect: ok
+
+  - id: multi_db_max_pdbs_second_missing
+    dbs:
+      - {params: [*p_create, *p_reco]}
+      - {oracle_db_name: DB2, max_pdbs: null, params: [*p_create, *p_reco]}
+    expect: failed

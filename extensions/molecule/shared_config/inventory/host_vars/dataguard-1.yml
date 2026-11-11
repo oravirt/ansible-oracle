@@ -24,6 +24,7 @@ oracle_databases:
       # EZConnect of the local listener => replaces the alias LISTENER_<SID> from dbca,
       # the standby gets its own value with SET in RMAN DUPLICATE (oradb_standby)
       - {name: local_listener, value: '//dataguard-1:1521', scope: both, state: present}
+      - {name: max_pdbs, value: '3', scope: both, state: present}
       # Data Guard Broker (dgmgrl.cfg from oradb_standby), not used by dbca
       # broker configuration files outside of ORACLE_HOME (Out-of-Place Patching): read-only ORACLE_HOME => ORACLE_BASE/dbs,
       # before dg_broker_start: the files cannot be changed while the broker is running
