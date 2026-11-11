@@ -34,10 +34,13 @@ Install Oracle Database Software
 
 ### autostartup_service
 
-Force a chopt operation in ORACLE_HOME.
+Force linking of all options from `oracle_ee_options` and
+`oracle_all_editions_options_state` in ORACLE_HOME.
 
-This is needed, when an existing ORACLE_HOME had multiple
-switches between on/off for an option.
+The current state of an option is read from the libraries in
+ORACLE_HOME. Only options not in intended state are linked, all of them
+in one make call with a single relink of oracle (ioracle).
+`true` links all options, even when they are already in intended state.
 
 ### configure_oracle_profile
 

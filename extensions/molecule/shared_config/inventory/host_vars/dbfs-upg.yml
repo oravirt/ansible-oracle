@@ -15,6 +15,24 @@ oracle_db2_home: db1932-si-ee
 # listener and network configuration from 26ai: a listener can serve databases of older releases only
 oracle_net_home: db26-si-ee
 
+# Linkable options: different states per home and differences to the defaults
+# (all options off) => one make call with a single ioracle per home.
+# Partitioning is enabled in both homes: the PDB is upgraded from 19c into 26ai.
+# Checked in verify.yml by libknlopt.a and v$option.
+oracle_ee_options_193:
+  - {option: oaa, state: false}
+  - {option: olap, state: false}
+  - {option: partitioning, state: true}
+  - {option: rat, state: true}
+
+oracle_ee_options_261:
+  - {option: partitioning, state: true}
+  - {option: rat, state: false}
+
+oracle_all_editions_options_state:
+  - {option: dnfs, enabled: false}
+  - {option: uniaud, enabled: true}
+
 db_homes_installed:
   - home: db1932-si-ee
     state: present

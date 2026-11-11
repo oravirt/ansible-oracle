@@ -191,6 +191,54 @@ _oracle_ee_opiton_dict:
   '21.3.0.0': "{{ oracle_ee_options_213 }}"
   '26.1.0.0': "{{ oracle_ee_options_261 }}"
 
+# @var _oracle_ee_options_link:description: >
+# This is an internal variable in `ansible-oracle`.
+#
+# Maps the chopt option names from `oracle_ee_options_*` to the make target
+# in `$ORACLE_HOME/rdbms/lib/ins_rdbms.mk` (suffixed by _on/_off) and
+# to the object in `libknlopt.a`, which is present when the option is enabled.
+# All options are linked by one make call with a single `ioracle` at the end.
+#
+# _IMPORTANT_
+#
+# Do not set this variable in inventory, set_fact ...!
+# @end
+_oracle_ee_options_link:
+  # Oracle Advanced Analytics (Data Mining)
+  oaa:
+    make_target: dm
+    match_file: rdbms/lib/libknlopt.a
+    enabled_matches: '\bdmwdm\.'
+  olap:
+    make_target: olap
+    match_file: rdbms/lib/libknlopt.a
+    enabled_matches: '\bxsyeolap\.'
+  partitioning:
+    make_target: part
+    match_file: rdbms/lib/libknlopt.a
+    enabled_matches: '\bkkpoban\.'
+  # Real Application Testing
+  rat:
+    make_target: rat
+    match_file: rdbms/lib/libknlopt.a
+    enabled_matches: '\bkecwr\.'
+
+# @var _oracle_ee_options_valid:description: >
+# This is an internal variable in `ansible-oracle`.
+#
+# Options from `_oracle_ee_options_link`, which are valid for a release.
+# Same as the options in `$ORACLE_HOME/bin/chopt.ini`.
+# 26ai has no oaa and olap anymore.
+#
+# _IMPORTANT_
+#
+# Do not set this variable in inventory, set_fact ...!
+# @end
+_oracle_ee_options_valid:
+  19.3.0.0: [oaa, olap, partitioning, rat]
+  21.3.0.0: [oaa, olap, partitioning, rat]
+  26.1.0.0: [partitioning, rat]
+
 # @var _oracle_all_editions_options:description: >
 # Defines linkable options available for all editions of oracle database (e.g. Unified auditing, DirectNFS)
 # Dictionary key (dnfs, uniaud, etc.), suffixed by _on/_off, must match the make target in {{ oracle_home_db }}/rdbms/lib/ins_rdbms.mk

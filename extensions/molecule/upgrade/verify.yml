@@ -29,3 +29,86 @@
           - _verify_db1.stdout is search('VERSION=23\.')
           - _verify_db1.stdout is search('PDB=ORCLPDB1:READ WRITE')
         fail_msg: "{{ _verify_db1.stdout_lines }}"
+
+    # Linkable options from host_vars/dbfs-upg.yml (oracle_ee_options_193/261,
+    # oracle_all_editions_options_state)
+    - name: Read objects in libknlopt.a
+      ansible.builtin.command:
+        cmd: "ar t {{ db_homes_config[item.home]['oracle_home'] }}/rdbms/lib/libknlopt.a"
+      loop: &verify_option_homes
+        - home: db1932-si-ee
+          sid: DB2
+          # object present in libknlopt.a
+          objects: [kkpoban.o, kecwr.o, xsnoolap.o, dmndm.o, kzaiang.o]
+          # option in v$option
+          options:
+            Partitioning: "TRUE"
+            Real Application Testing: "TRUE"
+            OLAP: "FALSE"
+            Unified Auditing: "TRUE"
+        - home: db26-si-ee
+          sid: DB1
+          objects: [kkpoban.o, kecnr.o, kzaiang.o]
+          options:
+            Partitioning: "TRUE"
+            Real Application Testing: "FALSE"
+            Unified Auditing: "TRUE"
+      loop_control:
+        label: "{{ item.home }}"
+      become: true
+      become_user: oracle
+      register: _verify_libknlopt
+      changed_when: false
+
+    - name: Assert objects in libknlopt.a
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - item.item.objects | difference(item.stdout_lines) | length == 0
+        fail_msg: >-
+          {{ item.item.home }}: missing {{ item.item.objects | difference(item.stdout_lines) }}
+          in libknlopt.a
+      loop: "{{ _verify_libknlopt.results }}"
+      loop_control:
+        label: "{{ item.item.home }}"
+
+    - name: Read v$option
+      ansible.builtin.shell: |
+        set -eu
+        "${ORACLE_HOME}/bin/sqlplus" -S -L /nolog <<EOF
+        connect / as sysdba
+        whenever sqlerror exit failure
+        set heading off feedback off pagesize 0 linesize 200
+        select 'OPTION=' || parameter || '=' || value from v\$option;
+        EOF
+      environment:
+        ORACLE_HOME: "{{ db_homes_config[item.home]['oracle_home'] }}"
+        ORACLE_SID: "{{ item.sid }}"
+      loop: *verify_option_homes
+      loop_control:
+        label: "{{ item.home }} {{ item.sid }}"
+      become: true
+      become_user: oracle
+      register: _verify_option
+      changed_when: false
+
+    - name: Assert v$option
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - ('OPTION=' ~ opt.key ~ '=' ~ opt.value) in _res.stdout_lines
+        fail_msg: "{{ _res.item.sid }}: expected {{ opt.key }}={{ opt.value }}"
+      loop: "{{ _verify_option_checks }}"
+      vars:
+        _verify_option_checks: >-
+          {%- set __c = [] -%}
+          {%- for r in _verify_option.results -%}
+          {%-   for k, v in r.item.options.items() -%}
+          {%-     set _ = __c.append({'res': r, 'opt': {'key': k, 'value': v}}) -%}
+          {%-   endfor -%}
+          {%- endfor -%}
+          {{- __c -}}
+        _res: "{{ item.res }}"
+        opt: "{{ item.opt }}"
+      loop_control:
+        label: "{{ item.res.item.sid }} {{ item.opt.key }}"
