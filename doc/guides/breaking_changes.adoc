@@ -130,6 +130,14 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<oracle_databases: control_management_pack_access in init_parameters of Enterprise Edition databases>>
 |A database of an Enterprise Edition home in `oracle_databases` with `state: present` *and* `control_management_pack_access` is missing in `init_parameters` or has a value other than `NONE`, `DIAGNOSTIC` or `DIAGNOSTIC+TUNING`, *or* a database of a Standard Edition 2 home with a value other than `NONE`
 |Add `control_management_pack_access` with the value allowed by your license to `init_parameters`, e.g. `{name: control_management_pack_access, value: 'NONE', scope: both, state: present}`
+
+|<<oracle_databases: sga_target and pga_aggregate_target in init_parameters>>
+|A database in `oracle_databases` with `state: present` *and* `sga_target` or `pga_aggregate_target` is missing in `init_parameters`, *or* `oracle_db_mem_totalmb` is set
+|Add `sga_target` and `pga_aggregate_target` to `init_parameters`, remove `oracle_db_mem_totalmb`
+
+|<<oracle_databases: no memory_target and memory_max_target with Hugepages>>
+|A database in `oracle_databases` with `state: present` *and* `memory_target` or `memory_max_target` in `init_parameters` *and* `configure_hugepages` is not `false`
+|Replace `memory_target` / `memory_max_target` by `sga_target` and `pga_aggregate_target` (`state: absent` for the old parameters), or set `configure_hugepages: false`
 |===
 
 ==== Minimum ansible-core 2.16
@@ -1430,6 +1438,75 @@ oracle_databases:
   - oracle_db_name: DB1
     init_parameters:
       - {name: control_management_pack_access, value: 'NONE', scope: both, state: present}
+----
+
+==== oracle_databases: sga_target and pga_aggregate_target in init_parameters
+
+As of 5.0.0 the assert of `oracle_databases` in `orasw_meta` fails for a database with `state: present`
+without `sga_target` or `pga_aggregate_target` in `init_parameters`.
+These are the essential memory parameters of an Oracle database and must be defined explicitly.
+Entries with `sid` are accepted (instance specific values for RAC).
+
+`oracle_db_mem_totalmb` (`totalMemory` in dbca) is not supported anymore, the assert fails if it is set.
+Before, the assert required either `oracle_db_mem_totalmb` or `sga_target` in `init_parameters`.
+
+Who is affected:
+
+- Inventories with a database without `sga_target` or `pga_aggregate_target` in `init_parameters`,
+  *or* with `oracle_db_mem_totalmb`. The playbooks fail in the assert of `orasw_meta`:
++
+----
+<oracle_db_name>: sga_target and pga_aggregate_target are essential memory parameters and must be defined in init_parameters ...
+----
+
+Required actions:
+
+. Add `sga_target` and `pga_aggregate_target` to `init_parameters`.
+. Remove `oracle_db_mem_totalmb`.
+
+.Example
+[source,yaml]
+----
+oracle_databases:
+  - oracle_db_name: DB1
+    init_parameters:
+      - {name: sga_target, value: '2G', scope: spfile, state: present}
+      - {name: pga_aggregate_target, value: '512M', scope: both, state: present}
+----
+
+==== oracle_databases: no memory_target and memory_max_target with Hugepages
+
+As of 5.0.0 the assert of `oracle_databases` in `orasw_meta` fails for a database with `state: present`
+with `memory_target` or `memory_max_target` in `init_parameters` (also with `sid`)
+if Hugepages are configured (`configure_hugepages: true`, default of `orahost`).
+Automatic Memory Management (AMM) prevents the usage of Hugepages.
+Entries with `state: absent` are allowed to remove the parameters from the spfile.
+
+Who is affected:
+
+- Inventories with a database with `memory_target` or `memory_max_target` in `init_parameters`
+  and without `configure_hugepages: false`. The playbooks fail in the assert of `orasw_meta`:
++
+----
+<oracle_db_name>: memory_target and memory_max_target are not allowed in init_parameters with Hugepages ...
+----
+
+Required actions:
+
+. Use `sga_target` and `pga_aggregate_target` (Automatic Shared Memory Management) instead of AMM.
+. Set `state: absent` for `memory_target` and `memory_max_target` to remove them from the spfile of existing databases,
+  *or* set `configure_hugepages: false` if Hugepages are not used.
+
+.Example
+[source,yaml]
+----
+oracle_databases:
+  - oracle_db_name: DB1
+    init_parameters:
+      - {name: memory_target, value: '0', scope: spfile, state: absent}
+      - {name: memory_max_target, value: '0', scope: spfile, state: absent}
+      - {name: sga_target, value: '2G', scope: spfile, state: present}
+      - {name: pga_aggregate_target, value: '512M', scope: both, state: present}
 ----
 
 === Adding new breaking changes

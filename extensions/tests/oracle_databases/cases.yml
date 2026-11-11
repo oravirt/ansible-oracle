@@ -6,6 +6,8 @@
 #         params: init_parameters in addition to local_listener and max_pdbs
 #         max_pdbs: value of max_pdbs in init_parameters (default '3', null: not defined)
 #         cmpa: value of control_management_pack_access in init_parameters (default 'NONE', null: not defined)
+#         sga / pga: value of sga_target / pga_aggregate_target in init_parameters (default '1G' / '256M', null: not defined)
+# vars:   additional variables for the asserts (only configure_hugepages, optional)
 # expect: ok | failed (asserts of orasw_meta)
 # dest:   {df, rf} - datafile / recovery area destination for dbca of the first database (optional)
 # rsp:    expected values in the dbca response file of the first database (optional)
@@ -301,4 +303,91 @@ tc_cases:
     dbs:
       - {params: [*p_create, *p_reco]}
       - {oracle_db_name: DB2, cmpa: null, params: [*p_create, *p_reco]}
+    expect: failed
+
+  # ---------- memory: sga_target, pga_aggregate_target ----------
+  - id: mem_sga_missing
+    dbs: [{sga: null, params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: mem_pga_missing
+    dbs: [{pga: null, params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: mem_both_missing_19c_non_cdb_se2
+    dbs: [{home: h19se2, is_container: false, sga: null, pga: null, params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: mem_missing_state_absent
+    dbs: [{state: absent, sga: null, pga: null}]
+    expect: ok
+
+  - id: mem_sga_param_state_absent
+    dbs: [{sga: null, params: [*p_create, *p_reco, {name: sga_target, value: '1G', state: absent}]}]
+    expect: failed
+
+  - id: mem_pga_empty_value
+    dbs: [{pga: '', params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: mem_sid_specific_rac
+    dbs:
+      - oracle_db_type: RAC
+        sga: null
+        pga: null
+        params:
+          - *p_create
+          - *p_reco
+          - {name: sga_target, value: '1G', sid: DB11, dbca: false}
+          - {name: pga_aggregate_target, value: '256M', sid: DB11, dbca: false}
+    expect: ok
+
+  - id: mem_uppercase
+    dbs: [{sga: null, pga: null, params: [*p_create, *p_reco, {name: SGA_TARGET, value: '1G'}, {name: PGA_AGGREGATE_TARGET, value: '256M'}]}]
+    expect: ok
+
+  - id: mem_oracle_db_mem_totalmb
+    dbs: [{oracle_db_mem_totalmb: 1024, params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: multi_db_mem_second_missing
+    dbs:
+      - {params: [*p_create, *p_reco]}
+      - {oracle_db_name: DB2, pga: null, params: [*p_create, *p_reco]}
+    expect: failed
+
+  # ---------- memory: no memory_target / memory_max_target with Hugepages ----------
+  - id: amm_memory_target_hugepages_default
+    dbs: [{params: [*p_create, *p_reco, {name: memory_target, value: '2G'}]}]
+    expect: failed
+
+  - id: amm_memory_max_target_hugepages_default
+    dbs: [{params: [*p_create, *p_reco, {name: MEMORY_MAX_TARGET, value: '2G', scope: spfile}]}]
+    expect: failed
+
+  - id: amm_memory_target_sid_hugepages
+    dbs: [{params: [*p_create, *p_reco, {name: memory_target, value: '2G', sid: DB1, dbca: false}]}]
+    expect: failed
+
+  - id: amm_memory_target_state_absent
+    dbs: [{params: [*p_create, *p_reco, {name: memory_target, value: '0', state: absent}, {name: memory_max_target, value: '0', state: absent}]}]
+    expect: ok
+
+  - id: amm_memory_target_db_state_absent
+    dbs: [{state: absent, params: [{name: memory_target, value: '2G'}]}]
+    expect: ok
+
+  - id: amm_memory_target_hugepages_false
+    vars: {configure_hugepages: false}
+    dbs: [{params: [*p_create, *p_reco, {name: memory_target, value: '2G'}, {name: memory_max_target, value: '2G'}]}]
+    expect: ok
+
+  - id: amm_memory_target_hugepages_string_false
+    vars: {configure_hugepages: 'false'}
+    dbs: [{params: [*p_create, *p_reco, {name: memory_target, value: '2G'}]}]
+    expect: ok
+
+  - id: amm_memory_target_hugepages_true
+    vars: {configure_hugepages: true}
+    dbs: [{params: [*p_create, *p_reco, {name: memory_target, value: '2G'}]}]
     expect: failed

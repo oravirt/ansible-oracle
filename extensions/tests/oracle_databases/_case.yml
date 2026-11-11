@@ -6,15 +6,17 @@
     _tc_dbs: >-
       {%- set ns = namespace(l=[]) -%}
       {%- for d in tc.dbs -%}
-      {#- max_pdbs: '3' by default, case key max_pdbs overrides the value, null removes it -#}
-      {%-   set mp = d.max_pdbs if 'max_pdbs' in d else '3' -%}
-      {%-   set mp_params = [] if mp is none else [{'name': 'max_pdbs', 'value': mp, 'scope': 'both', 'state': 'present'}] -%}
-      {#- control_management_pack_access: 'NONE' by default, case key cmpa overrides the value, null removes it -#}
-      {%-   set cm = d.cmpa if 'cmpa' in d else 'NONE' -%}
-      {%-   set cm_params = [] if cm is none else [{'name': 'control_management_pack_access', 'value': cm, 'scope': 'both', 'state': 'present'}] -%}
+      {#- default init_parameters from _default_params: a case key overrides the value, null removes it -#}
+      {%-   set dp = namespace(l=[]) -%}
+      {%-   for k, v in _default_params.items() -%}
+      {%-     set val = d[k] if k in d else v.value -%}
+      {%-     if val is not none -%}
+      {%-       set dp.l = dp.l + [{'name': v.name, 'value': val, 'scope': 'both', 'state': 'present'}] -%}
+      {%-     endif -%}
+      {%-   endfor -%}
       {%-   set ns.l = ns.l + [_base_db
-                               | combine(d | dict2items | rejectattr('key', 'in', ['params', 'max_pdbs', 'cmpa']) | items2dict)
-                               | combine({'init_parameters': _base_params + mp_params + cm_params + d.params | default([])})] -%}
+                               | combine(d | dict2items | rejectattr('key', 'in', ['params'] + _default_params.keys() | list) | items2dict)
+                               | combine({'init_parameters': _base_params + dp.l + d.params | default([])})] -%}
       {%- endfor -%}
       {{ ns.l }}
 
@@ -25,6 +27,15 @@
       ansible.builtin.include_tasks: "{{ _repo_roles }}/orasw_meta/tasks/assert_oracle_databases.yml"
       vars:
         oracle_databases: "{{ _tc_dbs }}"
+      when: tc['vars'] is not defined
+
+    # test case with additional variables (e.g. configure_hugepages)
+    - name: "{{ tc.id }} | asserts of orasw_meta with configure_hugepages"
+      ansible.builtin.include_tasks: "{{ _repo_roles }}/orasw_meta/tasks/assert_oracle_databases.yml"
+      vars:
+        oracle_databases: "{{ _tc_dbs }}"
+        configure_hugepages: "{{ tc['vars']['configure_hugepages'] }}"
+      when: tc['vars'] is defined
 
     - name: "{{ tc.id }} | assert passed"
       ansible.builtin.set_fact:
