@@ -126,16 +126,6 @@
               - ass_odb.users | default([]) | type_debug == 'list'
               - ass_odb.oracle_db_type | default('SI') in ('SI', 'RAC', 'RACONENODE')
               - ass_odb.storage_type | default('FS') in ('FS', 'ASM')
-              - >-
-                (ass_odb.oracle_db_mem_totalmb is defined
-                  and ass_odb.init_parameters | default([])
-                      | selectattr ('name', 'equalto', 'sga_target') | list | length == 0
-                )
-                or
-                (ass_odb.oracle_db_mem_totalmb is not defined
-                  and ass_odb.init_parameters | default([]) | list
-                       | selectattr ('name', 'equalto', 'sga_target') | list | length > 0
-                )
           with_items:
             - "{{ oracle_databases }}"
           loop_control:
@@ -320,6 +310,83 @@
               {%-   endif -%}
               {%- endfor -%}
               {{ ns.v }}
+          with_items:
+            - "{{ oracle_databases }}"
+          loop_control:
+            label: "{{ ass_odb.oracle_db_name | default('') }}"
+            loop_var: ass_odb
+          when:
+            - oracle_databases is defined
+          register: assertoracle_databases
+
+        # sga_target and pga_aggregate_target are the essential memory parameters.
+        # Entries with a sid are accepted (instance specific values in RAC).
+        # oracle_db_mem_totalmb (dbca totalMemory) is replaced by sga_target and pga_aggregate_target.
+        - name: assert sga_target and pga_aggregate_target in init_parameters of oracle_databases
+          ansible.builtin.assert:
+            quiet: true
+            fail_msg: >-
+              {{ ass_odb.oracle_db_name | default('') }}:
+              sga_target and pga_aggregate_target are essential memory parameters
+              and must be defined in init_parameters
+              (missing: {{ _ass_mem_missing | join(', ') if _ass_mem_missing else '-' }}),
+              e.g. {name: sga_target, value: '2G', scope: spfile, state: present}
+              and {name: pga_aggregate_target, value: '512M', scope: both, state: present}.
+              oracle_db_mem_totalmb is not supported anymore
+              (defined: {{ ass_odb.oracle_db_mem_totalmb is defined }}).
+              See doc/guides/breaking_changes.adoc.
+            that:
+              - >-
+                ass_odb.state | default('present') == 'absent'
+                or (_ass_mem_missing | length == 0
+                    and ass_odb.oracle_db_mem_totalmb is not defined)
+          vars:
+            _ass_mem_missing: >-
+              {%- set ns = namespace(l=['sga_target', 'pga_aggregate_target']) -%}
+              {%- for p in ass_odb.init_parameters | default([]) -%}
+              {%-   if p.state | default('present') != 'absent'
+                      and p.value | default('') | string | trim | length > 0 -%}
+              {%-     set ns.l = ns.l | reject('equalto', p.name | default('') | lower) | list -%}
+              {%-   endif -%}
+              {%- endfor -%}
+              {{ ns.l }}
+          with_items:
+            - "{{ oracle_databases }}"
+          loop_control:
+            label: "{{ ass_odb.oracle_db_name | default('') }}"
+            loop_var: ass_odb
+          when:
+            - oracle_databases is defined
+          register: assertoracle_databases
+
+        # Automatic Memory Management (memory_target, memory_max_target) prevents the usage of Hugepages.
+        # configure_hugepages: default true in orahost
+        - name: assert no memory_target and memory_max_target with Hugepages in oracle_databases
+          ansible.builtin.assert:
+            quiet: true
+            fail_msg: >-
+              {{ ass_odb.oracle_db_name | default('') }}:
+              memory_target and memory_max_target are not allowed in init_parameters
+              with Hugepages (configure_hugepages: true, default),
+              because Automatic Memory Management prevents the usage of Hugepages
+              (found: {{ _ass_amm_params | join(', ') }}).
+              Use sga_target and pga_aggregate_target instead, or set state: absent for these parameters.
+              See doc/guides/breaking_changes.adoc.
+            that:
+              - >-
+                ass_odb.state | default('present') == 'absent'
+                or not configure_hugepages | default(true) | bool
+                or _ass_amm_params | length == 0
+          vars:
+            _ass_amm_params: >-
+              {%- set ns = namespace(l=[]) -%}
+              {%- for p in ass_odb.init_parameters | default([]) -%}
+              {%-   if p.name | default('') | lower in ['memory_target', 'memory_max_target']
+                      and p.state | default('present') != 'absent' -%}
+              {%-     set ns.l = ns.l + [p.name | lower] -%}
+              {%-   endif -%}
+              {%- endfor -%}
+              {{ ns.l | unique }}
           with_items:
             - "{{ oracle_databases }}"
           loop_control:

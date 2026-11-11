@@ -40,11 +40,16 @@
       state: present
       oracle_db_type: SI
       storage_type: FS
-      oracle_db_mem_totalmb: 1024
       oracle_database_type: MULTIPURPOSE
       service_name: DB1_SRV
     _base_params:
       - {name: local_listener, value: '//localhost:1521', scope: both, state: present}
+    # init_parameters of every database, the key in a test case overrides the value (null: not defined)
+    _default_params:
+      max_pdbs: {name: max_pdbs, value: '3'}
+      cmpa: {name: control_management_pack_access, value: 'NONE'}
+      sga: {name: sga_target, value: '1G'}
+      pga: {name: pga_aggregate_target, value: '256M'}
     tc_results: []
 
   tasks:

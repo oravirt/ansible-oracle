@@ -724,6 +724,11 @@ with `NONE`, `DIAGNOSTIC` or `DIAGNOSTIC+TUNING`. It is optional for `SE2` and m
 IMPORTANT! `DIAGNOSTIC` needs a license for the Diagnostics Pack,
 `DIAGNOSTIC+TUNING` for the Diagnostics and Tuning Pack.
 
+Every database needs `sga_target` and `pga_aggregate_target` in `init_parameters` (assert).
+`oracle_db_mem_totalmb` is not supported anymore.
+With Hugepages (`configure_hugepages: true`, default) `memory_target` and `memory_max_target`
+are not allowed in `init_parameters` (assert), Automatic Memory Management prevents the usage of Hugepages.
+
 `datafile_dest` and `recoveryfile_dest` are removed from `oracle_databases` (assert fails),
 they are replaced by `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters`.
 

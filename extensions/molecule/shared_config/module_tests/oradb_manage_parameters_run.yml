@@ -21,17 +21,23 @@
     mt_id: "{{ _mp_id }}"
     mt_role: oradb_manage_parameters
     mt_role_expect: "{{ 'failed' if _mp_expect == 'failed' else 'ok' }}"
-    # orasw_meta asserts sga_target in init_parameters or oracle_db_mem_totalmb
-    # (only used by dbca) => dummy oracle_db_mem_totalmb, only the test parameters are set
-    # orasw_meta asserts local_listener in init_parameters => local_listener of the inventory
+    # orasw_meta asserts some init_parameters (_mp_assert_params) => these parameters
+    # of the inventory (already set by converge => no change) and the test parameters
     oracle_databases: >-
       {{ _mp_inventory_dbs | selectattr('oracle_db_name', 'equalto', mt_cdb)
          | map('combine', {'init_parameters': (_mp_inventory_dbs
                                                | selectattr('oracle_db_name', 'equalto', mt_cdb)
                                                | first).init_parameters | default([])
-                                              | selectattr('name', 'equalto', 'local_listener')
-                                              | list + _mp_cdb | default([]),
-                           'oracle_db_mem_totalmb': 2048}) | list }}
+                                              | selectattr('name', 'in', _mp_assert_params)
+                                              | list + _mp_cdb | default([])}) | list }}
+    _mp_assert_params:
+      - local_listener
+      - db_create_file_dest
+      - db_recovery_file_dest
+      - max_pdbs
+      - control_management_pack_access
+      - sga_target
+      - pga_aggregate_target
     oracle_pdbs: >-
       {{ _mp_inventory_pdbs | selectattr('pdb_name', 'equalto', mt_pdb)
          | map('combine', {'init_parameters': _mp_pdb | default([])}) | list }}

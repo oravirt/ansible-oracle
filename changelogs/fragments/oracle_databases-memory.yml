@@ -1,0 +1,10 @@
+---
+breaking_changes:
+  - "orasw_meta: the assert of oracle_databases requires sga_target and pga_aggregate_target in init_parameters for databases with state present (see doc/guides/breaking_changes.adoc)"
+  - "orasw_meta: the assert of oracle_databases fails for memory_target or memory_max_target in init_parameters with Hugepages (configure_hugepages: true, default). Automatic Memory Management prevents the usage of Hugepages (see doc/guides/breaking_changes.adoc)"
+removed_features:
+  - "orasw_meta: oracle_db_mem_totalmb in oracle_databases is not supported anymore, the assert fails. Use sga_target and pga_aggregate_target in init_parameters (see doc/guides/breaking_changes.adoc)"
+  - "oradb_manage_db: totalMemory is not set in the dbca response files for 19c and 26ai anymore (oracle_db_mem_totalmb)"
+trivial:
+  - "extensions: controller-only tests for the memory parameters in oracle_databases"
+  - "extensions: module test oradb_manage_parameters keeps the init_parameters of the inventory which are required by the asserts of orasw_meta"
