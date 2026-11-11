@@ -3,7 +3,8 @@
 #
 # id:     name of the test case
 # dbs:    list of databases, combined with _base_db (home h26, DB1, FS, SI, state present)
-#         params: init_parameters in addition to local_listener and max_pdbs
+#         params: init_parameters in addition to the default parameters below
+#         listener: value of local_listener in init_parameters (default '//localhost:1521', null: not defined)
 #         max_pdbs: value of max_pdbs in init_parameters (default '3', null: not defined)
 #         cmpa: value of control_management_pack_access in init_parameters (default 'NONE', null: not defined)
 #         sga / pga: value of sga_target / pga_aggregate_target in init_parameters (default '1G' / '256M', null: not defined)
@@ -11,6 +12,7 @@
 # expect: ok | failed (asserts of orasw_meta)
 # dest:   {df, rf} - datafile / recovery area destination for dbca of the first database (optional)
 # rsp:    expected values in the dbca response file of the first database (optional)
+# rsp_absent: keys which must not be set in the dbca response file of the first database (optional)
 
 _p_create: &p_create {name: db_create_file_dest, value: '/u02/oradata', scope: both, state: present}
 _p_reco: &p_reco {name: db_recovery_file_dest, value: '/u02/fra', scope: both, state: present}
@@ -349,6 +351,12 @@ tc_cases:
   - id: mem_oracle_db_mem_totalmb
     dbs: [{oracle_db_mem_totalmb: 1024, params: [*p_create, *p_reco]}]
     expect: failed
+    rsp_absent: [totalMemory]
+
+  - id: mem_oracle_db_mem_totalmb_19c
+    dbs: [{home: h19, oracle_db_mem_totalmb: 1024, params: [*p_create, *p_reco]}]
+    expect: failed
+    rsp_absent: [totalMemory]
 
   - id: multi_db_mem_second_missing
     dbs:
@@ -391,3 +399,28 @@ tc_cases:
     vars: {configure_hugepages: true}
     dbs: [{params: [*p_create, *p_reco, {name: memory_target, value: '2G'}]}]
     expect: failed
+
+  # ---------- local_listener (Single Instance) ----------
+  - id: listener_si_missing
+    dbs: [{listener: null, params: [*p_create, *p_reco]}]
+    expect: failed
+
+  - id: listener_si_param_state_absent
+    dbs: [{listener: null, params: [*p_create, *p_reco, {name: local_listener, value: '//localhost:1521', state: absent}]}]
+    expect: failed
+
+  - id: listener_si_uppercase
+    dbs: [{listener: null, params: [*p_create, *p_reco, {name: LOCAL_LISTENER, value: '//localhost:1521'}]}]
+    expect: ok
+
+  - id: listener_si_missing_state_absent
+    dbs: [{state: absent, listener: null}]
+    expect: ok
+
+  - id: listener_rac_missing
+    dbs: [{oracle_db_type: RAC, listener: null, params: [*p_create, *p_reco]}]
+    expect: ok
+
+  - id: listener_raconenode_missing
+    dbs: [{oracle_db_type: RACONENODE, listener: null, params: [*p_create, *p_reco]}]
+    expect: ok
