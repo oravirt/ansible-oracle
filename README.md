@@ -1,9 +1,10 @@
 # ansible-oracle
 
 * Automated installation of
-   * Oracle RAC databases
-   * RAC One Node database and
-   * single instance Oracle databases
+   * Single Instance Oracle databases without and with Oracle Restart
+   * Oracle Restart (Grid Infrastructure for a Standalone Server) with ASM
+   * Grid Infrastructure for a Cluster, RAC and RAC One Node databases: the roles contain tasks for it,
+     but they are not tested and will probably not work
 * Start with one or more clean Linux machine(s), end up with a fully configured Oracle database system
 
 # Documentation
@@ -38,4 +39,5 @@
   `ansible-oracle` 4.x supports ansible-core 2.14 - 2.18 only
 * Oracle Linux (or any RHEL-based Linux System) >= 8
 * Oracle Database 26ai, 19c
-* Oracle Grid Infrastructure/Restart 19c
+* Oracle Restart 19c, 26ai
+* Oracle Grid Infrastructure for a Cluster: not tested

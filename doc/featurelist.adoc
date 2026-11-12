@@ -1,11 +1,12 @@
 
 ## Supported features in ansible-oracle
 
-WARNING: Please check the official Compatibility List from Oracle for RDBMS and Restart/Grid-Infrastructure. +
+WARNING: Please check the official Compatibility List from Oracle for RDBMS, Oracle Restart and Grid Infrastructure. +
 `ansible-oracle` only supports combinations from Oracle with exceptions from the following table.
 
 IMPORTANT: As of `ansible-oracle` 5.0 only Oracle 19c and 26ai are supported for RDBMS.
-Restart and Grid-Infrastructure are supported for 19c only. +
+Installation and tests are done for Single Instance databases without and with Oracle Restart. +
+Grid Infrastructure for a Cluster is not tested and will probably not work. +
 Older releases (11.2, 12.1, 12.2, 18c, 21c) are rejected by the assert of `db_homes_config`,
 see link:guides/breaking_changes.adoc[Breaking Changes - Upgrade Guide].
 
@@ -17,6 +18,15 @@ See documentation from Oracle for differences between Enterprise and Standard Ed
 26ai
 
 :supportedgi: 19c
+
+:supportedrestart: 19c + \
+26ai
+
+NOTE: Terms used in this document: +
+*Oracle Restart*: Grid Infrastructure for a Standalone Server (`oracle_install_option_gi: HA_CONFIG`), Single Instance databases with ASM on one host. +
+*Grid Infrastructure*: Grid Infrastructure for a Cluster (`oracle_install_option_gi: CRS_CONFIG`). +
+*RAC* (Real Application Clusters) and *RAC One Node* need Grid Infrastructure. +
+Both Oracle Restart and Grid Infrastructure use the software of Grid Infrastructure (`oracle_home_gi`).
 
 .Featurelist
 [options="header" cols="1,2,2" valign="top"]
@@ -49,11 +59,11 @@ Redhat Enterprise Linux
 |Oracle RDBMS
 |{supportedversions}
 
-|Oracle Grid-Infrastructure
-|{supportedgi}
+|Oracle Grid Infrastructure (cluster)
+|not tested <<table1footnote,^[16]^>>
 
 |Oracle Restart
-|{supportedgi}
+|{supportedrestart}
 
 |python-oracledb
 |Python 3
@@ -84,7 +94,7 @@ RMAN Backup with
 * custom RMAN-scripts
 
 |dNFS (direct NFS)
-a| Golden Image for RDBMS, Restart & GI
+a| Golden Image for RDBMS and Grid Infrastructure software (Oracle Restart)
 
 * Create from Installation
 * Install from Image
@@ -122,7 +132,7 @@ e|Database Services <<table1footnote,^[3]^>>
 |Timezone Upgrades
 |{supportedversions}
 
-.5+|Database Patching
+.6+|Database Patching
 |Release Updates<<table1footnote,^[11]^>>
 .4+|{supportedversions}
 
@@ -135,6 +145,9 @@ a|OneOff Patches<<table1footnote,^[11]^>>
 
 |link:guides/out_of_place_patching.adoc[Out-of-Place Patching]: switch of a database into another `ORACLE_HOME` <<table1footnote,^[14]^>>
 |{supportedversions}
+
+|link:guides/out_of_place_patching.adoc#oracle_restart_switch_gi_home[Out-of-Place Patching of Oracle Restart]: switch of the Grid Infrastructure home <<table1footnote,^[15]^>>
+|26ai
 
 |Oracle APEX (experimental!)
 a|Installation of APEX in PDB. Not supported for CDB or nonCDB.
@@ -176,7 +189,7 @@ a|dynamic shell environment link:https://github.com/opitzconsulting/oracle-scrip
   Breaking changes in new commits are possible. +
   Please do not use this feature in production environments.
 [[table1footnote]]^3^::
-  Limited support. Not tested for Oracle Restart & Grid-Infrastructure
+  Limited support. Not tested for Oracle Restart and Grid Infrastructure.
 [[table1footnote]]^4^::
   Only tested with PDB on 19c+. May be work in nonCDB as well but noch in CDB.
 [[table1footnote]]^5^::
@@ -193,13 +206,20 @@ a|dynamic shell environment link:https://github.com/opitzconsulting/oracle-scrip
 [[table1footnote]]^10^::
   Use the Golden-Image feature as a workaround.
 [[table1footnote]]^11^::
-  Supported for Single-Instance, Oracle Restart and Oracle Grid-Infrastructure.
+  Supported for Single Instance databases without and with Oracle Restart.
+  Not tested with Grid Infrastructure (cluster).
 [[table1footnote]]^12^::
   Source CDB (old release) and target CDB (new release) must run on the same host.
   See link:guides/autoupgrade_upgrade.adoc[Upgrade of PDBs with AutoUpgrade].
 [[table1footnote]]^13^::
-  Single Instance databases without Grid Infrastructure / Oracle Restart only.
-  Not supported for Oracle Restart, RAC and RAC One Node.
+  Single Instance databases without Oracle Restart and without Grid Infrastructure only.
+  Not supported for Oracle Restart, Grid Infrastructure (cluster), RAC and RAC One Node.
 [[table1footnote]]^14^::
-  Single Instance primary databases without Grid Infrastructure and with Oracle Restart.
-  Not supported for RAC and RAC One Node.
+  Single Instance primary databases without and with Oracle Restart.
+  Not supported for Grid Infrastructure (cluster), RAC and RAC One Node.
+[[table1footnote]]^15^::
+  Oracle Restart only (`gridSetup.sh -switchGridHome`), inside the same release (e.g. 23.26.3 => 23.26.4).
+  Not supported for 19c Oracle Restart and for Grid Infrastructure (cluster).
+[[table1footnote]]^16^::
+  The roles contain tasks for Grid Infrastructure for a Cluster (`CRS_CONFIG`) and RAC,
+  but they are not tested and will probably not work.

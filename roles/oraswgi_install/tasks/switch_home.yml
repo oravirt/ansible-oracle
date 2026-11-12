@@ -1,0 +1,255 @@
+---
+# Out-of-Place Patching of Oracle Restart (HA_CONFIG)
+#
+# The stack runs from crs_home in /etc/oracle/olr.loc. When oracle_home_gi is a different
+# ORACLE_HOME, the new home is installed and the stack is switched into it:
+#   1. extract the image (gold image of the new RU) into oracle_home_gi
+#   2. <new home>/gridSetup.sh -silent -setupHomeAs <old home> (grid user): software only
+#      installation, registers the new home in the central inventory (INS-45127 otherwise)
+#   3. <new home>/gridSetup.sh -silent -switchGridHome (grid user)
+#   4. <new home>/root.sh (root) => roothas.pl -prepatch/-postpatch -dstcrshome <new home>:
+#      stops the stack in the old home, starts it in the new home
+#      (downtime of ASM, listener and all databases managed by Oracle Restart)
+#   5. runInstaller -updateNodeList: CRS=TRUE for the new home, CRS=FALSE for the old home
+#      (not done by root.sh)
+#
+# Supported by Oracle for Oracle Restart from 21c on (only inside the same release, e.g.
+# 23.26.3 => 23.26.4). 19c Oracle Restart needs a different procedure (roothas.sh -prepatch/
+# -postpatch -dstcrshome), which is not implemented.
+# The old ORACLE_HOME is not removed.
+- name: switch_home | Read /etc/oracle/olr.loc
+  ansible.builtin.slurp:
+    src: /etc/oracle/olr.loc
+  register: _oraswgi_install_olrloc_content
+
+- name: switch_home | Current ORACLE_HOME of Grid Infrastructure / Oracle Restart
+  ansible.builtin.set_fact:
+    _oraswgi_install_crs_home: >-
+      {{ _oraswgi_install_olrloc_content.content | b64decode
+         | regex_findall('(?m)^crs_home=(.*)$') | default([''], true) | first | trim | regex_replace('/+$', '') }}
+
+- name: switch_home | Switch Oracle Restart into oracle_home_gi
+  when:
+    - _oraswgi_install_crs_home | length > 0
+    - _oraswgi_install_crs_home != oracle_home_gi | regex_replace('/+$', '')
+  block:
+
+    - name: switch_home | Info
+      ansible.builtin.debug:
+        msg:
+          - "Out-of-Place Patching of Oracle Restart"
+          - "current ORACLE_HOME: {{ _oraswgi_install_crs_home }}"
+          - "new ORACLE_HOME:     {{ oracle_home_gi }}"
+
+    - name: switch_home | Assert Oracle Restart and release
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - not _oraswgi_meta_configure_cluster | bool
+          - oracle_install_version_gi is version('21', '>=')
+        fail_msg: >-
+          Grid Infrastructure runs from {{ _oraswgi_install_crs_home }}, but oracle_home_gi is
+          {{ oracle_home_gi }}. A switch of the ORACLE_HOME is supported for Oracle Restart
+          (oracle_install_option_gi=HA_CONFIG) from 21c on only.
+          Set oracle_home_gi to {{ _oraswgi_install_crs_home }} or patch the home in place.
+
+    - name: switch_home | Create ORACLE_HOME directory (GI)
+      ansible.builtin.file:
+        dest: "{{ oracle_home_gi }}"
+        owner: "{{ _grid_install_user }}"
+        group: "{{ oracle_group }}"
+        state: directory
+        mode: "0775"
+      become: true
+
+    - name: switch_home | Download oracle installfiles to server (GI) (www)
+      ansible.builtin.include_tasks: "{{ www_download_bin }}.yml"
+      when:
+        - not is_sw_source_local | bool
+        - oracle_sw_copy | bool
+
+    - name: switch_home | Copy oracle installfiles to server (GI) (local)
+      ansible.builtin.copy:
+        src: "{{ item.filesource | default(oracle_sw_source_local + '/' + item.filename, true) }}"
+        dest: "{{ oracle_stage }}"
+        mode: "0775"
+        force: false
+      with_items: "{{ oracle_sw_image_gi | selectattr('version', 'equalto', oracle_install_version_gi) }}"
+      become: true
+      become_user: "{{ _grid_install_user }}"
+      when:
+        - oracle_home_gi not in checkgiinstall.stdout
+        - is_sw_source_local | bool
+        - oracle_sw_copy | bool
+
+    - name: switch_home | Extract files to ORACLE_HOME (gi)
+      ansible.builtin.unarchive:
+        src: "{{ _oraswgi_install_oracle_gi_image }}"
+        dest: "{{ oracle_home_gi }}"
+        copy: false
+      with_items: "{{ oracle_sw_image_gi | selectattr('version', 'equalto', oracle_install_version_gi) }}"
+      loop_control:
+        label: "{{ _oraswgi_install_oracle_gi_image | default('') }}"
+      args:
+        creates: "{{ oracle_home_gi }}/root.sh"
+      become: true
+      become_user: "{{ _grid_install_user }}"
+      when:
+        - oracle_home_gi not in checkgiinstall.stdout
+
+    # software only installation with the settings (Oracle base, groups) of the old home
+    # root.sh of the software only installation is not needed => root.sh after -switchGridHome
+    - name: switch_home | gridSetup.sh -setupHomeAs (software only)
+      ansible.builtin.command:
+        argv: "{{ __argv | reject('equalto', '') | list }}"
+      vars:
+        __argv:
+          - "{{ oracle_home_gi }}/gridSetup.sh"
+          - -silent
+          - -setupHomeAs
+          - "{{ _oraswgi_install_crs_home }}"
+          - "{{ gi_ignoreprereq | bool | ternary('-ignorePrereqFailure', '') }}"
+      environment: "{{ oracle_script_env }}"
+      become: true
+      become_user: "{{ _grid_install_user }}"
+      register: _oraswgi_install_setuphomeas
+      changed_when: true
+      # 6: successful with warnings
+      failed_when: _oraswgi_install_setuphomeas.rc not in [0, 6]
+      when:
+        - oracle_home_gi not in checkgiinstall.stdout
+
+    - name: switch_home | Output of gridSetup.sh -setupHomeAs
+      ansible.builtin.debug:
+        var: _oraswgi_install_setuphomeas.stdout_lines
+      when: _oraswgi_install_setuphomeas.stdout_lines is defined
+
+    # A home, which was the running home before (e.g. switch back to the old home), is locked:
+    # root.sh/roothas.pl -postpatch changes the owner of files to root
+    # => gridSetup.sh -switchGridHome fails as grid user with INS-00001/OUI-10166
+    # => unlock the home (no impact on the stack running from the current home)
+    - name: switch_home | Check lock of new ORACLE_HOME
+      ansible.builtin.stat:
+        path: "{{ oracle_home_gi }}/crs/config/rootconfig.sh"
+      register: _oraswgi_install_rootconfig
+
+    - name: switch_home | Unlock new ORACLE_HOME
+      ansible.builtin.command:
+        argv:
+          - "{{ oracle_home_gi }}/crs/install/roothas.sh"
+          - -unlock
+          - -hahome
+          - "{{ oracle_home_gi }}"
+      environment: "{{ oracle_script_env }}"
+      become: true
+      become_user: root
+      changed_when: true
+      when:
+        - _oraswgi_install_rootconfig.stat.exists
+        - _oraswgi_install_rootconfig.stat.pw_name == 'root'
+
+    # prepares the switch => root.sh of the new home executes the switch
+    - name: switch_home | gridSetup.sh -switchGridHome
+      ansible.builtin.command:
+        argv: "{{ __argv | reject('equalto', '') | list }}"
+      vars:
+        __argv:
+          - "{{ oracle_home_gi }}/gridSetup.sh"
+          - -silent
+          - -switchGridHome
+          - "{{ gi_ignoreprereq | bool | ternary('-ignorePrereqFailure', '') }}"
+      environment: "{{ oracle_script_env }}"
+      become: true
+      become_user: "{{ _grid_install_user }}"
+      register: _oraswgi_install_switchgridhome
+      changed_when: true
+      # 6: successful with warnings
+      failed_when: _oraswgi_install_switchgridhome.rc not in [0, 6]
+
+    - name: switch_home | Output of gridSetup.sh -switchGridHome
+      ansible.builtin.debug:
+        var: _oraswgi_install_switchgridhome.stdout_lines
+
+    - name: switch_home | Run root.sh in new ORACLE_HOME (switch of the stack)
+      ansible.builtin.command: "{{ oracle_home_gi }}/root.sh"
+      environment: "{{ oracle_script_env }}"
+      become: true
+      become_user: root
+      register: _oraswgi_install_switch_rootsh
+      changed_when: true
+
+    - name: switch_home | Output of root.sh
+      ansible.builtin.debug:
+        var: _oraswgi_install_switch_rootsh.stdout_lines
+
+    - name: switch_home | Read /etc/oracle/olr.loc after switch
+      ansible.builtin.slurp:
+        src: /etc/oracle/olr.loc
+      register: _oraswgi_install_olrloc_content
+
+    - name: switch_home | ORACLE_HOME of Oracle Restart after switch
+      ansible.builtin.set_fact:
+        _oraswgi_install_crs_home_switched: >-
+          {{ _oraswgi_install_olrloc_content.content | b64decode
+             | regex_findall('(?m)^crs_home=(.*)$') | default([''], true) | first | trim
+             | regex_replace('/+$', '') }}
+
+    - name: switch_home | Assert switch of ORACLE_HOME
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _oraswgi_install_crs_home_switched == oracle_home_gi | regex_replace('/+$', '')
+        fail_msg: >-
+          crs_home in /etc/oracle/olr.loc is {{ _oraswgi_install_crs_home_switched }},
+          not {{ oracle_home_gi }} after root.sh.
+          See the log of root.sh in {{ oracle_home_gi }}/install/root_*.log.
+
+    - name: switch_home | Current ORACLE_HOME after switch
+      ansible.builtin.set_fact:
+        _oraswgi_install_crs_home: "{{ _oraswgi_install_crs_home_switched }}"
+
+# CRS flag in the central inventory: only oracle_home_gi (= running home) has CRS="true".
+# root.sh of the switch does not set the flag for the new home.
+# Outside of the block => repaired by the next run as well.
+- name: switch_home | CRS flag in central inventory
+  when:
+    - _oraswgi_install_crs_home == oracle_home_gi | regex_replace('/+$', '')
+  block:
+    - name: switch_home | Read central inventory
+      ansible.builtin.slurp:
+        src: "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml"
+      register: _oraswgi_install_inventory
+
+    - name: switch_home | Homes with CRS flag
+      ansible.builtin.set_fact:
+        _oraswgi_install_crs_flag_homes: >-
+          {{ _oraswgi_install_inventory.content | b64decode
+             | regex_findall('<HOME [^>]*LOC="([^"]+)"[^>]*CRS="true"')
+             | map('regex_replace', '/+$', '') | list }}
+
+    - name: switch_home | Update CRS flag in central inventory
+      ansible.builtin.command:
+        argv: "{{ __argv | reject('equalto', '') | list }}"
+      vars:
+        __argv:
+          - "{{ oracle_home_gi }}/oui/bin/runInstaller"
+          - -silent
+          - "{{ gi_ignoreprereq | bool | ternary('-ignoreSysPrereqs', '') }}"
+          - -updateNodeList
+          - "ORACLE_HOME={{ item.home }}"
+          - "CRS={{ item.crs }}"
+      environment: "{{ oracle_script_env }}"
+      become: true
+      become_user: "{{ _grid_install_user }}"
+      changed_when: true
+      loop: >-
+        {%- set ns = namespace(homes=[]) -%}
+        {%- for h in _oraswgi_install_crs_flag_homes if h != _oraswgi_install_crs_home -%}
+        {%-   set ns.homes = ns.homes + [{'home': h, 'crs': 'FALSE'}] -%}
+        {%- endfor -%}
+        {%- if _oraswgi_install_crs_home not in _oraswgi_install_crs_flag_homes -%}
+        {%-   set ns.homes = ns.homes + [{'home': _oraswgi_install_crs_home, 'crs': 'TRUE'}] -%}
+        {%- endif -%}
+        {{ ns.homes }}
+      loop_control:
+        label: "{{ item.home }} CRS={{ item.crs }}"

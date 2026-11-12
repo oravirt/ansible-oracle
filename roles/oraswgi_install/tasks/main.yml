@@ -84,6 +84,13 @@
   when:
     - not olrloc.stat.exists
 
+# Out-of-Place Patching: oracle_home_gi differs from crs_home in /etc/oracle/olr.loc
+- name: install_home_gi | Switch Oracle Restart into new ORACLE_HOME
+  ansible.builtin.include_tasks: switch_home.yml
+  when:
+    - olrloc.stat.exists
+    - orasw_meta_primary_node | bool
+
 - name: install_home_gi | include_tasks asmcmd_dsset.yml
   ansible.builtin.include_tasks: asmcmd_dsset.yml
   tags: always
