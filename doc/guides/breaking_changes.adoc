@@ -139,6 +139,10 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |A database in `oracle_databases` with `state: present` *and* `memory_target` or `memory_max_target` in `init_parameters` *and* `configure_hugepages` is not `false`
 |Replace `memory_target` / `memory_max_target` by `sga_target` and `pga_aggregate_target` (`state: absent` for the old parameters), or set `configure_hugepages: false`
 
+|<<oracle_databases: processes in init_parameters>>
+|A database in `oracle_databases` with `state: present` *and* `processes` is missing in `init_parameters`
+|Add `processes` to `init_parameters`, e.g. `{name: processes, value: '640', scope: spfile, state: present}`. Usually irrelevant in practice, the default of `processes` is too small in most cases anyway
+
 |<<Role oraswahf_install replaced by ahf>>
 |Own playbooks use the role `oraswahf_install`
 |Use the new role `ahf` (playbook `opitzconsulting.ansible_oracle.ahf`)
@@ -1541,6 +1545,45 @@ Only playbooks, which reference the role, fail with `the role 'oraswahf_install'
 ----
 
 The variables and the decisions for an installation are described in link:ahf.adoc[Oracle Autonomous Health Framework (AHF)].
+
+==== oracle_databases: processes in init_parameters
+
+As of 5.0.0 the assert of `oracle_databases` in `orahost_meta` fails for a database with `state: present`
+without `processes` in `init_parameters`, or with a value which is not an integer > 0.
+Entries with `sid` are accepted (instance specific values for RAC).
+
+`processes` is needed to calculate `kernel.sem` in `orahost_meta` and by further asserts.
+Before, a database without `processes` failed with an undefined variable (`oracle_databases_processes_max`),
+or `kernel.sem` was calculated without the databases lacking `processes`.
+
+NOTE: In practice the breaking change is usually irrelevant: the default of `processes` is too small in most cases anyway
+and should be set explicitly.
+
+The assert is in `orahost_meta`, because `orahost_meta` runs before the asserts of `orasw_meta`
+and the role `orahost` uses only `orahost_meta`.
+It is disabled together with the other asserts of `oracle_databases` by `orasw_meta_assert_oracle_databases: false`.
+
+Who is affected:
+
+- Inventories with a database without `processes` in `init_parameters`. The playbooks fail in the assert of `orahost_meta`:
++
+----
+<oracle_db_name>: processes must be defined in init_parameters with an integer value > 0 ...
+----
+
+Required actions:
+
+. Add `processes` to `init_parameters`.
+  For an existing database, use the current value (`show parameter processes`) to avoid a change of the spfile and a restart.
+
+.Example
+[source,yaml]
+----
+oracle_databases:
+  - oracle_db_name: DB1
+    init_parameters:
+      - {name: processes, value: '640', scope: spfile, state: present}
+----
 
 === Adding new breaking changes
 

@@ -1,0 +1,41 @@
+---
+# Asserts for oracle_databases which are needed by orahost_meta itself.
+# orahost_meta runs before the asserts of orasw_meta (orasw_meta depends on orahost_meta,
+# orahost depends only on orahost_meta) => the asserts are here.
+- name: assert ansible-oracle variables
+  tags:
+    - always
+    - assert_ansible_oracle
+  when:
+    - orasw_meta_assert_oracle_databases | default(true) | bool
+    - oracle_databases is defined
+  block:
+    # processes is needed for kernel.sem (calculate_kernel_semaphores.yml) and further asserts.
+    # Entries with a sid are accepted (instance specific values in RAC).
+    - name: assert processes in init_parameters of oracle_databases
+      ansible.builtin.assert:
+        quiet: true
+        fail_msg: >-
+          {{ ass_odb.oracle_db_name | default('') }}:
+          processes must be defined in init_parameters with an integer value > 0
+          (current value: '{{ _ass_processes | join(', ') }}'),
+          e.g. {name: processes, value: '640', scope: spfile, state: present}.
+          See doc/guides/breaking_changes.adoc.
+        that:
+          - >-
+            ass_odb.state | default('present') == 'absent'
+            or (_ass_processes | length > 0
+                and _ass_processes | reject('match', '^[1-9][0-9]*$') | list | length == 0)
+      vars:
+        _ass_processes: >-
+          {%- set ns = namespace(l=[]) -%}
+          {%- for p in ass_odb.init_parameters | default([]) -%}
+          {%-   if p.name | default('') | lower == 'processes' and p.state | default('present') != 'absent' -%}
+          {%-     set ns.l = ns.l + [p.value | default('') | string | trim] -%}
+          {%-   endif -%}
+          {%- endfor -%}
+          {{ ns.l }}
+      loop: "{{ oracle_databases }}"
+      loop_control:
+        label: "{{ ass_odb.oracle_db_name | default('') }}"
+        loop_var: ass_odb

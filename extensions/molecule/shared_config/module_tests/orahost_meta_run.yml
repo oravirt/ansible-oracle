@@ -1,0 +1,67 @@
+---
+# One case of orahost_meta.yml (role vars oracle_databases / oracle_asm_instance from include_tasks).
+#
+# _om_id:     id of the check
+# _om_expect: ok               => the role does not fail, kernel.sem is checked with _om_sem
+#             assert_processes => the role fails with the assert for processes in init_parameters
+# _om_sem:    expected {semmsl, semmns, instances} (only _om_expect: ok)
+- name: "orahost_meta | {{ _om_id }} | reset accumulated facts"
+  ansible.builtin.set_fact:
+    oracle_databases_processes_sum: 0
+    oracle_databases_processes_max: 0
+    oracle_databases_sga_sum: 0
+    oracle_databases_sga_max: 0
+    __orahost_oracle_database_sgas: []
+  when: _om_expect == 'ok'
+
+- name: "orahost_meta | {{ _om_id }} | run role"
+  block:
+    - name: "orahost_meta | {{ _om_id }} | run role as root"
+      ansible.builtin.include_role:
+        name: opitzconsulting.ansible_oracle.orahost_meta
+        apply:
+          become: true
+          become_user: root
+
+    - name: "orahost_meta | {{ _om_id }} | role passed"
+      ansible.builtin.set_fact:
+        _om_failed: false
+        _om_msg: ''
+  rescue:
+    - name: "orahost_meta | {{ _om_id }} | role failed"
+      ansible.builtin.set_fact:
+        _om_failed: true
+        _om_msg: >-
+          failed in task '{{ ansible_failed_task.name | default('') }}':
+          {{ ansible_failed_result.msg | default('') }}
+
+- name: "orahost_meta | {{ _om_id }} | check assert for processes"
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: "{{ _om_id }}"
+    mt_res:
+      # the role must fail with the assert, not with any other error
+      failed: >-
+        {{ not (_om_failed and _om_msg is search('processes')
+                and _om_msg is search('init_parameters')) }}
+      msg: "{{ _om_msg if _om_failed else 'role did not fail' }}"
+    mt_expect: ok
+  when: _om_expect == 'assert_processes'
+
+- name: "orahost_meta | {{ _om_id }} | check kernel.sem"
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: "{{ _om_id }}"
+    _got:
+      semmsl: "{{ __orahost_kernel_semmsl | default('undefined') | string }}"
+      semmns: "{{ __orahost_kernel_semmns | default('undefined') | string }}"
+      instances: "{{ oracle_nr_instances | default('undefined') | string | trim }}"
+    _exp:
+      semmsl: "{{ _om_sem.semmsl | string }}"
+      semmns: "{{ _om_sem.semmns | string }}"
+      instances: "{{ _om_sem.instances | string }}"
+    mt_res:
+      failed: "{{ _om_failed or _got != _exp }}"
+      msg: "{{ _om_msg if _om_failed else ('expected ' ~ _exp ~ ', got ' ~ _got ~ ', sysctl_kernel_sem: ' ~ sysctl_kernel_sem | default('undefined')) }}"
+    mt_expect: ok
+  when: _om_expect == 'ok'

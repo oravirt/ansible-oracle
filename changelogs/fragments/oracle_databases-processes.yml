@@ -1,0 +1,8 @@
+---
+breaking_changes:
+  - "orahost_meta: the assert of oracle_databases requires processes in init_parameters for databases with state present. processes is needed for the calculation of kernel.sem, before a database without processes failed with an undefined variable or was ignored in kernel.sem. Usually irrelevant in practice, the default of processes is too small in most cases anyway (see doc/guides/breaking_changes.adoc)"
+bugfixes:
+  - "orahost_meta: the calculation of kernel.sem failed with only databases with state absent without processes"
+trivial:
+  - "orahost_meta: the calculation of kernel.sem is not skipped in molecule anymore (tag molecule-notest removed)"
+  - "extensions: module test orahost_meta (scenario dbfs) for the aggregation of processes and the calculation of kernel.sem, processes in the molecule inventories"
