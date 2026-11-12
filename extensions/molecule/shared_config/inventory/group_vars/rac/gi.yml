@@ -1,0 +1,84 @@
+---
+# Grid Infrastructure 26ai as 2 node cluster (CRS_CONFIG) in the scenario rac
+#
+# Network, SCAN, VIPs: extensions/molecule/rac/molecule.yml (docker networks, etc_hosts)
+# ASM disks are loop devices on sparse files in /u01/asmshared (docker volume)
+# => /dev/asmdisks/<name> with the same major/minor in both containers (converge.yml)
+# => device_persistence: '' => asm_diskgroups.disk.device is used as ASM disk
+
+oracle_install_option_gi: CRS_CONFIG
+oracle_install_version_gi: 26.1.0.0
+oracle_install_image_gi: gi_goldimage_26_03.zip
+oracle_home_gi: /u01/app/gridinfra/26.03
+
+orasw_meta_cluster_hostgroup: rac
+oracle_cluster_name: molecule-rac
+oracle_gi_cluster_type: STANDARD
+
+oracle_scan: rac-scan
+oracle_scan_port: 1521
+# interface names are fixed in molecule.yml (com.docker.network.endpoint.ifname)
+oracle_gi_nic_pub: eth0
+oracle_gi_nic_priv: eth1
+
+# grid user for GI, oracle user for the database
+# grid_base: /u01/app/grid/base (default for CRS_CONFIG)
+role_separation: true
+default_gipass: Oracle_123
+
+apply_patches_gi: false
+patch_before_rootsh: false
+
+# cluvfy does not work inside a container
+gi_ignoreprereq: true
+
+device_persistence: ''
+partition_devices: false
+oracle_asm_disk_string: /dev/asmdisks/*
+
+# OCR and voting files
+oracle_asm_init_dg: crs
+
+# size: size of the sparse file for the loop device (converge.yml)
+asm_diskgroups:
+  - diskgroup: crs
+    state: present
+    properties:
+      - {redundancy: external, ausize: 4}
+    attributes:
+      - {name: compatible.rdbms, value: 19.0.0.0.0}
+      - {name: compatible.asm, value: 23.0.0.0.0}
+    disk:
+      - {device: /dev/asmdisks/crs01, asmlabel: crs01, size: 10G}
+  - diskgroup: data
+    state: present
+    properties:
+      - {redundancy: external, ausize: 4}
+    attributes:
+      - {name: compatible.rdbms, value: 19.0.0.0.0}
+      - {name: compatible.asm, value: 23.0.0.0.0}
+    disk:
+      - {device: /dev/asmdisks/data01, asmlabel: data01, size: 20G}
+  - diskgroup: fra
+    state: present
+    properties:
+      - {redundancy: external, ausize: 4}
+    attributes:
+      - {name: compatible.rdbms, value: 19.0.0.0.0}
+      - {name: compatible.asm, value: 23.0.0.0.0}
+    disk:
+      - {device: /dev/asmdisks/fra01, asmlabel: fra01, size: 10G}
+
+# directory of the sparse files for the loop devices (docker volume molecule-rac-asm)
+molecule_asm_shared_dir: /u01/asmshared
+
+# Grid Infrastructure only, no database (yet)
+# => override the database settings of group_vars/all (they reference oracle_pdbs)
+db_homes_installed: []
+listener_installed: []
+oracle_tnsnames_config: {}
+tnsnames_installed: []
+sqlnet_installed: []
+oracle_wallet_config: []
+oracle_databases: []
+oracle_pdbs: []

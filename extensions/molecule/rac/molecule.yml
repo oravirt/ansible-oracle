@@ -1,0 +1,107 @@
+---
+# Grid Infrastructure 26ai as 2 node cluster (CRS_CONFIG) on Oracle Linux 9
+#
+# rac-1: 1st node (gridSetup.sh, root.sh first)
+# rac-2: 2nd node
+#
+# Networks:
+#   molecule-rac-pub  10.89.20.0/24  eth0  public network, VIPs and SCAN
+#   molecule-rac-priv 10.89.21.0/24  eth1  private interconnect (HAIP)
+# There is no DNS => SCAN (1 IP) and VIPs in /etc/hosts (etc_hosts).
+#
+# Shared storage for ASM:
+#   sparse files in the docker volume molecule-rac-asm (/u01/asmshared)
+#   => loop devices of the (shared) kernel, /dev/asmdisks/* in both containers
+#   => converge.yml, cleanup.yml detaches the loop devices
+#
+# Inventory: shared_config/inventory/group_vars/rac and host_vars/rac-*.yml
+dependency:
+  name: galaxy
+  enabled: true
+
+driver:
+  name: docker
+platforms:
+  - name: rac-1
+    image: "${MOLECULE_IMAGE:-quay.io/rendanic/docker-ol9-ansible:latest}"
+    pre_build_image: true
+    # The following 4 lines are needed only for making systemd work
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - ${MOLECULE_SW_DIR}:/vagrant:ro
+      - molecule-rac-asm:/u01/asmshared
+    cgroupns_mode: host
+    privileged: true
+    # ASM uses MEMORY_TARGET => /dev/shm must be larger than 64m
+    shm_size: 4g
+    groups:
+      - rac
+    docker_networks:
+      - name: molecule-rac-pub
+        ipam_config:
+          - subnet: 10.89.20.0/24
+            gateway: 10.89.20.1
+      # not internal: docker drops packets of internal networks with addresses outside of
+      # the subnet => no connectivity for HAIP (169.254.x.x, PRVG-11891), ASM hangs
+      - name: molecule-rac-priv
+        ipam_config:
+          - subnet: 10.89.21.0/24
+    # The order of the interfaces is random => fixed names with
+    # com.docker.network.endpoint.ifname (docker >= 28), checked in converge.yml
+    networks:
+      - name: molecule-rac-pub
+        ipv4_address: 10.89.20.11
+        # default route over the public network
+        gw_priority: 100
+        driver_opts:
+          com.docker.network.endpoint.ifname: eth0
+      - name: molecule-rac-priv
+        ipv4_address: 10.89.21.11
+        driver_opts:
+          com.docker.network.endpoint.ifname: eth1
+    etc_hosts: &rac_etc_hosts
+      rac-1: 10.89.20.11
+      rac-2: 10.89.20.12
+      rac-1-vip: 10.89.20.21
+      rac-2-vip: 10.89.20.22
+      rac-scan: 10.89.20.30
+      rac-1-priv: 10.89.21.11
+      rac-2-priv: 10.89.21.12
+
+  - name: rac-2
+    image: "${MOLECULE_IMAGE:-quay.io/rendanic/docker-ol9-ansible:latest}"
+    pre_build_image: true
+    # The following 4 lines are needed only for making systemd work
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - ${MOLECULE_SW_DIR}:/vagrant:ro
+      - molecule-rac-asm:/u01/asmshared
+    cgroupns_mode: host
+    privileged: true
+    shm_size: 4g
+    groups:
+      - rac
+    networks:
+      - name: molecule-rac-pub
+        ipv4_address: 10.89.20.12
+        # default route over the public network
+        gw_priority: 100
+        driver_opts:
+          com.docker.network.endpoint.ifname: eth0
+      - name: molecule-rac-priv
+        ipv4_address: 10.89.21.12
+        driver_opts:
+          com.docker.network.endpoint.ifname: eth1
+    etc_hosts: *rac_etc_hosts
+
+verifier:
+  name: ansible
+
+provisioner:
+  name: ansible
+  inventory:
+    links:
+      group_vars: ../shared_config/inventory/group_vars/
+      host_vars: ../shared_config/inventory/host_vars/

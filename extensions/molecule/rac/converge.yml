@@ -1,0 +1,227 @@
+---
+- name: Converge
+  hosts: all
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+
+    # install missing cron on rhel9 container
+    - name: Install cron on RHEL/OL9
+      ansible.builtin.package:
+        name: cronie
+      when:
+        - ansible_os_family == 'RedHat'
+        - ansible_distribution_major_version | int == 9
+
+    # the container image is based on an older OL9 release.
+    # Installing packages pulls a newer openssl-libs and the old ssh-keygen
+    # fails with 'OpenSSL version mismatch' => update openssh first
+    - name: Update openssh on RHEL/OL9
+      ansible.builtin.package:
+        name:
+          - openssh
+          - openssh-clients
+          - openssh-server
+        state: latest  # noqa package-latest
+      when:
+        - ansible_os_family == 'RedHat'
+        - ansible_distribution_major_version | int == 9
+
+    # gridSetup.sh copies the ORACLE_HOME with ssh to the other nodes
+    # orahost_ssh (playbook os) reads the host keys with ssh-keyscan
+    - name: Start sshd
+      ansible.builtin.systemd_service:
+        name: sshd
+        state: started
+        enabled: true
+
+    # systemd-user-sessions is not started in the container => /run/nologin exists
+    # => pam_nologin denies ssh logins of all users except root (PRVF-4098 in gridSetup.sh)
+    - name: Start systemd-user-sessions (removes /run/nologin)
+      ansible.builtin.systemd_service:
+        name: systemd-user-sessions
+        state: started
+
+    # The interfaces depend on the order of the networks in molecule.yml
+    # => oracle_gi_nic_pub/oracle_gi_nic_priv must be the same on all nodes
+    - name: Assert public and private network interfaces
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - hostvars[inventory_hostname]['ansible_' + oracle_gi_nic_pub].ipv4.network == '10.89.20.0'
+          - hostvars[inventory_hostname]['ansible_' + oracle_gi_nic_priv].ipv4.network == '10.89.21.0'
+        fail_msg: >-
+          {{ oracle_gi_nic_pub }} must be in 10.89.20.0/24 (molecule-rac-pub),
+          {{ oracle_gi_nic_priv }} in 10.89.21.0/24 (molecule-rac-priv)
+
+    # docker adds '<IP of eth0> <hostname>' to /etc/hosts. eth0 is the private network
+    # => the hostname resolves to 2 IPs (PRVH-1541, PRVG-13632 in gridSetup.sh)
+    # => remove the entry of docker, the public IP is in etc_hosts (molecule.yml)
+    # /etc/hosts is a bind mount => no atomic replace (unsafe_writes)
+    - name: Remove private IP of hostname from /etc/hosts
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: >-
+          ^{{ hostvars[inventory_hostname]['ansible_' + oracle_gi_nic_priv].ipv4.address
+          | regex_escape }}\s+{{ inventory_hostname | regex_escape }}\s*$
+        state: absent
+        unsafe_writes: true
+
+- name: Converge os
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.os
+
+# Shared storage for ASM without block devices:
+# - sparse files in the docker volume molecule-rac-asm (molecule_asm_shared_dir)
+# - loop devices are created on the 1st node. Loop devices are devices of the kernel
+#   => the same block device is usable in all containers
+# - /dev of a privileged container is a copy from the start of the container
+#   => device nodes are created with mknod (major/minor from the 1st node)
+# ASM accepts block devices => no workaround for plain files (has-ol9) needed
+- name: Shared ASM disks with loop devices
+  hosts: rac
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  vars:
+    _asm_disks: "{{ asm_diskgroups | subelements('disk') | map(attribute='1') | list }}"
+    _primary_node: "{{ groups[orasw_meta_cluster_hostgroup][0] }}"
+  tasks:
+    - name: Create device nodes for loop devices
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          changed=0
+          for i in $(seq 0 127); do
+            if [ ! -b /dev/loop${i} ]; then
+              mknod -m 0660 /dev/loop${i} b 7 ${i}
+              changed=1
+            fi
+          done
+          echo "changed=${changed}"
+        executable: /bin/bash
+      register: _loop_nodes
+      changed_when: "'changed=1' in _loop_nodes.stdout"
+
+    - name: Create sparse files for ASM disks
+      ansible.builtin.command:
+        argv: [truncate, -s, "{{ item.size }}", "{{ molecule_asm_shared_dir }}/{{ item.device | basename }}"]
+        creates: "{{ molecule_asm_shared_dir }}/{{ item.device | basename }}"
+      loop: "{{ _asm_disks }}"
+      loop_control:
+        label: "{{ item.device | basename }}"
+      when: inventory_hostname == _primary_node
+
+    # result: '<major> <minor>' (decimal) of the loop device
+    - name: Attach loop devices to sparse files
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          file={{ molecule_asm_shared_dir }}/{{ item.device | basename }}
+          dev=$(losetup --list --noheadings -O NAME -j "${file}" | head -1)
+          if [ -z "${dev}" ]; then
+            dev=$(losetup --find --show "${file}")
+            echo "attached ${dev}" >&2
+          fi
+          echo "$((16#$(stat -L -c '%t' ${dev}))) $((16#$(stat -L -c '%T' ${dev})))"
+        executable: /bin/bash
+      loop: "{{ _asm_disks }}"
+      loop_control:
+        label: "{{ item.device | basename }}"
+      register: _loop_devices
+      changed_when: "'attached' in _loop_devices.stderr"
+      when: inventory_hostname == _primary_node
+
+    - name: Create directory for ASM disks
+      ansible.builtin.file:
+        path: "{{ oracle_asm_disk_string | dirname }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    # recreate the device node when major/minor are different
+    - name: Create device nodes for ASM disks
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          dev={{ item.item.device }}
+          if [ -b "${dev}" ] \
+            && [ "$((16#$(stat -c '%t' ${dev}))) $((16#$(stat -c '%T' ${dev})))" = "{{ item.stdout }}" ]; then
+            echo "ok"
+            exit 0
+          fi
+          rm -f "${dev}"
+          mknod "${dev}" b {{ item.stdout }}
+          echo "created"
+        executable: /bin/bash
+      loop: "{{ hostvars[_primary_node]['_loop_devices']['results'] }}"
+      loop_control:
+        label: "{{ item.item.device }} ({{ item.stdout }})"
+      register: _asm_dev_nodes
+      changed_when: "'created' in _asm_dev_nodes.stdout"
+
+    - name: Set ownership of ASM disks
+      ansible.builtin.file:
+        path: "{{ item.device }}"
+        # role defaults (grid_user, asmadmin_group) are not available in this play
+        owner: grid
+        group: asmadmin
+        mode: "0660"
+      loop: "{{ _asm_disks }}"
+      loop_control:
+        label: "{{ item.device }}"
+
+- name: Prepare container for Grid Infrastructure
+  hosts: rac
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    # init.ohasd refuses to start in Docker with cgroupv2:
+    #   'cgroupv2 not supported for Docker containers' + exit 1
+    # root.sh copies init.ohasd and starts oracle-ohasd.service
+    # - 19c:   /etc/init.d/init.ohasd
+    # - 26ai:  /etc/oracle/scls_scr/<hostname>/<user>/init.ohasd
+    #          (<user> depends on Oracle Restart/Cluster and grid user => all files are patched)
+    # => remove the exit before each start of the service
+    - name: Create script for patching init.ohasd
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/molecule-patch-init-ohasd.sh
+        owner: root
+        group: root
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          # molecule: init.ohasd for Docker with cgroupv2
+          for f in /etc/init.d/init.ohasd /etc/oracle/scls_scr/*/*/init.ohasd; do
+            [ -f "${f}" ] || continue
+            sed -i -e '/cgroupv2 not supported for Docker containers/{n;s/exit 1/CPU_TASKS=""/}' "${f}"
+          done
+          exit 0
+
+    - name: Create directory for oracle-ohasd.service drop-in
+      ansible.builtin.file:
+        path: /etc/systemd/system/oracle-ohasd.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Patch init.ohasd for Docker with cgroupv2
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/oracle-ohasd.service.d/99-molecule-docker.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Service]
+          ExecStartPre=-/usr/local/sbin/molecule-patch-init-ohasd.sh
+
+# installation media and patches are unpacked directly from /vagrant
+# gridSetup.sh with ConfigTools: root.sh on the 1st node creates the diskgroup
+# oracle_asm_init_dg (OCR, voting files), oraasm_manage_diskgroups the others
+- name: Converge swgi
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swgi
+  vars:
+    oracle_sw_copy: false
+    is_sw_source_local: true

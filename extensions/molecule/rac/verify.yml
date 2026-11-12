@@ -1,0 +1,118 @@
+---
+# Grid Infrastructure cluster molecule-rac:
+# - Clusterware stack on all nodes, all nodes active in the cluster
+# - SCAN, SCAN listener, VIPs, ASM
+# - voting files and OCR in the diskgroup oracle_asm_init_dg
+# - all diskgroups of asm_diskgroups mounted
+- name: Verify Grid Infrastructure cluster
+  hosts: rac
+  gather_facts: false
+  become: true
+  become_user: grid
+  any_errors_fatal: true
+  environment:
+    ORACLE_HOME: "{{ oracle_home_gi }}"
+    ORACLE_BASE: /u01/app/grid/base
+  vars:
+    _nodes: "{{ groups[orasw_meta_cluster_hostgroup] }}"
+  tasks:
+    - name: Check Clusterware stack on all nodes
+      ansible.builtin.command:
+        argv: ["{{ oracle_home_gi }}/bin/crsctl", check, cluster, -all]
+      register: _crsctl_check
+      changed_when: false
+      failed_when: >-
+        _crsctl_check.rc != 0
+        or (_crsctl_check.stdout | regex_findall('CRS-4537') | length) != _nodes | length
+        or (_crsctl_check.stdout | regex_findall('CRS-4529') | length) != _nodes | length
+        or (_crsctl_check.stdout | regex_findall('CRS-4533') | length) != _nodes | length
+      run_once: true
+
+    - name: Nodes of the cluster
+      ansible.builtin.command:
+        argv: ["{{ oracle_home_gi }}/bin/olsnodes", -n, -s, -t]
+      register: _olsnodes
+      changed_when: false
+      run_once: true
+
+    - name: Assert all nodes active
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _olsnodes.stdout_lines | select('search', '\sActive\s') | list | length == _nodes | length
+        fail_msg: "{{ _olsnodes.stdout_lines }}"
+      run_once: true
+
+    - name: Status of SCAN, SCAN listener, VIPs, ASM
+      ansible.builtin.command:
+        argv: ["{{ oracle_home_gi }}/bin/srvctl", status, "{{ item.res }}"]
+      loop:
+        - {res: scan, pattern: 'is running on node'}
+        - {res: scan_listener, pattern: 'is running on node'}
+        - {res: nodeapps, pattern: 'is running on node'}
+        - {res: asm, pattern: 'is running on'}
+      loop_control:
+        label: "{{ item.res }}"
+      register: _srvctl_status
+      changed_when: false
+      # adminhelper (ora.helper) of the nodeapps is OFFLINE by default (26ai)
+      failed_when: >-
+        _srvctl_status.rc != 0
+        or item.pattern not in _srvctl_status.stdout
+        or (_srvctl_status.stdout_lines | select('search', 'is not running')
+            | reject('search', '^adminhelper ') | list | length > 0)
+      run_once: true
+
+    - name: VIP of each node
+      ansible.builtin.command:
+        argv: ["{{ oracle_home_gi }}/bin/srvctl", status, vip, -node, "{{ inventory_hostname }}"]
+      register: _srvctl_vip
+      changed_when: false
+      failed_when:
+        - _srvctl_vip.rc != 0 or 'is running on node' not in _srvctl_vip.stdout
+
+    - name: Voting files
+      ansible.builtin.command:
+        argv: ["{{ oracle_home_gi }}/bin/crsctl", query, css, votedisk]
+      register: _votedisk
+      changed_when: false
+      failed_when: >-
+        _votedisk.rc != 0
+        or ('[' + oracle_asm_init_dg | upper + ']') not in _votedisk.stdout
+      run_once: true
+
+    - name: Mounted diskgroups
+      ansible.builtin.command:
+        argv: ["{{ oracle_home_gi }}/bin/asmcmd", lsdg, --suppressheader]
+      environment:
+        ORACLE_HOME: "{{ oracle_home_gi }}"
+        ORACLE_SID: "+ASM{{ _nodes.index(inventory_hostname) + 1 }}"
+      register: _lsdg
+      changed_when: false
+
+    - name: Assert all diskgroups mounted
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - (item.diskgroup | upper + '/') in _lsdg.stdout
+        fail_msg: "{{ item.diskgroup }} not mounted on {{ inventory_hostname }}: {{ _lsdg.stdout_lines }}"
+      loop: "{{ asm_diskgroups | selectattr('state', 'equalto', 'present') | list }}"
+      loop_control:
+        label: "{{ item.diskgroup }}"
+
+- name: Verify OCR
+  hosts: rac
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Check OCR (root)
+      ansible.builtin.command:
+        argv: ["{{ oracle_home_gi }}/bin/ocrcheck"]
+      register: _ocrcheck
+      changed_when: false
+      failed_when: >-
+        _ocrcheck.rc != 0
+        or 'Cluster registry integrity check succeeded' not in _ocrcheck.stdout
+        or ('+' + oracle_asm_init_dg | upper) not in _ocrcheck.stdout
+      run_once: true
