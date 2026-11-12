@@ -186,6 +186,16 @@ oracle_pdbs:
 ahf_tfa_settings:
   autodiagcollect: "OFF"
 ahf_compliance_autostart: true
+# upload complete TFA collections (with log files) into Fleet Insights
+ahf_properties:
+  ahf.fleet-insights.upload-only-minimal-files: "false"
+# audit files of DBHAS, not discovered by TFA
+ahf_tfa_directories:
+  - path: /u01/app/oracle/admin/DBHAS/adump
+    component: RDBMS
+    database: dbhas
+    instance: DBHAS
+    collection: noexclusions
 ahf_compliance_settings:
   autostart_client:
     COLLECTION_RETENTION: 10
