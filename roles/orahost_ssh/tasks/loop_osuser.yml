@@ -49,8 +49,9 @@
     owner: "{{ _key_owner }}"
     group: "{{ _key_group }}"
     mode: "0600"
-  register: _known_hosts_state
-  changed_when: _known_hosts_state.diff.before.state == 'absent'
+    # changed only for a new file or different owner/permissions
+    modification_time: preserve
+    access_time: preserve
 
 - name: Add hostkeys to user {{ _key_owner }}
   ansible.builtin.known_hosts:
