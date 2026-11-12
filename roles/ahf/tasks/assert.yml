@@ -10,6 +10,8 @@
       - ahf_tfa_settings is mapping
       - ahf_compliance_settings is mapping
       - ahf_compliance_settings.values() | reject('mapping') | list | length == 0
+      - ahf_properties is mapping
+      - ahf_tfa_directories | selectattr('path', 'undefined') | list | length == 0
       - ahf_installer_archive | length > 0 or _ahf_media_source != 'www'
     fail_msg: >-
       Check ahf_state, ahf_install_mode, ahf_loc, ahf_data_dir (absolute paths),

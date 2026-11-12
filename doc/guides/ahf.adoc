@@ -562,6 +562,134 @@ The URL is the URL of `ahffi info` without `/ahfservice`.
 `ahf_fleet_insights_force_register: true` registers again, e.g. after a password change.
 `ahf_fleet_insights_client: false` deregisters a client registered by the role.
 
+===== Data in AHF Fleet Insights
+
+A registered client uploads its data automatically. The views of Fleet Insights are filled by different data:
+
+.Data and views of Fleet Insights
+[options="header,footer",cols="2,2,2,3,3"]
+|=======================
+|Data |View in Fleet Insights |Automatic on the client |Manual start (as `root`) |Inventory (role `ahf`)
+|Topology: database servers, databases (CDB, PDB), ASM, clusters
+|Fleet Topology, Databases, Database Servers
+|AHF Insights collection at 05:00 and 17:00
+|`tfactl diagcollect -insights -last 1h -silent`
+|`ahf_fleet_insights_client: true` (no further setting)
+|Problems, events, OS issues, system changes, patches, RPMs, space
+|Insights (Detected Problems, Events, ...), Space Analysis
+|AHF Insights collection at 05:00 and 17:00
+|`tfactl diagcollect -insights -last 1h -silent`
+|`ahf_fleet_insights_client: true` (no further setting)
+|Compliance results (`orachk`)
+|Insights > Best Practice Issues
+|Compliance scheduler
+|`orachk -usediscovery -profile ahf -showpass -tag manual_check -readenvconfig`
+|`ahf_compliance_autostart: true`, schedule in `ahf_compliance_settings`
+|Diagnostic collections with log and trace files
+|collections of the clients
+|automatic collections after incidents
+|`tfactl diagcollect -database <db> -last 1h -silent`
+|`ahf_properties: {ahf.fleet-insights.upload-only-minimal-files: "false"}`, `ahf_tfa_settings: {autodiagcollect: "ON"}`
+|Capacity
+|Fleetwide Capacity Analysis, Cluster-Wise Usage Trends
+|capacity plugin of Fleet Insights and `exachk` (Exadata)
+|-
+|not supported
+|=======================
+
+.Collector options on the CLI and in the inventory of the role `ahf`
+[options="header,footer",cols="3,4,4"]
+|=======================
+|Option |CLI (as `root`) |Inventory (role `ahf`)
+|Automatic diagnostic collections after incidents
+|`tfactl set autodiagcollect=ON`
+|`ahf_tfa_settings: {autodiagcollect: "ON"}`
+|AHF Insights in automatic collections
+|`tfactl set autoinsights=ON`
+|`ahf_tfa_settings: {autoinsights: "ON"}`
+|Size of the TFA repository
+|`tfactl set reposizeMB=10240`
+|`ahf_tfa_settings: {reposizeMB: 10240}`
+|Upload of complete collections (log and trace files)
+|`ahf configuration set --property ahf.fleet-insights.upload-only-minimal-files --value false`
+|`ahf_properties: {ahf.fleet-insights.upload-only-minimal-files: "false"}`
+|Alert History: timeline of ASM events (only ASM: `dismount`, `dismount_force`, `offline`, `mount`, last 30 days), view with `ahf analysis create --type alert-history --component ASM`
+|`ahf configuration set --property ahf.collectors.alert-history --value on`
+|`ahf_properties: {ahf.collectors.alert-history: "on"}`
+|Events of the alert logs of databases, ASM and Clusterware (base of the automatic collections), view with `tfactl events`
+|always active with a running TFA daemon
+|`ahf_tfa_enabled: true`
+|Enhanced OS metrics
+|`ahf configuration set --property ahf.collectors.enhanced_os_metrics --value on`
+|`ahf_properties: {ahf.collectors.enhanced_os_metrics: "on"}`
+|Checks excluded from the Compliance checks
+|`ahf configuration set --property ahf.compliance.excluded-check-ids --value <id>`
+|`ahf_properties: {ahf.compliance.excluded-check-ids: "<id>"}`
+|Compliance scheduler
+|`ahfctl startahf -compliance` / `ahfctl stopahf -compliance`
+|`ahf_compliance_autostart: true` / `false`
+|Schedule and retention of a Compliance autorun
+|`orachk -set "AUTORUN_SCHEDULE=30 1 * * 1-6;COLLECTION_RETENTION=30" -id autostart_client_oratier1`
+|`ahf_compliance_settings: {autostart_client_oratier1: {AUTORUN_SCHEDULE: "30 1 * * 1-6", COLLECTION_RETENTION: 30}}`
+|Additional directory for collections
+|`tfactl directory add <dir> -public -noexclusions` (asks for component, database, instance)
+|`ahf_tfa_directories: [{path: <dir>, component: RDBMS, database: <db>, instance: <sid>, collection: noexclusions}]`
+|TFA daemon
+|`tfactl enable` + `ahfctl startahf -tfa` / `ahfctl stopahf -tfa` + `tfactl disable`
+|`ahf_tfa_enabled: true` / `false`
+|Registration in Fleet Insights
+|`ahf configuration set --type fleet-insights --user-name <user> --url <url> --public-cert <file> --os-user oracle`
+|`ahf_fleet_insights_client: true`, `ahf_fleet_insights_url`, `ahf_fleet_insights_user`, `ahf_fleet_insights_password`, `ahf_fleet_insights_public_cert`
+|CPU and memory limit of TFA
+|`ahfctl setresourcelimit -value 2`
+|not supported, see <<Resource requirements>>
+|=======================
+
+The role executes a setting only, when it differs from the last run (state file `ahf_ansible_state_file`).
+Manual changes on the CLI are not detected - `-e ahf_settings_force=true` executes all settings again.
+
+The data is processed about 2 minutes after the upload. A new client shows its databases after the first Insights collection.
+The role `ahf` does not start a collection - start one manually, when the data is needed immediately.
+
+====== Log files and diag_dest of the databases
+
+TFA discovers the directories of Grid Infrastructure, ASM, listeners and the running databases automatically,
+including the ADR (`diag_dest`) of each database with the database and instance name:
+
+.Directories discovered by TFA (example from Oracle Restart, shortened)
+----
+tfactl print directories
+| /u01/app/oracle/diag/rdbms/dbhas/DBHAS/trace | [RDBMS]{RDBMS|database=dbhas, RDBMS|instance=DBHAS} | public | root |
+| /u01/app/oracle/diag/asm/+asm/+ASM/trace     | [ASM]{ASM|instance=+ASM}                            | public | root |
+----
+
+Directories, which are not discovered (e.g. audit files or log files of an application), are added with `ahf_tfa_directories`.
+The role answers the questions of `tfactl directory add` (component, database, instance) and removes directories,
+which it has added and which are no longer in the list.
+
+By default the clients upload only minimal files into Fleet Insights: the Insights data and the Compliance results.
+Diagnostic collections with the log and trace files are uploaded only with `ahf.fleet-insights.upload-only-minimal-files: false`.
+
+NOTE: The property `ahf.fleet-insights.upload-only-minimal-files` is not documented by Oracle.
+The behavior is observed with AHF 26.10: with `true` (default) a `tfactl diagcollect -database` is not uploaded, with `false` it is uploaded.
+Complete collections need more space in the repository database and on the Fleet Insights server.
+
+.Upload of log files and an additional directory
+----
+ahf_properties:
+  ahf.fleet-insights.upload-only-minimal-files: "false"
+
+ahf_tfa_directories:
+  - path: /u01/app/oracle/admin/DB1/adump
+    component: RDBMS
+    database: db1
+    instance: DB1
+    collection: noexclusions
+----
+
+The properties of AHF are set with `ahf configuration set --property <name> --value <value>` (`ahf_properties`).
+`ahf configuration get --help` lists the supported properties, `ahf configuration get --property <name>` shows the value.
+
 ===== Check the upload on the client
 
 `ahf configuration check --type fleet-insights` tests the upload of a client into Fleet Insights.
@@ -677,11 +805,13 @@ orachk -usediscovery -profile ahf -showpass -tag manual_check -readenvconfig
 The output ends with `<name> successfully uploaded to Autonomous Health Framework Service`.
 Other profiles (`orachk -profile -h`), e.g. `dba` or `clusterware`, take longer. Without `-profile`, all checks are executed.
 
-.TFA collection of the last hour with upload
+.TFA collection of the last hour with AHF Insights and upload
 ----
-tfactl diagcollect -last 1h -silent
+tfactl diagcollect -insights -last 1h -silent
 ----
 
+The dashboard of Fleet Insights is built from AHF Insights data. The clients collect it at 05:00 and 17:00,
+`-insights` uploads it immediately (about 2 minutes until the data is processed).
 `-silent` starts the collection in the background without questions.
 Without it, `tfactl diagcollect` asks for an event or an event time (e.g. on hosts with Grid Infrastructure).
 The status is shown by `tfactl print actions` and `tfactl print collections`.
@@ -798,6 +928,11 @@ The uploads contain the hostname of the client in the path, e.g.
 |web interface not reachable after a reboot
 |processes are started by cron, `crond` is not running
 |`systemctl enable --now crond`, `./ahffi start` (the role starts Fleet Insights, when it is not running)
+|`Collection Processing Engine \| Not Running` after a reboot, uploads are not processed
+|the cron jobs of Fleet Insights restart the server and the collection processing engine at the same time.
+The restart of the engine removes its own cron entry and is interrupted (observed with Fleet Insights 25.2.1)
+|`./ahffi start` - starts all processes and adds the cron entries again. The role `ahf_fleet_insights` does it, when not all processes are running.
+Check with `./ahffi status` and `crontab -l` (4 entries) after a reboot
 |clients fail with `Hostname mismatch`
 |certificate of the installer has no SAN
 |`ahf_fi_cert_generate: true` (default), `ahf_fi_cert_names`

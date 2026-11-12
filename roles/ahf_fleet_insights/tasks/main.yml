@@ -188,8 +188,11 @@
   become_user: "{{ ahf_fi_install_user }}"
   register: _ahf_fi_start
   changed_when: true
-  # 'Fleet Insights server is running' (25.2), docs: 'Fleet Insights is running'
-  when: _ahf_fi_status.stdout is not search('Fleet Insights (server )?is running')
+  # all components must run: 'All AHF Fleet Insights processes for component(s): all are running.'
+  # (Fleet Insights server and collection processing engine). After a reboot the cron jobs of
+  # Fleet Insights can leave the collection processing engine stopped without its cron entry
+  # => 'ahffi start' starts all processes and adds the cron entries again.
+  when: _ahf_fi_status.stdout is not search('all are running')
 
 - name: ahf_fleet_insights | Wait for the web application
   ansible.builtin.uri:

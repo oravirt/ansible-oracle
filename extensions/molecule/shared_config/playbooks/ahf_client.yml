@@ -31,11 +31,13 @@
   gather_facts: false
   become: true
   tasks:
-    # -silent: background collection without questions
-    # (without it, tfactl asks for an event or event time, e.g. with GI)
-    - name: Create TFA collection
+    # -insights: AHF Insights data, which updates the dashboard of Fleet Insights immediately
+    #            (otherwise Insights are collected at 05:00 and 17:00 only)
+    # -silent:   background collection without questions
+    #            (without it, tfactl asks for an event or event time, e.g. with GI)
+    - name: Create TFA collection with AHF Insights
       ansible.builtin.shell: >-
-        /opt/oracle.ahf/bin/tfactl diagcollect -last 1h -silent
+        /opt/oracle.ahf/bin/tfactl diagcollect -insights -last 1h -silent
         && touch /opt/oracle.ahf.molecule_collect
       args:
         creates: /opt/oracle.ahf.molecule_collect

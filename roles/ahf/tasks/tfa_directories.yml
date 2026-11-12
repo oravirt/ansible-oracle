@@ -1,0 +1,56 @@
+---
+# Additional directories for TFA (tfactl directory add/remove)
+#
+# TFA discovers the directories of GI, ASM, listener and databases (diag_dest) automatically.
+# 'tfactl directory add' asks for the component, when it cannot determine it,
+# and for database and instance with RDBMS => answers with stdin.
+# Directories added by the role are stored in the state file and removed,
+# when they are no longer in ahf_tfa_directories (or state: absent).
+- name: tfa_directories | Set directories
+  ansible.builtin.set_fact:
+    _ahf_tfa_dirs_present: "{{ ahf_tfa_directories | rejectattr('state', 'defined') | list
+                               + ahf_tfa_directories | selectattr('state', 'defined') | selectattr('state', 'equalto', 'present') | list }}"
+    _ahf_tfa_dirs_old: "{{ _ahf_state_old.tfa_directories | default([]) }}"
+
+- name: tfa_directories | Add directory
+  ansible.builtin.command:
+    argv: >-
+      {{ [_ahf_bin + '/tfactl', 'directory', 'add', ahfd.path]
+         + (['-public'] if ahfd.public | default(true) | bool else [])
+         + ['-' + ahfd.collection | default('exclusions')] }}
+    # component, for RDBMS database and instance, "assign more components?" => N
+    stdin: >-
+      {{ ([ahfd.component | default('RDBMS') | upper]
+          + ([ahfd.database | default(''), ahfd.instance | default('')]
+             if (ahfd.component | default('RDBMS') | upper) == 'RDBMS' else [])
+          + ['N']) | join(_ahf_newline) }}
+  become: true
+  loop: "{{ _ahf_tfa_dirs_present }}"
+  loop_control:
+    loop_var: ahfd
+    label: "{{ ahfd.path }} ({{ ahfd.component | default('RDBMS') }})"
+  register: _ahf_tfa_dir_add
+  # 'was already added to TFA Directories': directory exists (e.g. ahf_settings_force)
+  changed_when: "'Successfully added' in _ahf_tfa_dir_add.stdout"
+  failed_when: >-
+    _ahf_tfa_dir_add.rc != 0
+    or ('Successfully added' not in _ahf_tfa_dir_add.stdout
+        and 'already added' not in _ahf_tfa_dir_add.stdout)
+  when:
+    - ahfd.path not in _ahf_tfa_dirs_old or _ahf_state_old | length == 0
+
+- name: tfa_directories | Remove directory
+  ansible.builtin.command:
+    argv: ["{{ _ahf_bin }}/tfactl", directory, remove, "{{ ahfd }}"]
+  become: true
+  loop: >-
+    {{ (_ahf_tfa_dirs_old | difference(_ahf_tfa_dirs_present | map(attribute='path') | list))
+       + (ahf_tfa_directories | selectattr('state', 'defined') | selectattr('state', 'equalto', 'absent')
+          | map(attribute='path') | intersect(_ahf_tfa_dirs_old) | list) }}
+  loop_control:
+    loop_var: ahfd
+  changed_when: true
+
+- name: tfa_directories | Set state of directories
+  ansible.builtin.set_fact:
+    _ahf_tfa_directories_state: "{{ _ahf_tfa_dirs_present | map(attribute='path') | list }}"

@@ -48,10 +48,12 @@ See `doc/guides/ahf.adoc` for decisions about the installation.
   - [ahf_manage_packages](#ahf_manage_packages)
   - [ahf_packages](#ahf_packages)
   - [ahf_perl_home](#ahf_perl_home)
+  - [ahf_properties](#ahf_properties)
   - [ahf_settings_force](#ahf_settings_force)
   - [ahf_setup_extra_args](#ahf_setup_extra_args)
   - [ahf_stage_dir](#ahf_stage_dir)
   - [ahf_state](#ahf_state)
+  - [ahf_tfa_directories](#ahf_tfa_directories)
   - [ahf_tfa_enabled](#ahf_tfa_enabled)
   - [ahf_tfa_settings](#ahf_tfa_settings)
   - [ahf_uninstall_delete_repo](#ahf_uninstall_delete_repo)
@@ -393,6 +395,36 @@ Empty: `ahf_setup` selects the Perl.
 ahf_perl_home: /usr
 ```
 
+### ahf_properties
+
+AHF properties - executed as `ahf configuration set --property <key> --value <value>`
+(`ahf_install_mode: root` only). Same behavior as `ahf_tfa_settings`.
+
+Show the supported properties with `ahf configuration get --help` and the current value
+with `ahf configuration get --property <key>`. Properties of AHF 26.10:
+
+| Property | Default | Description |
+| --- | --- | --- |
+| `ahf.fleet-insights.upload-only-minimal-files` | `true` | Upload only minimal files to Fleet Insights (not documented by Oracle) |
+| `ahf.collectors.alert-history` | `on` | Alert History, only for ASM (dismount, offline, mount) |
+| `ahf.collectors.enhanced_os_metrics` | `on` | Enhanced OS metrics |
+| `ahf.insights.max-collection-interval` | `4` | not documented by Oracle |
+| `ahf.compliance.excluded-check-ids` | | Check IDs excluded from the Compliance checks |
+
+#### Default value
+
+```YAML
+ahf_properties: {}
+```
+
+#### Example usage
+
+```YAML
+ahf_properties:
+  ahf.fleet-insights.upload-only-minimal-files: "false"
+  ahf.collectors.alert-history: "on"
+```
+
 ### ahf_settings_force
 
 Execute all settings and component states, even when they are unchanged
@@ -446,6 +478,42 @@ ahf_stage_dir: '{{ oracle_stage }}/ahf'
 
 ```YAML
 ahf_state: present
+```
+
+### ahf_tfa_directories
+
+Additional directories for TFA (`tfactl directory add`), `ahf_install_mode: root` only.
+
+TFA discovers the directories of GI, ASM, listener and databases (`diag_dest`) automatically
+(`tfactl print directories`). Add directories, which are not discovered, e.g. audit files
+or a log directory of an application.
+
+| Attribute | Default | Description |
+| --- | --- | --- |
+| `path` | | directory (mandatory) |
+| `component` | `RDBMS` | `RDBMS`, `CRS`, `ASM`, `INSTALL`, `OS`, `CFGTOOLS`, `TNS`, `DBWLM`, `ACFS`, `IPS` |
+| `database` / `instance` | | database and instance for `component: RDBMS` |
+| `public` | `true` | collection by all users, which can run `tfactl diagcollect` |
+| `collection` | `exclusions` | `exclusions`, `noexclusions` (time restrictions only) or `collectall` |
+| `state` | `present` | `absent` removes a directory added by the role |
+
+Directories added by the role are removed, when they are removed from the list.
+
+#### Default value
+
+```YAML
+ahf_tfa_directories: []
+```
+
+#### Example usage
+
+```YAML
+ahf_tfa_directories:
+  - path: /u01/app/oracle/admin/DB1/adump
+    component: RDBMS
+    database: db1
+    instance: DB1
+    collection: noexclusions
 ```
 
 ### ahf_tfa_enabled

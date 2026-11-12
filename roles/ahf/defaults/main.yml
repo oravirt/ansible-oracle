@@ -202,6 +202,56 @@ ahf_compliance_autostart: false
 # @end
 ahf_compliance_settings: {}
 
+# @var ahf_properties:description: >
+# AHF properties - executed as `ahf configuration set --property <key> --value <value>`
+# (`ahf_install_mode: root` only). Same behavior as `ahf_tfa_settings`.
+#
+# Show the supported properties with `ahf configuration get --help` and the current value
+# with `ahf configuration get --property <key>`. Properties of AHF 26.10:
+#
+# | Property | Default | Description |
+# | --- | --- | --- |
+# | `ahf.fleet-insights.upload-only-minimal-files` | `true` | Upload only minimal files to Fleet Insights (not documented by Oracle) |
+# | `ahf.collectors.alert-history` | `on` | Alert History, only for ASM (dismount, offline, mount) |
+# | `ahf.collectors.enhanced_os_metrics` | `on` | Enhanced OS metrics |
+# | `ahf.insights.max-collection-interval` | `4` | not documented by Oracle |
+# | `ahf.compliance.excluded-check-ids` | | Check IDs excluded from the Compliance checks |
+# @end
+# @var ahf_properties:example: >
+# ahf_properties:
+#   ahf.fleet-insights.upload-only-minimal-files: "false"
+#   ahf.collectors.alert-history: "on"
+# @end
+ahf_properties: {}
+
+# @var ahf_tfa_directories:description: >
+# Additional directories for TFA (`tfactl directory add`), `ahf_install_mode: root` only.
+#
+# TFA discovers the directories of GI, ASM, listener and databases (`diag_dest`) automatically
+# (`tfactl print directories`). Add directories, which are not discovered, e.g. audit files
+# or a log directory of an application.
+#
+# | Attribute | Default | Description |
+# | --- | --- | --- |
+# | `path` | | directory (mandatory) |
+# | `component` | `RDBMS` | `RDBMS`, `CRS`, `ASM`, `INSTALL`, `OS`, `CFGTOOLS`, `TNS`, `DBWLM`, `ACFS`, `IPS` |
+# | `database` / `instance` | | database and instance for `component: RDBMS` |
+# | `public` | `true` | collection by all users, which can run `tfactl diagcollect` |
+# | `collection` | `exclusions` | `exclusions`, `noexclusions` (time restrictions only) or `collectall` |
+# | `state` | `present` | `absent` removes a directory added by the role |
+#
+# Directories added by the role are removed, when they are removed from the list.
+# @end
+# @var ahf_tfa_directories:example: >
+# ahf_tfa_directories:
+#   - path: /u01/app/oracle/admin/DB1/adump
+#     component: RDBMS
+#     database: db1
+#     instance: DB1
+#     collection: noexclusions
+# @end
+ahf_tfa_directories: []
+
 # @var ahf_settings_force:description: >
 # Execute all settings and component states, even when they are unchanged
 # since the last run of the role.

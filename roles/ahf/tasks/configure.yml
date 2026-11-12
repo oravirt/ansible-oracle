@@ -205,6 +205,31 @@
     or 'AUTORUN_SCHEDULE' not in _ahf_compliance_new
     or ahfr.rc != 0
 
+# AHF properties (ahf configuration set --property), e.g. collectors and upload to Fleet Insights
+- name: configure | AHF properties
+  ansible.builtin.command:
+    argv:
+      - "{{ _ahf_bin }}/ahf"
+      - configuration
+      - set
+      - --property
+      - "{{ ahfp.key }}"
+      - --value
+      - "{{ ahfp.value | string }}"
+  become: true
+  loop: "{{ ahf_properties | dict2items }}"
+  loop_control:
+    loop_var: ahfp
+    label: "{{ ahfp.key }}={{ ahfp.value }}"
+  changed_when: true
+  when:
+    - _ahf_root | bool
+    - (_ahf_state_old.properties | default({}))[ahfp.key] | default(None) | string != ahfp.value | string
+
+- name: configure | TFA directories
+  ansible.builtin.include_tasks: tfa_directories.yml
+  when: _ahf_root | bool
+
 - name: configure | AHF Fleet Insights client
   ansible.builtin.include_tasks: fleet_insights_client.yml
   when: _ahf_root | bool
@@ -218,6 +243,8 @@
            'tfa_settings': ahf_tfa_settings,
            'compliance_autostart': ahf_compliance_autostart | bool,
            'compliance_settings': ahf_compliance_settings,
+           'properties': ahf_properties if _ahf_root | bool else {},
+           'tfa_directories': _ahf_tfa_directories_state | default([]),
            'fleet_insights': _ahf_fleet_insights_state | default({}),
          } | to_nice_json }}
     owner: "{{ _ahf_become_user }}"
