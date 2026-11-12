@@ -507,8 +507,6 @@ sysctl_kernel_sem_force: false
 
 **_assert_ansible_oracle_**
 
-**_molecule-notest_**
-
 ## Dependencies
 
 - oraswgi_meta

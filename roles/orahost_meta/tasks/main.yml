@@ -2,6 +2,9 @@
 - name: Import assert_cluster.yml
   ansible.builtin.import_tasks: assert_cluster.yml
 
+- name: Import assert_oracle_databases.yml
+  ansible.builtin.import_tasks: assert_oracle_databases.yml
+
 ### Determine kernel.panic according to Doc ID 2821641.1
 # kdump state cannot savely be retrieved from service_facts
 - name: Determine kernel.panic setting
@@ -83,10 +86,10 @@
       ansible.builtin.set_fact:
         hugepage_size_bytes: "{{ (__orahost_hugepagesize_result.stdout | split())[1] | int * 1024 }}"
 
-# Kernelsettings are not availible in molecule
+# reads kernel.sem only, processes is asserted in assert_oracle_databases.yml
 - name: Calculate kernel.sem
   ansible.builtin.include_tasks: calculate_kernel_semaphores.yml
   when:
     - oracle_databases | default([]) | length > 0
-  tags:
-    - molecule-notest
+    # not defined: only databases with state absent without processes
+    - oracle_databases_processes_max is defined

@@ -1,0 +1,141 @@
+---
+# Role test for orahost_meta: aggregation of processes / SGA and calculation of kernel.sem
+# from oracle_databases and oracle_asm_instance (calculate_kernel_semaphores.yml).
+#
+# oracle_databases of the inventory cannot be undefined by role vars => no databases is
+# tested with oracle_databases: [] (orahost_meta uses oracle_databases | default([])).
+#
+# orahost_meta accumulates facts (oracle_databases_processes_sum, oracle_databases_processes_max,
+# __orahost_oracle_database_sgas) over several runs on the same host. A fact cannot be undefined
+# => the cases with undefined oracle_databases_processes_max run first, the facts are reset
+# before every case with a calculation.
+#
+# The role runs as root like in the playbooks (kdump state, sysctl kernel.sem).
+- name: orahost_meta | variables
+  ansible.builtin.set_fact:
+    _om_bg: 130
+    _om_sga: {name: sga_target, value: '1G', scope: spfile, state: present}
+
+# ------------------------------------------------ no calculation of kernel.sem
+- name: orahost_meta | no databases
+  ansible.builtin.include_tasks: _role_run.yml
+  vars:
+    mt_id: orahost_meta.no_databases
+    mt_role: orahost_meta
+    mt_role_root: true
+    oracle_databases: []
+    oracle_asm_instance: []
+
+- name: orahost_meta | no databases => kernel.sem not calculated
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: orahost_meta.no_databases_kernel_sem
+    mt_res:
+      failed: "{{ sysctl_kernel_sem is defined }}"
+      msg: "sysctl_kernel_sem: {{ sysctl_kernel_sem | default('undefined') }}"
+    mt_expect: ok
+
+- name: orahost_meta | only databases with state absent without processes
+  ansible.builtin.include_tasks: _role_run.yml
+  vars:
+    mt_id: orahost_meta.db_absent_without_processes
+    mt_role: orahost_meta
+    mt_role_root: true
+    oracle_databases:
+      - {oracle_db_name: DB9, state: absent, init_parameters: ["{{ _om_sga }}"]}
+    oracle_asm_instance: []
+
+- name: orahost_meta | only databases with state absent => kernel.sem not calculated
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: orahost_meta.db_absent_without_processes_kernel_sem
+    mt_res:
+      failed: "{{ sysctl_kernel_sem is defined }}"
+      msg: "sysctl_kernel_sem: {{ sysctl_kernel_sem | default('undefined') }}"
+    mt_expect: ok
+
+# ------------------------------------------------ processes missing => the role must stop with an assert
+# (not with an undefined variable in calculate_kernel_semaphores.yml or a wrong kernel.sem)
+- name: orahost_meta | database without processes
+  ansible.builtin.include_tasks: orahost_meta_run.yml
+  vars:
+    _om_id: orahost_meta.db_without_processes
+    _om_expect: assert_processes
+    oracle_databases:
+      - {oracle_db_name: DB1, init_parameters: ["{{ _om_sga }}"]}
+    oracle_asm_instance: []
+
+- name: orahost_meta | one database without processes
+  ansible.builtin.include_tasks: orahost_meta_run.yml
+  vars:
+    _om_id: orahost_meta.one_db_without_processes
+    _om_expect: assert_processes
+    oracle_databases:
+      - {oracle_db_name: DB1, init_parameters: ["{{ _om_sga }}", {name: processes, value: 300}]}
+      - {oracle_db_name: DB2, init_parameters: ["{{ _om_sga }}"]}
+    oracle_asm_instance: []
+
+- name: orahost_meta | processes not an integer
+  ansible.builtin.include_tasks: orahost_meta_run.yml
+  vars:
+    _om_id: orahost_meta.processes_not_integer
+    _om_expect: assert_processes
+    oracle_databases:
+      - {oracle_db_name: DB1, init_parameters: ["{{ _om_sga }}", {name: processes, value: 'abc'}]}
+    oracle_asm_instance: []
+
+- name: orahost_meta | processes with state absent
+  ansible.builtin.include_tasks: orahost_meta_run.yml
+  vars:
+    _om_id: orahost_meta.processes_state_absent
+    _om_expect: assert_processes
+    oracle_databases:
+      - {oracle_db_name: DB1, init_parameters: ["{{ _om_sga }}", {name: processes, value: 300, state: absent}]}
+    oracle_asm_instance: []
+
+# ------------------------------------------------ calculation of kernel.sem
+# SEMMSL: max(processes) + 10
+# SEMMNS: ceil(((sum(processes) * 2) + (oracle_nr_bg_processes * instances)) * 1.1)
+- name: orahost_meta | one database
+  ansible.builtin.include_tasks: orahost_meta_run.yml
+  vars:
+    _om_id: orahost_meta.one_db
+    _om_expect: ok
+    _om_sem: {semmsl: 310, semmns: "{{ ((600 + _om_bg) * 1.1) | round(0, 'ceil') | int }}", instances: 1}
+    oracle_databases:
+      - {oracle_db_name: DB1, init_parameters: ["{{ _om_sga }}", {name: processes, value: 300}]}
+    oracle_asm_instance: []
+
+- name: orahost_meta | two databases, processes as string and in upper case
+  ansible.builtin.include_tasks: orahost_meta_run.yml
+  vars:
+    _om_id: orahost_meta.two_dbs
+    _om_expect: ok
+    _om_sem: {semmsl: 510, semmns: "{{ ((1600 + 2 * _om_bg) * 1.1) | round(0, 'ceil') | int }}", instances: 2}
+    oracle_databases:
+      - {oracle_db_name: DB1, init_parameters: ["{{ _om_sga }}", {name: processes, value: '300'}]}
+      - {oracle_db_name: DB2, init_parameters: ["{{ _om_sga }}", {name: PROCESSES, value: 500}]}
+    oracle_asm_instance: []
+
+- name: orahost_meta | database present and database absent without processes
+  ansible.builtin.include_tasks: orahost_meta_run.yml
+  vars:
+    _om_id: orahost_meta.db_and_db_absent
+    _om_expect: ok
+    # the absent database is counted as instance (oracle_nr_instances)
+    _om_sem: {semmsl: 310, semmns: "{{ ((600 + 2 * _om_bg) * 1.1) | round(0, 'ceil') | int }}", instances: 2}
+    oracle_databases:
+      - {oracle_db_name: DB1, init_parameters: ["{{ _om_sga }}", {name: processes, value: 300}]}
+      - {oracle_db_name: DB9, state: absent, init_parameters: ["{{ _om_sga }}"]}
+    oracle_asm_instance: []
+
+- name: orahost_meta | database and ASM instance
+  ansible.builtin.include_tasks: orahost_meta_run.yml
+  vars:
+    _om_id: orahost_meta.db_and_asm
+    _om_expect: ok
+    _om_sem: {semmsl: 310, semmns: "{{ ((840 + 2 * _om_bg) * 1.1) | round(0, 'ceil') | int }}", instances: 2}
+    oracle_databases:
+      - {oracle_db_name: DB1, init_parameters: ["{{ _om_sga }}", {name: processes, value: 300}]}
+    oracle_asm_instance:
+      - {init_parameters: [{name: processes, value: 120}]}
