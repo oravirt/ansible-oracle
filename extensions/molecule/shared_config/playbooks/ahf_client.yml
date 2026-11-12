@@ -3,7 +3,10 @@
 # Requires ahf_download.yml and ahf_fleet_connect.yml (molecule_ahffi_available).
 #
 # Variables:
-#   molecule_ahf_collect  create one TFA collection for the upload into Fleet Insights (default: true)
+#   molecule_ahf_collect              create one TFA collection for the upload into Fleet Insights
+#                                     (default: true)
+#   molecule_ahf_fleet_ignore_errors  ignore failures of the registration in Fleet Insights
+#                                     (default: false)
 
 # ansible.builtin.expect for the registration in Fleet Insights
 - name: Install pexpect for AHF
@@ -16,14 +19,43 @@
         name: python3-pexpect
       when: molecule_ahffi_available | bool
 
+# Role ahf in block/rescue (like playbooks/ahf.yml otherwise):
+# molecule_ahf_fleet_ignore_errors=true ignores failures of the registration in
+# AHF Fleet Insights (tasks fleet_insights_client), all other failures stop the converge.
 - name: Converge AHF
-  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.ahf
+  hosts: all
+  become: true
+  any_errors_fatal: true
   vars:
     oracle_sw_copy: false
     oracle_stage_remote: /u01/stage/download
     # registration only, when Fleet Insights is reachable
     ahf_fleet_insights_client: "{{ molecule_ahffi_available | bool }}"
     ahf_fleet_insights_public_cert: "{{ molecule_ahffi_public_cert | default('') }}"
+  tasks:
+    - name: AHF
+      block:
+        - name: Role ahf
+          ansible.builtin.include_role:
+            name: opitzconsulting.ansible_oracle.ahf
+      rescue:
+        - name: Failure outside the registration in AHF Fleet Insights
+          ansible.builtin.fail:
+            msg: "{{ ansible_failed_result.msg | default('see failed task above') }}"
+          when: >-
+            not molecule_ahf_fleet_ignore_errors | default(false) | bool
+            or 'fleet_insights_client' not in ansible_failed_task.name | default('')
+
+        - name: Ignored failure of the registration in AHF Fleet Insights
+          ansible.builtin.debug:
+            msg: >-
+              IGNORED (molecule_ahf_fleet_ignore_errors):
+              {{ ansible_failed_task.name | default('') }}:
+              {{ ansible_failed_result.msg | default('') }}
+
+        - name: Remember failed registration
+          ansible.builtin.set_fact:
+            molecule_ahffi_registered: false
 
 # Only once (marker file) => no change in the idempotence check
 - name: TFA collection for AHF Fleet Insights
@@ -44,6 +76,7 @@
       register: _mol_collect
       when:
         - molecule_ahffi_available | bool
+        - molecule_ahffi_registered | default(true) | bool
         - molecule_ahf_collect | default(true) | bool
 
     - name: Result of TFA collection
