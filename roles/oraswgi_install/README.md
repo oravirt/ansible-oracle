@@ -32,6 +32,7 @@ Known Issues from Oracle:
   - [oracle_scan_port](#oracle_scan_port)
   - [oracle_sw_image_gi](#oracle_sw_image_gi)
   - [oracle_vip](#oracle_vip)
+  - [oraswgi_install_remove_obsolete_homes](#oraswgi_install_remove_obsolete_homes)
   - [run_configtoolallcommand](#run_configtoolallcommand)
 - [Discovered Tags](#discovered-tags)
 - [Open Tasks](#open-tasks)
@@ -261,6 +262,25 @@ That replaces the logic from `oracle_vip` for the VIP!
 
 ```YAML
 oracle_vip: -vip
+```
+
+### oraswgi_install_remove_obsolete_homes
+
+Remove obsolete Grid Infrastructure homes of Oracle Restart with `deinstall`.
+
+Obsolete homes are all Grid Infrastructure homes in the central inventory
+except `crs_home` in `/etc/oracle/olr.loc` and `oracle_home_gi`,
+e.g. the old home after an Out-of-Place Patching.
+
+The removal is done only, when Oracle Restart runs from `oracle_home_gi` and
+`deinstall -checkonly` reports the home as not configured.
+
+Homes, which are not registered in the central inventory, are not touched.
+
+#### Default value
+
+```YAML
+oraswgi_install_remove_obsolete_homes: false
 ```
 
 ### run_configtoolallcommand

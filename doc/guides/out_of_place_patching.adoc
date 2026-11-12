@@ -415,8 +415,53 @@ The databases are started with their start option. `oracle-ohasd.service` and th
 Listeners running from the Grid Infrastructure home (e.g. `LISTENER`) are moved with the stack, `listener.ora` is copied into the new home.
 Listeners and databases in database homes are not changed.
 
-The old Grid Infrastructure home is not removed.
+The old Grid Infrastructure home is not removed by the switch.
 A switch back to the old home is done in the same way by setting `oracle_home_gi` to the old home.
+
+[[oracle_restart_remove_obsolete_gi_home]]
+==== Removal of obsolete Grid Infrastructure homes
+
+`oraswgi_install_remove_obsolete_homes: true` removes obsolete Grid Infrastructure homes with `deinstall`.
+Without it, old homes stay for a switch back.
+
+The source is the central inventory only. Obsolete is every home in the central inventory
+
+* with the component `oracle.crs` (1st component in `<home>/inventory/ContentsXML/comps.xml`), database homes are never removed,
+* which is not `crs_home` in `/etc/oracle/olr.loc` and not `oracle_home_gi`.
+
+Homes or directories, which are not registered in the central inventory, are not touched and must be removed manually.
+The removal is only done, when Oracle Restart runs from `oracle_home_gi` (completed switch).
+
+.Steps of `oraswgi_install` (`remove_obsolete_home.yml`) for each obsolete home
+[options="header"]
+|=======================
+|Step |User |Description
+|`<old home>/deinstall/deinstall -silent -checkonly -o <dir>`
+|grid
+|Creates the response file. The role stops with an error, when `deinstall` detects a configuration in the home: +
+`CRS_HOME=false`, `ASM_IN_HOME=false`, `ASM_DROP_DISKGROUPS=false` and `ORA_CRS_HOME=<running home>` are required,
+the output must contain `The home being deconfigured is NOT a configured Grid Infrastructure home`.
+|`<old home>/crs/install/roothas.sh -unlock -dstcrshome <old home>`
+|root
+|Only for a locked home (owner `root`), a former running home.
+|`<old home>/deinstall/deinstall -silent -paramfile <response file>`
+|grid
+|Removes the software and the home from the central inventory. No downtime.
+|`rootdeinstall.sh`
+|root
+|Only, when requested in the output of `deinstall`. Removes the files owned by `root` and the directory of the home.
+|=======================
+
+NOTE: `deinstall` of an obsolete home prints `Oracle Restart is stopped and de-configured successfully` and requests
+`rootdeinstall.sh` "to remove the configuration of the Oracle Restart".
+This is the standard text of `deinstall`: the running Oracle Restart in `crs_home` is not changed
+(tested with 23.26.3 => 23.26.4: resources, `/etc/oracle/olr.loc`, `oracle-ohasd.service`, `+ASM` in `/etc/oratab`
+and `listener.ora` of the running home unchanged).
+
+
+NOTE: Oracle documents `deinstall` of the home itself (same release) after an unlock for the previous release Grid home
+after an upgrade ("Unlocking and Deinstalling the Previous Release Grid Home").
+The removal of an old home of the same release after `-switchGridHome` is not described explicitly.
 
 .Inventory example
 [source,yaml]

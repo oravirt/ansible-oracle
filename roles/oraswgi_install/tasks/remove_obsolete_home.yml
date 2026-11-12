@@ -1,0 +1,164 @@
+---
+# Remove one obsolete Grid Infrastructure home (_oraswgi_install_rm_home) of Oracle Restart
+#
+#   1. deinstall -silent -checkonly (grid user): generates the response file
+#      => assert, that deinstall does not detect a configuration in the home:
+#         CRS_HOME=false, ASM_IN_HOME=false, ASM_DROP_DISKGROUPS=false,
+#         ORA_CRS_HOME = running home
+#   2. roothas.sh -unlock -dstcrshome <home> (root), when the home is locked (owner root)
+#   3. deinstall -silent -paramfile <response file> (grid user)
+#   4. rootdeinstall.sh (root), when requested by deinstall
+#   5. assert, that the home is not registered in the central inventory anymore
+- name: remove_obsolete_home | Directory for response file of deinstall
+  ansible.builtin.file:
+    path: "{{ _oraswgi_install_rm_dir }}"
+    state: "{{ item }}"
+    owner: "{{ _grid_install_user }}"
+    group: "{{ oracle_group }}"
+    mode: "0755"
+  loop: [absent, directory]
+  become: true
+  become_user: root
+  vars:
+    _oraswgi_install_rm_dir: "{{ oracle_tmp_stage }}/deinstall_{{ _oraswgi_install_rm_home | basename }}"
+
+- name: remove_obsolete_home | deinstall -checkonly {{ _oraswgi_install_rm_home }}
+  ansible.builtin.command:
+    argv:
+      - "{{ _oraswgi_install_rm_home }}/deinstall/deinstall"
+      - -silent
+      - -checkonly
+      - -o
+      - "{{ oracle_tmp_stage }}/deinstall_{{ _oraswgi_install_rm_home | basename }}"
+  environment: "{{ oracle_script_env }}"
+  become: true
+  become_user: "{{ _grid_install_user }}"
+  register: _oraswgi_install_rm_check
+  changed_when: false
+
+- name: remove_obsolete_home | Output of deinstall -checkonly
+  ansible.builtin.debug:
+    var: _oraswgi_install_rm_check.stdout_lines
+
+- name: remove_obsolete_home | Response file of deinstall -checkonly
+  ansible.builtin.find:
+    paths: "{{ oracle_tmp_stage }}/deinstall_{{ _oraswgi_install_rm_home | basename }}"
+    patterns: "*.rsp"
+  become: true
+  become_user: root
+  register: _oraswgi_install_rm_rspfind
+
+- name: remove_obsolete_home | Assert response file
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _oraswgi_install_rm_rspfind.matched == 1
+    fail_msg: "deinstall -checkonly did not create a response file for {{ _oraswgi_install_rm_home }}"
+
+- name: remove_obsolete_home | Read response file
+  ansible.builtin.slurp:
+    src: "{{ _oraswgi_install_rm_rspfind.files[0].path }}"
+  become: true
+  become_user: root
+  register: _oraswgi_install_rm_rsp
+
+# deinstall must not detect a configuration in the home
+# => otherwise it would deconfigure Oracle Restart or ASM (incl. drop of the disk groups)
+- name: remove_obsolete_home | Assert home is not configured
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - __rsp | regex_findall('(?m)^ORACLE_HOME=(.*)$') | map('trim') | map('regex_replace', '/+$', '') | unique
+        == [_oraswgi_install_rm_home]
+      - __rsp | regex_findall('(?m)^CRS_HOME=(.*)$') | map('trim') | map('lower') | list == ['false']
+      - __rsp | regex_findall('(?m)^ASM_IN_HOME=(.*)$') | map('trim') | map('lower') | list == ['false']
+      - __rsp | regex_findall('(?m)^ASM_DROP_DISKGROUPS=(.*)$') | map('trim') | map('lower') | list in [[], ['false']]
+      - __rsp | regex_findall('(?m)^ORA_CRS_HOME=(.*)$') | map('trim') | map('regex_replace', '/+$', '') | list
+        == [_oraswgi_install_rm_crs_home]
+      - "'NOT a configured Grid Infrastructure home' in _oraswgi_install_rm_check.stdout"
+    fail_msg: >-
+      deinstall -checkonly detected a configuration in {{ _oraswgi_install_rm_home }}
+      => the home is not removed. Check {{ _oraswgi_install_rm_rspfind.files[0].path }}
+      (expected: CRS_HOME=false, ASM_IN_HOME=false, ASM_DROP_DISKGROUPS=false,
+      ORA_CRS_HOME={{ _oraswgi_install_rm_crs_home }}).
+  vars:
+    __rsp: "{{ _oraswgi_install_rm_rsp.content | b64decode }}"
+
+# The home was the running home before => locked (owner root)
+- name: remove_obsolete_home | Owner of home
+  ansible.builtin.stat:
+    path: "{{ _oraswgi_install_rm_home }}/crs/install/roothas.sh"
+  register: _oraswgi_install_rm_roothas
+
+- name: remove_obsolete_home | Unlock home
+  ansible.builtin.command:
+    argv:
+      - "{{ _oraswgi_install_rm_home }}/crs/install/roothas.sh"
+      - -unlock
+      - -dstcrshome
+      - "{{ _oraswgi_install_rm_home }}"
+  environment: "{{ oracle_script_env }}"
+  become: true
+  become_user: root
+  changed_when: true
+  when:
+    - _oraswgi_install_rm_roothas.stat.exists
+    - _oraswgi_install_rm_roothas.stat.pw_name == 'root'
+
+- name: remove_obsolete_home | deinstall {{ _oraswgi_install_rm_home }}
+  ansible.builtin.command:
+    argv:
+      - "{{ _oraswgi_install_rm_home }}/deinstall/deinstall"
+      - -silent
+      - -paramfile
+      - "{{ _oraswgi_install_rm_rspfind.files[0].path }}"
+  environment: "{{ oracle_script_env }}"
+  become: true
+  become_user: "{{ _grid_install_user }}"
+  register: _oraswgi_install_rm_deinstall
+  changed_when: true
+
+- name: remove_obsolete_home | Output of deinstall
+  ansible.builtin.debug:
+    var: _oraswgi_install_rm_deinstall.stdout_lines
+
+# deinstall of a Grid Infrastructure home could request rootdeinstall.sh as root
+- name: remove_obsolete_home | rootdeinstall.sh
+  ansible.builtin.command: "{{ item }}"
+  loop: "{{ _oraswgi_install_rm_deinstall.stdout | regex_findall('(/\\S+/rootdeinstall\\.sh)') | unique }}"
+  environment: "{{ oracle_script_env }}"
+  become: true
+  become_user: root
+  changed_when: true
+
+- name: remove_obsolete_home | Read central inventory after deinstall
+  ansible.builtin.slurp:
+    src: "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml"
+  register: _oraswgi_install_rm_inventory_after
+
+- name: remove_obsolete_home | Assert home removed from central inventory
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - _oraswgi_install_rm_home not in __homes
+    fail_msg: "{{ _oraswgi_install_rm_home }} is still registered in the central inventory after deinstall"
+  vars:
+    __homes: >-
+      {{ _oraswgi_install_rm_inventory_after.content | b64decode
+         | regex_findall('<HOME [^>]*>')
+         | reject('search', 'REMOVED="T"')
+         | map('regex_findall', 'LOC="([^"]+)"') | map('first')
+         | map('regex_replace', '/+$', '') | list }}
+
+- name: remove_obsolete_home | Check directory of home
+  ansible.builtin.stat:
+    path: "{{ _oraswgi_install_rm_home }}"
+  register: _oraswgi_install_rm_home_stat
+
+# Files outside of the central inventory are not removed => manual cleanup
+- name: remove_obsolete_home | Remaining directory
+  ansible.builtin.debug:
+    msg: >-
+      {{ _oraswgi_install_rm_home }} is removed from the central inventory, but the directory
+      still exists. Please remove it manually.
+  when: _oraswgi_install_rm_home_stat.stat.exists
