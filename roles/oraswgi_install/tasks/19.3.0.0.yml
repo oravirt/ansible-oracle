@@ -269,3 +269,14 @@
         - run_configtoolallcommand | bool
         - orasw_meta_primary_node | bool
       register: configtool
+      # gi_ignoreprereq: failures of the post check with cluvfy (CVU) are ignored like the
+      # failed prerequisite checks. Failures of all other configuration assistants are fatal.
+      failed_when:
+        - configtool.rc != 0
+        - not (gi_ignoreprereq | bool
+               and __failed_assistants | length > 0
+               and __failed_assistants | reject('equalto', 'Oracle Cluster Verification Utility') | list | length == 0)
+      vars:
+        __failed_assistants: >-
+          {{ configtool.stdout | default('')
+             | regex_findall("INS-20801. Configuration Assistant '([^']+)' failed") }}
