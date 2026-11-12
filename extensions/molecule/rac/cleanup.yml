@@ -1,0 +1,47 @@
+---
+# Runs before destroy (molecule destroy, molecule test)
+#
+# The loop devices for ASM (converge.yml) are devices of the kernel. They survive the
+# containers => stop the Clusterware stack, detach the loop devices, remove the sparse files
+# (docker volume molecule-rac-asm).
+- name: Cleanup Grid Infrastructure cluster
+  hosts: rac
+  gather_facts: false
+  become: true
+  ignore_unreachable: true
+  tasks:
+    - name: Stop Clusterware stack
+      ansible.builtin.command:
+        argv: ["{{ oracle_home_gi }}/bin/crsctl", stop, crs, -f]
+        removes: /etc/oracle/olr.loc
+      register: _crsctl_stop
+      changed_when: _crsctl_stop.rc == 0
+      failed_when: false
+
+- name: Cleanup shared ASM disks
+  hosts: rac
+  gather_facts: false
+  become: true
+  ignore_unreachable: true
+  vars:
+    _asm_disks: "{{ asm_diskgroups | subelements('disk') | map(attribute='1') | list }}"
+  tasks:
+    - name: Detach loop devices and remove sparse files
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          file={{ molecule_asm_shared_dir }}/{{ item.device | basename }}
+          for dev in $(losetup --list --noheadings -O NAME -j "${file}"); do
+            losetup -d "${dev}" && echo "detached ${dev}"
+          done
+          if [ -f "${file}" ]; then
+            rm -f "${file}" && echo "removed ${file}"
+          fi
+        executable: /bin/bash
+      loop: "{{ _asm_disks }}"
+      loop_control:
+        label: "{{ item.device | basename }}"
+      register: _loop_cleanup
+      changed_when: _loop_cleanup.stdout | length > 0
+      failed_when: false
+      run_once: true
