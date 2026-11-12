@@ -8,8 +8,8 @@
   (dict "glob" "doc/featurelist.adoc" "section" "features")
   (dict "glob" "doc/guides/*.adoc" "section" "guides")
   (dict "glob" "doc/README-ansible.adoc" "section" "guides")
-  (dict "glob" "doc/vagrant.adoc" "section" "guides/vagrant")
-  (dict "glob" "doc/vagrant_basics.md" "section" "guides/vagrant")
+  (dict "glob" "doc/vagrant.adoc" "section" "legacy/vagrant")
+  (dict "glob" "doc/vagrant_basics.md" "section" "legacy/vagrant")
   (dict "glob" "doc/development.adoc" "section" "development")
   (dict "glob" "doc/website.adoc" "section" "development")
   (dict "glob" "doc/roles.adoc" "section" "roles")
@@ -21,22 +21,28 @@
   title  - page title, the first heading stays in the content
   slug   - last part of the URL (default: file name, directory name for README.md)
   weight - order in the navigation (default: 100)
+  aliases - old URLs, redirected to the page (after a move to another section)
+  section - section below /docs/ instead of the section of the rule (e.g. "legacy" for an outdated guide)
 */}}
 {{ $settings := dict
   "doc/featurelist.adoc" (dict "weight" 10)
-  "doc/guides/beginner.adoc" (dict "weight" 10)
-  "doc/guides/advanced.adoc" (dict "weight" 20)
-  "doc/readme-ansible.adoc" (dict "slug" "ansible-container" "weight" 30)
-  "doc/guides/local-install-howto.adoc" (dict "weight" 40)
-  "doc/guides/install-and-patch-settings.adoc" (dict "weight" 50)
-  "doc/guides/apex_ords.adoc" (dict "weight" 60)
-  "doc/guides/autoupgrade.adoc" (dict "weight" 70)
-  "doc/guides/autoupgrade_upgrade.adoc" (dict "weight" 80)
-  "doc/guides/ahf.adoc" (dict "weight" 85)
-  "doc/guides/out_of_place_patching.adoc" (dict "weight" 90)
+  "doc/guides/breaking_changes.adoc" (dict "section" "features" "weight" 20 "aliases" (slice "/docs/guides/breaking_changes/"))
+  "doc/guides/beginner.adoc" (dict "section" "examples" "weight" 10 "aliases" (slice "/docs/guides/beginner/"))
+  "doc/guides/advanced.adoc" (dict "section" "legacy" "weight" 20 "aliases" (slice "/docs/guides/advanced/"))
+  "doc/readme-ansible.adoc" (dict "section" "legacy" "slug" "ansible-container" "weight" 30 "aliases" (slice "/docs/guides/ansible-container/"))
+  "doc/guides/local-install-howto.adoc" (dict "section" "legacy" "weight" 40 "aliases" (slice "/docs/guides/local-install-howto/"))
+  "doc/guides/install-and-patch-settings.adoc" (dict "section" "guides/patching" "weight" 10 "aliases" (slice "/docs/guides/install-and-patch-settings/"))
+  "doc/guides/ahf.adoc" (dict "weight" 105)
+  "doc/guides/apex_ords.adoc" (dict "weight" 110)
+  "doc/guides/autoupgrade.adoc" (dict "section" "guides/patching" "weight" 20 "aliases" (slice "/docs/guides/autoupgrade/"))
+  "doc/guides/autoupgrade_upgrade.adoc" (dict "section" "guides/patching" "weight" 30 "aliases" (slice "/docs/guides/autoupgrade_upgrade/"))
+  "doc/guides/out_of_place_patching.adoc" (dict "section" "guides/patching" "weight" 40 "aliases" (slice "/docs/guides/out_of_place_patching/"))
+  "doc/guides/rman.adoc" (dict "section" "guides/rman-standby" "weight" 10 "aliases" (slice "/docs/guides/rman/"))
+  "doc/guides/standby_databases.adoc" (dict "section" "guides/rman-standby" "weight" 20 "aliases" (slice "/docs/guides/standby_databases/"))
+  "doc/guides/dataguard.adoc" (dict "section" "guides/rman-standby" "weight" 30 "aliases" (slice "/docs/guides/dataguard/"))
   "doc/guides/restart_rac.adoc" (dict "weight" 100)
-  "doc/vagrant.adoc" (dict "title" "Vagrant on Windows" "slug" "windows" "weight" 10)
-  "doc/vagrant_basics.md" (dict "title" "Vagrant Basics" "weight" 20)
+  "doc/vagrant.adoc" (dict "title" "Vagrant on Windows" "slug" "windows" "weight" 10 "aliases" (slice "/docs/guides/vagrant/windows/"))
+  "doc/vagrant_basics.md" (dict "title" "Vagrant Basics" "weight" 20 "aliases" (slice "/docs/guides/vagrant/vagrant_basics/"))
   "doc/development.adoc" (dict "title" "How to develop" "weight" 10)
   "doc/website.adoc" (dict "title" "Website" "weight" 20)
   "doc/roles.adoc" (dict "title" "Overview" "slug" "overview" "weight" 1)
@@ -55,7 +61,7 @@
     {{ if eq (path.Base $src) "README.md" }}
       {{ $slug = path.Base (path.Dir $src) }}
     {{ end }}
-    {{ $path := printf "%s/%s" $rule.section ($cfg.slug | default $slug) }}
+    {{ $path := printf "%s/%s" ($cfg.section | default $rule.section) ($cfg.slug | default $slug) }}
     {{ $urls.SetInMap "urls" (lower $src) (printf "/docs/%s/" $path) }}
     {{ $pages = $pages | append (dict "res" . "src" $src "path" $path "cfg" $cfg) }}
   {{ end }}
@@ -108,8 +114,71 @@
     )
     "content" (dict "mediaType" (cond $isMD "text/markdown" "text/asciidoc") "value" $raw)
   }}
+  {{ with $p.cfg.aliases }}
+    {{ $page = merge $page (dict "aliases" .) }}
+  {{ end }}
   {{ with $git }}
     {{ $page = merge $page (dict "dates" (dict "lastmod" (time.AsTime .date))) }}
   {{ end }}
+  {{ $.AddPage $page }}
+{{ end }}
+
+{{/*
+  Examples: one page per directory in ../example (mounted below assets/example, see hugo.yaml)
+  with the committed files (data/gitinfo.json) as code blocks.
+  Optional settings per directory: title, weight, guide (source of the guide, which uses the example), description,
+  section (default: examples) and slug (default: directory name)
+  No "Edit this page" links (github_repo ""): the page is a directory, not a file.
+*/}}
+{{ $examples := dict
+  "beginner" (dict "title" "Beginner Example" "weight" 5 "section" "legacy" "slug" "example-beginner" "guide" "doc/guides/beginner.adoc"
+    "description" "Single instance database on file system with one Oracle Linux VM.")
+  "dataguard" (dict "title" "Data Guard" "weight" 20 "guide" "doc/guides/dataguard.adoc"
+    "description" "Primary and standby database with Data Guard on 2 Oracle Linux VMs.")
+  "beginner_patching" (dict "title" "Beginner with Patching" "weight" 15
+    "description" "Single instance database on file system with patches, APEX and ORDS on a Vagrant VM.")
+  "rac" (dict "title" "RAC Example" "weight" 40 "section" "legacy" "slug" "example-rac"
+    "description" "Oracle Grid Infrastructure and RAC database on 2 Vagrant VMs.")
+}}
+{{ $gitinfo := hugo.Data.gitinfo | default dict }}
+{{ $lang := dict ".yml" "yaml" ".cfg" "ini" ".txt" "text" "" "ruby" }}
+{{ $byExample := dict }}
+{{ range resources.Match "example/**" }}
+  {{ $src := strings.TrimPrefix "/" .Name }}
+  {{ $git := index $gitinfo (lower $src) }}
+  {{ if $git }}
+    {{ $name := index (split $src "/") 1 }}
+    {{ $byExample = merge $byExample (dict $name ((index $byExample $name | default slice) | append (dict "res" . "src" $src "git" $git))) }}
+  {{ end }}
+{{ end }}
+
+{{ range $name, $files := $byExample }}
+  {{ $cfg := index $examples $name | default dict }}
+  {{ $dir := printf "example/%s" $name }}
+  {{ $md := "" }}
+  {{ with $cfg.description }}{{ $md = printf "%s\n\n" . }}{{ end }}
+  {{ with $cfg.guide }}
+    {{ with index ($urls.Get "urls") (lower .) }}
+      {{ $md = printf "%sThe example is described step by step in the [guide](%s).\n\n" $md . }}
+    {{ end }}
+  {{ end }}
+  {{ $md = printf "%sSource: [`%s`](https://github.com/oravirt/ansible-oracle/tree/master/%s)\n\n## Files\n" $md $dir $dir }}
+  {{ $newest := dict "date" "" }}
+  {{ range sort $files "src" }}
+    {{ $file := strings.TrimPrefix (printf "%s/" $dir) .src }}
+    {{ $md = printf "%s\n### %s\n\n````%s\n%s\n````\n" $md $file (index $lang (path.Ext .src) | default "text") (strings.TrimRight "\n" .res.Content) }}
+    {{ if gt .git.date $newest.date }}{{ $newest = .git }}{{ end }}
+  {{ end }}
+  {{ $page := dict
+    "path" (printf "%s/%s" ($cfg.section | default "examples") ($cfg.slug | default $name))
+    "title" ($cfg.title | default $name)
+    "weight" ($cfg.weight | default 100)
+    "params" (dict
+      "github_repo" ""
+      "source_git" $newest
+    )
+    "dates" (dict "lastmod" (time.AsTime $newest.date))
+    "content" (dict "mediaType" "text/markdown" "value" $md)
+  }}
   {{ $.AddPage $page }}
 {{ end }}

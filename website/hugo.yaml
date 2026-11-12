@@ -129,13 +129,17 @@ outputs:
 
 module:
   proxy: direct
-  # doc/ and roles/ are used by content/docs/_content.gotmpl
+  # doc/, roles/ and example/ are used by content/docs/_content.gotmpl
   # A custom mount replaces the default mount of its target => content and assets are listed again.
   mounts:
     - {source: content, target: content}
     - {source: assets, target: assets}
     - {source: ../doc, target: assets/doc}
     - {source: ../roles, target: assets/roles}
+    # only the files shown on the example pages, the pages show only committed files (data/gitinfo.json)
+    - source: ../example
+      target: assets/example
+      files: ['**.yml', '**.cfg', '**/Vagrantfile', '**/requirements.txt', '! **/context/**', '! **/.venv/**', '! **/navigator/**']
   hugoVersion:
     extended: true
     min: 0.156.0

@@ -3,6 +3,7 @@
 
 hugo gives the pages of content/docs/_content.gotmpl the git info of the
 content adapter itself. The adapter uses this file for "Last modified" instead.
+The example pages show only the files listed here (committed files).
 Keys are the paths below the repository root in lower case, like in the adapter.
 """
 
@@ -12,7 +13,7 @@ import sys
 from pathlib import Path
 
 website = Path(__file__).resolve().parent.parent
-sources = ["doc", ":(glob)roles/*/README.md"]
+sources = ["doc", ":(glob)roles/*/README.md", "example"]
 
 log = subprocess.run(
     ["git", "log", "--format=%x1e%H%x1f%h%x1f%cI%x1f%s", "--name-only", "--", *sources],
