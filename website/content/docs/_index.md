@@ -22,8 +22,8 @@ Automated installation of
 
 ## Getting Started
 
-1. [Vagrant setup on Windows](/docs/guides/vagrant/windows/)
-1. [Beginners Guide](/docs/guides/beginner/)
+1. [Vagrant setup on Windows](/docs/legacy/vagrant/windows/)
+1. [Beginners Guide](/docs/examples/beginner/)
 
 ### Next Steps
 

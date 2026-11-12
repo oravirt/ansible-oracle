@@ -8,7 +8,7 @@ set -o pipefail
 # (see doc/website.adoc) and published with GitHub Pages from the directory
 # docs/ in the branch main of the website repository.
 #
-# - check that website/, doc/, roles/ and docker/hugo/ have no uncommitted changes
+# - check that website/, doc/, roles/, example/ and docker/hugo/ have no uncommitted changes
 # - build the website with 'task website:build' and check the links
 # - clone or update the website repository (default: ~/.cache/ansible-oracle-website)
 # - replace docs/ with the new build, keep CNAME, add .nojekyll
@@ -38,7 +38,7 @@ repo="Rendanic/ansible-oracle-website"
 branch="main"
 clone_dir="${XDG_CACHE_HOME:-${HOME}/.cache}/ansible-oracle-website"
 public="website/public"
-sources="website doc roles docker/hugo"
+sources="website doc roles example docker/hugo"
 mode="local"
 a11y=false
 force=false
