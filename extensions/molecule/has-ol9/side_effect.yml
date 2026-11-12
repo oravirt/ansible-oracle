@@ -1,6 +1,8 @@
 ---
 # Out-of-Place Patching with Oracle Restart:
-# switch database DBHAS from db19-gi-ee (converge) to db19-2-gi-ee.
+# - switch Oracle Restart from gi_goldimage_26_03 (converge) to gi_goldimage_26_04
+#   (oraswgi_install: gridSetup.sh -switchGridHome + root.sh of the new home)
+# - switch database DBHAS from db19-gi-ee (converge) to db19-2-gi-ee.
 # LISTENER_DB_1523, tnsnames.ora and sqlnet.ora follow oracle_dbhas_home.
 # The new ORACLE_HOME is installed with swdb before the switch.
 #
@@ -8,16 +10,22 @@
 # PDB ORCLPDB1 and the ASM instance of Oracle Restart in the new ORACLE_HOME.
 # The scenario specific variables are in module_tests.yml.
 # A 2nd run of the configuration (idempotence) is done with 'task idempotence S=has-ol9'.
-- name: Side-Effect - Install new ORACLE_HOME
-  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swdb
-  vars:
+- name: Side-Effect - Switch Oracle Restart into new ORACLE_HOME
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swgi
+  vars: &side_effect_vars
+    oracle_install_image_gi: gi_goldimage_26_04.zip
+    oracle_home_gi: /u01/app/oracle/product/26/restart_26.04
+    oracle_dbhas_home: db19-2-gi-ee
     oracle_sw_copy: false
     is_sw_source_local: true
 
+- name: Side-Effect - Install new ORACLE_HOME
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swdb
+  vars: *side_effect_vars
+
 - name: Side-Effect - Switch ORACLE_HOME of DBHAS
   ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db
-  vars: &side_effect_vars
-    oracle_dbhas_home: db19-2-gi-ee
+  vars: *side_effect_vars
 
 - name: Side-Effect - Module tests
   ansible.builtin.import_playbook: ../shared_config/module_tests/module_tests.yml
