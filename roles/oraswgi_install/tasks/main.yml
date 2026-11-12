@@ -91,6 +91,14 @@
     - olrloc.stat.exists
     - orasw_meta_primary_node | bool
 
+# Remove obsolete Grid Infrastructure homes from the central inventory (deinstall)
+- name: install_home_gi | Remove obsolete Grid Infrastructure homes
+  ansible.builtin.include_tasks: remove_obsolete_homes.yml
+  when:
+    - olrloc.stat.exists
+    - orasw_meta_primary_node | bool
+    - oraswgi_install_remove_obsolete_homes | bool
+
 - name: install_home_gi | include_tasks asmcmd_dsset.yml
   ansible.builtin.include_tasks: asmcmd_dsset.yml
   tags: always

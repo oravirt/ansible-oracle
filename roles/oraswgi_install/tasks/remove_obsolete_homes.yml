@@ -1,0 +1,88 @@
+---
+# Remove obsolete Grid Infrastructure homes of Oracle Restart (oraswgi_install_remove_obsolete_homes)
+#
+# Source is the central inventory only:
+#   obsolete = Grid Infrastructure home (1st component in comps.xml is oracle.crs)
+#              registered in the central inventory
+#              and not crs_home in /etc/oracle/olr.loc
+#              and not oracle_home_gi
+# Homes, which are not registered in the central inventory, are not touched.
+#
+# Each home is removed with deinstall of the home itself (same release, see Oracle documentation
+# "Unlocking and Deinstalling the Previous Release Grid Home"), see remove_obsolete_home.yml.
+- name: remove_obsolete_homes | Read /etc/oracle/olr.loc
+  ansible.builtin.slurp:
+    src: /etc/oracle/olr.loc
+  register: _oraswgi_install_rm_olrloc
+
+- name: remove_obsolete_homes | Current ORACLE_HOME of Oracle Restart
+  ansible.builtin.set_fact:
+    _oraswgi_install_rm_crs_home: >-
+      {{ _oraswgi_install_rm_olrloc.content | b64decode
+         | regex_findall('(?m)^crs_home=(.*)$') | default([''], true) | first | trim | regex_replace('/+$', '') }}
+
+# Only after a completed switch: otherwise the old home could be needed by switch_home.yml
+- name: remove_obsolete_homes | Assert Oracle Restart and running home
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - not _oraswgi_meta_configure_cluster | bool
+      - _oraswgi_install_rm_crs_home == oracle_home_gi | regex_replace('/+$', '')
+    fail_msg: >-
+      oraswgi_install_remove_obsolete_homes is supported for Oracle Restart only and needs
+      a stack running from oracle_home_gi ({{ oracle_home_gi }}).
+      crs_home in /etc/oracle/olr.loc: {{ _oraswgi_install_rm_crs_home }}
+
+- name: remove_obsolete_homes | Read central inventory
+  ansible.builtin.slurp:
+    src: "{{ oracle_inventory_loc }}/ContentsXML/inventory.xml"
+  register: _oraswgi_install_rm_inventory
+
+# all homes in the central inventory without removed homes (REMOVED="T")
+# except the running home and oracle_home_gi
+- name: remove_obsolete_homes | Candidates from central inventory
+  ansible.builtin.set_fact:
+    _oraswgi_install_rm_candidates: >-
+      {{ _oraswgi_install_rm_inventory.content | b64decode
+         | regex_findall('<HOME [^>]*>')
+         | reject('search', 'REMOVED="T"')
+         | map('regex_findall', 'LOC="([^"]+)"') | map('first')
+         | map('regex_replace', '/+$', '')
+         | reject('equalto', _oraswgi_install_rm_crs_home)
+         | reject('equalto', oracle_home_gi | regex_replace('/+$', ''))
+         | list }}
+
+# Grid Infrastructure home => 1st component in comps.xml is oracle.crs (database home: oracle.server)
+- name: remove_obsolete_homes | Type of the candidates
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -m1
+      - -o
+      - '<COMP NAME="[^"]*"'
+      - "{{ item }}/inventory/ContentsXML/comps.xml"
+  loop: "{{ _oraswgi_install_rm_candidates }}"
+  become: true
+  become_user: root
+  register: _oraswgi_install_rm_comps
+  changed_when: false
+  failed_when: false
+
+- name: remove_obsolete_homes | Obsolete Grid Infrastructure homes
+  ansible.builtin.set_fact:
+    _oraswgi_install_rm_homes: >-
+      {{ _oraswgi_install_rm_comps.results
+         | selectattr('stdout', 'equalto', '<COMP NAME="oracle.crs"')
+         | map(attribute='item') | list }}
+
+- name: remove_obsolete_homes | Info
+  ansible.builtin.debug:
+    msg:
+      - "running home:   {{ _oraswgi_install_rm_crs_home }}"
+      - "obsolete homes: {{ _oraswgi_install_rm_homes }}"
+
+- name: remove_obsolete_homes | Remove obsolete Grid Infrastructure home
+  ansible.builtin.include_tasks: remove_obsolete_home.yml
+  loop: "{{ _oraswgi_install_rm_homes }}"
+  loop_control:
+    loop_var: _oraswgi_install_rm_home
