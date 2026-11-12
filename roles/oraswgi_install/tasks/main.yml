@@ -121,14 +121,28 @@
     - oracle_home_gi not in checkgiinstall.stdout
     - orasw_meta_primary_node | bool
 
+# CRS flag in the local inventory of each node (Grid Infrastructure: all nodes of the cluster)
+# gi_ignoreprereq: -ignoreSysPrereqs, e.g. for missing swap space
 - name: install_home_gi | Update Nodelist, set CRS=TRUE
-  ansible.builtin.shell: "{{ oracle_home_gi }}/oui/bin/runInstaller -updateNodeList ORACLE_HOME={{ oracle_home_gi }} CRS=TRUE"
-  # noqa command-instead-of-shell no-changed-when ignore-errors
+  ansible.builtin.command:
+    argv: "{{ __argv | reject('equalto', '') | list }}"
+  vars:
+    __argv:
+      - "{{ oracle_home_gi }}/oui/bin/runInstaller"
+      - -silent
+      - "{{ gi_ignoreprereq | bool | ternary('-ignoreSysPrereqs', '') }}"
+      - -updateNodeList
+      - -local
+      - "ORACLE_HOME={{ oracle_home_gi }}"
+      - CRS=TRUE
+  # noqa no-changed-when ignore-errors
   become: true
   become_user: "{{ _grid_install_user }}"
   when:
     - oracle_home_gi not in checkgiinstall.stdout
     - orasw_meta_primary_node | bool
+      or (_oraswgi_meta_configure_cluster | bool
+          and inventory_hostname in groups[orasw_meta_cluster_hostgroup])
   ignore_errors: true
   tags:
     - updatenodelist
