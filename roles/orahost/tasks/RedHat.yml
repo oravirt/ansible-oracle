@@ -149,7 +149,7 @@
         | flatten
         | selectattr('host', 'defined')
         | map(attribute='port', default=listener_port)
-        | list + (oracle_extra_firewall_ports | default([])) + (oracle_scan_port | default([]))
+        | list + (oracle_extra_firewall_ports | default([])) + ([oracle_scan_port] if oracle_scan_port is defined else [])
       ) | unique
     }}
   tags: iptables,firewalld
