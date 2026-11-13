@@ -1073,4 +1073,7 @@ It is a test environment, not a template for production:
   (`MemAvailable` + memory of running containers of the scenario), override with `MOLECULE_RAC_MIN_FREE_MB=<MB>`.
 
 Inventory: `extensions/molecule/shared_config/inventory/group_vars/rac` (`gi.yml`, `db.yml`) and `host_vars/rac-*.yml`. +
-`verify.yml` checks the cluster stack, SCAN, VIPs, ASM, voting files, OCR, disk groups and the open instances of the RAC databases.
+`verify.yml` checks the cluster stack, SCAN, VIPs, ASM, voting files, OCR, disk groups and the open instances of the RAC databases. +
+`verify.yml` uses the running home of Grid Infrastructure (`crs_home` in `/etc/oracle/olr.loc`). +
+`side_effect.yml`: Out-of-Place Patching of Grid Infrastructure (gold image 23.26.3 => 23.26.4, `root.sh` rolling),
+PDB `ORCLPDB1`, `tnsnames.ora`, `sqlnet.ora`, wallet and the module tests (`module_tests.yml`) on the 1st node.

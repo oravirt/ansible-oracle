@@ -1,11 +1,13 @@
 ---
-# Module tests for opitzconsulting.ansible_oracle, shared by the scenarios dbfs, dbfs-ol10 and has-ol9.
+# Module tests for opitzconsulting.ansible_oracle, shared by the scenarios dbfs, dbfs-ol10, has-ol9 and rac.
 # Imported by side_effect.yml of the scenario. The scenario specific variables (database,
 # ORACLE_HOME, module list, known bugs) are in <scenario>/module_tests.yml.
 # The tests are repeatable: every test removes its objects at the beginning and at the end.
 # See doc/development.adoc (chapter "Module tests") for usage, conventions and the result files.
+# mt_hosts (variable of import_playbook): hosts of the tests, default all.
+# RAC: the tests run on 1 node only, all instances share the same database.
 - name: Side-Effect - Module tests
-  hosts: all
+  hosts: "{{ mt_hosts | default('all') }}"
   gather_facts: true
   become: true
   become_user: oracle

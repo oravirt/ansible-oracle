@@ -1,0 +1,44 @@
+---
+# Scenario variables for the module tests (shared_config/module_tests)
+# Grid Infrastructure 26ai (cluster), RAC database RACCDB 26ai with PDB ORCLPDB1 in +DATA
+# The tests run on the 1st node only (mt_hosts in side_effect.yml), instance RACCDB1.
+mt_all_modules:
+  - oracle_directory
+  - oracle_user
+  - oracle_role
+  - oracle_profile
+  - oracle_grants
+  - oracle_privs
+  - oracle_tablespace
+  - oracle_sql
+  - oracle_parameter
+  # role test: init_parameters per instance (sid), typical for RAC
+  - oradb_manage_parameters
+  - oracle_job
+  - oracle_jobclass
+  - oracle_jobschedule
+  - oracle_jobwindow
+  - oracle_rsrc_consgroup
+  - oracle_stats_prefs
+  - oracle_awr
+  - oracle_facts
+  # oracle_services with Grid Infrastructure (srvctl), RAC: preferred instances
+  - oracle_services_gi
+  # redo log groups per thread
+  - oracle_redo
+  - oracle_pdb
+  # not in the list (Single Instance / Oracle Restart specific, see has-ol9):
+  # - oracle_asmdg, oraasm_manage_diskgroups: spare ASM disks, ASM instance +ASM
+  # - oracle_crs_listener: listener resource of Oracle Restart
+  # - oracle_db: creates Single Instance databases
+  # - oracle_datapatch
+
+mt_oracle_home: "{{ db_homes_config['db26-rac-ee']['oracle_home'] }}"
+mt_oracle_sid: RACCDB1
+# read-only ORACLE_HOME: tnsnames.ora, sqlnet.ora are in ORACLE_BASE_HOME
+mt_tns_admin: "/u01/app/oracle/homes/{{ db_homes_config['db26-rac-ee']['oracle_home_name'] }}/network/admin"
+mt_cdb: RACCDB
+mt_pdb: ORCLPDB1
+mt_datafile_dir: +DATA
+
+mt_known_bugs_scenario: {}
