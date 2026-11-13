@@ -84,8 +84,15 @@
     - name: oracle_pdb | verify saved state after create
       ansible.builtin.include_tasks: _sql.yml
       vars:
-        mt_sql: "select count(*) from dba_pdb_saved_states where con_name = '{{ _pdb_name }}';"
-        mt_sql_expect: "1"
+        # save state instances=all: 1 row per instance (RAC)
+        mt_sql: >-
+          select case when (select count(*) from dba_pdb_saved_states where con_name = '{{ _pdb_name }}')
+                         = (select count(*) from gv$instance)
+                      then 'ALL_INSTANCES'
+                      else (select to_char(count(*)) from dba_pdb_saved_states
+                            where con_name = '{{ _pdb_name }}') end
+          from dual;
+        mt_sql_expect: "ALL_INSTANCES"
         mt_sql_id: oracle_pdb.cdb.create_save_state_sql
 
     - name: oracle_pdb | close
