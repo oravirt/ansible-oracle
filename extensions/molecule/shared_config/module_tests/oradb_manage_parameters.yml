@@ -41,9 +41,13 @@
         end loop;
       end;
       /
-    # spfile entries (sorted by SID) | memory value
+    # spfile entries ('*', own instance, other instances) | memory value
+    # fixed order instead of 'order by sid': the expected values do not depend on the name of the
+    # own instance (e.g. DBHAS before MOLTEST2, but RACCDB1 after MOLTEST2)
+    # mt_sql_value = _mp_sid (not yet defined in this set_fact)
     _mp_state_sql: >-
-      select (select listagg(sid || '=' || value, ',') within group (order by sid)
+      select (select listagg(sid || '=' || value, ',') within group
+                (order by case sid when '*' then 0 when '{{ mt_sql_value }}' then 1 else 2 end, sid)
               from v$spparameter where name = '{{ _mp_par }}' and isspecified = 'TRUE')
              || '|' || (select value from v$parameter where name = '{{ _mp_par }}')
       from dual;
@@ -350,7 +354,8 @@
       ansible.builtin.include_tasks: _sql.yml
       vars:
         mt_sql: >-
-          select (select listagg(sid || '=' || value, ',') within group (order by sid)
+          select (select listagg(sid || '=' || value, ',') within group
+                    (order by case sid when '*' then 0 when '{{ _mp_sid }}' then 1 else 2 end, sid)
                   from v$spparameter where name = '{{ _mp_par }}' and isspecified = 'TRUE')
                  || '|' || (select ismodified from v$parameter where name = '{{ _mp_par }}')
           from dual;
