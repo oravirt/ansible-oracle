@@ -61,10 +61,10 @@ options:
             - V(read_only) - the PDB is opened read only (C(OPEN READ ONLY FORCE)).
             - V(restricted) - the PDB is opened in restricted mode
               (C(OPEN RESTRICTED FORCE)).
-            - For an existing PDB, the open mode and restricted flag in C(V$PDBS) are
-              compared with the intended state. The C(ALTER PLUGGABLE DATABASE)
-              statement is only executed on a difference and affects the current
-              instance only.
+            - For an existing PDB, the open mode and restricted flag of all instances
+              in C(GV$PDBS) are compared with the intended state. The
+              C(ALTER PLUGGABLE DATABASE ... INSTANCES=ALL) statement is only
+              executed on a difference and affects all instances (RAC).
             - V(absent) - the PDB is closed on all instances and dropped
               C(INCLUDING DATAFILES).
             - V(unplugged) - the PDB is closed on all instances, unplugged into the
@@ -418,9 +418,11 @@ def ensure_pdb_state(
     timezone,
 ):
     wanted_state = []
+    # gv$pdbs: state of all instances (RAC),
+    # 1 row only when all instances have the same state
     sql = (
-        'select lower(open_mode), lower(restricted) '
-        'from v$pdbs '
+        'select distinct lower(open_mode), lower(restricted) '
+        'from gv$pdbs '
         'where name = :name'
     )
     propsql = (
@@ -454,6 +456,9 @@ def ensure_pdb_state(
     elif state == 'restricted':
         wanted_state = [('read write', 'yes')]
         ensure_sql += 'open restricted force'
+    # RAC: change the state on all instances (ORA-16002 for open read only otherwise),
+    # also valid for a single instance like 'open instances=all' of create_pdb
+    ensure_sql += ' instances=all'
 
     # if def_tbs_type[0] != default_tablespace_type:
     #   deftbstypesql = 'alter database set default %s tablespace'
