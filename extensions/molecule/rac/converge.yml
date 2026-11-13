@@ -1,4 +1,63 @@
 ---
+# Grid Infrastructure + RAC database on 2 containers need a lot of memory.
+# The converge starts only, when at least molecule_rac_min_free_mb (default 12 GB) are available:
+#   MemAvailable of the docker host + memory used by running containers of this scenario
+#   (a converge of existing containers reuses their memory)
+# Override: MOLECULE_RAC_MIN_FREE_MB=<MB>
+- name: Check free memory on the docker host
+  hosts: localhost
+  gather_facts: false
+  become: false
+  vars:
+    molecule_rac_min_free_mb: "{{ lookup('ansible.builtin.env', 'MOLECULE_RAC_MIN_FREE_MB') | default(12288, true) | int }}"
+    _rac_containers: "{{ groups['all'] | difference(['localhost']) }}"
+  tasks:
+    - name: MemAvailable of the docker host
+      ansible.builtin.command:
+        argv: [awk, '/^MemAvailable:/ {print int($2 / 1024)}', /proc/meminfo]
+      register: _mem_available
+      changed_when: false
+
+    - name: Running containers of this scenario
+      ansible.builtin.command:
+        argv: [docker, ps, --format, '{% raw %}{{.Names}}{% endraw %}']
+      register: _docker_ps
+      changed_when: false
+
+    # MemUsage: '4.295GiB / 31.31GiB' => MB of the 1st value
+    - name: Memory used by running containers of this scenario
+      ansible.builtin.shell:
+        cmd: >-
+          set -o pipefail;
+          docker stats --no-stream --format '{% raw %}{{.MemUsage}}{% endraw %}' {{ _running | join(' ') }}
+          | awk '{v=$1; n=v+0; u=v; gsub(/[0-9.]/, "", u);
+                  f=1; if (u=="B") f=1/1048576; else if (u=="KiB" || u=="kB") f=1/1024;
+                  else if (u=="GiB" || u=="GB") f=1024; else if (u=="TiB" || u=="TB") f=1048576;
+                  s+=n*f} END {print int(s)}'
+        executable: /bin/bash
+      vars:
+        _running: "{{ _docker_ps.stdout_lines | intersect(_rac_containers) }}"
+      register: _mem_containers
+      changed_when: false
+      when: _running | length > 0
+
+    - name: Assert free memory for Grid Infrastructure and RAC
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _usable_mb | int >= molecule_rac_min_free_mb | int
+        success_msg: >-
+          {{ _usable_mb }} MB usable (MemAvailable {{ _mem_available.stdout }} MB
+          + {{ _containers_mb }} MB of running containers {{ _rac_containers | join(', ') }})
+        fail_msg: >-
+          Not enough memory for the scenario rac: {{ _usable_mb }} MB usable
+          (MemAvailable {{ _mem_available.stdout }} MB + {{ _containers_mb }} MB of running containers
+          {{ _rac_containers | join(', ') }}), {{ molecule_rac_min_free_mb }} MB needed.
+          Stop other scenarios or set MOLECULE_RAC_MIN_FREE_MB.
+      vars:
+        _containers_mb: "{{ _mem_containers.stdout | default(0, true) | int }}"
+        _usable_mb: "{{ _mem_available.stdout | int + _containers_mb | int }}"
+
 - name: Converge
   hosts: all
   gather_facts: true
