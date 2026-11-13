@@ -6,58 +6,1029 @@ toc::[]
 :sectnums:
 :sectnumlevels: 4
 
-== Setup ASM for Oracle Grid Infrastructure / Restart
+== Setup of Oracle Restart and Grid Infrastructure
 
-.Inventory Variables for ASM
-[options="header,footer"]
+This guide describes the setup of the software of Grid Infrastructure with `ansible-oracle` in 2 independent parts:
+
+* <<Oracle Restart>>: Grid Infrastructure for a Standalone Server, Single Instance databases with ASM on one host.
+* <<Grid Infrastructure (cluster)>>: Grid Infrastructure for a Cluster, the prerequisite for RAC and RAC One Node.
+
+Both parts are complete on their own.
+Some variables are described in both parts on purpose, because their meaning and their defaults differ between Oracle Restart and Grid Infrastructure.
+Read only the part you need.
+
+NOTE: Terms (Oracle Restart, Grid Infrastructure, RAC): see link:../featurelist.adoc[Featurelist]. +
+Both Oracle Restart and Grid Infrastructure use the software of Grid Infrastructure (`oracle_home_gi`).
+The variable `oracle_install_option_gi` decides what is configured.
+
+.Oracle Restart and Grid Infrastructure at a glance
+[options="header" cols="2,3,3"]
 |=======================
-|Value |Default |Description
-|`device_persistence`
-|empty string
-| Allowed values: `asmfd`, `asmlib`
-|`oracle_asm_disk_string`
-|`ORCL:*`
-| init.ora-Parameter for `asm_diskstring`.
-|`oracle_asm_init_dg`
-|`crs`
-| 1st Diskgroup for ASM SPFile.
-|`asm_diskgroups`
 |
-| Defines the ASM-Diskgroups. More Details below.
+|Oracle Restart
+|Grid Infrastructure (cluster)
+
+|`oracle_install_option_gi`
+|`HA_CONFIG`
+|`CRS_CONFIG`
+
+|State in `ansible-oracle`
+|supported and tested (19c and 26ai)
+|tested with 26ai, 2 nodes, Grid Infrastructure and a RAC database (molecule scenario `rac`). +
+Grid Infrastructure 19c and RAC One Node are not tested.
+
+|Hosts
+|every host is configured on its own
+|all nodes of the cluster are configured together +
+(inventory group `orasw_meta_cluster_hostgroup`)
+
+|Default of `oracle_home_gi`
+|`{{ oracle_base }}/{{ oracle_install_version_gi }}/grid`
+|`/u01/app/{{ oracle_install_version_gi }}/grid`
+
+|Default of `grid_base`
+|`oracle_base`
+|`/u01/app/grid/base`
+
+|Storage for ASM
+|local disks
+|shared disks, visible on all nodes
+
+|Network
+|no special requirements
+|public and private network, SCAN, VIP for each node
+
+|SSH user equivalence
+|not needed
+|configured by `orahost_ssh` for the grid user (and `oracle_user`)
 |=======================
+
+=== Playbooks and roles
+
+The same playbooks are used for Oracle Restart and Grid Infrastructure:
+
+[options="header" cols="1,2,4"]
+|=======================
+|Order |Playbook |Content for Oracle Restart / Grid Infrastructure
+
+|1
+|`opitzconsulting.ansible_oracle.os`
+|`orahost`: users, groups, kernel parameters, packages, firewall. +
+`orahost_storage`: partitions and device persistence (`asmlib`, `udev`) of the ASM disks. +
+`orahost_ssh`: SSH user equivalence between the nodes (Grid Infrastructure only).
+
+|2
+|`opitzconsulting.ansible_oracle.swgi`
+|`oraswgi_install`: installation and configuration of Grid Infrastructure (`gridSetup.sh`, `root.sh`, ConfigTools). +
+`oraswgi_manage_patches`: patches for `oracle_home_gi`. +
+`oraasm_manage_diskgroups`: all ASM disk groups of `asm_diskgroups` except `oracle_asm_init_dg`.
+
+|3
+|`opitzconsulting.ansible_oracle.swdb`
+|Installation of the RDBMS software (`db_homes_installed`).
+The version of a database home must not be newer than Grid Infrastructure.
+
+|4
+|`opitzconsulting.ansible_oracle.manage_db`
+|Listener, databases and PDBs.
+|=======================
+
+The playbooks use the variable `hostgroup` (default: `all`) as target hosts.
+
+=== Common basics for both parts
+
+==== Software of Grid Infrastructure
+
+[options="header" cols="2,2,5"]
+|=======================
+|Variable |Default |Description
+
+|`oracle_install_version_gi`
+|`19.3.0.0`
+|Base release of the software, e.g. `19.3.0.0` or `26.1.0.0`.
+It selects the response file template (`grid-install.rsp.<version>.j2`) and the task file of `oraswgi_install`.
+It is the base release, not the Release Update: a Golden Image with 19.33 is still `19.3.0.0`.
+
+|`oracle_sw_image_gi`
+|list of the base release images
+|List of installation media with `filename` and `version`.
+The entry with `version: oracle_install_version_gi` is unpacked into `oracle_home_gi`.
+
+|`oracle_install_image_gi`
+|not defined
+|Filename of the installation media.
+When it is defined, it is used instead of the `filename` from `oracle_sw_image_gi`, e.g. for a Golden Image (`gi_goldimage_26_03.zip`).
+
+|`oracle_sw_copy`, `is_sw_source_local`, `oracle_stage_remote`
+|
+|Source of the installation media (copied into `oracle_stage` or used directly from `oracle_stage_remote`).
+See link:Install-and-Patch-Settings.adoc[Install and Patch Settings].
+
+|`oracle_home_gi`
+|derived, see below
+|`ORACLE_HOME` of Grid Infrastructure.
+The default depends on `oracle_install_option_gi`:
+`oracle_home_gi_so` for Oracle Restart, `oracle_home_gi_cl` for Grid Infrastructure.
+Set `oracle_home_gi` directly when the path should not contain the base release, e.g. for Golden Images with a Release Update.
+|=======================
+
+==== Passwords
+
+[options="header" cols="2,2,5"]
+|=======================
+|Variable |Default |Description
+
+|`default_gipass`
+|`''`
+|Default password for `SYS` (SYSASM) and `ASMSNMP` of ASM.
+Mandatory, as long as `sysasmpassword` and `asmmonitorpassword` are not defined.
+
+|`sysasmpassword`
+|`{{ default_gipass }}`
+|Password of `SYS` in ASM (`sysasmPassword` in the response file).
+
+|`asmmonitorpassword`
+|`{{ default_gipass }}`
+|Password of `ASMSNMP` (`asmsnmpPassword` in the response file).
+|=======================
+
+==== Patching during the installation
+
+[options="header" cols="2,2,5"]
+|=======================
+|Variable |Default |Description
+
+|`apply_patches_gi`
+|`true`
+|Apply the patches from `gi_patches` to `oracle_home_gi`.
+
+|`patch_before_rootsh`
+|`true`
+|`true`: the Release Update (`opatchauto` patch with `state: present`) is applied by `gridSetup.sh -applyRU` before `root.sh`. +
+Only used together with `apply_patches_gi: true`.
+
+|`gi_patches`
+|`{}`
+|Patches for Grid Infrastructure per base release (`opatchauto`, `opatch`).
+See the example in role `oraswgi_meta` and link:Install-and-Patch-Settings.adoc[Install and Patch Settings].
+|=======================
+
+TIP: With a Golden Image, which already contains the Release Update, set `apply_patches_gi: false` and `patch_before_rootsh: false`.
+
+==== ASM disk groups
+
+`asm_diskgroups` defines all disk groups, for Oracle Restart and for Grid Infrastructure.
 
 .Example `asm_diskgroups`
 ----
-asm_diskgroups:        # ASM Diskgroups used for DB-storage. Should map to dict asm_storage_layout.
+asm_diskgroups:
+  - diskgroup: crs                   # oracle_asm_init_dg => created by gridSetup.sh
+    state: present
+    properties:
+      - {redundancy: external, ausize: 4}
+    attributes:
+      - {name: compatible.rdbms, value: 19.0.0.0.0}
+      - {name: compatible.asm, value: 23.0.0.0.0}
+    disk:
+      - {device: /dev/sdc, asmlabel: crs01}
+  - diskgroup: data                  # created by oraasm_manage_diskgroups
+    state: present
+    properties:
+      - {redundancy: external}
+    attributes:
+      - {name: compatible.rdbms, value: 19.0.0.0.0}
+      - {name: compatible.asm, value: 23.0.0.0.0}
+      - {name: au_size, value: 4M}
+    disk:
+      - {device: /dev/sdd, asmlabel: data01}
+----
+
+.Attributes of an entry in `asm_diskgroups`
+[options="header" cols="2,5"]
+|=======================
+|Attribute |Description
+
+|`diskgroup`
+|Name of the disk group (lower case in the inventory, ASM uses upper case).
+
+|`state`
+|`present` or `absent`.
+
+|`properties`
+|List with 1 dictionary: `redundancy` (`external`, `normal`, `high`) and `ausize` (in MB). +
+`ausize` in `properties` is used only for `oracle_asm_init_dg` (response file of `gridSetup.sh`).
+Use the attribute `au_size` for all other disk groups.
+
+|`attributes`
+|ASM attributes of the disk group (`name`, `value`), e.g. `compatible.asm`, `compatible.rdbms`, `au_size`.
+
+|`disk`
+|List of disks:
+
+* `device`: device of the disk (e.g. `/dev/sdc`).
+* `asmlabel`: label of the disk for `asmlib`, `udev` and `asmfd` (see `device_persistence`).
+* `failure_group` (optional): name of the failure group. Disks with the same name are in the same failure group.
+Without `failure_group`, ASM creates a failure group for every disk.
+For `oracle_asm_init_dg` set `failure_group` for all disks or for none.
+* `quorum` (optional): `true` for a quorum failure group (voting files only). Must be the same for all disks of a failure group.
+|=======================
+
+`oracle_asm_init_dg` (default: `crs`) is the 1st disk group.
+It must be an entry of `asm_diskgroups`.
+It is created during the configuration of Grid Infrastructure (`gridSetup.sh`, `root.sh`) and contains the SPFile of ASM,
+with Grid Infrastructure additionally the OCR and the voting files.
+All other disk groups are created later by `oraasm_manage_diskgroups`.
+
+==== Device persistence of the ASM disks
+
+`device_persistence` defines how the ASM disks are made persistent.
+It controls 3 things together with `oracle_asm_disk_string`:
+
+. the preparation of the disks by `orahost_storage` or `oraswgi_install`,
+. the path of each disk in the response file of `gridSetup.sh` (`diskList` of `oracle_asm_init_dg`),
+. the ASM discovery string (`asm_diskstring`, `diskString` in the response file).
+
+.`device_persistence`
+[options="header" cols="1,3,2,2"]
+|=======================
+|Value |Preparation |Path of a disk |Discovery string
+
+|`''` (default)
+|nothing, the devices must already exist with owner `_grid_install_user` and group `asmadmin_group`.
+|`device`
+|`oracle_asm_disk_string`
+
+|`asmlib`
+|`orahost_storage`: `oracleasm createdisk <asmlabel> <device><partition_suffix>`
+|`oracle_asm_disk_string` without trailing `*` + `asmlabel` (upper case), e.g. `ORCL:DATA01`
+|`oracle_asm_disk_string` (default: `ORCL:*`)
+
+|`udev`
+|`orahost_storage`: udev rules with a symlink `<oracle_asm_disk_string without leading /dev/><asmlabel>` per disk
+|`oracle_asm_disk_string` + `asmlabel` => `oracle_asm_disk_string` must end with `/` (no `*`), e.g. `/dev/oracle/`
+|`oracle_asm_disk_string`
+
+|`asmfd`
+|`oraswgi_install`: installation and configuration of the ASM Filter Driver, `asmcmd afd_label <asmlabel> <device>1`
+|`AFD:<ASMLABEL>`
+|`oracle_asmfd_disk_string` (mandatory for `asmfd`)
+|=======================
+
+[options="header" cols="2,2,5"]
+|=======================
+|Variable |Default |Description
+
+|`oracle_asm_disk_string`
+|`ORCL:*`
+|ASM discovery string (`asm_diskstring`).
+The default fits `asmlib` only. Set it for all other values of `device_persistence`, e.g. `/dev/oracleasm/*` for `''`.
+
+|`oracle_asmfd_disk_string`
+|not defined
+|ASM discovery string with `asmfd`, e.g. `AFD:*`.
+
+|`partition_devices`
+|`true`
+|Create 1 partition on every disk of `asm_diskgroups` with `parted` (GPT).
+`asmlib` uses `<device><partition_suffix>`, `asmfd` uses `<device>1`.
+Set `false` when the disks must not be partitioned (e.g. `device_persistence: ''` with existing devices).
+|=======================
+
+WARNING: Only `device_persistence: ''` is tested by the molecule scenarios of `ansible-oracle`.
+`asmlib`, `udev` and `asmfd` are not tested with Oracle Linux 9 and 26ai.
+
+== Oracle Restart
+
+Oracle Restart is Grid Infrastructure for a Standalone Server (`oracle_install_option_gi: HA_CONFIG`).
+It manages ASM, listeners and Single Instance databases on one host.
+
+Oracle Restart is supported and tested with 19c and 26ai (molecule scenario `has-ol9`).
+Every host is configured on its own; there is no dependency between hosts.
+
+=== Requirements
+
+* Oracle Linux / RHEL 8 or 9, see link:../featurelist.adoc[Featurelist].
+* Local disks for ASM (at least for `oracle_asm_init_dg`).
+* `oracle_install_version_gi` must be the same or newer than the version of all database homes.
+
+=== Example inventory
+
+.`host_vars/<host>/restart.yml`
+----
+oracle_install_option_gi: HA_CONFIG
+oracle_install_version_gi: 26.1.0.0
+oracle_install_image_gi: gi_goldimage_26_03.zip   # Golden Image with RU 23.26.3
+oracle_home_gi: /u01/app/oracle/product/26/restart_26.03
+
+apply_patches_gi: false        # the Golden Image contains the Release Update
+patch_before_rootsh: false
+
+role_separation: false         # GI software owned by oracle_user
+default_gipass: "{{ vault_default_gipass }}"
+
+device_persistence: ''
+partition_devices: false
+oracle_asm_disk_string: /dev/oracleasm/*
+oracle_asm_init_dg: data
+
+asm_diskgroups:
   - diskgroup: data
     state: present
     properties:
       - {redundancy: external, ausize: 4}
     attributes:
-      - {name: compatible.rdbms, value: 11.2.0.4.0}
-      - {name: compatible.asm, value: "19.0.0.0.0"}
+      - {name: compatible.rdbms, value: 19.0.0.0.0}
+      - {name: compatible.asm, value: 23.0.0.0.0}
     disk:
-      - {device: /dev/sdc, asmlabel: data01}
+      - {device: /dev/oracleasm/data01, asmlabel: data01}
+  - diskgroup: fra
+    state: present
+    properties:
+      - {redundancy: external}
+    attributes:
+      - {name: compatible.rdbms, value: 19.0.0.0.0}
+      - {name: compatible.asm, value: 23.0.0.0.0}
+      - {name: au_size, value: 4M}
+    disk:
+      - {device: /dev/oracleasm/fra01, asmlabel: fra01}
 ----
 
-== Setup Real Application Clusters (RAC)
+=== Installation type
 
-IMPORTANT: The documentation is heavily work in progress.
-
-=== Inventory Variables
-
-.Inventory Variables for Cluster configuration
-[options="header,footer"]
+[options="header" cols="2,2,5"]
 |=======================
-|Value |Default |Description
+|Variable |Value |Description
+
 |`oracle_install_option_gi`
-|empty string
-| Allowed values: `CRS_CONFIG`, `HA_CONFIG`
-| `oracle_node_vip`
-| {{ ansible_hostname }}{{ oracle_vip }}
-| Defines the VIP of the clusternode.
-| `oracle_vip`
-| `-vip`
-| Suffix for VIP when `oracle_node_vip` is not defined.
+|`HA_CONFIG`
+|Configure Oracle Restart.
+An empty string (default) means: no Grid Infrastructure software on the host, databases use file systems.
 |=======================
 
+With `HA_CONFIG`:
+
+* `orasw_meta_primary_node` is always `true`: every host runs all steps itself.
+* `orasw_meta_cluster_hostgroup`, `oracle_scan`, `oracle_vip` and all network variables of Grid Infrastructure are not used.
+
+=== ORACLE_HOME and ORACLE_BASE
+
+[options="header" cols="2,3,4"]
+|=======================
+|Variable |Default for Oracle Restart |Description
+
+|`oracle_base`
+|`/u01/app/oracle`
+|`ORACLE_BASE` of the databases.
+
+|`grid_base`
+|`{{ oracle_base }}`
+|`ORACLE_BASE` of Oracle Restart. For Oracle Restart it is the same as `oracle_base` by default.
+
+|`oracle_home_gi_so`
+|`{{ oracle_base }}/{{ oracle_install_version_gi }}/grid`
+|Default for `oracle_home_gi` with Oracle Restart (`so` = stand alone).
+
+|`oracle_home_gi`
+|`{{ oracle_home_gi_so }}`
+|`ORACLE_HOME` of Oracle Restart.
+Recommended: an own path per Release Update, e.g. `/u01/app/oracle/product/26/restart_26.03`.
+That is the prerequisite for the switch into a new home, see below.
+
+|`oracle_inventory_loc`
+|`/u01/app/oraInventory`
+|Central inventory.
+|=======================
+
+=== Users and groups
+
+[options="header" cols="2,2,5"]
+|=======================
+|Variable |Default |Description
+
+|`role_separation`
+|`false`
+|`false`: Oracle Restart is installed and owned by `oracle_user`. +
+`true`: Oracle Restart is installed and owned by `grid_user`.
+
+|`oracle_user`
+|`oracle`
+|Owner of the database software.
+
+|`grid_user`
+|`grid`
+|Owner of Oracle Restart with `role_separation: true`.
+
+|`asmadmin_group`, `asmdba_group`, `asmoper_group`
+|`asmadmin`, `asmdba`, `asmoper`
+|OS groups OSASM, OSDBA and OSOPER for ASM (`OSASM`, `OSDBA`, `OSOPER` in the response file).
+The ASM disks must be owned by the install user and `asmadmin_group`.
+|=======================
+
+The install user of Oracle Restart is derived from both variables:
+`_grid_install_user` is `grid_user` with `role_separation: true`, otherwise `oracle_user`.
+It is the owner of `oracle_home_gi`, of `grid_base` and of the ASM disks.
+
+=== Installation steps
+
+`oraswgi_install` executes the following steps.
+Steps 5 to 8 are only executed when `/etc/oracle/olr.loc` does not exist (Oracle Restart is not configured yet).
+
+. Unpack the installation media into `oracle_home_gi`, when the home is not registered in the central inventory.
+. Install `cvuqdisk` (only with `device_persistence: asmfd`).
+. Create the response file `<oracle_rsp_stage>/grid-<oracle_cluster_name>.rsp`.
+. Run `cluvfy` (skipped with `gi_ignoreprereq: true`).
+. With `device_persistence: asmfd`: configure the ASM Filter Driver and label the disks.
+. `gridSetup.sh -silent -responseFile ...` (with `-applyRU`, when `apply_patches_gi` and `patch_before_rootsh` are `true`).
+. `orainstRoot.sh` and `root.sh`. `root.sh` configures Oracle Restart and creates `oracle_asm_init_dg`.
+. `gridSetup.sh -executeConfigTools` (`run_configtoolallcommand: true`): listener `LISTENER` in `oracle_home_gi`, ASM post configuration, CVU.
+. CRS flag (`CRS=TRUE`) of `oracle_home_gi` in the central inventory.
+. Patches (`oraswgi_manage_patches`) and all other disk groups (`oraasm_manage_diskgroups`).
+
+=== Prerequisite checks and ConfigTools
+
+[options="header" cols="2,2,5"]
+|=======================
+|Variable |Default |Description
+
+|`gi_ignoreprereq`
+|`false`
+|`true`: `cluvfy` is not executed and `gridSetup.sh` is started with `-ignorePrereq`.
+Failures of the Cluster Verification Utility (CVU) in `-executeConfigTools` are ignored as well.
+Failures of all other configuration assistants (NETCA, ASMCA) still stop the installation.
+`runInstaller -updateNodeList` is started with `-ignoreSysPrereqs` (e.g. for missing swap space).
+
+|`run_configtoolallcommand`
+|`true`
+|Run `gridSetup.sh -executeConfigTools` after `root.sh`.
+|=======================
+
+=== Listener and databases with Oracle Restart
+
+Databases on Oracle Restart are created by `oradb_manage_db` (playbook `manage_db`) with `storage_type: ASM`.
+
+* The listener in `oracle_home_gi` is defined in `listener_installed` with `use_gi_home: true` (no `home`).
+  The `ORACLE_HOME` of Oracle Restart is read from `/etc/oracle/olr.loc`.
+* A listener in a database home is defined with `home` and is registered in Oracle Restart with `srvctl`.
+* The `ORACLE_HOME` of a database must not be newer than `oracle_home_gi`.
+* `db_create_file_dest` and `db_recovery_file_dest` in `init_parameters` point to the disk groups (e.g. `+DATA`, `+FRA`).
+
+----
+listener_installed:
+  - listener_name: LISTENER
+    use_gi_home: true
+    state: present
+
+oracle_databases:
+  - home: db19-gi-ee
+    oracle_db_name: DBHAS
+    oracle_db_type: SI
+    storage_type: ASM
+    init_parameters:
+      - {name: db_create_file_dest, value: '+DATA', scope: both, state: present}
+      - {name: db_recovery_file_dest, value: '+FRA', scope: both, state: present}
+      ...
+----
+
+=== Out-of-Place Patching of Oracle Restart
+
+With 26ai the home of Oracle Restart can be switched into a new `oracle_home_gi` (new Release Update),
+see link:out_of_place_patching.adoc[Out-of-Place Patching].
+Obsolete homes can be removed with `oraswgi_install_remove_obsolete_homes: true`.
+
+== Grid Infrastructure (cluster)
+
+Grid Infrastructure for a Cluster (`oracle_install_option_gi: CRS_CONFIG`) is the prerequisite for RAC and RAC One Node.
+
+IMPORTANT: Grid Infrastructure and a RAC database are tested with 26ai, 2 nodes on Oracle Linux 9
+(molecule scenario `rac`, see <<Test environment: molecule scenario rac>>). +
+Grid Infrastructure 19c, RAC databases 19c and RAC One Node are not tested.
+
+All nodes of a cluster are configured together in one play.
+Most steps run on the 1st node only; `gridSetup.sh` copies the software to the other nodes with SSH.
+
+=== Requirements
+
+* All nodes in one inventory group (`orasw_meta_cluster_hostgroup`), all nodes in the same play.
+* Shared disks for ASM, visible with the same path and the same owner on all nodes.
+* 2 networks with the *same interface names on all nodes*:
+** public network: IP of the node, VIP of every node, SCAN,
+** private network: interconnect (and ASM network with Flex ASM).
+* Name resolution of the nodes, the VIPs and the SCAN on all nodes (DNS or `/etc/hosts`).
+  The hostname of a node must resolve to its public IP only.
+* `sshd` on all nodes and SSH logins allowed for the grid user (and `oracle_user`).
+* Time synchronization (chrony). Without it, the Cluster Time Synchronization Service (CTSS) runs in active mode.
+
+=== Inventory structure
+
+The cluster is defined by an inventory group.
+`orasw_meta_cluster_hostgroup` contains the name of this group.
+The order of the hosts in the group is important: the 1st host is the primary node.
+
+.`hosts.yml`
+----
+all:
+  children:
+    rac:                  # orasw_meta_cluster_hostgroup
+      hosts:
+        rac-1:            # primary node: gridSetup.sh, 1st root.sh
+        rac-2:
+----
+
+.`group_vars/rac/gi.yml`
+----
+oracle_install_option_gi: CRS_CONFIG
+oracle_install_version_gi: 26.1.0.0
+oracle_install_image_gi: gi_goldimage_26_03.zip
+oracle_home_gi: /u01/app/gridinfra/26.03
+
+orasw_meta_cluster_hostgroup: rac
+oracle_cluster_name: cluster-rac
+oracle_gi_cluster_type: STANDARD
+
+oracle_scan: rac-scan.example.com
+oracle_scan_port: 1521
+oracle_gi_nic_pub: eth0
+oracle_gi_nic_priv: eth1
+
+role_separation: true          # grid user for GI, oracle user for the databases
+default_gipass: "{{ vault_default_gipass }}"
+
+apply_patches_gi: false
+patch_before_rootsh: false
+
+device_persistence: udev      # not tested, see 'Device persistence of the ASM disks'
+partition_devices: true
+oracle_asm_disk_string: /dev/oracle/
+oracle_asm_init_dg: crs
+
+asm_diskgroups:
+  - diskgroup: crs
+    state: present
+    properties:
+      - {redundancy: normal, ausize: 4}
+    attributes:
+      - {name: compatible.rdbms, value: 19.0.0.0.0}
+      - {name: compatible.asm, value: 23.0.0.0.0}
+    disk:
+      - {device: /dev/sdc, asmlabel: crs01, failure_group: fg1}
+      - {device: /dev/sdd, asmlabel: crs02, failure_group: fg2}
+      - {device: /dev/sde, asmlabel: crs03, failure_group: fg3}
+  - diskgroup: data
+    state: present
+    properties:
+      - {redundancy: external}
+    attributes:
+      - {name: compatible.rdbms, value: 19.0.0.0.0}
+      - {name: compatible.asm, value: 23.0.0.0.0}
+      - {name: au_size, value: 4M}
+    disk:
+      - {device: /dev/sdf, asmlabel: data01}
+----
+
+.`host_vars/rac-1/gi.yml` (`rac-2` accordingly)
+----
+oracle_node_vip: rac-1-vip.example.com
+----
+
+=== Installation type and cluster
+
+[options="header" cols="2,2,5"]
+|=======================
+|Variable |Default |Description
+
+|`oracle_install_option_gi`
+|`''`
+|`CRS_CONFIG`: configure Grid Infrastructure for a Cluster.
+
+|`orasw_meta_cluster_hostgroup`
+|`''`
+|Name of the inventory group with all nodes of the cluster.
+Mandatory for `CRS_CONFIG`; the group must exist in the inventory (assert in `orahost_meta`).
+
+|`orasw_meta_primary_node`
+|derived
+|`true` for the 1st host of `groups[orasw_meta_cluster_hostgroup]`, `false` for all other nodes.
+Do not set it in the inventory.
+
+|`oracle_cluster_name`
+|`{{ orasw_meta_cluster_hostgroup }}`
+|Name of the cluster (`clusterName` in the response file).
+Oracle allows at most 15 characters: letters, digits and `-`, starting with a letter.
+Set it explicitly when the group name contains `_` or is too long.
+It is also part of the name of the response file (`grid-<oracle_cluster_name>.rsp`).
+
+|`oracle_gi_cluster_type`
+|`STANDARD`
+|Type of the cluster: `STANDARD` or `STANDALONE` (assert in `oraswgi_install`).
+Only `STANDARD` is tested.
+
+|`oracle_asm_storage_option`
+|`FLEX_ASM_STORAGE` (12.2+)
+|Storage option of ASM in the response file.
+It changes the usage of the private interface in `networkInterfaceList`, see <<Networks>>.
+
+|=======================
+
+==== Primary node and the other nodes
+
+`orasw_meta_primary_node` decides which node executes a step:
+
+[options="header" cols="5,1,1"]
+|=======================
+|Step |Primary node |Other nodes
+
+|Users, groups, kernel parameters, packages (`orahost`)
+|x
+|x
+
+|Partitions of the ASM disks (`partition_devices`), `asmlib createdisk`
+|x
+|
+
+|udev rules (`device_persistence: udev`)
+|x
+|x
+
+|SSH user equivalence (`orahost_ssh`)
+|x
+|x
+
+|Unpack the installation media into `oracle_home_gi`
+|x
+|
+
+|Install `cvuqdisk` (copied from the primary node via the Ansible controller)
+|x
+|x
+
+|Response file, `cluvfy`, `gridSetup.sh` (copies the home to all nodes)
+|x
+|
+
+|`orainstRoot.sh`
+|x
+|x
+
+|`root.sh`: 1st on the primary node, then on the other nodes one after the other (`throttle: 1`)
+|x
+|x
+
+|`gridSetup.sh -executeConfigTools`
+|x
+|
+
+|CRS flag of `oracle_home_gi` in the central inventory (`runInstaller -updateNodeList -local`)
+|x
+|x
+
+|Disk groups (`oraasm_manage_diskgroups`)
+|x
+|
+|=======================
+
+IMPORTANT: Run the playbooks always for all nodes of the cluster.
+Many steps on the other nodes use facts or results of the primary node (`hostvars`).
+
+=== ORACLE_HOME and ORACLE_BASE
+
+[options="header" cols="2,3,4"]
+|=======================
+|Variable |Default for Grid Infrastructure |Description
+
+|`oracle_home_gi_cl`
+|`/u01/app/{{ oracle_install_version_gi }}/grid`
+|Default for `oracle_home_gi` with Grid Infrastructure (`cl` = cluster).
+
+|`oracle_home_gi`
+|`{{ oracle_home_gi_cl }}`
+|`ORACLE_HOME` of Grid Infrastructure. Same path on all nodes.
+It must not be below `grid_base` or `oracle_base`: `root.sh` changes the owner of the home and its parent directories to `root`.
+
+|`grid_base`
+|`/u01/app/grid/base`
+|`ORACLE_BASE` of Grid Infrastructure. It must differ from `oracle_base` with `role_separation: true` (assert in `orasw_meta`).
+
+|`oracle_base`
+|`/u01/app/oracle`
+|`ORACLE_BASE` of the databases.
+|=======================
+
+=== Users and groups
+
+The variables are the same as for Oracle Restart (`role_separation`, `grid_user`, `oracle_user`, `asmadmin_group`, ...).
+For Grid Infrastructure `role_separation: true` is recommended (and tested):
+
+* `grid_user` owns `oracle_home_gi`, `grid_base` and the ASM disks,
+* `oracle_user` owns the database homes.
+
+The install user `_grid_install_user` is `grid_user` with `role_separation: true`, otherwise `oracle_user`.
+
+=== Networks
+
+==== Public and private network
+
+[options="header" cols="2,2,5"]
+|=======================
+|Variable |Default |Description
+
+|`oracle_gi_nic_pub`
+|`eth0`
+|Interface of the public network.
+
+|`oracle_gi_nic_priv`
+|`eth1`
+|Interface of the private network (interconnect).
+|=======================
+
+Both interfaces must exist with an IPv4 address on all nodes and have the *same name on all nodes*.
+The response file is created on the primary node from its facts (`ansible_<interface>.ipv4.network`):
+
+----
+networkInterfaceList=<oracle_gi_nic_pub>:<public network>:1,<oracle_gi_nic_priv>:<private network>:5
+----
+
+The interface type of the private network depends on `oracle_asm_storage_option`:
+
+* `FLEX_ASM_STORAGE` (default for 12.2+): `5` = interconnect and ASM network,
+* `LOCAL_ASM_STORAGE`: `2` = interconnect only.
+
+Grid Infrastructure uses Highly Available IP addresses (HAIP, `169.254.x.x`) on the private interface.
+The private network must allow these addresses between the nodes (no filter on the subnet of the private network).
+
+NOTE: `configure_interconnect` and `oracle_ic_net` of `orahost` write `ifcfg` files of the network scripts.
+They are not usable with Oracle Linux 9. Configure the private network outside of `ansible-oracle`.
+
+==== SCAN
+
+[options="header" cols="2,2,5"]
+|=======================
+|Variable |Default |Description
+
+|`oracle_scan`
+|not defined
+|Name of the Single Client Access Name (`scanName`). Mandatory for `CRS_CONFIG` (assert in `oraswgi_install`).
+`scanType` is always `LOCAL_SCAN`.
+
+|`oracle_scan_port`
+|`1521`
+|Port of the SCAN listener. `orahost` opens it in `firewalld` together with the listener ports
+(`firewall_open_listener_ports`, default `true`).
+|=======================
+
+The SCAN should resolve to 3 IPs in DNS.
+A SCAN with 1 IP in `/etc/hosts` works, but the Cluster Verification Utility reports `PRVG-1101` (see <<Prerequisite checks and ConfigTools for the cluster>>).
+
+==== VIPs of the nodes
+
+The response file contains every node of `orasw_meta_cluster_hostgroup` with its VIP:
+
+----
+clusterNodes=<ansible_fqdn of node 1>:<VIP of node 1>,<ansible_fqdn of node 2>:<VIP of node 2>
+----
+
+[options="header" cols="2,2,5"]
+|=======================
+|Variable |Default |Description
+
+|`oracle_node_vip` (host variable)
+|not defined
+|Name of the VIP of this node, e.g. `rac-1-vip.example.com`.
+Recommended: set it in `host_vars` for every node.
+
+|`oracle_vip`
+|`-vip`
+|Suffix for the VIP, when `oracle_node_vip` is not defined:
+`<ansible_hostname><oracle_vip>[.<ansible_domain>]`, e.g. `rac-1-vip.example.com`.
+|=======================
+
+==== Name resolution
+
+Without DNS, `orahost` can write the entries into `/etc/hosts`:
+
+[options="header" cols="2,2,5"]
+|=======================
+|Variable |Default |Description
+
+|`configure_etc_hosts`
+|`false`
+|`true`: add `<etc_hosts_ip> <ansible_hostname> <ansible_fqdn>` of the node and all `etc_hosts_entries` to `/etc/hosts`.
+
+|`etc_hosts_ip`
+|`ansible_default_ipv4.address`
+|IP of the node in `/etc/hosts`. Must be the public IP.
+
+|`etc_hosts_entries`
+|`[]`
+|Additional entries, e.g. other nodes, VIPs and the SCAN (`fqdn`, `ip`, `aliases`).
+|=======================
+
+----
+configure_etc_hosts: true
+etc_hosts_entries:
+  - {fqdn: rac-1.example.com, ip: 192.168.56.11}
+  - {fqdn: rac-2.example.com, ip: 192.168.56.12}
+  - {fqdn: rac-1-vip.example.com, ip: 192.168.56.21}
+  - {fqdn: rac-2-vip.example.com, ip: 192.168.56.22}
+  - {fqdn: rac-scan.example.com, ip: 192.168.56.30}
+----
+
+IMPORTANT: The hostname must resolve to exactly 1 IP (the public IP) on all nodes.
+A 2nd entry with the private IP stops `gridSetup.sh` with `PRVH-1541` / `PRVG-13632`.
+
+The Grid Naming Service (GNS) is not supported: `configureGNS` is always `false` in the response file.
+
+=== SSH user equivalence
+
+`gridSetup.sh` copies `oracle_home_gi` from the primary node to the other nodes with SSH.
+`orahost_ssh` (playbook `os`) configures the user equivalence automatically for `CRS_CONFIG`
+for `oracle_user` and, with `role_separation: true`, for `grid_user`:
+
+* creates a key pair per user and node (`orahost_ssh_key_type`, default `rsa`, `orahost_ssh_key_size`, default `4096`),
+* adds the public keys of all nodes into `authorized_keys` on all nodes,
+* adds the host keys (`ssh-keyscan -t <orahost_ssh_hostkeytypes>` for `ansible_hostname`) into `known_hosts` on all nodes.
+
+`configure_ssh` is not needed for Grid Infrastructure.
+
+`sshd` must run on all nodes and allow logins of these users.
+Typical failures: `/run/nologin` exists, `AllowUsers` in `sshd_config`.
+`gridSetup.sh` stops with `PRVF-4098 : User equivalence not found for node`.
+
+=== Shared storage for ASM
+
+The ASM disks must be shared between all nodes:
+
+* Every device of `asm_diskgroups` must exist on every node with the same path.
+  With `device_persistence: ''` the owner (`_grid_install_user`) and the group (`asmadmin_group`) must be set before `gridSetup.sh`.
+* Partitions (`partition_devices`) and `asmlib` labels are created on the primary node only.
+* `oracle_asm_init_dg` contains the OCR and the voting files.
+  The number of voting files depends on the redundancy: `external` 1, `normal` 3, `high` 5 disks (failure groups).
+  With `normal` and 2 storage systems use a quorum failure group (`quorum: true`) for the 3rd voting file.
+
+=== Prerequisite checks and ConfigTools for the cluster
+
+[options="header" cols="2,2,5"]
+|=======================
+|Variable |Default |Description
+
+|`gi_ignoreprereq`
+|`false`
+|`true`: no `cluvfy` before the installation, `gridSetup.sh -ignorePrereq`,
+failures of the post check with CVU in `-executeConfigTools` are ignored
+(e.g. `PRVG-1101` for a SCAN without DNS), `runInstaller -updateNodeList -ignoreSysPrereqs`.
+Failures of NETCA or ASMCA still stop the installation.
+
+|`run_configtoolallcommand`
+|`true`
+|Run `gridSetup.sh -executeConfigTools` on the primary node after `root.sh` on all nodes.
+|=======================
+
+TIP: Start with `gi_ignoreprereq: false`.
+Use `true` only for known and accepted failures of `cluvfy`, e.g. in test environments.
+
+=== RAC databases
+
+A RAC database needs 2 things on top of Grid Infrastructure:
+an `ORACLE_HOME` on all nodes (playbook `swdb`) and the database itself (playbook `manage_db`).
+
+==== ORACLE_HOME of a RAC database
+
+The database home is defined in `db_homes_config` and installed with `db_homes_installed`, as for Single Instance databases.
+`oraswdb_install` decides from `oracle_databases` how the home is installed:
+when a database with `oracle_db_type: RAC` or `RACONENODE` uses the home, it is installed as cluster home.
+
+[options="header" cols="5,1,1"]
+|=======================
+|Step |Primary node |Other nodes
+
+|Unpack the installation media into the `ORACLE_HOME`
+|x
+|
+
+|`runInstaller` with `clusterNodes` = all hosts of `orasw_meta_cluster_hostgroup` (copies the home to all nodes)
+|x
+|
+
+|`root.sh` of the database home (other nodes only after `runInstaller` on the primary node)
+|x
+|x
+|=======================
+
+* The version of the database home must not be newer than Grid Infrastructure,
+  e.g. a database home with 23.26.3 needs Grid Infrastructure with 23.26.3 or newer.
+* `oracle_databases` must be defined for `swdb`, not only for `manage_db`:
+  without a RAC database in `oracle_databases`, the home is installed as Single Instance home on every node.
+* All databases of a home must have the same `oracle_db_type` (assert in `orasw_meta`).
+* Read-Only Oracle Homes (`readonly_home: true` with `oracle_home_name`) are supported for RAC as well.
+
+.`group_vars/rac/db.yml`: database home
+----
+db_homes_config:
+  db26-rac-ee:
+    version: 26.1.0.0
+    oracle_home: /u01/app/oracle/product/26/db_26.03
+    imagename: db_home_26.03.zip      # Golden Image with RU 23.26.3
+    edition: EE
+    readonly_home: true
+    oracle_home_name: db2603racee
+
+db_homes_installed:
+  - home: db26-rac-ee
+    state: present
+    apply_patches: false
+----
+
+==== Database
+
+`oradb_manage_db` creates the database with `dbca` on the primary node:
+
+* `nodelist` in the response file of `dbca` contains all hosts of `orasw_meta_cluster_hostgroup`.
+* The instances are named `<oracle_db_name><n>` (e.g. `RACCDB1` on the 1st node, `RACCDB2` on the 2nd node).
+* `dbca` registers the database in Grid Infrastructure (`srvctl config database`), the database is administrator managed.
+* `/etc/oratab` gets an entry `<oracle_db_name>:<ORACLE_HOME>:N` on all nodes (start and stop by Clusterware, not by `dbstart`).
+
+[options="header" cols="2,2,5"]
+|=======================
+|Attribute in `oracle_databases` |Value |Description
+
+|`oracle_db_type`
+|`RAC`
+|RAC database on all nodes of `orasw_meta_cluster_hostgroup`. (`RACONENODE` is not tested.)
+
+|`storage_type`
+|`ASM`
+|The datafiles are in the disk group of `db_create_file_dest`.
+
+|`init_parameters`
+|
+|`local_listener` is not needed: Clusterware sets `local_listener` (VIP of the node) and `remote_listener` (SCAN).
+The assert for `local_listener` applies to Single Instance databases only. +
+`db_create_file_dest`, `db_recovery_file_dest` (with `dbca: false` for `db_recovery_file_dest_size`),
+`processes`, `sga_target`, `pga_aggregate_target` and `control_management_pack_access` are mandatory as for every database.
+|=======================
+
+[options="header" cols="2,2,5"]
+|=======================
+|Variable |Default |Description
+
+|`oradb_manage_db_dbca_ignore_prereq_failure`
+|`{{ gi_ignoreprereq }}`
+|`true`: `dbca -ignorePrereqFailure`. `dbca` executes its prerequisite checks for RAC databases (e.g. SCAN, runlevel),
+but failures do not stop the creation of the database.
+The default follows `gi_ignoreprereq`.
+|=======================
+
+.`group_vars/rac/db.yml`: database
+----
+oracle_databases:
+  - home: db26-rac-ee
+    oracle_db_name: RACCDB
+    oracle_db_type: RAC
+    storage_type: ASM
+    oracle_database_type: MULTIPURPOSE
+    redolog_size: 50M
+    redolog_groups: 2
+    listener_port: 1521
+    archivelog: false
+    flashback: false
+    force_logging: false
+    state: present
+    init_parameters:
+      - {name: max_pdbs, value: '3', scope: both, state: present}
+      - {name: control_management_pack_access, value: 'NONE', scope: both, state: present}
+      - {name: db_create_file_dest, value: '+DATA', scope: both, state: present}
+      - {name: db_recovery_file_dest_size, value: '8G', scope: both, state: present, dbca: false}
+      - {name: db_recovery_file_dest, value: '+FRA', scope: both, state: present}
+      - {name: pga_aggregate_target, value: '256M', scope: both, state: present}
+      - {name: processes, value: '320', scope: spfile, state: present}
+      - {name: sga_target, value: '2560M', scope: spfile, state: present}
+----
+
+Sizing hints from the tests with 26ai:
+
+* `dbca` checks the free space of the disk group of the Fast Recovery Area before the creation
+  (`DBT-06604`, about 13 GB for a new Container Database), independent from `db_recovery_file_dest_size`.
+* `sga_target: 1536M` was too small: `datapatch` during `dbca` failed with `ORA-04031` in the java pool and the instance hung.
+  `2560M` works.
+
+=== Limitations
+
+* Out-of-Place Patching (switch into a new `oracle_home_gi`) is supported for Oracle Restart only.
+  `oraswgi_install` stops with an assert, when `oracle_home_gi` differs from the running home of Grid Infrastructure.
+  The switch of a RAC database into a new `ORACLE_HOME` is not supported either.
+* `oraswgi_install_remove_obsolete_homes` is supported for Oracle Restart only.
+* RAC databases are tested with 26ai only (2 nodes, administrator managed, Container Database without PDB).
+* RAC One Node is not tested.
+* Grid Infrastructure 19c is not tested.
+
+=== Test environment: molecule scenario rac
+
+The molecule scenario `extensions/molecule/rac` installs Grid Infrastructure 26ai on 2 containers with Oracle Linux 9
+and creates the RAC database `RACCDB` (26ai, instances `RACCDB1` and `RACCDB2`).
+It is a test environment, not a template for production:
+
+* ASM disks are loop devices on sparse files (`device_persistence: ''`).
+* SCAN with 1 IP and VIPs in `/etc/hosts` => `gi_ignoreprereq: true`.
+* Container specific workarounds (`init.ohasd` with cgroup v2, `/run/nologin`, entries of Docker in `/etc/hosts`).
+
+Inventory: `extensions/molecule/shared_config/inventory/group_vars/rac` (`gi.yml`, `db.yml`) and `host_vars/rac-*.yml`. +
+`verify.yml` checks the cluster stack, SCAN, VIPs, ASM, voting files, OCR, disk groups and the open instances of the RAC databases.
