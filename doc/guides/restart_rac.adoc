@@ -1068,6 +1068,8 @@ It is a test environment, not a template for production:
 * ASM disks are loop devices on sparse files (`device_persistence: ''`).
 * SCAN with 1 IP and VIPs in `/etc/hosts` => `gi_ignoreprereq: true`.
 * Container specific workarounds (`init.ohasd` with cgroup v2, `/run/nologin`, entries of Docker in `/etc/hosts`).
+* `converge.yml` starts only with at least 12 GB usable memory on the Docker host
+  (`MemAvailable` + memory of running containers of the scenario), override with `MOLECULE_RAC_MIN_FREE_MB=<MB>`.
 
 Inventory: `extensions/molecule/shared_config/inventory/group_vars/rac` (`gi.yml`, `db.yml`) and `host_vars/rac-*.yml`. +
 `verify.yml` checks the cluster stack, SCAN, VIPs, ASM, voting files, OCR, disk groups and the open instances of the RAC databases.
