@@ -6,9 +6,15 @@ WARNING: Please check the official Compatibility List from Oracle for RDBMS, Ora
 
 IMPORTANT: As of `ansible-oracle` 5.0 only Oracle 19c and 26ai are supported for RDBMS.
 Installation and tests are done for Single Instance databases without and with Oracle Restart. +
-Grid Infrastructure for a Cluster is not tested and will probably not work. +
+Grid Infrastructure 26ai for a Cluster is supported (tested with a RAC database 26ai). +
 Older releases (11.2, 12.1, 12.2, 18c, 21c) are rejected by the assert of `db_homes_config`,
 see link:guides/breaking_changes.adoc[Breaking Changes - Upgrade Guide].
+
+NOTE: The number of combinations of options is huge (operating system, Oracle release, Edition,
+Single Instance / Oracle Restart / Grid Infrastructure, device persistence for ASM, file system or ASM, ...).
+Only a few combinations are tested by the molecule scenarios of `ansible-oracle`. +
+All other combinations should work, as long as they are not explicitly excluded in this list
+and are supported by Oracle. _Not tested_ means: not covered by an automated test, it does not mean _does not work_.
 
 IMPORTANT: All Editions from Oracle are supported.
 See documentation from Oracle for differences between Enterprise and Standard Edition (SE, SE One and SE2)
@@ -60,7 +66,7 @@ Redhat Enterprise Linux
 |{supportedversions}
 
 |Oracle Grid Infrastructure (cluster)
-|not tested <<table1footnote,^[16]^>>
+|26ai <<table1footnote,^[16]^>>
 
 |Oracle Restart
 |{supportedrestart}
@@ -221,5 +227,6 @@ a|dynamic shell environment link:https://github.com/opitzconsulting/oracle-scrip
   Oracle Restart only (`gridSetup.sh -switchGridHome`), inside the same release (e.g. 23.26.3 => 23.26.4).
   Not supported for 19c Oracle Restart and for Grid Infrastructure (cluster).
 [[table1footnote]]^16^::
-  The roles contain tasks for Grid Infrastructure for a Cluster (`CRS_CONFIG`) and RAC,
-  but they are not tested and will probably not work.
+  Tested with Grid Infrastructure 26ai on 2 nodes and a RAC database 26ai (molecule scenario `rac`),
+  see link:guides/restart_rac.adoc[Oracle Restart and Grid Infrastructure].
+  Grid Infrastructure 19c, RAC databases 19c and RAC One Node are not tested.

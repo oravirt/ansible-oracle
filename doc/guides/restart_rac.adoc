@@ -18,6 +18,8 @@ Some variables are described in both parts on purpose, because their meaning and
 Read only the part you need.
 
 NOTE: Terms (Oracle Restart, Grid Infrastructure, RAC): see link:../featurelist.adoc[Featurelist]. +
+_Not tested_ in this guide means: not covered by the molecule scenarios.
+Untested combinations should work, as long as they are not explicitly excluded and are supported by Oracle. +
 Both Oracle Restart and Grid Infrastructure use the software of Grid Infrastructure (`oracle_home_gi`).
 The variable `oracle_install_option_gi` decides what is configured.
 
@@ -33,9 +35,9 @@ The variable `oracle_install_option_gi` decides what is configured.
 |`CRS_CONFIG`
 
 |State in `ansible-oracle`
-|supported and tested (19c and 26ai)
-|tested with 26ai, 2 nodes, Grid Infrastructure and a RAC database (molecule scenario `rac`). +
-Grid Infrastructure 19c and RAC One Node are not tested.
+|Oracle Restart 26ai is supported, tested with databases 19c and 26ai (molecule scenario `has-ol9`).
+|Grid Infrastructure 26ai is supported, tested with 2 nodes and a RAC database 26ai (molecule scenario `rac`). +
+Grid Infrastructure 19c, RAC databases 19c and RAC One Node are not tested.
 
 |Hosts
 |every host is configured on its own
@@ -49,6 +51,10 @@ Grid Infrastructure 19c and RAC One Node are not tested.
 |Default of `grid_base`
 |`oracle_base`
 |`/u01/app/grid/base`
+
+|`oracle_home_gi` and `grid_base`
+|`oracle_home_gi` *must be below* `grid_base`
+|`oracle_home_gi` *must not be below* `grid_base`
 
 |Storage for ASM
 |local disks
@@ -104,20 +110,26 @@ The playbooks use the variable `hostgroup` (default: `all`) as target hosts.
 |Variable |Default |Description
 
 |`oracle_install_version_gi`
-|`19.3.0.0`
-|Base release of the software, e.g. `19.3.0.0` or `26.1.0.0`.
-It selects the response file template (`grid-install.rsp.<version>.j2`) and the task file of `oraswgi_install`.
-It is the base release, not the Release Update: a Golden Image with 19.33 is still `19.3.0.0`.
+|`26.1.0.0`
+|Base release of the software, e.g. `26.1.0.0` or `19.3.0.0`.
+It selects the response file template (`grid-install.rsp.<version>.j2`), the task file of `oraswgi_install`,
+the default installation media in `oracle_sw_image_gi`, the key in `gi_patches` and the default of `oracle_home_gi`.
+It is the base release, not the Release Update: a Golden Image with 19.33 is still `19.3.0.0`, 23.26.3 is `26.1.0.0`.
+Always set it in the inventory, it must match the installation media.
 
 |`oracle_sw_image_gi`
 |list of the base release images
 |List of installation media with `filename` and `version`.
-The entry with `version: oracle_install_version_gi` is unpacked into `oracle_home_gi`.
+The entry with `version: oracle_install_version_gi` is unpacked into `oracle_home_gi`,
+when `oracle_install_image_gi` is not defined. +
+No need to change it: the default contains all supported releases.
 
 |`oracle_install_image_gi`
 |not defined
 |Filename of the installation media.
-When it is defined, it is used instead of the `filename` from `oracle_sw_image_gi`, e.g. for a Golden Image (`gi_goldimage_26_03.zip`).
+When it is defined, it is used instead of the `filename` from `oracle_sw_image_gi`, e.g. for a Golden Image (`gi_goldimage_26_03.zip`). +
+*Recommended*: always install a Golden Image with the Release Update from Oracle
+and use a new `oracle_home_gi` for every Release Update (Out-of-Place Patching, see below).
 
 |`oracle_sw_copy`, `is_sw_source_local`, `oracle_stage_remote`
 |
@@ -131,6 +143,12 @@ The default depends on `oracle_install_option_gi`:
 `oracle_home_gi_so` for Oracle Restart, `oracle_home_gi_cl` for Grid Infrastructure.
 Set `oracle_home_gi` directly when the path should not contain the base release, e.g. for Golden Images with a Release Update.
 |=======================
+
+IMPORTANT: The default of `oracle_install_version_gi` is `26.1.0.0` (26ai) as of 5.0.0 (19c before).
+Set `oracle_install_version_gi` in every inventory with Oracle Restart or Grid Infrastructure,
+especially for existing 19c installations without `oracle_home_gi` in the inventory:
+the default of `oracle_home_gi` contains the version.
+See link:breaking_changes.adoc[Breaking Changes] (_Default of oracle_install_version_gi is 26ai_).
 
 ==== Passwords
 
@@ -173,7 +191,10 @@ Only used together with `apply_patches_gi: true`.
 See the example in role `oraswgi_meta` and link:Install-and-Patch-Settings.adoc[Install and Patch Settings].
 |=======================
 
-TIP: With a Golden Image, which already contains the Release Update, set `apply_patches_gi: false` and `patch_before_rootsh: false`.
+TIP: Recommended is a Golden Image with the Release Update from Oracle in `oracle_install_image_gi` instead of patching the base release.
+Then set `apply_patches_gi: false` and `patch_before_rootsh: false`.
+A new Release Update is installed as new Golden Image into a new `oracle_home_gi` (Out-of-Place Patching),
+not with `opatchauto` into the running home.
 
 ==== ASM disk groups
 
@@ -302,7 +323,7 @@ WARNING: Only `device_persistence: ''` is tested by the molecule scenarios of `a
 Oracle Restart is Grid Infrastructure for a Standalone Server (`oracle_install_option_gi: HA_CONFIG`).
 It manages ASM, listeners and Single Instance databases on one host.
 
-Oracle Restart is supported and tested with 19c and 26ai (molecule scenario `has-ol9`).
+Oracle Restart 26ai is supported and tested with databases 19c and 26ai (molecule scenario `has-ol9`).
 Every host is configured on its own; there is no dependency between hosts.
 
 === Requirements
@@ -390,7 +411,7 @@ With `HA_CONFIG`:
 
 |`oracle_home_gi`
 |`{{ oracle_home_gi_so }}`
-|`ORACLE_HOME` of Oracle Restart.
+|`ORACLE_HOME` of Oracle Restart. It must be below `grid_base`.
 Recommended: an own path per Release Update, e.g. `/u01/app/oracle/product/26/restart_26.03`.
 That is the prerequisite for the switch into a new home, see below.
 
@@ -398,6 +419,11 @@ That is the prerequisite for the switch into a new home, see below.
 |`/u01/app/oraInventory`
 |Central inventory.
 |=======================
+
+IMPORTANT: Oracle Restart: `oracle_home_gi` must be a subdirectory of `grid_base`,
+e.g. `grid_base: /u01/app/oracle` and `oracle_home_gi: /u01/app/oracle/product/26/restart_26.03`. +
+This is the opposite of Grid Infrastructure (cluster), where `oracle_home_gi` must not be below `grid_base`.
+Keep this in mind, when an inventory is changed from Oracle Restart to Grid Infrastructure or vice versa.
 
 === Users and groups
 
@@ -493,13 +519,16 @@ oracle_databases:
 
 With 26ai the home of Oracle Restart can be switched into a new `oracle_home_gi` (new Release Update),
 see link:out_of_place_patching.adoc[Out-of-Place Patching].
+This is the recommended way for Release Updates:
+install the Golden Image of the new Release Update with `oracle_install_image_gi` into a new `oracle_home_gi`
+(e.g. `/u01/app/oracle/product/26/restart_26.04`), the switch is done by `oraswgi_install`.
 Obsolete homes can be removed with `oraswgi_install_remove_obsolete_homes: true`.
 
 == Grid Infrastructure (cluster)
 
 Grid Infrastructure for a Cluster (`oracle_install_option_gi: CRS_CONFIG`) is the prerequisite for RAC and RAC One Node.
 
-IMPORTANT: Grid Infrastructure and a RAC database are tested with 26ai, 2 nodes on Oracle Linux 9
+IMPORTANT: Grid Infrastructure 26ai is supported: tested with 2 nodes on Oracle Linux 9 and a RAC database 26ai
 (molecule scenario `rac`, see <<Test environment: molecule scenario rac>>). +
 Grid Infrastructure 19c, RAC databases 19c and RAC One Node are not tested.
 
@@ -702,7 +731,7 @@ Many steps on the other nodes use facts or results of the primary node (`hostvar
 |`oracle_home_gi`
 |`{{ oracle_home_gi_cl }}`
 |`ORACLE_HOME` of Grid Infrastructure. Same path on all nodes.
-It must not be below `grid_base` or `oracle_base`: `root.sh` changes the owner of the home and its parent directories to `root`.
+It must *not* be below `grid_base` (and not below `oracle_base`): `root.sh` changes the owner of the home and its parent directories to `root`.
 
 |`grid_base`
 |`/u01/app/grid/base`
@@ -712,6 +741,11 @@ It must not be below `grid_base` or `oracle_base`: `root.sh` changes the owner o
 |`/u01/app/oracle`
 |`ORACLE_BASE` of the databases.
 |=======================
+
+IMPORTANT: Grid Infrastructure (cluster): `oracle_home_gi` must *not* be a subdirectory of `grid_base`,
+e.g. `grid_base: /u01/app/grid/base` and `oracle_home_gi: /u01/app/gridinfra/26.03`. +
+This is the opposite of Oracle Restart, where `oracle_home_gi` must be below `grid_base`.
+The default `oracle_home_gi_cl` (`/u01/app/<version>/grid`) is outside of the default `grid_base`.
 
 === Users and groups
 
