@@ -7,7 +7,7 @@
 - name: root.sh | Run root script after installation (Master Node)
   ansible.builtin.command: "{{ oracle_home_gi }}/root.sh"
   # noqa no-changed-when
-  environment: "{{ _oraswgi_install_rootsh_env }}"
+  environment: "{{ oracle_script_env }}"
   become: true
   register: rootmaster
   when:
@@ -32,7 +32,7 @@
 - name: root.sh | Run root script after installation (Other Nodes)
   ansible.builtin.command: "{{ oracle_home_gi }}/root.sh"
   # noqa no-changed-when
-  environment: "{{ _oraswgi_install_rootsh_env }}"
+  environment: "{{ oracle_script_env }}"
   become: true
   become_user: root
   throttle: 1
