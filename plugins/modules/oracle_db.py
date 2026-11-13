@@ -374,6 +374,15 @@ options:
         required: false
         type: bool
         default: false
+    ignore_prereq_failure:
+        description:
+            - Create the database with C(dbca -ignorePrereqFailure).
+            - C(dbca) executes the prerequisite checks, but failures do not stop
+              the creation, e.g. a SCAN without DNS for RAC databases.
+        required: false
+        type: bool
+        default: false
+        version_added: "5.0.0"
 notes:
     - python-oracledb needs to be installed, e.g. with the role
       C(opitzconsulting.ansible_oracle.pyoracledb).
@@ -577,6 +586,7 @@ def create_db(
     datapatch,
     domain,
     omf,
+    ignore_prereq_failure=False,
 ):
     initparam = ' -initParams '
     paramslist = ''
@@ -713,6 +723,9 @@ def create_db(
                 command += ' -useOMF true '
             else:
                 command += ' -useOMF false '
+
+    if ignore_prereq_failure:
+        command += ' -ignorePrereqFailure '
 
     if initparam != ' -initParams ' or paramslist != "":
         command += initparam
@@ -1386,6 +1399,7 @@ def main():
             hostname            = dict(required=False, aliases = ['host']), # noqa E231
             port                = dict(required=False, default = 1521), # noqa E231
             omf                 = dict(required=False, type='bool', default=False), # noqa E231
+            ignore_prereq_failure = dict(required=False, type='bool', default=False), # noqa E231
             script_env          = dict(required=False, type='dict', default={}), # noqa E231
         ),
         mutually_exclusive=[['memory_percentage', 'memory_totalmb']],
@@ -1433,6 +1447,7 @@ def main():
     hostname            = module.params["hostname"] or os.uname()[1] # noqa E221
     port                = module.params["port"] # noqa E221
     omf                 = module.params["omf"] # noqa E221
+    ignore_prereq_failure = module.params["ignore_prereq_failure"] # noqa E221
     script_env          = module.params["script_env"] # noqa E221
     # fmt: on
 
@@ -1577,6 +1592,7 @@ def main():
                 datapatch,
                 domain,
                 omf,
+                ignore_prereq_failure,
             ):
                 newdb = True
                 ensure_db_state(

@@ -4,6 +4,15 @@
 # @end
 dbca_templatename: General_Purpose.dbc
 
+# @var oradb_manage_db_dbca_ignore_prereq_failure:description: >
+# Create databases with `dbca -ignorePrereqFailure`:
+# dbca executes the prerequisite checks, but failures do not stop the creation
+# of the database (e.g. a SCAN without DNS for RAC databases).
+#
+# The default follows `gi_ignoreprereq` (prerequisite checks of Grid Infrastructure).
+# @end
+oradb_manage_db_dbca_ignore_prereq_failure: "{{ gi_ignoreprereq | default(false) }}"
+
 oracle_gi_cluster_type: STANDARD
 hostgroup_hub: "{{ hostgroup }}-hub"
 

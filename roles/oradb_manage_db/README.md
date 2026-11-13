@@ -10,6 +10,7 @@ Create, modify and remove Oracle Databases
   - [hostgroup_hub](#hostgroup_hub)
   - [listener_name](#listener_name)
   - [oracle_gi_cluster_type](#oracle_gi_cluster_type)
+  - [oradb_manage_db_dbca_ignore_prereq_failure](#oradb_manage_db_dbca_ignore_prereq_failure)
 - [Discovered Tags](#discovered-tags)
 - [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
@@ -58,6 +59,20 @@ listener_name: LISTENER
 
 ```YAML
 oracle_gi_cluster_type: STANDARD
+```
+
+### oradb_manage_db_dbca_ignore_prereq_failure
+
+Create databases with `dbca -ignorePrereqFailure`:
+dbca executes the prerequisite checks, but failures do not stop the creation
+of the database (e.g. a SCAN without DNS for RAC databases).
+
+The default follows `gi_ignoreprereq` (prerequisite checks of Grid Infrastructure).
+
+#### Default value
+
+```YAML
+oradb_manage_db_dbca_ignore_prereq_failure: '{{ gi_ignoreprereq | default(false) }}'
 ```
 
 ## Discovered Tags
