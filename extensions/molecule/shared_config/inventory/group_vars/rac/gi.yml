@@ -68,17 +68,16 @@ asm_diskgroups:
       - {name: compatible.asm, value: 23.0.0.0.0}
     disk:
       - {device: /dev/asmdisks/fra01, asmlabel: fra01, size: 10G}
+      # dbca needs at least 13 GB for the FRA of RACCDB
+      - {device: /dev/asmdisks/fra02, asmlabel: fra02, size: 10G}
 
 # directory of the sparse files for the loop devices (docker volume molecule-rac-asm)
 molecule_asm_shared_dir: /u01/asmshared
 
-# Grid Infrastructure only, no database (yet)
-# => override the database settings of group_vars/all (they reference oracle_pdbs)
-db_homes_installed: []
+# override the database settings of group_vars/all (they reference oracle_pdbs)
 listener_installed: []
 oracle_tnsnames_config: {}
 tnsnames_installed: []
 sqlnet_installed: []
 oracle_wallet_config: []
-oracle_databases: []
 oracle_pdbs: []

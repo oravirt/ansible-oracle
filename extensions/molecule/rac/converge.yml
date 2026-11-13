@@ -225,3 +225,14 @@
   vars:
     oracle_sw_copy: false
     is_sw_source_local: true
+
+# RAC database home: runInstaller on the 1st node copies the ORACLE_HOME to all nodes
+- name: Converge swdb
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swdb
+  vars:
+    oracle_sw_copy: false
+    is_sw_source_local: true
+
+# RAC database RACCDB: dbca on the 1st node
+- name: Converge manage_db
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db

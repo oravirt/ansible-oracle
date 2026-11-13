@@ -1,0 +1,48 @@
+---
+# RAC database RACCDB (Oracle AI Database 26ai) on the cluster molecule-rac
+#
+# The database home must not be newer than Grid Infrastructure (gi_goldimage_26_03)
+# => db_home_26.03.zip
+# runInstaller on rac-1 copies the ORACLE_HOME to rac-2 (clusterNodes from
+# orasw_meta_cluster_hostgroup), root.sh on all nodes.
+# dbca on rac-1 creates the instances RACCDB1 (rac-1) and RACCDB2 (rac-2).
+db_homes_config:
+  db26-rac-ee:
+    version: 26.1.0.0
+    oracle_home: /u01/app/oracle/product/26/db_26.03
+    imagename: db_home_26.03.zip
+    edition: EE
+    readonly_home: true
+    oracle_home_name: db2603racee
+
+db_homes_installed:
+  - home: db26-rac-ee
+    state: present
+    apply_patches: false
+
+# The listener LISTENER and the SCAN listener are resources of Grid Infrastructure.
+# RAC: Clusterware sets local_listener and remote_listener.
+oracle_databases:
+  - home: db26-rac-ee
+    oracle_db_name: RACCDB
+    oracle_db_type: RAC
+    storage_type: ASM
+    oracle_database_type: MULTIPURPOSE
+    redolog_size: 50M
+    redolog_groups: 2
+    listener_port: 1521
+    archivelog: false
+    flashback: false
+    force_logging: false
+    state: present
+    init_parameters:
+      - {name: max_pdbs, value: '3', scope: both, state: present}
+      - {name: control_management_pack_access, value: 'NONE', scope: both, state: present}
+      - {name: db_create_file_dest, value: '+DATA', scope: both, state: present}
+      - {name: db_recovery_file_dest_size, value: '8G', scope: both, state: present, dbca: false}
+      - {name: db_recovery_file_dest, value: '+FRA', scope: both, state: present}
+      - {name: recyclebin, value: 'off', scope: spfile, state: present}
+      - {name: pga_aggregate_target, value: '256M', scope: both, state: present}
+      - {name: processes, value: '320', scope: spfile, state: present}
+      # 1536M: ORA-04031 in java pool during datapatch of dbca
+      - {name: sga_target, value: '2560M', scope: spfile, state: present}
