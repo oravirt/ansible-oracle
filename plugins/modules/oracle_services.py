@@ -74,6 +74,11 @@ options:
             - Comma-separated list of the RAC instances on which the service actively
               runs (C(srvctl -r) / C(-preferred)).
             - Grid Infrastructure cluster only, ignored with Oracle Restart.
+            - Default for a new service in a cluster - all instances of the database
+              (C(Database instances) of C(srvctl config database)), because
+              C(srvctl add service) needs C(-preferred) for an administrator managed
+              RAC database (PRKO-3116). An existing service is not changed without
+              O(preferred_instances).
         type: str
         required: false
         aliases: ['pi']
@@ -290,6 +295,19 @@ def create_service(
     rlbgoal,
 ):
     if gimanaged:
+        # administrator managed RAC: srvctl add service needs -preferred (PRKO-3116)
+        # => default: all instances of the database
+        if is_cluster and preferred_instances is None:
+            preferred_instances = _database_instances(
+                module, oracle_home, database_name
+            )
+            if preferred_instances is None:
+                msg = (
+                    'preferred_instances is not set and the instances of database %s '
+                    'could not be read with srvctl config database' % (database_name)
+                )
+                module.fail_json(msg=msg, changed=False)
+
         command = "%s/bin/srvctl add service -d %s -s %s" % (
             oracle_home,
             database_name,
@@ -321,8 +339,8 @@ def create_service(
                 msg = 'Service %s already exists in database %s' % (name, database_name)
                 module.exit_json(msg=msg, changed=False)
             else:
-                msg = 'Error: %s, command is %s' % (stdout, command)
-                return False
+                msg = 'Error: %s %s, command is %s' % (stdout, stderr, command)
+                module.fail_json(msg=msg, changed=False)
         else:
             if pdb is not None:
                 database_name = pdb
@@ -721,6 +739,22 @@ def execute_sql(module, msg, cursor, sql):
         module.fail_json(msg=msg, changed=False)
         return False
     return True
+
+
+def _database_instances(module, oracle_home, database_name):
+    """Instances of an administrator managed RAC database, e.g. 'DB1,DB2'.
+
+    'Database instances' of srvctl config database, None if not found.
+    """
+    command = '%s/bin/srvctl config database -d %s' % (oracle_home, database_name)
+    rc, stdout, stderr = module.run_command(command)
+    if rc != 0:
+        return None
+    for line in stdout.splitlines():
+        key, _sep, value = line.partition(':')
+        if key.strip() == 'Database instances' and value.strip():
+            return value.strip()
+    return None
 
 
 def _is_cluster(ocr_loc='/etc/oracle/ocr.loc'):
