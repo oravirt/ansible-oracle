@@ -25,8 +25,13 @@ description:
       group with O(size) is added to the same thread
       (C(ALTER DATABASE ADD LOGFILE THREAD <n> SIZE <size>)) and the old group is
       dropped. If the old group is C(CURRENT) or C(ACTIVE), a log switch and a
-      checkpoint are done first (C(SWITCH ALL LOGFILE) and C(CHECKPOINT GLOBAL) in
-      RAC), followed by a wait of 5 seconds.
+      checkpoint are done first and the module waits up to 60 seconds each until
+      the group is no longer C(CURRENT) and C(ACTIVE).
+    - RAC (C(CHECKPOINT GLOBAL)) - the log switch of the thread of the own
+      instance is done with C(SWITCH LOGFILE). For another thread
+      C(SWITCH ALL LOGFILE) is used in C(ARCHIVELOG) mode. In C(NOARCHIVELOG)
+      mode (C(SWITCH ALL LOGFILE) fails with ORA-00258) a one-time scheduler job
+      runs C(SWITCH LOGFILE) on the instance of the thread (C(instance_id)).
     - New groups are created without file names or member count, so the database
       defaults (for example C(DB_CREATE_ONLINE_LOG_DEST_n)) are used.
     - If a thread has fewer groups than O(groups), groups are added with the next
@@ -34,9 +39,10 @@ description:
       that are not C(CURRENT) or C(ACTIVE) are dropped. Files of dropped groups are
       not deleted by the module.
     - C(changed=true) is returned if any group was replaced, added or dropped.
-    - The connected user needs the privileges to read C(V$LOG), C(V$THREAD) and
-      C(V$INSTANCE), C(ALTER DATABASE), C(ALTER SYSTEM) and C(EXECUTE) on
-      C(DBMS_LOCK).
+    - The connected user needs the privileges to read C(V$LOG), C(V$THREAD),
+      C(V$INSTANCE), C(GV$INSTANCE) and C(V$DATABASE), C(ALTER DATABASE),
+      C(ALTER SYSTEM) and C(EXECUTE) on C(DBMS_LOCK). RAC in C(NOARCHIVELOG) mode
+      needs C(CREATE JOB) in addition.
     - If neither O(user) nor O(password) is given, a connection with an Oracle wallet
       (C(/@<service_name>)) is used. Otherwise both must be set.
     - Can be run locally on the control machine or on a remote host.
@@ -193,16 +199,72 @@ def main():
        v_maxbytes_actual  number(10,1);
        v_maxbytes_suffix varchar2(1);
        v_divisor number(20);
-       v_sleep     number := 5;
        v_israc     VARCHAR2(3);
        v_existing_redogroups number ;
        v_max_groupnum  number;
        v_group_diff number;
        v_sql_sw_lf varchar2 (50);
        v_sql_cp    varchar2 (50);
+       v_own_thread number;
+       v_log_mode  varchar2(12);
 
        -- exceptions
        missing_suffix exception;
+
+       -- Make a CURRENT or ACTIVE redo log group INACTIVE (log switch + checkpoint).
+       -- RAC: 'SWITCH LOGFILE' switches the thread of the own instance only,
+       -- 'SWITCH ALL LOGFILE' fails in NOARCHIVELOG mode (ORA-00258)
+       -- => NOARCHIVELOG: log switch of another thread with a scheduler job on the
+       --    instance of the thread (instance_id)
+       PROCEDURE make_inactive (p_thread number, p_group number) IS
+           v_status varchar2(16);
+           v_inst   number;
+           v_job    varchar2(128);
+       BEGIN
+           select status into v_status from v$log where group# = p_group;
+           IF v_status = 'CURRENT' THEN
+               IF v_israc = 'NO' OR p_thread = v_own_thread THEN
+                   execute immediate 'alter system switch logfile';
+               ELSIF v_log_mode = 'ARCHIVELOG' THEN
+                   execute immediate v_sql_sw_lf;
+               ELSE
+                   select min(instance_number) into v_inst
+                   from gv$instance where thread# = p_thread;
+                   IF v_inst IS NULL THEN
+                       raise_application_error(-20001,
+                           'No running instance for redo thread ' || p_thread
+                           || ': CURRENT redo log group ' || p_group
+                           || ' cannot be switched');
+                   END IF;
+                   v_job := dbms_scheduler.generate_job_name('ANSIBLE_REDO_');
+                   dbms_scheduler.create_job(
+                       job_name   => v_job,
+                       job_type   => 'PLSQL_BLOCK',
+                       job_action => q'[begin execute immediate ]'
+                                     || q'['alter system switch logfile'; end;]',
+                       enabled    => false,
+                       auto_drop  => true);
+                   dbms_scheduler.set_attribute(v_job, 'instance_id', v_inst);
+                   dbms_scheduler.enable(v_job);
+               END IF;
+               FOR i IN 1..60 LOOP
+                   select status into v_status from v$log where group# = p_group;
+                   EXIT WHEN v_status != 'CURRENT';
+                   dbms_lock.sleep(1);
+               END LOOP;
+               IF v_status = 'CURRENT' THEN
+                   raise_application_error(-20002,
+                       'Redo log group ' || p_group || ' of thread ' || p_thread
+                       || ' is still CURRENT 60 seconds after the log switch');
+               END IF;
+           END IF;
+           execute immediate v_sql_cp;
+           FOR i IN 1..60 LOOP
+               select status into v_status from v$log where group# = p_group;
+               EXIT WHEN v_status NOT IN ('CURRENT', 'ACTIVE');
+               dbms_lock.sleep(1);
+           END LOOP;
+       END make_inactive;
 
        BEGIN
 
@@ -212,7 +274,8 @@ def main():
 
 
            -- Check if it is a RAC database or not (parallel = True -> RAC)
-           select parallel into v_israc from v$instance;
+           select parallel, thread# into v_israc, v_own_thread from v$instance;
+           select log_mode into v_log_mode from v$database;
            IF v_israc = 'YES' THEN
               v_sql_sw_lf := 'alter system switch all logfile';
               v_sql_cp := 'alter system checkpoint global';
@@ -253,10 +316,7 @@ def main():
                        where thread# = rec.thread# and group# = rec.group#)
                        loop
                            IF chloop.status in ('CURRENT','ACTIVE') THEN
-                                 --dbms_output.put_line('Current');
-                                 execute immediate v_sql_sw_lf;
-                                 execute immediate v_sql_cp;
-                                 dbms_lock.sleep(v_sleep);
+                                 make_inactive(chloop.thread#, chloop.group#);
                                  execute immediate 'alter database add logfile thread '
                                     || chloop.thread# ||' size '|| v_maxbytes ;
                                  execute immediate 'alter database drop logfile group '
