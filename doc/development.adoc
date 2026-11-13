@@ -1174,8 +1174,11 @@ Test objects left behind are removed by the cleanup at the beginning of the next
 
 At the end the play shows
 
-* `Summary per module`: a table with the number of checks per module and in total: `passed`, `failed`, `known` (known bug) and `not repr.` (known bug not reproduced)
+* `Summary per module`: a table with the number of checks per module and in total: `passed`, `failed`, `known` (known bug), `not repr.` (known bug not reproduced) and `time` (runtime of the tests of the module, also for an aborted module)
 * `Summary of module tests`: the result file and the lists of the failed checks, the known bugs and the known bugs not reproduced
+
+The runtime per module is written into `<scenario>/module_tests_results/<label>.durations.json`
+(list of `module` and `duration_s`) - useful to find slow modules.
 
 Every check is written into `<scenario>/module_tests_results/<label>.json` on the controller (ignored by git), also after an abort:
 
@@ -1306,7 +1309,8 @@ Every run creates `extensions/test-runs/<date>-<time>_<commit>[-dirty]/` (not in
 |`steps.jsonl` |one JSON line per finished step: scenario, step, rc, duration, logfile
 |`<scenario>-<step>.log` |output of molecule without colors
 |`module_tests/<scenario>.json` |result of the module tests (`MODULE_TESTS_LABEL=<run-id>`)
-|`summary.md` |report: scenario x step, module tests, changed tasks of idempotence, errors of failed steps
+|`module_durations/<scenario>.json` |runtime per module of the module tests
+|`summary.md` |report: scenario x step, module tests, runtime per module (slowest first), changed tasks of idempotence, errors of failed steps
 |=======================
 
 `summary.md` is updated after every step and can be read while the run is in progress.

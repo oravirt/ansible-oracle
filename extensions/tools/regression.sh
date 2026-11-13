@@ -21,6 +21,7 @@
 #     steps.jsonl      one JSON line per finished step (rc, duration, logfile)
 #     <scenario>-<step>.log
 #     module_tests/<scenario>.json  results of the module tests (MODULE_TESTS_LABEL=<run-id>)
+#     module_durations/<scenario>.json  runtime per module of the module tests
 #     summary.md       report (tools/regression_report.py), updated after every step
 # - test-runs/latest is a symlink to the last run.
 set -u
@@ -130,6 +131,12 @@ run_scenario() {
     if [ "${t}" = module-test ] \
        && [ -f "molecule/${s}/module_tests_results/${RUN_ID}.json" ]; then
       cp "molecule/${s}/module_tests_results/${RUN_ID}.json" "${RUN_DIR}/module_tests/${s}.json"
+    fi
+    # runtime per module (own directory: module_tests/*.json contains only the checks)
+    if [ "${t}" = module-test ] \
+       && [ -f "molecule/${s}/module_tests_results/${RUN_ID}.durations.json" ]; then
+      mkdir -p "${RUN_DIR}/module_durations"
+      cp "molecule/${s}/module_tests_results/${RUN_ID}.durations.json" "${RUN_DIR}/module_durations/${s}.json"
     fi
     record "${s}" "${t}" "${rc}" "${start}" "$(date +%s)"
     echo "$(date +%H:%M) ${s} ${t} rc=${rc}"

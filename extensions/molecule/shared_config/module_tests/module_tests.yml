@@ -55,6 +55,7 @@
     - name: Initialize test results
       ansible.builtin.set_fact:
         mt_results: []
+        mt_durations: []
         mt_failures: []
         mt_known: []
         mt_fixed: []
@@ -85,20 +86,32 @@
       delegate_to: localhost
       become: false
 
+    # runtime per module: <label>.durations.json next to the result file
+    - name: Write durations file on controller
+      ansible.builtin.copy:
+        content: "{{ mt_durations | to_nice_json }}\n"
+        dest: "{{ mt_result_file | regex_replace('[.]json$', '.durations.json') }}"
+        mode: '0644'
+      delegate_to: localhost
+      become: false
+
     - name: Summary per module
       ansible.builtin.debug:
         msg: "{{ _table | trim | split('\n') }}"
       vars:
-        _fmt: '%-24s %7s %7s %7s %7s %9s'
+        _fmt: '%-24s %7s %7s %7s %7s %9s %8s'
         _table: |-
-          {{ _fmt | format('module', 'checks', 'passed', 'failed', 'known', 'not repr.') }}
+          {{ _fmt | format('module', 'checks', 'passed', 'failed', 'known', 'not repr.', 'time') }}
           {% for m in mt_modules + ['total'] %}
           {% set r = mt_results if m == 'total' else mt_results | selectattr('module', 'equalto', m) | list %}
+          {% set d = mt_durations if m == 'total' else mt_durations | selectattr('module', 'equalto', m) | list %}
+          {% set s = d | map(attribute='duration_s') | sum | int %}
           {{ _fmt | format(m, r | length,
                            r | selectattr('status', 'equalto', 'passed') | list | length,
                            r | selectattr('status', 'equalto', 'failed') | list | length,
                            r | selectattr('status', 'equalto', 'known') | list | length,
-                           r | selectattr('status', 'equalto', 'fixed') | list | length) }}
+                           r | selectattr('status', 'equalto', 'fixed') | list | length,
+                           '%dm%02ds' | format(s // 60, s % 60)) }}
           {% endfor %}
 
     - name: Summary of module tests
