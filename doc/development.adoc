@@ -1043,7 +1043,9 @@ The clients use the shared playbooks in `extensions/molecule/shared_config/playb
 * `ahf_fleet_connect.yml`: connects the container to the network `molecule-ahf` (`docker network connect` on the Ansible controller),
   checks `https://ahf:5005/ahfservice` and reads the certificate of Fleet Insights from the container `ahf`.
 * `ahf_client.yml`: role `ahf` and one TFA collection (`tfactl diagcollect -last 1h`) for the upload.
-  Without a reachable Fleet Insights, AHF is installed without the registration (warning).
+  Fleet Insights is optional for `dbfs` and `has-ol9`: without the scenario `ahf`, AHF is installed and verified,
+  the registration is not changed (`ahf_fleet_insights_manage: false`) and the Fleet Insights checks of verify are skipped
+  (`extensions/molecule/shared_config/tasks/ahf_fleet_verify.yml`). Only the scenario `ahf` requires Fleet Insights.
 
 .Run the scenarios
 ----

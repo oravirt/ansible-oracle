@@ -35,6 +35,7 @@ See `doc/guides/ahf.adoc` for decisions about the installation.
   - [ahf_data_dir_min_free_mb](#ahf_data_dir_min_free_mb)
   - [ahf_fleet_insights_client](#ahf_fleet_insights_client)
   - [ahf_fleet_insights_force_register](#ahf_fleet_insights_force_register)
+  - [ahf_fleet_insights_manage](#ahf_fleet_insights_manage)
   - [ahf_fleet_insights_os_user](#ahf_fleet_insights_os_user)
   - [ahf_fleet_insights_password](#ahf_fleet_insights_password)
   - [ahf_fleet_insights_public_cert](#ahf_fleet_insights_public_cert)
@@ -199,6 +200,20 @@ Register again, even when URL and user are unchanged - e.g. after a password cha
 
 ```YAML
 ahf_fleet_insights_force_register: false
+```
+
+### ahf_fleet_insights_manage
+
+Manage the registration in AHF Fleet Insights (`ahf_fleet_insights_client`).
+
+`false`: the registration is not changed - no registration, no deregistration.
+The state file keeps the last registration. Useful, when Fleet Insights is not reachable,
+e.g. during a maintenance of the Fleet Insights server.
+
+#### Default value
+
+```YAML
+ahf_fleet_insights_manage: true
 ```
 
 ### ahf_fleet_insights_os_user

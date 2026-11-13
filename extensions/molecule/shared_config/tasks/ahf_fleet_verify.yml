@@ -1,0 +1,46 @@
+---
+# Verify of AHF Fleet Insights for the clients (dbfs, has-ol9) - optional:
+# the checks are skipped, when the client is not registered or Fleet Insights
+# of the scenario ahf is not reachable.
+- name: Read state file of role ahf
+  ansible.builtin.slurp:
+    src: /opt/oracle.ahf.ansible.json
+  register: _verify_state
+
+- name: Check AHF Fleet Insights
+  ansible.builtin.uri:
+    url: "https://{{ molecule_ahffi_host }}:{{ molecule_ahffi_port }}/ahfservice"
+    validate_certs: false
+    status_code: [200, 301, 302, 401]
+    timeout: 10
+  register: _verify_ahffi_check
+  failed_when: false
+
+- name: Set registration and availability of AHF Fleet Insights
+  ansible.builtin.set_fact:
+    _verify_registered: "{{ (_verify_state.content | b64decode | from_json).fleet_insights | default({}) | length > 0 }}"
+    _verify_ahffi_available: "{{ _verify_ahffi_check.status | default(-1) in [200, 301, 302, 401] }}"
+
+- name: Registration in AHF Fleet Insights
+  ansible.builtin.debug:
+    msg: >-
+      registered: {{ (_verify_state.content | b64decode | from_json).fleet_insights | default('no', true) }},
+      Fleet Insights reachable: {{ _verify_ahffi_available }}
+      {{ '' if _verify_registered | bool and _verify_ahffi_available | bool
+         else '=> upload test skipped (scenario ahf not running)' }}
+
+# uploads TestUploadFile.txt into Fleet Insights
+- name: Test upload into AHF Fleet Insights
+  ansible.builtin.command: /opt/oracle.ahf/bin/ahf configuration check --type fleet-insights
+  register: _verify_upload
+  changed_when: false
+  when:
+    - _verify_registered | bool
+    - _verify_ahffi_available | bool
+
+- name: Assert upload into AHF Fleet Insights
+  ansible.builtin.assert:
+    that:
+      - "'configured correctly' in _verify_upload.stdout"
+    fail_msg: "{{ _verify_upload.stdout_lines | default([]) }}"
+  when: _verify_upload is not skipped

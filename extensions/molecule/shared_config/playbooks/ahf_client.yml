@@ -29,8 +29,11 @@
   vars:
     oracle_sw_copy: false
     oracle_stage_remote: /u01/stage/download
-    # registration only, when Fleet Insights is reachable
-    ahf_fleet_insights_client: "{{ molecule_ahffi_available | bool }}"
+    # Fleet Insights is optional for the clients (provided by the scenario ahf):
+    # registration only, when Fleet Insights is reachable, otherwise the registration
+    # is not changed (no deregistration without Fleet Insights)
+    ahf_fleet_insights_client: true
+    ahf_fleet_insights_manage: "{{ molecule_ahffi_available | bool }}"
     ahf_fleet_insights_public_cert: "{{ molecule_ahffi_public_cert | default('') }}"
   tasks:
     - name: AHF

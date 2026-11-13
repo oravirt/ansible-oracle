@@ -29,7 +29,9 @@
     fail_msg: >-
       AHF Fleet Insights client requires ahf_install_mode: root,
       ahf_fleet_insights_url (https://...), ahf_fleet_insights_user and ahf_fleet_insights_password.
-  when: ahf_fleet_insights_client | bool
+  when:
+    - ahf_fleet_insights_client | bool
+    - ahf_fleet_insights_manage | bool
 
 - name: assert | Install packages for AHF
   ansible.builtin.package:

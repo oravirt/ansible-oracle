@@ -46,28 +46,6 @@
           - _verify_autoruns.stdout is search('COLLECTION_RETENTION = 10')
         fail_msg: "{{ _verify_autoruns.stdout_lines }}"
 
-    # registered only, when AHF Fleet Insights of the scenario ahf was reachable during converge
-    - name: Read state file of role ahf
-      ansible.builtin.slurp:
-        src: /opt/oracle.ahf.ansible.json
-      register: _verify_state
-
-    - name: Registration in AHF Fleet Insights
-      ansible.builtin.debug:
-        msg: >-
-          {{ (_verify_state.content | b64decode | from_json).fleet_insights
-             | default('not registered (scenario ahf not running during converge)', true) }}
-
-    # test upload into Fleet Insights (uploads TestUploadFile.txt), only when registered
-    - name: Test upload into AHF Fleet Insights
-      ansible.builtin.command: /opt/oracle.ahf/bin/ahf configuration check --type fleet-insights
-      register: _verify_upload
-      changed_when: false
-      when: (_verify_state.content | b64decode | from_json).fleet_insights | default({}) | length > 0
-
-    - name: Assert upload into AHF Fleet Insights
-      ansible.builtin.assert:
-        that:
-          - "'configured correctly' in _verify_upload.stdout"
-        fail_msg: "{{ _verify_upload.stdout_lines | default([]) }}"
-      when: _verify_upload is not skipped
+    # AHF Fleet Insights is optional (scenario ahf)
+    - name: Verify AHF Fleet Insights (optional)
+      ansible.builtin.include_tasks: ../shared_config/tasks/ahf_fleet_verify.yml
