@@ -232,7 +232,9 @@
 
 - name: configure | AHF Fleet Insights client
   ansible.builtin.include_tasks: fleet_insights_client.yml
-  when: _ahf_root | bool
+  when:
+    - _ahf_root | bool
+    - ahf_fleet_insights_manage | bool
 
 - name: configure | Write state file
   ansible.builtin.copy:
@@ -245,7 +247,9 @@
            'compliance_settings': ahf_compliance_settings,
            'properties': ahf_properties if _ahf_root | bool else {},
            'tfa_directories': _ahf_tfa_directories_state | default([]),
-           'fleet_insights': _ahf_fleet_insights_state | default({}),
+           'fleet_insights': _ahf_fleet_insights_state | default({})
+                             if ahf_fleet_insights_manage | bool
+                             else _ahf_state_old.fleet_insights | default({}),
          } | to_nice_json }}
     owner: "{{ _ahf_become_user }}"
     mode: "0600"
