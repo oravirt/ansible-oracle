@@ -1,13 +1,18 @@
 ---
 # Tests for oracle_redo in the CDB DB1 (online redo logs belong to the CDB)
+# RAC: groups per thread, log switch of other threads (scenario rac, NOARCHIVELOG)
 # - add groups, change size (incl. CURRENT group), remove groups, idempotence, error cases
 # - the initial state (3 groups of 50M) is restored at the beginning and at the end
 # - connection variants: system in CDB, sys as sysdba, wallet (PDB, no change), wrong password
+# groups per enabled redo thread: RAC has 1 thread per instance, the module manages
+# 'groups' redo log groups per thread
 - name: oracle_redo | variables
   ansible.builtin.set_fact:
     _redo_sql: >-
-      select count(*) || ':' || min(bytes) / 1048576 || ':' || max(bytes) / 1048576
-      from v$log;
+      select count(*) / max(t.threads) || ':' || min(l.bytes) / 1048576
+             || ':' || max(l.bytes) / 1048576
+      from v$log l,
+           (select count(*) threads from v$thread where enabled != 'DISABLED') t;
 
 - name: oracle_redo | cleanup (restore 3 groups of 50M)
   opitzconsulting.ansible_oracle.oracle_redo:

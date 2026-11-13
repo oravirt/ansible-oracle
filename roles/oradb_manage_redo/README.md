@@ -6,7 +6,6 @@ Manage redolog groups in Oracle
 
 - [Requirements](#requirements)
 - [Discovered Tags](#discovered-tags)
-- [Open Tasks](#open-tasks)
 - [Dependencies](#dependencies)
 - [License](#license)
 - [Author](#author)
@@ -21,10 +20,6 @@ Manage redolog groups in Oracle
 ## Discovered Tags
 
 **_redolog_**
-
-## Open Tasks
-
-- (bug): Redologs could not be managed in RAC environments.
 
 ## Dependencies
 
