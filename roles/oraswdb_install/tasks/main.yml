@@ -40,12 +40,14 @@
   tags:
     - nfsmountdb
 
+# owner root like orainstRoot.sh: the CVU check of rootcrs.pl -prepatch (Out-of-Place Patching
+# of Grid Infrastructure) fails with PRVG-2031/PRVG-2032 for another owner
 - name: install_home_db | Add oraInst.loc
   ansible.builtin.template:
     src: oraInst.loc.j2
     dest: /etc/oraInst.loc
-    owner: "{{ oracle_user }}"
-    group: "{{ oracle_group }}"
+    owner: root
+    group: root
     mode: "0644"
     backup: true
   tags:
