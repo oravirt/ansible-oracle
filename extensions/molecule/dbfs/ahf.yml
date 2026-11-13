@@ -9,7 +9,7 @@
 - name: Download AHF
   ansible.builtin.import_playbook: ../shared_config/playbooks/ahf_download.yml
   vars:
-    molecule_ahf_java_home: /u01/app/oracle/product/26/db_26.1/jdk
+    molecule_ahf_java_home: "{{ db_homes_config['db26-si-ee']['oracle_home'] }}/jdk"
 
 - name: Connect to AHF Fleet Insights
   ansible.builtin.import_playbook: ../shared_config/playbooks/ahf_fleet_connect.yml

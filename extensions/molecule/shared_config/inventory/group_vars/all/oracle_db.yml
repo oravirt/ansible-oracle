@@ -33,6 +33,8 @@ oracle_sw_patches:
   #   version: 24.1
   #   description: PSE BUNDLE FOR APEX 24.1
   #   opatch_needed: false
+  # RU for the patch tests (dbfs-ol9): must match molecule_ru_19 in oracle_ru.yml
+  # => update manually after a renovate update of oracle_ru.yml (patch id is not known by renovate)
   - filename: p39472050_190000_Linux-x86-64.zip
     patchid: 39472050
     version: 19.3.0.0
@@ -40,51 +42,57 @@ oracle_sw_patches:
 
 # Important!
 # The converge.yml disables the installation of patches.
-# That is tested in side-effect.yml with installation of OneOff 29213893 for 19.3.
-# The OneOff is removed before the installation of RU 19.20 and then reinstalled with the
+# Patching is tested in side_effect.yml of dbfs-ol9.
 db_homes_installed:
   - home: db19-si-ee
     state: present
     apply_patches: "{{ apply_patches_db }}"  # patching is done in side-effect.yml!
 
+# ORACLE_HOMEs with the Release Updates of oracle_ru.yml (updated by renovate):
+#   db19curr-si-ee / db26curr-si-ee: current RU      (molecule_ru_19 / molecule_ru_26)
+#   db19prev-si-ee / db26prev-si-ee: previous RU-1   (molecule_ru_19_prev / molecule_ru_26_prev)
+# The keys are fixed, only the values follow the RU.
+# Use the stable aliases db19-si-ee / db26-si-ee unless a scenario needs a specific RU.
 db_homes_config:
-  db1919-si-ee: &db1919-si-ee
+  db19prev-si-ee: &db19prev-si-ee
     version: 19.3.0.0
-    oracle_home: "/u01/app/oracle/product/19/db_19.19"
+    oracle_home: "/u01/app/oracle/product/19/db_{{ molecule_ru_19_prev }}"
     edition: EE
-    opatch_minversion: 12.2.0.1.52  # minimum for RU 19.32 (39472050)
-    imagename: db_home_19.19.zip
+    opatch_minversion: 12.2.0.1.52
+    imagename: "db_home_{{ molecule_ru_19_prev }}.zip"
     readonly_home: true
-    oracle_home_name: db1919siee
+    oracle_home_name: "db{{ molecule_ru_19_prev_nodot }}siee"
     opatch: []
-  db1932-si-ee: &db1932-si-ee
+  db19curr-si-ee: &db19curr-si-ee
     version: 19.3.0.0
-    oracle_home: "/u01/app/oracle/product/19/db_19.32"
+    oracle_home: "/u01/app/oracle/product/19/db_{{ molecule_ru_19 }}"
     edition: EE
-    opatch_minversion: 12.2.0.1.52  # minimum for RU 19.32 (39472050)
-    imagename: db_home_19.32.zip
+    opatch_minversion: 12.2.0.1.52
+    imagename: "db_home_{{ molecule_ru_19 }}.zip"
     readonly_home: true
-    oracle_home_name: db1932siee
+    oracle_home_name: "db{{ molecule_ru_19_nodot }}siee"
     opatch: []
-  db1933-si-ee:
-    version: 19.3.0.0
-    oracle_home: "/u01/app/oracle/product/19/db_19.33"
-    edition: EE
-    opatch_minversion: 12.2.0.1.52  # minimum for RU 19.32 (39472050)
-    imagename: db_home_19.33.zip
-    readonly_home: true
-    oracle_home_name: db1933siee
-    opatch: []
-  # target for the upgrade with AutoUpgrade (scenario upgrade)
-  db26-si-ee:
+  db26prev-si-ee: &db26prev-si-ee
     version: 26.1.0.0
-    oracle_home: "/u01/app/oracle/product/26/db_26.1"
-    imagename: db_home_26.04.zip
+    oracle_home: "/u01/app/oracle/product/26/db_{{ molecule_ru_26_prev_short }}"
+    imagename: "db_home_{{ molecule_ru_26_prev_short }}.zip"
     edition: EE
     readonly_home: true
-    oracle_home_name: db261siee
+    oracle_home_name: "db{{ molecule_ru_26_prev_nodot }}siee"
+  db26curr-si-ee: &db26curr-si-ee
+    version: 26.1.0.0
+    oracle_home: "/u01/app/oracle/product/26/db_{{ molecule_ru_26_short }}"
+    imagename: "db_home_{{ molecule_ru_26_short }}.zip"
+    edition: EE
+    readonly_home: true
+    oracle_home_name: "db{{ molecule_ru_26_nodot }}siee"
+  # stable aliases for the scenarios
+  # 19c: RU-1 => patch tests (dbfs-ol9) patch it to the current RU
   db19-si-ee:
-    <<: *db1932-si-ee
+    <<: *db19prev-si-ee
+  # 26ai: current RU (dbfs, dbfs-ol10, dataguard, target of the upgrade)
+  db26-si-ee:
+    <<: *db26curr-si-ee
 
 oracle_listeners_config:
   LISTENER:

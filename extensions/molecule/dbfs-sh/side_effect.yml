@@ -1,11 +1,11 @@
 ---
 # Out-of-Place Patching
-# Switch database DB2 from db1919-si-ee (converge) to db1932-si-ee
+# Switch database DB2 from db19prev-si-ee (converge, RU-1) to db19curr-si-ee (current RU)
 # Listener, sqlnet.ora and tnsnames.ora are switched to the same ORACLE_HOME.
 - name: Switch ORACLE_HOME of DB2
   ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db
   vars:
-    oracle_db2_home: db1933-si-ee
+    oracle_db2_home: db19curr-si-ee
 
     listener_installed:
       - home: "{{ oracle_db2_home }}"

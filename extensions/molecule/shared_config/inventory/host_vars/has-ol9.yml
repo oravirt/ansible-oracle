@@ -7,8 +7,9 @@
 
 oracle_install_option_gi: HA_CONFIG
 oracle_install_version_gi: 26.1.0.0
-oracle_install_image_gi: gi_goldimage_26_03.zip
-oracle_home_gi: /u01/app/oracle/product/26/restart_26.03
+# converge: RU-1 (oracle_ru.yml), side_effect.yml: Out-of-Place Patching to the current RU
+oracle_install_image_gi: "gi_goldimage_{{ molecule_ru_26_prev_gi }}.zip"
+oracle_home_gi: "/u01/app/oracle/product/26/restart_{{ molecule_ru_26_prev_short }}"
 
 apply_patches_gi: false
 patch_before_rootsh: false
@@ -52,36 +53,38 @@ molecule_asm_spare_disks:
   - {device: /u01/asmdisks/spare03, size: 2G}
 
 # DB-Home must not be newer than GI
+# Release Updates from oracle_ru.yml (updated by renovate)
 db_homes_config:
-  db19-gi-ee:
+  # ORACLE_HOME of the converge
+  db19prev-gi-ee:
     version: 19.3.0.0
-    oracle_home: "/u01/app/oracle/product/19/db_19.33"
+    oracle_home: "/u01/app/oracle/product/19/db_{{ molecule_ru_19_prev }}"
     edition: EE
     opatch_minversion: 12.2.0.1.52
-    imagename: db_home_19.33.zip
+    imagename: "db_home_{{ molecule_ru_19_prev }}.zip"
     readonly_home: true
-    oracle_home_name: db1933giee
+    oracle_home_name: "db{{ molecule_ru_19_prev_nodot }}giee"
     opatch: []
   # target ORACLE_HOME for Out-of-Place Patching (side_effect.yml)
-  db19-2-gi-ee:
+  db19curr-gi-ee:
     version: 19.3.0.0
-    oracle_home: "/u01/app/oracle/product/19/db_19.32"
+    oracle_home: "/u01/app/oracle/product/19/db_{{ molecule_ru_19 }}"
     edition: EE
     opatch_minversion: 12.2.0.1.52
-    imagename: db_home_19.32.zip
+    imagename: "db_home_{{ molecule_ru_19 }}.zip"
     readonly_home: true
-    oracle_home_name: db1932giee
+    oracle_home_name: "db{{ molecule_ru_19_nodot }}giee"
     opatch: []
 
 # ORACLE_HOME of database DBHAS
-# side_effect.yml switches the database to db19-2-gi-ee (Out-of-Place Patching)
-oracle_dbhas_home: db19-gi-ee
+# side_effect.yml switches the database to db19curr-gi-ee (Out-of-Place Patching)
+oracle_dbhas_home: db19prev-gi-ee
 
 db_homes_installed:
-  - home: db19-gi-ee
+  - home: db19prev-gi-ee
     state: present
     apply_patches: false
-  - home: db19-2-gi-ee
+  - home: db19curr-gi-ee
     state: present
     apply_patches: false
 

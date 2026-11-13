@@ -4,31 +4,31 @@
 # => /vagrant only exists inside the container
 oracle_sw_source_local: "{{ lookup('ansible.builtin.env', 'MOLECULE_SW_DIR') }}"
 
-oracle_db2_home: db1932-si-ee
+oracle_db2_home: db19prev-si-ee
 
 db_homes_installed:
-  - home: db1932-si-ee
+  - home: db19prev-si-ee
     state: present
     apply_patches: false
-  - home: db1933-si-ee
+  - home: db19curr-si-ee
     state: present
     apply_patches: false
 
 listener_installed:
-  - home: db1932-si-ee
+  - home: db19prev-si-ee
     listener_name: LISTENER
     state: present
-  - home: db1933-si-ee
+  - home: db19curr-si-ee
     listener_name: LISTENER1522
     state: present
 
 tnsnames_installed:
   - tnsname: "{{ oracle_pdbs[0]['pdb_name'] }}"
-    home: db1933-si-ee
+    home: db19curr-si-ee
     state: present
 
 sqlnet_installed:
-  - home: db1933-si-ee
+  - home: db19curr-si-ee
     sqlnet: sqlnetalias1
     state: present
 
