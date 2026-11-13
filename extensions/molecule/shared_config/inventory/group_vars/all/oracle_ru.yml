@@ -1,0 +1,30 @@
+---
+# Oracle Release Updates for the molecule scenarios, updated by renovate
+# (custom datasources oracle-ru-* in renovate.json).
+#
+# molecule_ru_*:      current Release Update
+# molecule_ru_*_prev: previous Release Update (RU-1), source for the patch tests
+#
+# The RU of the database is used for Grid Infrastructure / Oracle Restart as well.
+# The installation media (gold images) for a new RU must be created manually,
+# e.g. db_home_{{ molecule_ru_19 }}.zip.
+#
+# Do not change the format: renovate needs the comment directly above the variable.
+
+# renovate: datasource=custom.oracle-ru-19 depName=oracle-ru-19
+molecule_ru_19: "19.33"
+# renovate: datasource=custom.oracle-ru-19-prev depName=oracle-ru-19-prev
+molecule_ru_19_prev: "19.32"
+
+# renovate: datasource=custom.oracle-ru-26 depName=oracle-ru-26
+molecule_ru_26: "23.26.4"
+# renovate: datasource=custom.oracle-ru-26-prev depName=oracle-ru-26-prev
+molecule_ru_26_prev: "23.26.3"
+
+# Short forms for ORACLE_HOME, gold images and oracle_home_name
+# 19c:  19.33    => 1933
+# 26ai: 23.26.4  => 26.04 / 26_04 / 2604
+molecule_ru_19_nodot: "{{ molecule_ru_19 | replace('.', '') }}"
+molecule_ru_19_prev_nodot: "{{ molecule_ru_19_prev | replace('.', '') }}"
+molecule_ru_26_short: "26.{{ '%02d' | format(molecule_ru_26.split('.')[2] | int) }}"
+molecule_ru_26_prev_short: "26.{{ '%02d' | format(molecule_ru_26_prev.split('.')[2] | int) }}"
