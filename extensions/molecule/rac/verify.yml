@@ -4,6 +4,7 @@
 # - SCAN, SCAN listener, VIPs, ASM
 # - voting files and OCR in the diskgroup oracle_asm_init_dg
 # - all diskgroups of asm_diskgroups mounted
+# - RAC databases of oracle_databases: 1 running instance per node
 - name: Verify Grid Infrastructure cluster
   hosts: rac
   gather_facts: false
@@ -116,3 +117,56 @@
         or 'Cluster registry integrity check succeeded' not in _ocrcheck.stdout
         or ('+' + oracle_asm_init_dg | upper) not in _ocrcheck.stdout
       run_once: true
+
+- name: Verify RAC databases
+  hosts: rac
+  gather_facts: false
+  become: true
+  become_user: oracle
+  any_errors_fatal: true
+  vars:
+    _nodes: "{{ groups[orasw_meta_cluster_hostgroup] }}"
+    _rac_databases: >-
+      {{ oracle_databases | selectattr('state', 'equalto', 'present')
+         | selectattr('oracle_db_type', 'equalto', 'RAC') | list }}
+  tasks:
+    - name: Status of RAC databases
+      ansible.builtin.command:
+        argv:
+          - "{{ db_homes_config[item.home].oracle_home }}/bin/srvctl"
+          - status
+          - database
+          - -db
+          - "{{ item.oracle_db_unique_name | default(item.oracle_db_name) }}"
+      environment:
+        ORACLE_HOME: "{{ db_homes_config[item.home].oracle_home }}"
+      loop: "{{ _rac_databases }}"
+      loop_control:
+        label: "{{ item.oracle_db_name }}"
+      register: _srvctl_db
+      changed_when: false
+      failed_when: >-
+        _srvctl_db.rc != 0
+        or (_srvctl_db.stdout_lines | select('search', 'is running on node') | list | length) != _nodes | length
+      run_once: true
+
+    - name: Instances of RAC databases (gv$instance)
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          printf '%s\n' 'set heading off feedback off pagesize 0' \
+            "select count(*) from gv\$instance where status = 'OPEN';" \
+            | sqlplus -s -L / as sysdba | awk '$1 ~ /^[0-9]+$/ {print $1}'
+        executable: /bin/bash
+      environment:
+        ORACLE_HOME: "{{ db_homes_config[item.home].oracle_home }}"
+        ORACLE_SID: "{{ item.oracle_db_name }}{{ _nodes.index(inventory_hostname) + 1 }}"
+        PATH: "{{ db_homes_config[item.home].oracle_home }}/bin:/usr/bin:/bin"
+      loop: "{{ _rac_databases }}"
+      loop_control:
+        label: "{{ item.oracle_db_name }}{{ _nodes.index(inventory_hostname) + 1 }}"
+      register: _gv_instance
+      changed_when: false
+      failed_when: >-
+        _gv_instance.rc != 0
+        or _gv_instance.stdout | trim | int != _nodes | length
