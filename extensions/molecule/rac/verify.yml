@@ -5,6 +5,27 @@
 # - voting files and OCR in the diskgroup oracle_asm_init_dg
 # - all diskgroups of asm_diskgroups mounted
 # - RAC databases of oracle_databases: 1 running instance per node
+# The running home of Grid Infrastructure: crs_home in /etc/oracle/olr.loc
+# converge: oracle_home_gi (26.03), side_effect.yml: Out-of-Place Patching into 26.04
+- name: Running home of Grid Infrastructure
+  hosts: rac
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Read /etc/oracle/olr.loc
+      ansible.builtin.slurp:
+        src: /etc/oracle/olr.loc
+      register: _olrloc
+
+    - name: Set running home of Grid Infrastructure
+      ansible.builtin.set_fact:
+        rac_gi_home: >-
+          {{ _olrloc.content | b64decode | regex_findall('(?m)^crs_home=(.*)$') | first | trim }}
+
+    - name: Show running home of Grid Infrastructure
+      ansible.builtin.debug:
+        var: rac_gi_home
+
 - name: Verify Grid Infrastructure cluster
   hosts: rac
   gather_facts: false
@@ -12,14 +33,14 @@
   become_user: grid
   any_errors_fatal: true
   environment:
-    ORACLE_HOME: "{{ oracle_home_gi }}"
+    ORACLE_HOME: "{{ rac_gi_home }}"
     ORACLE_BASE: /u01/app/grid/base
   vars:
     _nodes: "{{ groups[orasw_meta_cluster_hostgroup] }}"
   tasks:
     - name: Check Clusterware stack on all nodes
       ansible.builtin.command:
-        argv: ["{{ oracle_home_gi }}/bin/crsctl", check, cluster, -all]
+        argv: ["{{ rac_gi_home }}/bin/crsctl", check, cluster, -all]
       register: _crsctl_check
       changed_when: false
       failed_when: >-
@@ -31,7 +52,7 @@
 
     - name: Nodes of the cluster
       ansible.builtin.command:
-        argv: ["{{ oracle_home_gi }}/bin/olsnodes", -n, -s, -t]
+        argv: ["{{ rac_gi_home }}/bin/olsnodes", -n, -s, -t]
       register: _olsnodes
       changed_when: false
       run_once: true
@@ -46,7 +67,7 @@
 
     - name: Status of SCAN, SCAN listener, VIPs, ASM
       ansible.builtin.command:
-        argv: ["{{ oracle_home_gi }}/bin/srvctl", status, "{{ item.res }}"]
+        argv: ["{{ rac_gi_home }}/bin/srvctl", status, "{{ item.res }}"]
       loop:
         - {res: scan, pattern: 'is running on node'}
         - {res: scan_listener, pattern: 'is running on node'}
@@ -66,7 +87,7 @@
 
     - name: VIP of each node
       ansible.builtin.command:
-        argv: ["{{ oracle_home_gi }}/bin/srvctl", status, vip, -node, "{{ inventory_hostname }}"]
+        argv: ["{{ rac_gi_home }}/bin/srvctl", status, vip, -node, "{{ inventory_hostname }}"]
       register: _srvctl_vip
       changed_when: false
       failed_when:
@@ -74,7 +95,7 @@
 
     - name: Voting files
       ansible.builtin.command:
-        argv: ["{{ oracle_home_gi }}/bin/crsctl", query, css, votedisk]
+        argv: ["{{ rac_gi_home }}/bin/crsctl", query, css, votedisk]
       register: _votedisk
       changed_when: false
       failed_when: >-
@@ -84,9 +105,9 @@
 
     - name: Mounted diskgroups
       ansible.builtin.command:
-        argv: ["{{ oracle_home_gi }}/bin/asmcmd", lsdg, --suppressheader]
+        argv: ["{{ rac_gi_home }}/bin/asmcmd", lsdg, --suppressheader]
       environment:
-        ORACLE_HOME: "{{ oracle_home_gi }}"
+        ORACLE_HOME: "{{ rac_gi_home }}"
         ORACLE_SID: "+ASM{{ _nodes.index(inventory_hostname) + 1 }}"
       register: _lsdg
       changed_when: false
@@ -109,7 +130,7 @@
   tasks:
     - name: Check OCR (root)
       ansible.builtin.command:
-        argv: ["{{ oracle_home_gi }}/bin/ocrcheck"]
+        argv: ["{{ rac_gi_home }}/bin/ocrcheck"]
       register: _ocrcheck
       changed_when: false
       failed_when: >-

@@ -1,0 +1,25 @@
+---
+# Side-Effect of the scenario rac (Grid Infrastructure 26ai, RAC database RACCDB 26ai)
+# - Out-of-Place Patching of Grid Infrastructure: switch from gi_goldimage_26_03 (converge,
+#   /u01/app/gridinfra/26.03) to gi_goldimage_26_04 (/u01/app/gridinfra/26.04)
+#   (oraswgi_install: gridSetup.sh -setupHomeAs + -switchGridHome, root.sh rolling)
+# - manage_db: PDB ORCLPDB1 in RACCDB, tnsnames.ora, sqlnet.ora and wallet on all nodes
+#   (group_vars/rac/db.yml), for inventories converged before the PDB was added
+# - module tests (shared_config/module_tests) on the 1st node only: all instances share the
+#   same database, tests on all nodes in parallel would collide.
+#   The scenario specific variables are in module_tests.yml.
+- name: Side-Effect - Switch Grid Infrastructure into new ORACLE_HOME
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swgi
+  vars:
+    oracle_install_image_gi: gi_goldimage_26_04.zip
+    oracle_home_gi: /u01/app/gridinfra/26.04
+    oracle_sw_copy: false
+    is_sw_source_local: true
+
+- name: Side-Effect - PDB, tnsnames.ora, sqlnet.ora and wallet
+  ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.manage_db
+
+- name: Side-Effect - Module tests
+  ansible.builtin.import_playbook: ../shared_config/module_tests/module_tests.yml
+  vars:
+    mt_hosts: "{{ groups['rac'] | first }}"

@@ -46,3 +46,44 @@ oracle_databases:
       - {name: processes, value: '320', scope: spfile, state: present}
       # 1536M: ORA-04031 in java pool during datapatch of dbca
       - {name: sga_target, value: '2560M', scope: spfile, state: present}
+
+# PDB ORCLPDB1 in RACCDB (open on all instances), used by the module tests (side_effect.yml)
+oracle_pdbs:
+  - cdb: RACCDB
+    home: db26-rac-ee
+    pdb_name: ORCLPDB1
+    listener_port: 1521
+    state: present
+
+# tnsnames.ora, sqlnet.ora and wallet on every node for the module tests (side_effect.yml)
+# Read-Only Oracle Home => files are in ORACLE_BASE_HOME (/u01/app/oracle/homes/db2603racee)
+# the alias is used for the wallet credential (items2dict in group_vars/all drops 'alias')
+oracle_tnsnames_config:
+  ORCLPDB1:
+    alias:
+      - ORCLPDB1_SYSTEM
+    connect:
+      service_name: ORCLPDB1
+    address:
+      - host: "{{ ansible_hostname }}"
+
+tnsnames_installed:
+  - tnsname: ORCLPDB1
+    home: db26-rac-ee
+    state: present
+
+sqlnet_installed:
+  - home: db26-rac-ee
+    sqlnet: sqlnetalias1
+    state: present
+
+oracle_wallet_config:
+  - name: wallet1
+    home: db26-rac-ee
+    path: /u01/app/oracle/wallet
+    state: present
+    dbcredentials:
+      - tns_name: ORCLPDB1_SYSTEM
+        db_name: ORCLPDB1
+        db_user: system
+        state: present
