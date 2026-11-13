@@ -179,6 +179,26 @@ def main():
         if failed_checks:
             out.append("")
 
+    # runtime per module of the module tests, slowest first
+    durations = sorted((run_dir / "module_durations").glob("*.json"))
+    if durations:
+        out.append("## Module test durations")
+        out.append("")
+        out.append("| Scenario | module | duration | share |")
+        out.append("|---|---|---|---|")
+        for path in durations:
+            entries = json.loads(path.read_text())
+            total = sum(e.get("duration_s", 0) for e in entries) or 1
+            entries.sort(key=lambda e: e.get("duration_s", 0), reverse=True)
+            for entry in entries:
+                seconds = int(entry.get("duration_s", 0))
+                out.append("| %s | %s | %dm%02ds | %d%% |" % (
+                    path.stem, entry.get("module"), seconds // 60, seconds % 60,
+                    round(100 * entry.get("duration_s", 0) / total)))
+            out.append("| %s | **total** | **%dm%02ds** | 100%% |" % (
+                path.stem, int(total) // 60, int(total) % 60))
+        out.append("")
+
     # idempotence
     idem = [(s, idempotence_tasks(run_dir / ("%s-idempotence.log" % s)))
             for s in scenarios if (s, "idempotence") in steps]
