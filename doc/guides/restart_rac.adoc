@@ -1053,6 +1053,11 @@ Sizing hints from the tests with 26ai:
 * RAC databases are tested with 26ai only (2 nodes, administrator managed, Container Database without PDB).
 * RAC One Node is not tested.
 * Grid Infrastructure 19c is not tested.
+* Grid Infrastructure (cluster) on hosts with FIPS (`ansible_fips`) is not supported:
+  `oracle_tmp_stage` is not `/tmp`, `_JAVA_OPTIONS` (`-Djava.io.tmpdir`) is passed to `root.sh`
+  and java prints `Picked up _JAVA_OPTIONS: ...`.
+  `rootcrs.pl` parses this line as output of `cluutil` and stops with `CLSRSC-732`.
+  Oracle Restart is not affected.
 
 === Test environment: molecule scenario rac
 

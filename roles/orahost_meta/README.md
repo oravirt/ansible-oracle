@@ -27,6 +27,7 @@ Meta role used by other roles to share variable defaults.
   - [oracle_user](#oracle_user)
   - [oracle_user_home](#oracle_user_home)
   - [orahost_meta_cv_assume_distid](#orahost_meta_cv_assume_distid)
+  - [orahost_meta_java_env](#orahost_meta_java_env)
   - [orahost_meta_java_options](#orahost_meta_java_options)
   - [orahost_meta_tmpdir](#orahost_meta_tmpdir)
   - [orahost_min_swap_mb](#orahost_min_swap_mb)
@@ -271,13 +272,16 @@ oracle_rsp_stage: '{{ oracle_stage }}/rsp'
 (Minimum) environment settings to pass to Oracle scripts.
 Usually passed to shell: or command: through "environment:" keyword
 
+`_JAVA_OPTIONS` is only part of the environment, when `orahost_meta_java_options` is not empty
+(`orahost_meta_java_env`).
+
 #### Default value
 
 ```YAML
-oracle_script_env:
-  CV_ASSUME_DISTID: "{{ orahost_meta_cv_assume_distid | default('', true) }}"
-  TMPDIR: "{{ orahost_meta_tmpdir | default('', true) }}"
-  _JAVA_OPTIONS: "{{ orahost_meta_java_options | default('', true) }}"
+oracle_script_env: >-
+  {{ {'CV_ASSUME_DISTID': orahost_meta_cv_assume_distid | default('', true),
+      'TMPDIR': orahost_meta_tmpdir | default('', true)}
+     | combine(orahost_meta_java_env) }}
 ```
 
 ### oracle_seclimits
@@ -373,6 +377,22 @@ orahost_meta_cv_assume_distid: |-
   {%- endif %}
   {%- elif ansible_os_family in ('SuSe', 'Suse') %}SUSE{{ ansible_distribution_major_version }}
   {%- endif %}
+```
+
+### orahost_meta_java_env
+
+`_JAVA_OPTIONS` for Oracle scripts, only when `orahost_meta_java_options` is not empty.
+
+Java prints `Picked up _JAVA_OPTIONS: ...` for every start, even for an empty value.
+Oracle scripts, which parse the output of java tools, fail with this line,
+e.g. `root.sh` of Grid Infrastructure (cluster) with CLSRSC-732 (`cluutil -doesHomeExist`).
+
+#### Default value
+
+```YAML
+orahost_meta_java_env: >-
+  {{ (orahost_meta_java_options | default('', true) | trim | length > 0)
+     | ternary({'_JAVA_OPTIONS': orahost_meta_java_options | default('', true) | trim}, {}) }}
 ```
 
 ### orahost_meta_java_options

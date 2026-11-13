@@ -22,10 +22,3 @@ _oraswgi_install_oracle_gi_image: >-
   {{ oracle_sw_copy | bool | ternary(oracle_stage, oracle_stage_remote) }}/
   {{- oracle_install_image_gi is defined | bool |
      ternary(oracle_install_image_gi, item.filename) }}
-
-# Environment for root.sh: oracle_script_env without _JAVA_OPTIONS
-# rootcrs.pl starts cluutil (java) with 'su <grid user> -c' and parses its output.
-# With _JAVA_OPTIONS (even empty) java prints 'Picked up _JAVA_OPTIONS: ...' first
-# => CLSRSC-732: The Oracle home ... does not exist on the nodes ... (Grid Infrastructure)
-_oraswgi_install_rootsh_env: >-
-  {{ oracle_script_env | dict2items | rejectattr('key', 'equalto', '_JAVA_OPTIONS') | items2dict }}
