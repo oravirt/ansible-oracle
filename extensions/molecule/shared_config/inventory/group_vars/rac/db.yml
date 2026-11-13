@@ -1,29 +1,29 @@
 ---
 # RAC database RACCDB (Oracle AI Database 26ai) on the cluster molecule-rac
 #
-# The database home must not be newer than Grid Infrastructure (gi_goldimage_26_03)
-# => db_home_26.03.zip
+# The database home must not be newer than Grid Infrastructure (RU-1 in the converge)
+# => RU-1 of 26ai from oracle_ru.yml (db_home_<molecule_ru_26_prev_short>.zip)
 # runInstaller on rac-1 copies the ORACLE_HOME to rac-2 (clusterNodes from
 # orasw_meta_cluster_hostgroup), root.sh on all nodes.
 # dbca on rac-1 creates the instances RACCDB1 (rac-1) and RACCDB2 (rac-2).
 db_homes_config:
-  db26-rac-ee:
+  db26prev-rac-ee:
     version: 26.1.0.0
-    oracle_home: /u01/app/oracle/product/26/db_26.03
-    imagename: db_home_26.03.zip
+    oracle_home: "/u01/app/oracle/product/26/db_{{ molecule_ru_26_prev_short }}"
+    imagename: "db_home_{{ molecule_ru_26_prev_short }}.zip"
     edition: EE
     readonly_home: true
-    oracle_home_name: db2603racee
+    oracle_home_name: "db{{ molecule_ru_26_prev_nodot }}racee"
 
 db_homes_installed:
-  - home: db26-rac-ee
+  - home: db26prev-rac-ee
     state: present
     apply_patches: false
 
 # The listener LISTENER and the SCAN listener are resources of Grid Infrastructure.
 # RAC: Clusterware sets local_listener and remote_listener.
 oracle_databases:
-  - home: db26-rac-ee
+  - home: db26prev-rac-ee
     oracle_db_name: RACCDB
     oracle_db_type: RAC
     storage_type: ASM
@@ -50,13 +50,13 @@ oracle_databases:
 # PDB ORCLPDB1 in RACCDB (open on all instances), used by the module tests (side_effect.yml)
 oracle_pdbs:
   - cdb: RACCDB
-    home: db26-rac-ee
+    home: db26prev-rac-ee
     pdb_name: ORCLPDB1
     listener_port: 1521
     state: present
 
 # tnsnames.ora, sqlnet.ora and wallet on every node for the module tests (side_effect.yml)
-# Read-Only Oracle Home => files are in ORACLE_BASE_HOME (/u01/app/oracle/homes/db2603racee)
+# Read-Only Oracle Home => files are in ORACLE_BASE_HOME (/u01/app/oracle/homes/<oracle_home_name>)
 # the alias is used for the wallet credential (items2dict in group_vars/all drops 'alias')
 oracle_tnsnames_config:
   ORCLPDB1:
@@ -69,17 +69,17 @@ oracle_tnsnames_config:
 
 tnsnames_installed:
   - tnsname: ORCLPDB1
-    home: db26-rac-ee
+    home: db26prev-rac-ee
     state: present
 
 sqlnet_installed:
-  - home: db26-rac-ee
+  - home: db26prev-rac-ee
     sqlnet: sqlnetalias1
     state: present
 
 oracle_wallet_config:
   - name: wallet1
-    home: db26-rac-ee
+    home: db26prev-rac-ee
     path: /u01/app/oracle/wallet
     state: present
     dbcredentials:

@@ -1,7 +1,7 @@
 ---
 # Side-Effect of the scenario rac (Grid Infrastructure 26ai, RAC database RACCDB 26ai)
-# - Out-of-Place Patching of Grid Infrastructure: switch from gi_goldimage_26_03 (converge,
-#   /u01/app/gridinfra/26.03) to gi_goldimage_26_04 (/u01/app/gridinfra/26.04)
+# - Out-of-Place Patching of Grid Infrastructure: switch from RU-1 (converge) to the
+#   current RU of 26ai (oracle_ru.yml), /u01/app/gridinfra/<RU>
 #   (oraswgi_install: gridSetup.sh -setupHomeAs + -switchGridHome, root.sh rolling)
 # - manage_db: PDB ORCLPDB1 in RACCDB, tnsnames.ora, sqlnet.ora and wallet on all nodes
 #   (group_vars/rac/db.yml), for inventories converged before the PDB was added
@@ -11,8 +11,8 @@
 - name: Side-Effect - Switch Grid Infrastructure into new ORACLE_HOME
   ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swgi
   vars:
-    oracle_install_image_gi: gi_goldimage_26_04.zip
-    oracle_home_gi: /u01/app/gridinfra/26.04
+    oracle_install_image_gi: "gi_goldimage_{{ molecule_ru_26_gi }}.zip"
+    oracle_home_gi: "/u01/app/gridinfra/{{ molecule_ru_26_short }}"
     oracle_sw_copy: false
     is_sw_source_local: true
 

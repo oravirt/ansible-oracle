@@ -1,6 +1,6 @@
 ---
 # Scenario upgrade: Unplug/Plug upgrade of ORCLPDB1 with AutoUpgrade
-#   from DB2 (19c, db1932-si-ee) into DB1 (26ai, db26-si-ee)
+#   from DB2 (19c, db19prev-si-ee) into DB1 (26ai, db26-si-ee)
 #
 # converge:    DB2 with ORCLPDB1 and the empty target CDB DB1 (oracle_pdbs: source state)
 # side_effect: oracle_pdbs in end state + attribute autoupgrade (defined in side_effect.yml)
@@ -11,7 +11,7 @@
 oracle_sw_source_local: "{{ lookup('ansible.builtin.env', 'MOLECULE_SW_DIR') }}"
 
 oracle_db1_home: db26-si-ee
-oracle_db2_home: db1932-si-ee
+oracle_db2_home: db19prev-si-ee
 # listener and network configuration from 26ai: a listener can serve databases of older releases only
 oracle_net_home: db26-si-ee
 
@@ -34,7 +34,7 @@ oracle_all_editions_options_state:
   - {option: uniaud, enabled: true}
 
 db_homes_installed:
-  - home: db1932-si-ee
+  - home: db19prev-si-ee
     state: present
     apply_patches: false
   - home: db26-si-ee

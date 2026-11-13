@@ -23,8 +23,13 @@ molecule_ru_26_prev: "23.26.3"
 
 # Short forms for ORACLE_HOME, gold images and oracle_home_name
 # 19c:  19.33    => 1933
-# 26ai: 23.26.4  => 26.04 / 26_04 / 2604
+# 26ai: 23.26.4  => 26.04 (_short) / 2604 (_nodot) / 26_04 (_gi)
 molecule_ru_19_nodot: "{{ molecule_ru_19 | replace('.', '') }}"
 molecule_ru_19_prev_nodot: "{{ molecule_ru_19_prev | replace('.', '') }}"
 molecule_ru_26_short: "26.{{ '%02d' | format(molecule_ru_26.split('.')[2] | int) }}"
 molecule_ru_26_prev_short: "26.{{ '%02d' | format(molecule_ru_26_prev.split('.')[2] | int) }}"
+molecule_ru_26_nodot: "{{ molecule_ru_26_short | replace('.', '') }}"
+molecule_ru_26_prev_nodot: "{{ molecule_ru_26_prev_short | replace('.', '') }}"
+# Gold images of Grid Infrastructure: gi_goldimage_26_04.zip
+molecule_ru_26_gi: "{{ molecule_ru_26_short | replace('.', '_') }}"
+molecule_ru_26_prev_gi: "{{ molecule_ru_26_prev_short | replace('.', '_') }}"

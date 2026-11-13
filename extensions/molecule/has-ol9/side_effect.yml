@@ -1,8 +1,8 @@
 ---
 # Out-of-Place Patching with Oracle Restart:
-# - switch Oracle Restart from gi_goldimage_26_03 (converge) to gi_goldimage_26_04
+# - switch Oracle Restart from RU-1 (converge) to the current RU of 26ai (oracle_ru.yml)
 #   (oraswgi_install: gridSetup.sh -switchGridHome + root.sh of the new home)
-# - switch database DBHAS from db19-gi-ee (converge) to db19-2-gi-ee.
+# - switch database DBHAS from db19prev-gi-ee (converge) to db19curr-gi-ee.
 # LISTENER_DB_1523, tnsnames.ora and sqlnet.ora follow oracle_dbhas_home.
 # The new ORACLE_HOME is installed with swdb before the switch.
 #
@@ -13,9 +13,9 @@
 - name: Side-Effect - Switch Oracle Restart into new ORACLE_HOME
   ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.swgi
   vars: &side_effect_vars
-    oracle_install_image_gi: gi_goldimage_26_04.zip
-    oracle_home_gi: /u01/app/oracle/product/26/restart_26.04
-    oracle_dbhas_home: db19-2-gi-ee
+    oracle_install_image_gi: "gi_goldimage_{{ molecule_ru_26_gi }}.zip"
+    oracle_home_gi: "/u01/app/oracle/product/26/restart_{{ molecule_ru_26_short }}"
+    oracle_dbhas_home: db19curr-gi-ee
     oracle_sw_copy: false
     is_sw_source_local: true
 

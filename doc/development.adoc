@@ -737,8 +737,13 @@ Both are set in `extensions/molecule/shared_config/inventory/group_vars/all/orac
   `*-prev` is the same calculation, shifted by one quarter.
 * The RU of the database is used for Grid Infrastructure / Oracle Restart as well.
 * Short forms for `ORACLE_HOME`, gold images and `oracle_home_name` are derived in `oracle_ru.yml`:
-  `molecule_ru_19_nodot` (`1933`), `molecule_ru_26_short` (`26.04`) and the same for `*_prev`.
+  `molecule_ru_19_nodot` (`1933`), `molecule_ru_26_short` (`26.04`), `molecule_ru_26_nodot` (`2604`),
+  `molecule_ru_26_gi` (`26_04`, gold image of Grid Infrastructure) and the same for `*_prev`.
   Use the variables in the scenarios instead of fixed versions.
+* The keys of `db_homes_config` are fixed, only the values (`oracle_home`, `imagename`, `oracle_home_name`) follow the RU:
+  `db19curr-si-ee`, `db19prev-si-ee`, `db26curr-si-ee`, `db26prev-si-ee` in `group_vars/all/oracle_db.yml`.
+  `db19-si-ee` (RU-1, patch tests) and `db26-si-ee` (current RU) are aliases for the scenarios without a specific RU.
+* Out-of-Place Patching tests (`dbfs-sh`, `has-ol9`, `rac`) install RU-1 in the converge and switch to the current RU in `side_effect.yml`.
 * All 4 variables are updated in one branch `pr/renovate/oracle-ru-molecule`.
 * Manual steps after an update (listed in the Pull-Request as well):
   create the gold images for the new RUs and update the RU patches in `oracle_sw_patches`.

@@ -34,10 +34,10 @@ mt_all_modules:
   # role test: RMAN backups (oradb_rman, rman_backup.sh), backups in /u01/app/oracle/backup
   - oradb_rman
 
-mt_oracle_home: /u01/app/oracle/product/26/db_26.1
+mt_oracle_home: "{{ db_homes_config['db26-si-ee']['oracle_home'] }}"
 mt_oracle_sid: DB1
 # read-only ORACLE_HOME: tnsnames.ora, sqlnet.ora are in ORACLE_BASE_HOME
-mt_tns_admin: /u01/app/oracle/homes/db261siee/network/admin
+mt_tns_admin: "/u01/app/oracle/homes/{{ db_homes_config['db26-si-ee']['oracle_home_name'] }}/network/admin"
 mt_cdb: DB1
 mt_pdb: ORCLPDB
 mt_datafile_dir: /u01/app/oracle/oradata
