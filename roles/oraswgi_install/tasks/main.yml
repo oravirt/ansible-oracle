@@ -85,11 +85,14 @@
     - not olrloc.stat.exists
 
 # Out-of-Place Patching: oracle_home_gi differs from crs_home in /etc/oracle/olr.loc
-- name: install_home_gi | Switch Oracle Restart into new ORACLE_HOME
+# Oracle Restart: the host, Grid Infrastructure: all nodes of the cluster (root.sh rolling)
+- name: install_home_gi | Switch Grid Infrastructure / Oracle Restart into new ORACLE_HOME
   ansible.builtin.include_tasks: switch_home.yml
   when:
     - olrloc.stat.exists
     - orasw_meta_primary_node | bool
+      or (_oraswgi_meta_configure_cluster | bool
+          and inventory_hostname in groups[orasw_meta_cluster_hostgroup])
 
 # Remove obsolete Grid Infrastructure homes from the central inventory (deinstall)
 - name: install_home_gi | Remove obsolete Grid Infrastructure homes

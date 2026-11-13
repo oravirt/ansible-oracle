@@ -1,21 +1,24 @@
 ---
-# Out-of-Place Patching of Oracle Restart (HA_CONFIG)
+# Out-of-Place Patching of Oracle Restart (HA_CONFIG) and Grid Infrastructure (CRS_CONFIG)
 #
 # The stack runs from crs_home in /etc/oracle/olr.loc. When oracle_home_gi is a different
 # ORACLE_HOME, the new home is installed and the stack is switched into it:
 #   1. extract the image (gold image of the new RU) into oracle_home_gi
-#   2. <new home>/gridSetup.sh -silent -setupHomeAs <old home> (grid user): software only
-#      installation, registers the new home in the central inventory (INS-45127 otherwise)
-#   3. <new home>/gridSetup.sh -silent -switchGridHome (grid user)
-#   4. <new home>/root.sh (root) => roothas.pl -prepatch/-postpatch -dstcrshome <new home>:
-#      stops the stack in the old home, starts it in the new home
-#      (downtime of ASM, listener and all databases managed by Oracle Restart)
+#   2. <new home>/gridSetup.sh -silent -setupHomeAs <old home> (grid user):
+#      software only installation, registers the new home in the central inventory
+#      (INS-45127 otherwise)
+#      Grid Infrastructure: 1. and 2. on every node, one after the other. -setupHomeAs works
+#      on the local node only, -switchGridHome needs the home on all nodes (INS-42016)
+#   3. <new home>/gridSetup.sh -silent -switchGridHome (grid user, primary node)
+#   4. <new home>/root.sh (root): stops the stack in the old home, starts it in the new home
+#      Oracle Restart: downtime of ASM, listener and all databases
+#      Grid Infrastructure: rolling, primary node first, then the other nodes one by one
 #   5. runInstaller -updateNodeList: CRS=TRUE for the new home, CRS=FALSE for the old home
-#      (not done by root.sh)
+#      (not done by root.sh), Grid Infrastructure: on every node (-local)
 #
-# Supported by Oracle for Oracle Restart from 21c on (only inside the same release, e.g.
-# 23.26.3 => 23.26.4). 19c Oracle Restart needs a different procedure (roothas.sh -prepatch/
-# -postpatch -dstcrshome), which is not implemented.
+# Supported by Oracle from 21c on (only inside the same release, e.g. 23.26.3 => 23.26.4).
+# 19c needs a different procedure (roothas.sh/rootcrs.sh -prepatch/-postpatch -dstcrshome),
+# which is not implemented.
 # The old ORACLE_HOME is not removed.
 - name: switch_home | Read /etc/oracle/olr.loc
   ansible.builtin.slurp:
@@ -28,7 +31,7 @@
       {{ _oraswgi_install_olrloc_content.content | b64decode
          | regex_findall('(?m)^crs_home=(.*)$') | default([''], true) | first | trim | regex_replace('/+$', '') }}
 
-- name: switch_home | Switch Oracle Restart into oracle_home_gi
+- name: switch_home | Switch Grid Infrastructure / Oracle Restart into oracle_home_gi
   when:
     - _oraswgi_install_crs_home | length > 0
     - _oraswgi_install_crs_home != oracle_home_gi | regex_replace('/+$', '')
@@ -37,20 +40,19 @@
     - name: switch_home | Info
       ansible.builtin.debug:
         msg:
-          - "Out-of-Place Patching of Oracle Restart"
+          - "Out-of-Place Patching of {{ _oraswgi_meta_configure_cluster | bool | ternary('Grid Infrastructure', 'Oracle Restart') }}"
           - "current ORACLE_HOME: {{ _oraswgi_install_crs_home }}"
           - "new ORACLE_HOME:     {{ oracle_home_gi }}"
+          - "primary node:        {{ orasw_meta_primary_node }}"
 
-    - name: switch_home | Assert Oracle Restart and release
+    - name: switch_home | Assert release
       ansible.builtin.assert:
         quiet: true
         that:
-          - not _oraswgi_meta_configure_cluster | bool
           - oracle_install_version_gi is version('21', '>=')
         fail_msg: >-
           Grid Infrastructure runs from {{ _oraswgi_install_crs_home }}, but oracle_home_gi is
-          {{ oracle_home_gi }}. A switch of the ORACLE_HOME is supported for Oracle Restart
-          (oracle_install_option_gi=HA_CONFIG) from 21c on only.
+          {{ oracle_home_gi }}. A switch of the ORACLE_HOME is supported from 21c on only.
           Set oracle_home_gi to {{ _oraswgi_install_crs_home }} or patch the home in place.
 
     - name: switch_home | Create ORACLE_HOME directory (GI)
@@ -116,6 +118,8 @@
       changed_when: true
       # 6: successful with warnings
       failed_when: _oraswgi_install_setuphomeas.rc not in [0, 6]
+      # Grid Infrastructure: one node after the other
+      throttle: 1
       when:
         - oracle_home_gi not in checkgiinstall.stdout
 
@@ -128,10 +132,31 @@
     # root.sh/roothas.pl -postpatch changes the owner of files to root
     # => gridSetup.sh -switchGridHome fails as grid user with INS-00001/OUI-10166
     # => unlock the home (no impact on the stack running from the current home)
+    # Oracle Restart only: a switch back of Grid Infrastructure is not implemented
     - name: switch_home | Check lock of new ORACLE_HOME
       ansible.builtin.stat:
         path: "{{ oracle_home_gi }}/crs/config/rootconfig.sh"
       register: _oraswgi_install_rootconfig
+
+    # crsctl.bin owned by root: the home was a running home of Grid Infrastructure before
+    # (completely locked by root.sh/rootcrs.pl -postpatch)
+    - name: switch_home | Check former running home
+      ansible.builtin.stat:
+        path: "{{ oracle_home_gi }}/bin/crsctl.bin"
+      register: _oraswgi_install_crsctlbin
+
+    - name: switch_home | Assert no switch back of Grid Infrastructure
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - not (_oraswgi_install_crsctlbin.stat.exists
+                 and _oraswgi_install_crsctlbin.stat.pw_name == 'root')
+        fail_msg: >-
+          {{ oracle_home_gi }} was a running home of Grid Infrastructure before (locked).
+          A switch back of Grid Infrastructure (cluster) into a former home is not implemented.
+          Use a new oracle_home_gi or switch back manually.
+      when:
+        - _oraswgi_meta_configure_cluster | bool
 
     - name: switch_home | Unlock new ORACLE_HOME
       ansible.builtin.command:
@@ -145,10 +170,15 @@
       become_user: root
       changed_when: true
       when:
+        - not _oraswgi_meta_configure_cluster | bool
         - _oraswgi_install_rootconfig.stat.exists
         - _oraswgi_install_rootconfig.stat.pw_name == 'root'
 
     # prepares the switch => root.sh of the new home executes the switch
+    # Grid Infrastructure: root.sh changes the owner of rootconfig.sh to root. A new home with
+    # rootconfig.sh owned by root (but not crsctl.bin, see assert above) => -switchGridHome was
+    # done, root.sh was started and failed before the switch
+    # => resume with root.sh (a 2nd -switchGridHome fails with INS-00001/OUI-10166)
     - name: switch_home | gridSetup.sh -switchGridHome
       ansible.builtin.command:
         argv: "{{ __argv | reject('equalto', '') | list }}"
@@ -165,29 +195,64 @@
       changed_when: true
       # 6: successful with warnings
       failed_when: _oraswgi_install_switchgridhome.rc not in [0, 6]
+      when:
+        - orasw_meta_primary_node | bool
+        - not (_oraswgi_meta_configure_cluster | bool
+               and _oraswgi_install_rootconfig.stat.exists
+               and _oraswgi_install_rootconfig.stat.pw_name == 'root')
 
     - name: switch_home | Output of gridSetup.sh -switchGridHome
       ansible.builtin.debug:
         var: _oraswgi_install_switchgridhome.stdout_lines
+      when: _oraswgi_install_switchgridhome.stdout_lines is defined
 
-    - name: switch_home | Run root.sh in new ORACLE_HOME (switch of the stack)
+    # rootcrs.pl -prepatch runs 'cluvfy stage -pre patch': /etc/oraInst.loc must be owned by root
+    # (PRVG-2031/PRVG-2032 otherwise, e.g. created by older versions of oraswdb_install)
+    - name: switch_home | Owner of /etc/oraInst.loc
+      ansible.builtin.file:
+        path: /etc/oraInst.loc
+        owner: root
+        group: root
+        mode: "0644"
+      become: true
+      when:
+        - _oraswgi_meta_configure_cluster | bool
+
+    # Oracle Restart: the host, Grid Infrastructure: primary node first
+    - name: switch_home | Run root.sh in new ORACLE_HOME (switch of the stack, primary node)
       ansible.builtin.command: "{{ oracle_home_gi }}/root.sh"
       environment: "{{ oracle_script_env }}"
       become: true
       become_user: root
       register: _oraswgi_install_switch_rootsh
       changed_when: true
+      when:
+        - orasw_meta_primary_node | bool
+
+    # Grid Infrastructure: rolling, one node after the other
+    - name: switch_home | Run root.sh in new ORACLE_HOME (switch of the stack, other nodes)
+      ansible.builtin.command: "{{ oracle_home_gi }}/root.sh"
+      environment: "{{ oracle_script_env }}"
+      become: true
+      become_user: root
+      register: _oraswgi_install_switch_rootsh_other
+      changed_when: true
+      throttle: 1
+      when:
+        - not orasw_meta_primary_node | bool
 
     - name: switch_home | Output of root.sh
       ansible.builtin.debug:
-        var: _oraswgi_install_switch_rootsh.stdout_lines
+        msg: >-
+          {{ _oraswgi_install_switch_rootsh.stdout_lines | default([])
+             + _oraswgi_install_switch_rootsh_other.stdout_lines | default([]) }}
 
     - name: switch_home | Read /etc/oracle/olr.loc after switch
       ansible.builtin.slurp:
         src: /etc/oracle/olr.loc
       register: _oraswgi_install_olrloc_content
 
-    - name: switch_home | ORACLE_HOME of Oracle Restart after switch
+    - name: switch_home | ORACLE_HOME of Grid Infrastructure / Oracle Restart after switch
       ansible.builtin.set_fact:
         _oraswgi_install_crs_home_switched: >-
           {{ _oraswgi_install_olrloc_content.content | b64decode
@@ -236,6 +301,8 @@
           - -silent
           - "{{ gi_ignoreprereq | bool | ternary('-ignoreSysPrereqs', '') }}"
           - -updateNodeList
+          # Grid Infrastructure: central inventory of every node
+          - "{{ _oraswgi_meta_configure_cluster | bool | ternary('-local', '') }}"
           - "ORACLE_HOME={{ item.home }}"
           - "CRS={{ item.crs }}"
       environment: "{{ oracle_script_env }}"

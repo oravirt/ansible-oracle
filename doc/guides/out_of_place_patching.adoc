@@ -9,8 +9,9 @@ toc::[]
 == Out-of-Place Patching - Switch ORACLE_HOME
 
 IMPORTANT: Out-of-Place Patching is supported for Single Instance primary databases without and with Oracle Restart. +
-Grid Infrastructure for a Cluster, RAC and RAC One Node are not supported. +
-The Grid Infrastructure home of Oracle Restart (26ai) can be switched as well, see <<Oracle Restart: switch of the Grid Infrastructure home>>. +
+The switch of RAC and RAC One Node databases is not supported. +
+The Grid Infrastructure home of Oracle Restart and of Grid Infrastructure (cluster) 26ai can be switched as well,
+see <<Switch of the Grid Infrastructure home (Oracle Restart and cluster)>>. +
 Terms (Oracle Restart, Grid Infrastructure, RAC): see link:../featurelist.adoc[Featurelist]. +
 The guide describes the concept, all dependencies and the gaps in the current implementation.
 
@@ -350,7 +351,7 @@ With Oracle Restart the entry `<db_unique_name>:<ORACLE_HOME>:N` is written as w
 |Switch Grid Infrastructure home of Oracle Restart
 |`oraswgi_install` (`switch_home.yml`)
 |Change of `oracle_home_gi`. Oracle Restart 26ai only.
-See <<Oracle Restart: switch of the Grid Infrastructure home>>.
+See <<Switch of the Grid Infrastructure home (Oracle Restart and cluster)>>.
 |=======================
 
 ==== Gaps
@@ -377,14 +378,16 @@ The `oracle_db_type` must still be identical for all databases in the same `ORAC
 All roles and asserts must support an `ORACLE_HOME` without database.
 
 [[oracle_restart_switch_gi_home]]
-=== Oracle Restart: switch of the Grid Infrastructure home
+=== Switch of the Grid Infrastructure home (Oracle Restart and cluster)
 
-The Grid Infrastructure home of Oracle Restart is switched by `oraswgi_install`, when `oracle_home_gi` differs from `crs_home` in `/etc/oracle/olr.loc`.
+The Grid Infrastructure home of Oracle Restart and of Grid Infrastructure (cluster) is switched by `oraswgi_install`,
+when `oracle_home_gi` differs from `crs_home` in `/etc/oracle/olr.loc`.
 The new home is created from `oracle_install_image_gi`, normally a gold image of the new Release Update.
 
-IMPORTANT: Supported for Oracle Restart 26ai inside the same release (e.g. 23.26.3 => 23.26.4). +
-Not supported for 19c Oracle Restart: `-switchGridHome` is not supported by Oracle for Oracle Restart 19c (INS-45101, MOS 2764906.1). +
-Not supported for Grid Infrastructure (cluster): `oraswgi_install` stops with an error when `oracle_home_gi` differs from the running home.
+IMPORTANT: Supported for Oracle Restart 26ai and Grid Infrastructure (cluster) 26ai inside the same release (e.g. 23.26.3 => 23.26.4). +
+Not supported for 19c: `-switchGridHome` is not supported by Oracle for Oracle Restart 19c (INS-45101, MOS 2764906.1),
+19c Grid Infrastructure (cluster) is not implemented. +
+Grid Infrastructure (cluster): tested with 2 nodes and a RAC database (molecule scenario `rac`, `side_effect.yml`).
 
 .Steps of `oraswgi_install` (`switch_home.yml`)
 [options="header"]
@@ -392,22 +395,32 @@ Not supported for Grid Infrastructure (cluster): `oraswgi_install` stops with an
 |Step |User |Description
 |Extract `oracle_install_image_gi` into `oracle_home_gi`
 |grid
-|Without downtime.
+|Without downtime. +
+Grid Infrastructure (cluster): on every node.
 |`gridSetup.sh -silent -setupHomeAs <old home>`
 |grid
 |Software only installation with Oracle base and groups of the old home. Registers the new home in the central inventory. +
-Without it, `-switchGridHome` fails with `INS-45127`. Without downtime.
+Without it, `-switchGridHome` fails with `INS-45127`. Without downtime. +
+Grid Infrastructure (cluster): on every node, one after the other. `-setupHomeAs` works on the local node only,
+`-switchGridHome` needs the new home on all nodes (`INS-42016` otherwise).
 |`gridSetup.sh -silent -switchGridHome`
 |grid
-|Prepares the switch. Without downtime.
+|Prepares the switch. Without downtime. +
+Grid Infrastructure (cluster): on the primary node (1st host of `orasw_meta_cluster_hostgroup`).
 |`root.sh` of the new home
 |root
-|`roothas.pl -prepatch/-postpatch -dstcrshome <new home>`: stops the stack in the old home and starts it in the new home. +
+|Oracle Restart: `roothas.pl -prepatch/-postpatch -dstcrshome <new home>`: stops the stack in the old home and starts it in the new home. +
 *Downtime* of ASM, the listeners in the Grid Infrastructure home and all databases managed by Oracle Restart. +
-The databases are started with their start option. `oracle-ohasd.service` and the `+ASM` entry in `/etc/oratab` point to the new home.
+The databases are started with their start option. `oracle-ohasd.service` and the `+ASM` entry in `/etc/oratab` point to the new home. +
+Grid Infrastructure (cluster): `rootcrs.pl -prepatch/-postpatch -dstcrshome <new home>`, *rolling*:
+primary node first, then the other nodes one after the other (`throttle: 1`).
+Only the instances of the node in progress are stopped, the RAC databases stay available.
+`rootcrs.pl -prepatch` runs `cluvfy stage -pre patch`: `/etc/oraInst.loc` must be owned by `root` (`PRVG-2031`/`PRVG-2032`),
+`oraswgi_install` sets the owner before `root.sh`.
 |`runInstaller -updateNodeList`
 |grid
-|`CRS=TRUE` for the new home, `CRS=FALSE` for the old home in the central inventory (not changed by `root.sh`).
+|`CRS=TRUE` for the new home, `CRS=FALSE` for the old home in the central inventory (not changed by `root.sh`). +
+Grid Infrastructure (cluster): in the central inventory of every node (`-local`).
 |=======================
 
 `gi_ignoreprereq: true` adds `-ignorePrereqFailure` to `gridSetup.sh` and `-ignoreSysPrereqs` to `runInstaller`.
@@ -416,7 +429,15 @@ Listeners running from the Grid Infrastructure home (e.g. `LISTENER`) are moved 
 Listeners and databases in database homes are not changed.
 
 The old Grid Infrastructure home is not removed by the switch.
-A switch back to the old home is done in the same way by setting `oracle_home_gi` to the old home.
+
+Oracle Restart: a switch back to the old home is done in the same way by setting `oracle_home_gi` to the old home.
+
+Grid Infrastructure (cluster):
+
+* A switch back into a former home is not implemented: the former running home is locked by `root.sh`
+  (e.g. `bin/crsctl.bin` owned by `root`), `oraswgi_install` stops with an assert. Use a new `oracle_home_gi`.
+* When `root.sh` fails before the switch (e.g. the CVU check of `rootcrs.pl -prepatch`), the next run resumes with `root.sh`:
+  `-switchGridHome` is skipped, when `rootconfig.sh` of the new home is already owned by `root`.
 
 [[oracle_restart_remove_obsolete_gi_home]]
 ==== Removal of obsolete Grid Infrastructure homes
