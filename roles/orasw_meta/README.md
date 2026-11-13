@@ -1056,25 +1056,29 @@ oracle_install_option_gi: HA_CONFIG
 
 ### oracle_install_version_gi
 
-Define the version for Grid-Infrastructure or Oracle Restart.
+Define the version (base release) for Grid-Infrastructure or Oracle Restart.
 
 _Important_
 
 Do not forget to set `oracle_install_option_gi`.
 
+Set the version in every inventory with Grid Infrastructure or Oracle Restart.
+It must match the installation media (`oracle_sw_image_gi`, `oracle_install_image_gi`).
+The default is 26ai (`26.1.0.0`) as of 5.0.0 (19c before).
+
 #### Default value
 
 ```YAML
-oracle_install_version_gi: 19.3.0.0
+oracle_install_version_gi: 26.1.0.0
 ```
 
 #### Example usage
 
 ```YAML
 
-oracle_install_version_gi: 19.3.0.0
+oracle_install_version_gi: 26.1.0.0
 
-oracle_install_version_gi: 21.3.0.0
+oracle_install_version_gi: 19.3.0.0
 ```
 
 ### oracle_opatch_patch
@@ -1087,6 +1091,8 @@ The variable is configured for all supported Oracle Release by default.
 
 ```YAML
 oracle_opatch_patch:
+  - filename: p6880880_230000_Linux-x86-64.zip
+    version: 26.1.0.0
   - filename: p6880880_210000_Linux-x86-64.zip
     version: 21.3.0.0
   - filename: p6880880_190000_Linux-x86-64.zip

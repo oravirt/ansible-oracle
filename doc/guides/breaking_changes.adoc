@@ -146,6 +146,10 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<Role oraswahf_install replaced by ahf>>
 |Own playbooks use the role `oraswahf_install`
 |Use the new role `ahf` (playbook `opitzconsulting.ansible_oracle.ahf`)
+
+|<<Default of oracle_install_version_gi is 26ai>>
+|`oracle_install_option_gi` is `HA_CONFIG` or `CRS_CONFIG` *and* `oracle_install_version_gi` is not set in inventory
+|Set `oracle_install_version_gi` to the base release of the installation media, e.g. `19.3.0.0` for 19c. Usually irrelevant in practice, the version must match the installation media anyway
 |===
 
 ==== Minimum ansible-core 2.16
@@ -1583,6 +1587,46 @@ oracle_databases:
   - oracle_db_name: DB1
     init_parameters:
       - {name: processes, value: '640', scope: spfile, state: present}
+----
+
+==== Default of oracle_install_version_gi is 26ai
+
+As of 5.0.0 the default of `oracle_install_version_gi` is `26.1.0.0` (26ai) instead of `19.3.0.0` (19c).
+New installations should use the current release, an older release as default makes no sense anymore.
+
+NOTE: In practice the breaking change is usually irrelevant:
+`oracle_install_version_gi` must match the installation media of Grid Infrastructure
+(`oracle_sw_image_gi`, `oracle_install_image_gi`) and should be set in every inventory with Grid Infrastructure or Oracle Restart.
+
+`oracle_install_version_gi` is only used with `oracle_install_option_gi: HA_CONFIG` or `CRS_CONFIG`.
+Inventories without Grid Infrastructure or Oracle Restart are not affected.
+
+Who is affected:
+
+- Inventories with `oracle_install_option_gi: HA_CONFIG` or `CRS_CONFIG` without `oracle_install_version_gi`.
+  The variable selects the response file, the task file and the installation media of `oraswgi_install`,
+  and the key in `gi_patches`.
+- The default of `oracle_home_gi` contains the version:
+  `{{ oracle_base }}/{{ oracle_install_version_gi }}/grid` (Oracle Restart) and
+  `/u01/app/{{ oracle_install_version_gi }}/grid` (Grid Infrastructure).
+  Without `oracle_install_version_gi` *and* without `oracle_home_gi` in inventory,
+  `oracle_home_gi` changes from `.../19.3.0.0/grid` to `.../26.1.0.0/grid`.
++
+WARNING: For an installed Oracle Restart, a different `oracle_home_gi` starts the switch into a new home
+(Out-of-Place Patching, `switch_home.yml` of `oraswgi_install`).
+Set `oracle_install_version_gi` (and `oracle_home_gi`) before the first run with 5.0.0.
+
+Required actions:
+
+. Set `oracle_install_version_gi` to the base release of the installation media (19c: `19.3.0.0`, 26ai: `26.1.0.0`).
+. Recommended: set `oracle_home_gi` as well, to be independent from the default.
+
+.Example: Oracle Restart 19c
+[source,yaml]
+----
+oracle_install_option_gi: HA_CONFIG
+oracle_install_version_gi: 19.3.0.0
+oracle_home_gi: /u01/app/oracle/19.3.0.0/grid   # the former default
 ----
 
 === Adding new breaking changes
