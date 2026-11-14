@@ -24,12 +24,18 @@ db_standby_config:
         dg:
           connect_identifier: DB1_SITE1
           log_xpt_mode: ASYNC
+          # broker default 300: the redo transport is retried 30 seconds after an error,
+          # e.g. while the new standby database is restarted during a switchover
+          reopen_secs: 30
       - hosts: [dataguard-2]
         db_unique_name: DB1_SITE2
         initial_role: physical_standby
         dg:
           connect_identifier: DB1_SITE2
           log_xpt_mode: ASYNC
+          # broker default 300: the redo transport is retried 30 seconds after an error,
+          # e.g. while the new standby database is restarted during a switchover
+          reopen_secs: 30
 
 db_homes_installed:
   - home: db26-si-ee

@@ -101,3 +101,11 @@
           {{ _oradb_standby_broker_check.stdout_lines }}
       loop: "{{ _odb_standby_config.members | map(attribute='db_unique_name') | list }}"
       when: _oradb_standby_broker_check.stdout is defined
+
+    # dgmgrl.cfg is executed only for a new configuration
+    # => the properties of an existing configuration are changed here, when they differ
+    - name: Broker create | Broker properties of the members
+      ansible.builtin.include_tasks: broker_properties.yml
+      when: >-
+        'Configuration - ' in _oradb_standby_broker_show.stdout
+        or _oradb_standby_broker_create.stdout_lines is defined
