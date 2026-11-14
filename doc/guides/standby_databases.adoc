@@ -273,6 +273,24 @@ the standby gets its own value with `SET` in RMAN `DUPLICATE`.
 
 The SYS password is read from `dbpasswords[<oracle_db_name>]['sys']` or `default_dbpass`, like `dbca` in `oradb_manage_db`.
 
+=== Flashback Database of the standby database
+
+`RMAN DUPLICATE ... FOR STANDBY` creates the standby database with Flashback Database disabled,
+and `oradb_manage_db` changes `flashback` of `oracle_databases` on the primary database only.
+After a switchover the new primary database would have no Flashback Database.
+`oradb_standby` therefore sets `flashback` of `oracle_databases` on every physical standby database,
+for a new and for an existing one. Nothing is changed when the state already matches.
+
+- The task runs after the broker configuration was created: `ALTER DATABASE FLASHBACK ON` fails with
+  ORA-38788 (_more standby database recovery is needed_), until the standby database has applied more redo
+  than after `RMAN DUPLICATE`. The redo transport is configured by the broker.
+- `oradb_standby_flashback_retries` (default `20`) attempts, `oradb_standby_flashback_delay` (default `15`) seconds
+  between two attempts. Redo Apply is running between the attempts.
+- Redo Apply is stopped for the statement (ORA-01153) and started again in every case, also when the statement fails.
+  With a broker configuration `APPLY-OFF` / `APPLY-ON` is used, otherwise the broker would start the stopped Redo Apply again.
+- Not executed with `oradb_standby_broker_create: false`: `oradb_standby` does not create the broker configuration then
+  and cannot know, when the redo transport is available. Set Flashback Database of the standby database yourself in this case.
+
 === Archivelog deletion policy
 
 `archivelog_deletion_policy` is mandatory for `type: dataguard`:
