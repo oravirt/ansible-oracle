@@ -78,9 +78,21 @@ oracle_rsp_stage: "{{ oracle_stage }}/rsp"
 # (on hardened systems, /tmp usually is noexec-flagged and thus not usable to execute scripts)
 #
 # There is usually no need to change this variable.
+#
+# Owner and permissions of `/tmp` and `/var/tmp` are defined by the operating system. They are never
+# changed by the roles, see `orahost_meta_tmp_stage_os_managed`.
 # @end
 oracle_tmp_stage: >-
   {% if ansible_fips | default(false) %}{{ oracle_stage }}{%- endif %}/tmp
+
+# @var orahost_meta_tmp_stage_os_managed:description: >
+# `true`, when `oracle_tmp_stage` is `/tmp` or `/var/tmp`.
+# Owner and permissions of these directories are defined by the operating system (root:root, sticky bit).
+# The roles do not change them.
+#
+# There is no need to change this variable.
+# @end
+orahost_meta_tmp_stage_os_managed: "{{ (oracle_tmp_stage | trim | regex_replace('/+$', '')) in ['/tmp', '/var/tmp'] }}"
 
 # @var orahost_meta_cv_assume_distid:description: >
 # The variable is used by `oracle_script_env` and passed
