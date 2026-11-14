@@ -3,9 +3,11 @@
 # 0. asserts of orasw_meta for db_standby_config and oracle_databases with standby_config
 #    (modified inventory, no change on the hosts)
 # 1. initial state: broker SUCCESS, DB1_SITE1 primary, DB1_SITE2 physical standby,
-#    archivelog deletion policy on both members
-# 2. switchover DB1_SITE1 => DB1_SITE2, check roles and temporary tablespaces of the new primary
-# 3. switchover DB1_SITE2 => DB1_SITE1, check roles and temporary tablespaces
+#    archivelog deletion policy on both members, Flashback Database of the standby
+# 2. switchover DB1_SITE1 => DB1_SITE2, check roles, temporary tablespaces of the new primary
+#    and Flashback Database of the new standby
+# 3. switchover DB1_SITE2 => DB1_SITE1, check roles, temporary tablespaces
+#    and Flashback Database of the standby
 #
 # dgmgrl and sqlplus connect with the connect identifiers of db_standby_config from dataguard-1,
 # the SYS password is passed with stdin.
@@ -158,6 +160,11 @@
         dg_primary: "{{ dg_site1 }}"
         dg_standby: "{{ dg_site2 }}"
 
+    - name: Flashback Database of the standby {{ dg_site2 }}
+      ansible.builtin.include_tasks: tasks/dg_check_flashback.yml
+      vars:
+        dg_standby: "{{ dg_site2 }}"
+
     - name: Archivelog deletion policy of both members
       ansible.builtin.include_tasks: tasks/dg_check_adp.yml
       loop: ["{{ dg_site1 }}", "{{ dg_site2 }}"]
@@ -181,6 +188,11 @@
       vars:
         dg_primary: "{{ dg_site2 }}"
 
+    - name: Flashback Database of the new standby {{ dg_site1 }}
+      ansible.builtin.include_tasks: tasks/dg_check_flashback.yml
+      vars:
+        dg_standby: "{{ dg_site1 }}"
+
     - name: Switchover back to {{ dg_site1 }}
       ansible.builtin.include_tasks: tasks/dg_switchover.yml
       vars:
@@ -197,3 +209,8 @@
       ansible.builtin.include_tasks: tasks/dg_check_temp.yml
       vars:
         dg_primary: "{{ dg_site1 }}"
+
+    - name: Flashback Database of the standby {{ dg_site2 }} after the switchover back
+      ansible.builtin.include_tasks: tasks/dg_check_flashback.yml
+      vars:
+        dg_standby: "{{ dg_site2 }}"

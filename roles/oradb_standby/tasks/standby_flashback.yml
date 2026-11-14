@@ -1,0 +1,57 @@
+---
+# Flashback Database of a physical standby database from the inventory (flashback in oracle_databases).
+# RMAN DUPLICATE ... FOR STANDBY always creates the standby database without Flashback Database,
+# oradb_manage_db (oracle_db) changes only the primary database
+# => a missing (or not wanted) Flashback Database is changed here, also for an existing standby.
+#
+# ALTER DATABASE FLASHBACK ON/OFF is not allowed while Redo Apply is running (ORA-01153)
+# => a running Redo Apply is stopped before and started again afterwards
+#    (the Data Guard Broker keeps its state APPLY-ON).
+# Nothing is changed, when flashback is not defined or the current state is the wanted state.
+- name: Standby flashback | Flashback Database {{ 'ON' if odb.flashback | bool else 'OFF' }}
+  ansible.builtin.shell: |
+    set -eu
+    set -o pipefail
+    sql() {
+      "${ORACLE_HOME}/bin/sqlplus" -S -L /nolog <<EOF
+    connect / as sysdba
+    whenever sqlerror exit failure
+    set heading off feedback off pagesize 0 linesize 200
+    $1
+    EOF
+    }
+    current=$(sql "select flashback_on from v\$database;" | tr -d '[:space:]')
+    if [ "${current}" = "${WANTED}" ] ; then
+      echo "UNCHANGED: flashback_on=${current}"
+      exit 0
+    fi
+    # Redo Apply (MRP0) running?
+    mrp=$(sql "select count(*) from v\$dataguard_process where name like 'MRP%';" | tr -d '[:space:]')
+    if [ "${mrp}" != "0" ] ; then
+      sql "alter database recover managed standby database cancel;"
+      echo "Redo Apply stopped"
+    fi
+    if [ "${WANTED}" = "YES" ] ; then
+      sql "alter database flashback on;"
+    else
+      sql "alter database flashback off;"
+    fi
+    echo "CHANGED: flashback_on ${current} => ${WANTED}"
+    if [ "${mrp}" != "0" ] ; then
+      sql "alter database recover managed standby database disconnect from session;"
+      echo "Redo Apply started"
+    fi
+  args:
+    executable: /bin/bash
+  environment: >-
+    {{ _oracle_env | combine({'ORACLE_SID': _orasw_meta_standby_sid,
+                              'WANTED': 'YES' if odb.flashback | bool else 'NO'}) }}
+  become: true
+  become_user: "{{ oracle_user }}"
+  register: _oradb_standby_flashback
+  changed_when: "'CHANGED:' in _oradb_standby_flashback.stdout"
+
+- name: Standby flashback | Result
+  ansible.builtin.debug:
+    msg: "{{ _oradb_standby_flashback.stdout_lines }}"
+  when: _oradb_standby_flashback is changed  # noqa no-handler
