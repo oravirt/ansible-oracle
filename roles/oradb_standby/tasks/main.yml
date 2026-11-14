@@ -41,3 +41,23 @@
     - orasw_meta_primary_node | bool
     - oradb_standby_broker_create | bool
   tags: oradb_standby
+
+# RMAN DUPLICATE creates the standby database without Flashback Database
+# => flashback of the inventory on every physical standby (new and existing).
+# Executed after the broker configuration (task above runs on all hosts first):
+# ALTER DATABASE FLASHBACK ON needs more redo applied on the standby (ORA-38788),
+# the redo transport is configured by the broker.
+- name: Flashback Database of physical standby databases
+  ansible.builtin.include_tasks: flashback.yml
+  loop: >-
+    {{ oracle_databases | default([]) | selectattr('standby_config', 'defined')
+       | selectattr('state', 'equalto', 'present') | selectattr('flashback', 'defined') | list }}
+  loop_control:
+    loop_var: odb
+    label: >-
+      {{ odb.oracle_db_name | default('') }}
+      standby_config={{ odb.standby_config | default('') }}
+  when:
+    - orasw_meta_primary_node | bool
+    - oradb_standby_broker_create | bool
+  tags: oradb_standby

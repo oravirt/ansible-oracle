@@ -29,3 +29,17 @@ oradb_standby_start_apply: true
 # `false`: `dgmgrl.cfg` is created on all members, but not executed.
 # @end
 oradb_standby_broker_create: true
+
+# @var oradb_standby_flashback_retries:description: >
+# Attempts to enable Flashback Database on a physical standby database.
+#
+# `ALTER DATABASE FLASHBACK ON` fails with ORA-38788 until the standby database has applied more redo
+# than after `RMAN DUPLICATE`. The task retries after `oradb_standby_flashback_delay` seconds.
+# @end
+oradb_standby_flashback_retries: 20
+
+# @var oradb_standby_flashback_delay:description: >
+# Seconds between two attempts to enable Flashback Database on a physical standby database,
+# Redo Apply is running meanwhile.
+# @end
+oradb_standby_flashback_delay: 15

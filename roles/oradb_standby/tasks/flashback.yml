@@ -1,0 +1,16 @@
+---
+# Flashback Database of a physical standby database (flashback in oracle_databases).
+# Requires odb (entry of oracle_databases) as loop_var.
+# The role of the local database decides: a primary database is changed by oradb_manage_db.
+- name: Flashback | State of database
+  ansible.builtin.include_role:
+    name: orasw_meta
+    tasks_from: standby_state.yml
+  when:
+    - _odb_standby_config.type | default('') == 'dataguard'
+
+- name: Flashback | Flashback Database of physical standby database
+  ansible.builtin.include_tasks: standby_flashback.yml
+  when:
+    - _odb_standby_config.type | default('') == 'dataguard'
+    - _orasw_meta_standby_state.role | default('') | trim == 'PHYSICAL STANDBY'

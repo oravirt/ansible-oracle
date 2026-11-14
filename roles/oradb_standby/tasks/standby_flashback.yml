@@ -3,14 +3,18 @@
 # RMAN DUPLICATE ... FOR STANDBY always creates the standby database without Flashback Database,
 # oradb_manage_db (oracle_db) changes only the primary database
 # => a missing (or not wanted) Flashback Database is changed here, also for an existing standby.
+# Nothing is changed, when the current state is the wanted state.
 #
-# ALTER DATABASE FLASHBACK ON/OFF is not allowed while Redo Apply is running (ORA-01153)
-# => a running Redo Apply is stopped before and started again afterwards
-#    (the Data Guard Broker keeps its state APPLY-ON).
-# Nothing is changed, when flashback is not defined or the current state is the wanted state.
+# - ALTER DATABASE FLASHBACK ON/OFF is not allowed while Redo Apply is running (ORA-01153)
+#   => Redo Apply is stopped before. With a broker configuration APPLY-OFF/APPLY-ON is used,
+#      otherwise the broker would start the stopped Redo Apply again.
+# - ORA-38788 (more standby database recovery is needed): the standby database has to apply more redo,
+#   e.g. directly after RMAN DUPLICATE => Redo Apply is started again and the statement is repeated
+#   after oradb_standby_flashback_delay seconds, oradb_standby_flashback_retries times.
+# - Redo Apply is started again in every case, also when the statement fails.
 - name: Standby flashback | Flashback Database {{ 'ON' if odb.flashback | bool else 'OFF' }}
   ansible.builtin.shell: |
-    set -eu
+    set -u
     set -o pipefail
     sql() {
       "${ORACLE_HOME}/bin/sqlplus" -S -L /nolog <<EOF
@@ -20,32 +24,86 @@
     $1
     EOF
     }
+    # dgmgrl returns 0 for failed commands => check the output
+    dg() {
+      local out
+      out=$("${ORACLE_HOME}/bin/dgmgrl" -silent / "$1" 2>&1) || return 1
+      echo "${out}"
+      if echo "${out}" | grep -qE '^(Error:|ORA-|Syntax error)' ; then return 1 ; fi
+    }
+
     current=$(sql "select flashback_on from v\$database;" | tr -d '[:space:]')
+    if [ -z "${current}" ] ; then
+      echo "flashback_on of v\$database could not be read"
+      exit 1
+    fi
     if [ "${current}" = "${WANTED}" ] ; then
       echo "UNCHANGED: flashback_on=${current}"
       exit 0
     fi
-    # Redo Apply (MRP0) running?
-    mrp=$(sql "select count(*) from v\$dataguard_process where name like 'MRP%';" | tr -d '[:space:]')
-    if [ "${mrp}" != "0" ] ; then
-      sql "alter database recover managed standby database cancel;"
-      echo "Redo Apply stopped"
-    fi
-    if [ "${WANTED}" = "YES" ] ; then
-      sql "alter database flashback on;"
+
+    # broker configuration: Redo Apply is controlled by the broker (intended state of the member)
+    apply_stopped=0
+    broker=0
+    if show=$(dg "show database '${DB_UNIQUE_NAME}'") && echo "${show}" | grep -q 'Intended State:' ; then
+      broker=1
+      echo "${show}" | grep -q 'Intended State: *APPLY-ON' && apply_wanted=1 || apply_wanted=0
     else
-      sql "alter database flashback off;"
+      # without broker: Redo Apply is running, when MRP0 exists
+      [ "$(sql "select count(*) from v\$dataguard_process where name like 'MRP%';" | tr -d '[:space:]')" != "0" ] \
+        && apply_wanted=1 || apply_wanted=0
     fi
-    echo "CHANGED: flashback_on ${current} => ${WANTED}"
-    if [ "${mrp}" != "0" ] ; then
-      sql "alter database recover managed standby database disconnect from session;"
+
+    stop_apply() {
+      [ "${apply_wanted}" = "1" ] || return 0
+      if [ "${broker}" = "1" ] ; then
+        dg "edit database '${DB_UNIQUE_NAME}' set state='apply-off'" > /dev/null || return 1
+      else
+        sql "alter database recover managed standby database cancel;" > /dev/null || return 1
+      fi
+      apply_stopped=1
+      echo "Redo Apply stopped"
+    }
+    start_apply() {
+      [ "${apply_stopped}" = "1" ] || return 0
+      if [ "${broker}" = "1" ] ; then
+        dg "edit database '${DB_UNIQUE_NAME}' set state='apply-on'" > /dev/null || return 1
+      else
+        sql "alter database recover managed standby database disconnect from session;" > /dev/null || return 1
+      fi
+      apply_stopped=0
       echo "Redo Apply started"
-    fi
+    }
+    # Redo Apply is started again in every case (also after an error or exit)
+    trap 'start_apply || echo "WARNING: Redo Apply could not be started"' EXIT
+
+    if [ "${WANTED}" = "YES" ] ; then statement="alter database flashback on;" ; else statement="alter database flashback off;" ; fi
+    attempt=1
+    while : ; do
+      stop_apply || { echo "Redo Apply could not be stopped"; exit 1; }
+      if out=$(sql "${statement}" 2>&1) ; then rc=0 ; else rc=1 ; fi
+      start_apply || echo "WARNING: Redo Apply could not be started"
+      if [ "${rc}" = "0" ] ; then
+        echo "CHANGED: flashback_on ${current} => ${WANTED}"
+        exit 0
+      fi
+      if echo "${out}" | grep -q 'ORA-38788' && [ "${attempt}" -lt "${RETRIES}" ] ; then
+        echo "ORA-38788: more redo has to be applied (attempt ${attempt}/${RETRIES}), next attempt in ${DELAY} seconds"
+        attempt=$((attempt + 1))
+        sleep "${DELAY}"
+        continue
+      fi
+      echo "${out}"
+      exit 1
+    done
   args:
     executable: /bin/bash
   environment: >-
     {{ _oracle_env | combine({'ORACLE_SID': _orasw_meta_standby_sid,
-                              'WANTED': 'YES' if odb.flashback | bool else 'NO'}) }}
+                              'WANTED': 'YES' if odb.flashback | bool else 'NO',
+                              'DB_UNIQUE_NAME': _oradb_standby_unique_name | trim,
+                              'RETRIES': oradb_standby_flashback_retries | string,
+                              'DELAY': oradb_standby_flashback_delay | string}) }}
   become: true
   become_user: "{{ oracle_user }}"
   register: _oradb_standby_flashback

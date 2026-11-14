@@ -15,6 +15,8 @@ The inventory structure is described in `doc/guides/standby_databases.adoc`.
 - [Requirements](#requirements)
 - [Default Variables](#default-variables)
   - [oradb_standby_broker_create](#oradb_standby_broker_create)
+  - [oradb_standby_flashback_delay](#oradb_standby_flashback_delay)
+  - [oradb_standby_flashback_retries](#oradb_standby_flashback_retries)
   - [oradb_standby_rman_compressed](#oradb_standby_rman_compressed)
   - [oradb_standby_rman_logdir](#oradb_standby_rman_logdir)
   - [oradb_standby_rman_parallel](#oradb_standby_rman_parallel)
@@ -43,6 +45,30 @@ when no broker configuration exists and all other members are physical standby d
 
 ```YAML
 oradb_standby_broker_create: true
+```
+
+### oradb_standby_flashback_delay
+
+Seconds between two attempts to enable Flashback Database on a physical standby database,
+Redo Apply is running meanwhile.
+
+#### Default value
+
+```YAML
+oradb_standby_flashback_delay: 15
+```
+
+### oradb_standby_flashback_retries
+
+Attempts to enable Flashback Database on a physical standby database.
+
+`ALTER DATABASE FLASHBACK ON` fails with ORA-38788 until the standby database has applied more redo
+than after `RMAN DUPLICATE`. The task retries after `oradb_standby_flashback_delay` seconds.
+
+#### Default value
+
+```YAML
+oradb_standby_flashback_retries: 20
 ```
 
 ### oradb_standby_rman_compressed
