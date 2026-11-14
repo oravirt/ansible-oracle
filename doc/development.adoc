@@ -319,7 +319,7 @@ Use `cp -r` instead of `ln -sfn` for an independent copy.
 ==== Usage
 
 ----
-/pr [draft] [base=<branch>] [milestone=<name>] [label=<l1,l2,...>] [notes on content]
+/pr [draft] [base=<branch>] [milestone=<pattern>] [label=<p1,p2,...>] [notes on content]
 ----
 
 [cols="1,3"]
@@ -332,11 +332,11 @@ Use `cp -r` instead of `ln -sfn` for an independent copy.
 |`base=<branch>`
 |Target branch. Default: default branch of the target repository.
 
-|`milestone=<name>`
-|Milestone in the target repository, name or number (e.g. `milestone=4.17`).
+|`milestone=<pattern>`
+|Milestone in the target repository. The value is searched as case-insensitive regular expression in the titles of the open milestones (e.g. `milestone=5.0` or `milestone=5.0.*alpha`). A number is the number of the milestone.
 
-|`label=<l1,l2,...>`
-|Comma-separated labels in the target repository (e.g. `label=bug`).
+|`label=<p1,p2,...>`
+|Comma-separated labels in the target repository. Every entry is searched as case-insensitive regular expression in the label names (e.g. `label=enh,bug,break`).
 
 |any text
 |Hints for title and description of the Pull-Request.
@@ -345,7 +345,7 @@ Use `cp -r` instead of `ln -sfn` for an independent copy.
 .Examples
 ----
 /pr milestone=4.17 label=bug
-/pr draft milestone="5.0.0 alpha" label=enhancement,breaking_change
+/pr draft milestone=5.0.*alpha label=enh,break
 ----
 
 ==== Behavior
@@ -353,7 +353,9 @@ Use `cp -r` instead of `ln -sfn` for an independent copy.
 * The target is the remote `upstream`, if it exists (Pull-Request from `<fork-owner>:<branch>` into `oravirt/ansible-oracle`), otherwise `origin`.
 * On the default branch a new branch is created.
 * A missing fragment in `changelogs/fragments` is created. The PR reference is added later with `tools/release/fix_fragments.py`.
-* Labels and milestones are checked against the target repository before pushing. Unknown values stop the skill, nothing is created.
+* Labels and milestones are resolved against the target repository before pushing. Only open milestones are considered.
+  An exact name wins, otherwise the value is searched as regular expression.
+  The skill stops when a value matches nothing or more than one name (the matches are listed), nothing is created.
   Setting labels or milestones in `oravirt/ansible-oracle` needs the `triage` permission.
 * An existing Pull-Request for the branch is updated (push, labels, milestone) instead of creating a new one.
 * The skill asks before a force push, a push into the default branch, unrelated uncommitted changes or merge conflicts.
