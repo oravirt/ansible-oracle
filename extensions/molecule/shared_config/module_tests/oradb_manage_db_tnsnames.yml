@@ -1,0 +1,39 @@
+---
+# Role test for oradb_manage_db: IFILE entry in tnsnames.ora (read only)
+# dbca writes the tnsnames.ora of the ORACLE_HOME and removes the IFILE entry. The role creates the entry
+# after the creation of the databases too => the entry exists after the 1st converge, before an idempotence run.
+# - tnsnames.ora contains exactly 1 IFILE entry for tnsnames_ansible.ora in mt_tns_admin
+# - tnsnames_ansible.ora exists
+- name: oradb_manage_db_tnsnames | tnsnames.ora
+  ansible.builtin.slurp:
+    src: "{{ mt_tns_admin }}/tnsnames.ora"
+  register: _tns_file
+  failed_when: false
+
+- name: oradb_manage_db_tnsnames | tnsnames_ansible.ora
+  ansible.builtin.stat:
+    path: "{{ mt_tns_admin }}/tnsnames_ansible.ora"
+  register: _tns_ansible_file
+
+- name: oradb_manage_db_tnsnames | check IFILE entry
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    _tns_text: "{{ _tns_file.content | default('') | b64decode }}"
+    _tns_ifile_lines: "{{ _tns_text | regex_findall('(?m)^IFILE=.*$') }}"
+    mt_id: oradb_manage_db_tnsnames.ifile
+    mt_res:
+      changed: false
+      failed: >-
+        {{ _tns_ifile_lines != ['IFILE=' ~ mt_tns_admin ~ '/tnsnames_ansible.ora'] }}
+      msg: "IFILE entries in {{ mt_tns_admin }}/tnsnames.ora: {{ _tns_ifile_lines }}"
+    mt_expect: ok
+
+- name: oradb_manage_db_tnsnames | check tnsnames_ansible.ora
+  ansible.builtin.include_tasks: _check.yml
+  vars:
+    mt_id: oradb_manage_db_tnsnames.tnsnames_ansible
+    mt_res:
+      changed: false
+      failed: "{{ not _tns_ansible_file.stat.exists }}"
+      msg: "{{ mt_tns_admin }}/tnsnames_ansible.ora exists: {{ _tns_ansible_file.stat.exists }}"
+    mt_expect: ok

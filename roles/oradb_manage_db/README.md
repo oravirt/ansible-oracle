@@ -129,6 +129,8 @@ oradb_manage_db_dbca_ignore_prereq_failure: '{{ gi_ignoreprereq | default(false)
 
 **_tnsnames2_**
 
+**_tnsnames2,create_db,dbca_**
+
 **_update_oratab_**
 
 ## Open Tasks

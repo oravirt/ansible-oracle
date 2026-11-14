@@ -101,6 +101,25 @@
   when: oracle_databases is defined
   tags: create_db,dbca,customdbcatemplate,dotprofile_db,listener2
 
+# dbca writes the tnsnames.ora of the ORACLE_HOME and removes the IFILE entry of loop_tnsnames.yml
+# => the entry once more after the creation of the databases (otherwise the aliases of
+#    tnsnames_ansible.ora are not available after the 1st run and the 2nd run changes the file)
+- name: manage_db | IFILE entry in tnsnames.ora after the creation of the databases
+  ansible.builtin.include_tasks:
+    file: tnsnames_ifile.yml
+    apply:
+      tags:
+        - tnsnames2
+        - create_db
+        - dbca
+  with_items:
+    - "{{ tnsnames_installed }}"
+  loop_control:
+    loop_var: tnsinst
+    label: "{{ tnsinst.tnsname | default('') }}"
+  when: tnsnames_installed is defined
+  tags: tnsnames2,create_db,dbca
+
 # Autostart: one systemd unit per database and listener.
 # autostartup_service_mode: legacy is configured in oraswdb_install.
 - name: manage_db | Autostart with systemd units
