@@ -14,6 +14,7 @@ ADD DATABASE '{{ m.db_unique_name }}' AS CONNECT IDENTIFIER IS '{{ m.dg.connect_
 {% for m in [_odb_standby_member] + _odb_standby_others %}
 EDIT DATABASE '{{ m.db_unique_name }}' SET PROPERTY 'LogXptMode'='{{ m.dg.log_xpt_mode | default('ASYNC') }}';
 EDIT DATABASE '{{ m.db_unique_name }}' SET PROPERTY 'DelayMins'={{ m.dg.delay_mins | default(0) | int }};
+EDIT DATABASE '{{ m.db_unique_name }}' SET PROPERTY 'ReopenSecs'={{ m.dg.reopen_secs | default(300) | int }};
 {% endfor %}
 ENABLE CONFIGURATION;
 {% if _oradb_standby_protection_mode != 'MaxPerformance' %}

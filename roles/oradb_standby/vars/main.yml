@@ -120,3 +120,18 @@ _oradb_standby_adp_current: >-
       | select('match', '^CONFIGURE ARCHIVELOG DELETION POLICY TO ') | list + [''])
      | first | upper | regex_replace('^CONFIGURE ARCHIVELOG DELETION POLICY TO ', '')
      | regex_replace(';.*$', '') | replace("'", '') | regex_replace('\s+', ' ') | trim }}
+
+# Broker properties of all members (broker_properties.yml, dgmgrl.cfg.j2):
+# [{db, name, value, quote}] quote: string property (LogXptMode) in quotes for EDIT DATABASE
+_oradb_standby_broker_props: >-
+  {%- set __p = [] -%}
+  {%- for m in _odb_standby_config.members | default([]) -%}
+  {%-   set __dg = m.dg | default({}) -%}
+  {%-   set _ = __p.append({'db': m.db_unique_name, 'name': 'LogXptMode',
+                            'value': __dg.log_xpt_mode | default('ASYNC') | string, 'quote': true}) -%}
+  {%-   set _ = __p.append({'db': m.db_unique_name, 'name': 'DelayMins',
+                            'value': __dg.delay_mins | default(0) | int | string, 'quote': false}) -%}
+  {%-   set _ = __p.append({'db': m.db_unique_name, 'name': 'ReopenSecs',
+                            'value': __dg.reopen_secs | default(300) | int | string, 'quote': false}) -%}
+  {%- endfor -%}
+  {{ __p }}

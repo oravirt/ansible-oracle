@@ -109,6 +109,9 @@
               - >-
                 _members_dg | map(attribute='delay_mins', default=0) | map('string')
                 | reject('match', '^[0-9]+$') | list | length == 0
+              - >-
+                _members_dg | map(attribute='reopen_secs', default=300) | map('string')
+                | reject('match', '^[0-9]+$') | list | length == 0
               # MaxAvailability and MaxProtection need SYNC or FASTSYNC for a standby
               - >-
                 _protection_mode == 'MaxPerformance'

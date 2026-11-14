@@ -89,6 +89,7 @@ List of standby configurations.
 |`connect_identifier` | - | TNS alias from `oracle_tnsnames_config`. Used for redo transport and as broker property `DGConnectIdentifier`.
 |`log_xpt_mode` | `ASYNC` | Broker property `LogXptMode`: `ASYNC`, `SYNC` or `FASTSYNC`
 |`delay_mins` | `0` | Broker property `DelayMins` (delay of redo apply in minutes)
+|`reopen_secs` | `300` | Broker property `ReopenSecs`: seconds until the redo transport to this member is retried after an error, e.g. while the standby database is restarted during a switchover
 |`create_method` | `create_method` of the configuration | Method for the creation of this standby database
 |`create_tasks_file` | `create_tasks_file` of the configuration | Tasks file for `create_method: custom`
 |`archivelog_deletion_policy` | `archivelog_deletion_policy` of the configuration | RMAN `CONFIGURE ARCHIVELOG DELETION POLICY TO <value>` of this member
@@ -343,7 +344,7 @@ The content depends on the inventory only, not on the current role => it is iden
 .Content
 - `CREATE CONFIGURATION '<name>' AS PRIMARY DATABASE IS '<local db_unique_name>' CONNECT IDENTIFIER IS '<connect_identifier>'`
 - `ADD DATABASE ... MAINTAINED AS PHYSICAL` for all other members
-- `EDIT DATABASE ... SET PROPERTY` `LogXptMode` (`log_xpt_mode`) and `DelayMins` (`delay_mins`) for all members
+- `EDIT DATABASE ... SET PROPERTY` `LogXptMode` (`log_xpt_mode`), `DelayMins` (`delay_mins`) and `ReopenSecs` (`reopen_secs`) for all members
 - `ENABLE CONFIGURATION`
 - `EDIT CONFIGURATION SET PROTECTION MODE` (only when `protection_mode` is not `MaxPerformance`)
 - `SHOW CONFIGURATION`
@@ -354,6 +355,10 @@ dgmgrl / "@$ORACLE_BASE/admin/<db_unique_name>/pfile/dgmgrl.cfg"
 ----
 
 Requirements: `dg_broker_start=TRUE` on all members and no existing broker configuration.
+
+For an existing broker configuration `oradb_standby` compares the properties `LogXptMode`, `DelayMins`
+and `ReopenSecs` of all members on the host of the primary database (`SHOW DATABASE ... '<property>'`)
+and changes only the differing properties (`EDIT DATABASE ... SET PROPERTY`).
 
 IMPORTANT: `dg_broker_config_file1`, `dg_broker_config_file2`, `dg_broker_start` and `standby_file_management`
 must be defined in `init_parameters` of all members (`state: present`, `sid: '*'`).
@@ -490,7 +495,7 @@ The asserts can be disabled with `orasw_meta_assert_db_standby_config: false`.
 - `db_unique_name` is defined for each member and unique in the configuration (case insensitive).
 - `protection_mode` is `MaxPerformance`, `MaxAvailability` or `MaxProtection` (case sensitive).
 - `log_xpt_mode` is `ASYNC`, `SYNC` or `FASTSYNC`.
-- `delay_mins` is an integer >= 0.
+- `delay_mins` and `reopen_secs` are integers >= 0.
 - `MaxAvailability` and `MaxProtection` need `SYNC` or `FASTSYNC` for at least 1 member
   with `initial_role: physical_standby`.
 - `connect_identifier` is defined for each member and exists in `oracle_tnsnames_config`.

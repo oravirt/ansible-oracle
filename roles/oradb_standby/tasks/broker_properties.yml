@@ -1,0 +1,54 @@
+---
+# Broker properties LogXptMode, DelayMins and ReopenSecs of all members from db_standby_config
+# (log_xpt_mode, delay_mins, reopen_secs), executed on the host of the primary database.
+# dgmgrl.cfg sets them only for a new configuration => an existing configuration is changed here.
+# Only differing properties are changed (EDIT DATABASE ... SET PROPERTY).
+- name: Broker properties | Current properties
+  ansible.builtin.command:
+    argv:
+      - "{{ _oracle_home_db }}/bin/dgmgrl"
+      - -silent
+      - /
+      - "show database '{{ item.db }}' '{{ item.name }}'"
+  environment: "{{ _oracle_env | combine({'ORACLE_SID': _orasw_meta_standby_sid}) }}"
+  become: true
+  become_user: "{{ oracle_user }}"
+  register: _oradb_standby_broker_prop
+  changed_when: false
+  # dgmgrl returns 0 for failed commands => check the output
+  failed_when: >-
+    _oradb_standby_broker_prop.rc != 0
+    or _oradb_standby_broker_prop.stdout is search('(?m)^(Error:|ORA-)')
+  check_mode: false
+  loop: "{{ _oradb_standby_broker_props }}"
+  loop_control:
+    label: "{{ item.db }} {{ item.name }}={{ item.value }}"
+
+# output: "  ReopenSecs = '300'"
+- name: Broker properties | Change properties
+  ansible.builtin.command:
+    argv:
+      - "{{ _oracle_home_db }}/bin/dgmgrl"
+      - -silent
+      - /
+      - >-
+        edit database '{{ item.item.db }}' set property
+        '{{ item.item.name }}'={{ ("'" ~ item.item.value ~ "'") if item.item.quote else item.item.value }}
+  environment: "{{ _oracle_env | combine({'ORACLE_SID': _orasw_meta_standby_sid}) }}"
+  become: true
+  become_user: "{{ oracle_user }}"
+  register: _oradb_standby_broker_prop_edit
+  changed_when: true
+  # dgmgrl returns 0 for failed commands => check the output
+  failed_when: >-
+    _oradb_standby_broker_prop_edit.rc != 0
+    or _oradb_standby_broker_prop_edit.stdout is search('(?m)^(Error:|ORA-)')
+  vars:
+    # current value from "  ReopenSecs = '300'" (regex_findall: no backreference argument,
+    # a backslash in a conditional is not handled like in a template)
+    _oradb_standby_broker_prop_current: >-
+      {{ (item.stdout | regex_findall(item.item.name ~ " *= *'([^']*)'") + ['']) | first | upper }}
+  loop: "{{ _oradb_standby_broker_prop.results }}"
+  loop_control:
+    label: "{{ item.item.db }} {{ item.item.name }}={{ item.item.value }}"
+  when: _oradb_standby_broker_prop_current != item.item.value | upper
