@@ -89,6 +89,15 @@
               with {{ _odb_standby_create_method }} did not result in a mounted physical standby
               (exists={{ _orasw_meta_standby_state.exists }}, role={{ _orasw_meta_standby_state.role }}).
 
+# RMAN DUPLICATE creates the standby database without Flashback Database
+# => flashback of the inventory on every physical standby (new and existing)
+- name: Standby | Flashback Database of physical standby database
+  ansible.builtin.include_tasks: standby_flashback.yml
+  when:
+    - _odb_standby_config.type | default('') == 'dataguard'
+    - odb.flashback is defined
+    - _orasw_meta_standby_state.role | default('') | trim == 'PHYSICAL STANDBY'
+
 - name: Standby | dgmgrl configuration file
   ansible.builtin.include_tasks: broker_cfg.yml
   when:

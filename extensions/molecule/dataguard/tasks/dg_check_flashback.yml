@@ -1,0 +1,19 @@
+---
+# Flashback Database of the physical standby database:
+# RMAN DUPLICATE creates the standby without Flashback Database, oradb_standby sets flashback
+# of the inventory => the standby (and after a switchover the new standby) has flashback_on YES.
+# Input: dg_standby (connect identifier of the standby database)
+- name: Flashback Database of {{ dg_standby }}
+  ansible.builtin.include_tasks: dg_sql.yml
+  vars:
+    dg_sql_ci: "{{ dg_standby }}"
+    dg_sql: "select 'FLASHBACK=' || flashback_on from v$database;"
+
+- name: Assert Flashback Database of {{ dg_standby }}
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - ('FLASHBACK=' ~ _dg_flashback_expected) in dg_sql_result
+    fail_msg: "{{ dg_standby }}: expected flashback_on {{ _dg_flashback_expected }}, found {{ dg_sql_result }}"
+  vars:
+    _dg_flashback_expected: "{{ 'YES' if dg_db.flashback | default(false) | bool else 'NO' }}"
