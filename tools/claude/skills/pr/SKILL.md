@@ -1,7 +1,8 @@
 ---
 name: pr
 description: Creates a GitHub pull request from the current state of the local Git repo (create branch, commit, push, gh pr create). Only on explicit invocation via /pr.
-argument-hint: "[draft] [base=<branch>] [milestone=<name>] [label=<l1,l2,...>] [notes on content]"
+argument-hint: "[draft] [base=<branch>] [milestone=<pattern>] [label=<p1,p2,...>] [notes on content]"
+model: sonnet
 disable-model-invocation: true
 ---
 
@@ -13,9 +14,12 @@ Do not ask again – only stop in the cases listed under "Stop rules".
 Arguments (`$ARGUMENTS`, all optional):
 - `draft` → create the PR as a draft
 - `base=<branch>` → override the target branch
-- `milestone=<name>` → set a milestone in the target repo (name or number; quote names containing
-  spaces: `milestone="Release 4.15"`)
-- `label=<l1,l2,...>` → set labels in the target repo, comma-separated
+- `milestone=<pattern>` → set a milestone in the target repo. The value is a case-insensitive
+  regex (e.g. `milestone=5.0.*` or `milestone=rel.*4`) that is searched in the titles of the
+  **open** milestones only (see "Pattern matching"); a plain number is the milestone number.
+  Quote values containing spaces: `milestone="Release 4.15"`
+- `label=<p1,p2,...>` (also `labels=`) → set labels in the target repo, comma-separated; every entry
+  is a case-insensitive regex that is searched in the label names (e.g. `label=enh,bug,break`)
 - any other text → hints for title/description
 
 ## 1. Provide gh
@@ -37,14 +41,33 @@ Login lives in `~/.config/gh/hosts.yml` (account `Rendanic`), no `gh auth login`
 - Base branch: `base=` from the arguments, otherwise the default branch of the target repo
   (`gh repo view <owner/repo> --json defaultBranchRef -q .defaultBranchRef.name`)
 - Is there already a PR for the branch? `gh pr list --repo <target> --head <branch> --state open`
-  → if so: commit + push; add `milestone=`/`label=` via
+  → if so: commit + push; add `milestone=`/`label=` (resolved as described under "Pattern matching") via
   `gh pr edit <nr> --repo <target> --milestone … --add-label …`; report the URL, done.
-- Validate `milestone=`/`label=` against the **target repo** before pushing:
-  - `gh label list --repo <target> --limit 200 --json name -q '.[].name'`
-  - `gh api repos/<target>/milestones?state=open --jq '.[] | "\(.number) \(.title)"'`
-    (resolve a number to the title, `gh` expects the title)
-  - Unknown label/milestone → stop and list the existing ones (similar names first).
-    Never create anything automatically.
+- Resolve `milestone=`/`label=` against the **target repo** before pushing (see "Pattern matching").
+  The result is the exact milestone title and the exact label names; `gh` expects these, not the
+  pattern. Never create anything automatically.
+
+### Pattern matching (milestone and labels)
+
+Candidates (never use anything else; closed milestones are not considered):
+- labels: `gh label list --repo <target> --limit 200 --json name -q '.[].name'`
+- milestones, **open only**:
+  `gh api --paginate "repos/<target>/milestones?state=open&per_page=100" --jq '.[] | "\(.number)\t\(.title)"'`
+
+Matching per value (milestone: the one value; labels: each comma-separated entry separately):
+1. milestone only: a value consisting only of digits = milestone number → must be one of the open
+   milestones, otherwise "unknown".
+2. Exact match of the whole name/title (case-insensitive) → take it, done.
+3. Otherwise search the value as an extended regex (`grep -iE -- "<value>"`, unanchored, so
+   `enh` finds `enhancement` and `5.0` finds `5.0.0`) in the candidate names. Pass the value
+   quoted, no shell expansion of `*`. Invalid regex → treat the value literally (`grep -iF`).
+4. Exactly one hit → take it. Mention in the final output which pattern resolved to which name.
+5. No hit → stop, list all candidates (milestone: only the open ones).
+6. Several hits → stop, list the hits for this value and ask for a more precise pattern. Do not
+   guess. Exception: several hits for a **label** entry are not resolved by choosing the first one,
+   it is the same stop.
+
+Different entries of `label=` must resolve to different labels; duplicates are removed.
 
 ## 3. Branch
 
@@ -96,4 +119,5 @@ gh pr create --repo <target-owner/repo> --base <base> --head <origin-owner>:<bra
 - Uncommitted changes clearly belong to different topics
 - Merge conflicts / rebase required
 - No changes compared to the base → report, do nothing
-- A given label or milestone does not exist in the target repo
+- A given label or milestone pattern matches nothing (milestone: no open milestone) or is ambiguous
+  in the target repo
