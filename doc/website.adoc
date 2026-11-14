@@ -152,6 +152,10 @@ Steps for an update of Docsy:
 NOTE: `security.exec.osEnv` in `website/hugo.yaml` passes `GEM_HOME` to `asciidoctor`.
 Without it, `asciidoctor` does not find its gem in the base image.
 
+NOTE: Since hugo 0.170, the SCSS of Docsy is compiled with Dart Sass (`sass` in the base image), libsass was removed.
+`security.exec.allow` in `website/hugo.yaml` must contain `^sass$`.
+The deprecation warnings of Dart Sass come from Docsy and Bootstrap.
+
 == Container Setup
 
 The setup of Docker or Podman is described in the link:development.adoc#_development_environment[Development Guide].
