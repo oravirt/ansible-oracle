@@ -23,10 +23,13 @@
 # Delegate=yes), otherwise systemd stops them with the session during a shutdown of the server.
 #
 # db-monitor is the main process of oracle-db@<ORACLE_SID>.service. When PMON is gone, the last
-# entry in the alert log decides:
+# entry in the alert log since the start of the monitor decides:
 # - "Instance shutdown complete" or "Instance shutdown (abort)  complete": shutdown outside of
 #   systemd => exit 0, no restart
-# - otherwise the instance crashed => exit 1, systemd restarts the unit with Restart=on-failure,
+# - otherwise the instance crashed (e.g. all processes killed by the OOM killer: no entry)
+# The entry is written by the foreground process of the shutdown after the end of the background
+# processes => db-monitor waits up to SHUTDOWN_ENTRY_WAIT seconds for it. A stop of the unit
+# (db-stop) creates the file "stopping" in RuntimeDirectory= of the unit => exit 0. => exit 1, systemd restarts the unit with Restart=on-failure,
 #   exit 3 with ORACLE_RESTART=no (RestartPreventExitStatus=3 => unit failed, no restart)
 
 set -u
@@ -35,10 +38,14 @@ PROGNAME=$(basename "$0")
 SYSTEMD_PRIVATE_SOCKET=/run/systemd/private
 # seconds between 2 checks of PMON
 MONITOR_INTERVAL=10
+# seconds db-monitor waits for "Instance shutdown complete" after the end of the instance
+SHUTDOWN_ENTRY_WAIT=15
 ORATAB=/etc/oratab
 SYSCONFIG_DIR=/etc/sysconfig/oracledb
 # exit code of db-monitor after a crash without restart (RestartPreventExitStatus= of the unit)
 EXIT_NO_RESTART=3
+# created by db-stop in RuntimeDirectory= of the unit (removed by systemd after the stop)
+STOP_MARKER=${RUNTIME_DIRECTORY:+${RUNTIME_DIRECTORY}/stopping}
 
 log() {
     echo "${PROGNAME}: $*"
@@ -181,7 +188,7 @@ select value from v\$diag_info where name = 'Diag Trace';" | tail -1)
 
 db_monitor() {
     local sid=${1}
-    local alertlog last i restart
+    local alertlog offset size last i restart
     export ORACLE_SID=${sid}
     set_db_oracle_home "${sid}"
     set_oracle_env
@@ -189,6 +196,9 @@ db_monitor() {
 
     [ -n "$(pmon_pid "${sid}")" ] || die "Database ${sid} is not running"
     alertlog=$(alert_log "${sid}")
+    # only entries written after the start of the monitor are relevant, an older
+    # "Instance shutdown complete" must not hide a crash without an entry in the alert log
+    offset=$(stat -c %s "${alertlog}" 2>/dev/null || echo 0)
     log "Monitoring database ${sid}, alert log ${alertlog}"
 
     while [ -n "$(pmon_pid "${sid}")" ] ; do
@@ -205,12 +215,29 @@ db_monitor() {
     done
 
     # shutdown abort writes "Instance terminated by USER" before "Instance shutdown (abort)  complete"
-    last=$(grep -E 'Instance shutdown .*complete|Instance terminated by|terminating the instance' \
-           "${alertlog}" 2>/dev/null | tail -1)
-    if [[ "${last}" =~ ^Instance\ shutdown\ .*complete ]] ; then
-        log "Database ${sid} was shut down outside of systemd"
-        exit 0
-    fi
+    i=0
+    while : ; do
+        if [ -n "${STOP_MARKER}" ] && [ -f "${STOP_MARKER}" ] ; then
+            log "Database ${sid} was stopped by systemd"
+            exit 0
+        fi
+        # alert log rotated (smaller than at the start) => complete file
+        size=$(stat -c %s "${alertlog}" 2>/dev/null || echo 0)
+        [ "${size}" -ge "${offset}" ] || offset=0
+        last=$(tail -c +$((offset + 1)) "${alertlog}" 2>/dev/null \
+               | grep -E 'Instance shutdown .*complete|Instance terminated by|terminating the instance' | tail -1)
+        if [[ "${last}" =~ ^Instance\ shutdown\ .*complete ]] ; then
+            log "Database ${sid} was shut down outside of systemd"
+            exit 0
+        fi
+        # crash entry (not "Instance terminated by USER" of a shutdown abort) => no wait
+        if [ -n "${last}" ] && [[ ! "${last}" =~ ^Instance\ terminated\ by\ USER ]] ; then
+            break
+        fi
+        [ ${i} -lt ${SHUTDOWN_ENTRY_WAIT} ] || break
+        sleep 1
+        i=$((i + 1))
+    done
     log "ERROR: Database ${sid} crashed: ${last:-no entry found in ${alertlog}}"
 
     # read ORACLE_RESTART from the file => a change by ansible-oracle is used without a restart
@@ -243,6 +270,11 @@ db_stop() {
         set_db_oracle_home "${sid}"
     fi
     set_oracle_env
+
+    # db-monitor ends with exit 0 when PMON is gone
+    if [ -n "${STOP_MARKER}" ] ; then
+        touch "${STOP_MARKER}" || log "WARNING: Could not create ${STOP_MARKER}"
+    fi
 
     local mode=${ORACLE_SHUTDOWN_MODE:-immediate}
     log "Stopping database ${sid} (shutdown ${mode}) from ${ORACLE_HOME}"
