@@ -48,16 +48,23 @@
       ansible.builtin.package:
         name: python3-pexpect
 
+    # The directories are also created by other tasks, the same mode is needed in each case
+    # (otherwise both tasks change the mode in every run => idempotence test):
+    # - oracle_stage: role orahost (mode 0775)
+    # - download directory: role autoupgrade, download_patches.yml (mode 0755, no owner)
+    # The owner is needed here: the role would create the download directory as root.
     - name: Create oracle_stage and download directory
       ansible.builtin.file:
-        path: "{{ item }}"
+        path: "{{ item.path }}"
         state: directory
         owner: "{{ oracle_user }}"
         group: "{{ oracle_group }}"
-        mode: "0755"
+        mode: "{{ item.mode }}"
       loop:
-        - "{{ oracle_stage }}"
-        - "{{ autoupgrade_download_dir }}"
+        - {path: "{{ oracle_stage }}", mode: "0775"}
+        - {path: "{{ autoupgrade_download_dir }}", mode: "0755"}
+      loop_control:
+        label: "{{ item.path }}"
 
     - name: Install autoupgrade.jar
       ansible.builtin.import_role:
