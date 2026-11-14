@@ -20,3 +20,23 @@ dependencies:
   community.crypto: '>=2.21.1,<3.0.0'
   ansible.posix: '2.2.2'
   ansible.utils: '6.1.1'
+# not part of the collection: website (Hugo) and local files of the development environment
+# (ansible-galaxy collection install <dir> copies all files, e.g. tools/collection_install.sh)
+# fnmatch: '*' matches '/' as well => '*/<name>' ignores <name> in subdirectories
+build_ignore:
+  - .ansible
+  - "*/.ansible"
+  - .venv
+  - "*/.venv"
+  - .direnv
+  - .vagrant
+  - "*/.vagrant"
+  - context
+  - "example/*/ansible/context"
+  - .env
+  - "*/.env"
+  - extensions/.env.yml
+  - .renovate-report.json
+  - "*/__pycache__"
+  - website
+  - "*.tar.gz"

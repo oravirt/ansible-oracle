@@ -27,6 +27,9 @@ ExecStart=/usr/local/bin/oracle-systemd db-monitor %i
 # as root: attach a database, which was started outside of systemd
 ExecStartPost=+/usr/local/bin/oracle-systemd attach %n
 ExecStop=/usr/local/bin/oracle-systemd db-stop %i
+# /run/oracle-db-<ORACLE_SID> (owner User=): db-stop marks the stop for db-monitor,
+# systemd removes the directory after the stop
+RuntimeDirectory=oracle-db-%i
 # restart after a crash of the database, exit code 3 of the monitor: crash with ORACLE_RESTART=no
 # in /etc/sysconfig/oracledb/db-<ORACLE_SID> (autostartup_service_restart of the database)
 Restart=on-failure

@@ -4,8 +4,34 @@
 # The loop devices for ASM (converge.yml) are devices of the kernel. They survive the
 # containers => stop the Clusterware stack, detach the loop devices, remove the sparse files
 # (docker volume molecule-rac-asm).
+#
+# The containers may be gone, while the molecule state still says created (e.g. removed
+# with docker rm). Then the cleanup runs in a temporary privileged container with the
+# docker volume, otherwise converge would use the old sparse files with ASM headers.
+# A failed cleanup must not stop destroy (the state would not be reset).
+- name: Running containers of the cluster
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: State of the containers
+      ansible.builtin.command:
+        argv: [docker, inspect, -f, "{{ '{{' }}.State.Running{{ '}}' }}", "{{ item }}"]
+      loop: "{{ groups['rac'] }}"
+      register: _rac_containers
+      changed_when: false
+      failed_when: false
+
+    - name: Group of running containers
+      ansible.builtin.add_host:
+        name: "{{ item.item }}"
+        groups: rac_running
+      loop: "{{ _rac_containers.results | selectattr('stdout', 'equalto', 'true') | list }}"
+      loop_control:
+        label: "{{ item.item }}"
+      changed_when: false
+
 - name: Cleanup Grid Infrastructure cluster
-  hosts: rac
+  hosts: rac_running
   gather_facts: false
   become: true
   ignore_unreachable: true
@@ -19,7 +45,7 @@
       failed_when: false
 
 - name: Cleanup shared ASM disks
-  hosts: rac
+  hosts: rac_running
   gather_facts: false
   become: true
   ignore_unreachable: true
@@ -44,4 +70,48 @@
       register: _loop_cleanup
       changed_when: _loop_cleanup.stdout | length > 0
       failed_when: false
-      run_once: true
+      # shared volume => only on one node
+      when: inventory_hostname == ansible_play_hosts[0]
+
+# no running container: loop devices and sparse files in a temporary container
+# (privileged: losetup -d, same path of the volume as in the containers for losetup -j)
+- name: Cleanup shared ASM disks without running containers
+  hosts: localhost
+  gather_facts: false
+  vars:
+    _asm_dir: "{{ hostvars[groups['rac'][0]]['molecule_asm_shared_dir'] }}"
+    _asm_files: >-
+      {{ hostvars[groups['rac'][0]]['asm_diskgroups'] | subelements('disk') | map(attribute='1')
+         | map(attribute='device') | map('basename') | list }}
+  tasks:
+    - name: Detach loop devices and remove sparse files in a temporary container
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - --privileged
+          - -v
+          - "molecule-rac-asm:{{ _asm_dir }}"
+          - "{{ lookup('ansible.builtin.env', 'MOLECULE_IMAGE') | default('quay.io/rendanic/docker-ol9-ansible:latest', true) }}"
+          - /bin/bash
+          - -c
+          - |
+            for f in {{ _asm_files | join(' ') }}; do
+              file={{ _asm_dir }}/${f}
+              for dev in $(losetup --list --noheadings -O NAME -j "${file}"); do
+                losetup -d "${dev}" && echo "detached ${dev}"
+              done
+              if [ -f "${file}" ]; then
+                rm -f "${file}" && echo "removed ${file}"
+              fi
+            done
+      register: _asm_cleanup
+      changed_when: _asm_cleanup.stdout | length > 0
+      failed_when: false
+      when: groups['rac_running'] | default([]) | length == 0
+
+    - name: Result of the cleanup in a temporary container
+      ansible.builtin.debug:
+        var: _asm_cleanup.stdout_lines
+      when: _asm_cleanup.stdout_lines | default([]) | length > 0
