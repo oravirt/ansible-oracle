@@ -107,7 +107,8 @@
   become: true
   become_user: "{{ oracle_user }}"
   register: _oradb_standby_flashback
-  changed_when: "'CHANGED:' in _oradb_standby_flashback.stdout"
+  # a line starting with CHANGED: ('UNCHANGED: ...' contains the string 'CHANGED:' as well)
+  changed_when: _oradb_standby_flashback.stdout_lines | select('match', '^CHANGED:') | list | length > 0
 
 - name: Standby flashback | Result
   ansible.builtin.debug:
