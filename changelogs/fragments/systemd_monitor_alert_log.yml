@@ -1,0 +1,6 @@
+bugfixes:
+  - "oradb_manage_db: the monitor of the systemd unit (oracle-systemd db-monitor) only uses alert log entries written after its start. An older 'Instance shutdown complete' hid a crash without an entry (e.g. OOM killer) and the database was not restarted (oravirt#265)"
+  - "oradb_manage_db: a stop of the database unit with systemctl no longer leaves the unit failed, when the monitor sees the end of PMON before the entry in the alert log (oravirt#265)"
+trivial:
+  - "galaxy.yml: build_ignore for website and local development files (.venv, .ansible, .env), the installation of the collection from the repository is much faster"
+  - "molecule rac: cleanup.yml works without running containers"
