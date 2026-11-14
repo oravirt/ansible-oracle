@@ -63,6 +63,8 @@
     group: "{{ item.group }}"
     state: directory
   with_items: "{{ _oraswgi_manage_patches_oracle_directories }}"
+  # owner and permissions of /tmp and /var/tmp are defined by the operating system
+  when: not (orahost_meta_tmp_stage_os_managed | bool and item.name == oracle_tmp_stage)
   tags:
     - directories
 

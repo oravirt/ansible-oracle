@@ -15,6 +15,8 @@
   when:
     - orasw_meta_cluster_hostgroup | default('') | length > 0
     - _oraswgi_manage_patches_crstype == 'crs'
+    # owner and permissions of /tmp and /var/tmp are defined by the operating system
+    - not orahost_meta_tmp_stage_os_managed | bool
   ansible.builtin.file:
     path: "{{ oracle_tmp_stage }}"
     state: directory

@@ -29,6 +29,7 @@ Meta role used by other roles to share variable defaults.
   - [orahost_meta_cv_assume_distid](#orahost_meta_cv_assume_distid)
   - [orahost_meta_java_env](#orahost_meta_java_env)
   - [orahost_meta_java_options](#orahost_meta_java_options)
+  - [orahost_meta_tmp_stage_os_managed](#orahost_meta_tmp_stage_os_managed)
   - [orahost_meta_tmpdir](#orahost_meta_tmpdir)
   - [orahost_min_swap_mb](#orahost_min_swap_mb)
   - [orahost_ssh_hostkeytypes](#orahost_ssh_hostkeytypes)
@@ -321,6 +322,9 @@ Defines the temporary directory to be used by Oracle scripts.
 
 There is usually no need to change this variable.
 
+Owner and permissions of `/tmp` and `/var/tmp` are defined by the operating system. They are never
+changed by the roles, see `orahost_meta_tmp_stage_os_managed`.
+
 #### Default value
 
 ```YAML
@@ -407,6 +411,20 @@ orahost_meta_java_options: >-
   {% if oracle_tmp_stage != '/tmp' -%}
   -Djava.io.tmpdir={{ oracle_tmp_stage -}}
   {% endif %}
+```
+
+### orahost_meta_tmp_stage_os_managed
+
+`true`, when `oracle_tmp_stage` is `/tmp` or `/var/tmp`.
+Owner and permissions of these directories are defined by the operating system (root:root, sticky bit).
+The roles do not change them.
+
+There is no need to change this variable.
+
+#### Default value
+
+```YAML
+orahost_meta_tmp_stage_os_managed: "{{ (oracle_tmp_stage | trim | regex_replace('/+$', '')) in ['/tmp', '/var/tmp'] }}"
 ```
 
 ### orahost_meta_tmpdir
