@@ -14,16 +14,14 @@
     - tnsnames2
   block:
 
+    # also executed after the creation of the databases (main.yml), dbca removes the entry
     - name: loop_tnsnames | create IFILE entry in tnsnames.ora
-      ansible.builtin.lineinfile:
-        line: "IFILE={{ _oradb_manage_db_tns_home }}/network/admin/tnsnames_ansible.ora"
-        regexp: "^IFILE=/"
-        insertbefore: BOF
-        path: "{{ _oradb_manage_db_tns_home }}/network/admin/tnsnames.ora"
-        backup: true
-        create: true
-        state: present
-        mode: "0644"
+      ansible.builtin.include_tasks:
+        file: tnsnames_ifile.yml
+        apply:
+          tags:
+            - tnsnames
+            - tnsnames2
 
     - name: loop_tnsnames | create custom configuration in tnsnames_ansible.ora  # noqa: args[module]
       ansible.builtin.blockinfile:
