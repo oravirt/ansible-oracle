@@ -7,7 +7,7 @@
 # - stop/start of the database and listener units and the targets
 # - shutdown (immediate/abort) outside of systemd => unit inactive (no restart), start outside of systemd =>
 #   oracle-adopt.service starts the unit again
-# - crash (kill -9 of PMON) => restart after autostartup_service_restart_sec (default)
+# - crash (kill -9 of PMON) => restart after autostartup_service_restart_sec (_sd_restart_sec)
 # - crash with autostartup_service_restart: false for the database => unit failed (exit code 3)
 # - ORACLE_HOME from /etc/oratab: stop with a wrong ORACLE_HOME uses the running instance,
 #   start with a wrong ORACLE_HOME fails
@@ -21,20 +21,27 @@
     _sd_lsnr: LISTENER
     _sd_unit: "oracle-db@{{ mt_oracle_sid }}.service"
     _sd_inventory_dbs: "{{ oracle_databases }}"
+    # RestartSec= of the database unit in this test (default 2min => long waits)
+    _sd_restart_sec: 15s
+    # TimeoutStartSec=/TimeoutStopSec= (default 15min => long waits after a hang)
+    _sd_timeout: 5min
     # state of the database unit: active state, result, restarts, main process (monitor)
     _sd_unit_state: |
       echo "db=$(systemctl show -p ActiveState --value oracle-db@{{ mt_oracle_sid }}.service)"
       echo "result=$(systemctl show -p Result --value oracle-db@{{ mt_oracle_sid }}.service)"
       echo "pmon=$(pgrep -cf '^ora_pmon_{{ mt_oracle_sid }}$')"
-    # wait until PMON and all background processes are gone, then for the monitor (max. 3 min)
+    # wait until PMON and all background processes are gone (~1 min after kill -9 of PMON),
+    # then for the end of the monitor (MONITOR_INTERVAL) and of ExecStop= (deactivating)
     _sd_wait_crash: |
       for i in $(seq 180) ; do
         pgrep -f '^ora_[a-z0-9]+_{{ mt_oracle_sid }}$' > /dev/null || break
         sleep 1
       done
       for i in $(seq 60) ; do
-        [ "$(systemctl show -p ActiveState --value oracle-db@{{ mt_oracle_sid }}.service)" = active ] || break
-        sleep 1
+        case "$(systemctl show -p ActiveState --value oracle-db@{{ mt_oracle_sid }}.service)" in
+          active|deactivating) sleep 1 ;;
+          *) break ;;
+        esac
       done
 
 # ---------------------------------------------------------------- cleanup of a previous run
@@ -96,6 +103,9 @@
     mt_role: oradb_manage_db
     mt_role_tasks_from: systemd_units.yml
     autostartup_service: true
+    autostartup_service_restart_sec: "{{ _sd_restart_sec }}"
+    autostartup_service_start_timeout: "{{ _sd_timeout }}"
+    autostartup_service_stop_timeout: "{{ _sd_timeout }}"
 
 - name: oradb_manage_db_systemd | create units again
   ansible.builtin.include_tasks: _role_run.yml
@@ -104,6 +114,9 @@
     mt_role: oradb_manage_db
     mt_role_tasks_from: systemd_units.yml
     autostartup_service: true
+    autostartup_service_restart_sec: "{{ _sd_restart_sec }}"
+    autostartup_service_start_timeout: "{{ _sd_timeout }}"
+    autostartup_service_stop_timeout: "{{ _sd_timeout }}"
 
 - name: oradb_manage_db_systemd | state of units and legacy unit file
   ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
@@ -251,7 +264,7 @@
       echo "prevent=$(systemctl show -p RestartPreventExitStatus --value {{ _sd_unit }})"
       echo "env=$(grep -c '^ORACLE_RESTART=yes$' /etc/sysconfig/oracledb/db-{{ _sd_sid }})"
       echo "db=$(systemctl is-active {{ _sd_unit }})"
-    _sd_expect: ['restart=on-failure', 'restartsec=2min', 'prevent=3', 'env=1', 'db=active']
+    _sd_expect: ['restart=on-failure', 'restartsec={{ _sd_restart_sec }}', 'prevent=3', 'env=1', 'db=active']
 
 - name: oradb_manage_db_systemd | crash with restart (kill -9 PMON)
   ansible.builtin.include_tasks: oradb_manage_db_systemd_cmd.yml
@@ -270,13 +283,13 @@
       echo "pmon=$(pgrep -cf '^ora_pmon_{{ _sd_sid }}$')"
     _sd_expect: ['db=activating', 'sub=auto-restart', 'pmon=0']
 
-# RestartSec=2min => wait max. 5 minutes for the restart
+# RestartSec=_sd_restart_sec => wait max. 2 minutes for the restart
 - name: oradb_manage_db_systemd | state after the restart
   ansible.builtin.include_tasks: oradb_manage_db_systemd_state.yml
   vars:
     mt_id: oradb_manage_db_systemd.restart_state
     _sd_script: |
-      for i in $(seq 300) ; do
+      for i in $(seq 120) ; do
         [ "$(systemctl show -p SubState --value {{ _sd_unit }})" = running ] && break
         sleep 1
       done
@@ -301,9 +314,14 @@
     mt_id: oradb_manage_db_systemd.norestart_units
     mt_role: oradb_manage_db
     mt_role_tasks_from: systemd_units.yml
+    autostartup_service_restart_sec: "{{ _sd_restart_sec }}"
+    autostartup_service_start_timeout: "{{ _sd_timeout }}"
+    autostartup_service_stop_timeout: "{{ _sd_timeout }}"
     oracle_databases: >-
       {{ _sd_inventory_dbs | map('combine', {'autostartup_service_restart': false}) | list }}
 
+# kill -9 of PMON only: a kill -9 of all background processes leaves the SGA behind
+# => the next startup fails with ORA-01081
 - name: oradb_manage_db_systemd | crash without restart (kill -9 PMON)
   ansible.builtin.include_tasks: oradb_manage_db_systemd_cmd.yml
   vars:
@@ -330,6 +348,9 @@
     mt_id: oradb_manage_db_systemd.oratab_start
     mt_role: oradb_manage_db
     mt_role_tasks_from: systemd_units.yml
+    autostartup_service_restart_sec: "{{ _sd_restart_sec }}"
+    autostartup_service_start_timeout: "{{ _sd_timeout }}"
+    autostartup_service_stop_timeout: "{{ _sd_timeout }}"
 
 - name: oradb_manage_db_systemd | wrong ORACLE_HOME in /etc/oratab
   ansible.builtin.shell: |
@@ -412,7 +433,8 @@
   vars:
     mt_id: oradb_manage_db_systemd.legacy_inactive_state
     _sd_script: |
-      echo "unitfiles=$(ls /etc/systemd/system | grep -c '^oracle-')"
+      # only units of oradb_manage_db (oracle-tfa.service of AHF in the scenario dbfs)
+      echo "unitfiles=$(ls /etc/systemd/system | grep -cE '^oracle-(db@|listener@|databases\.target|listeners\.target|adopt\.)')"
       echo "script=$(test -f /usr/local/bin/oracle-systemd && echo exists || echo removed)"
       echo "envdir=$(test -d /etc/sysconfig/oracledb && echo exists || echo removed)"
     _sd_expect: ['unitfiles=0', 'script=removed', 'envdir=removed']
