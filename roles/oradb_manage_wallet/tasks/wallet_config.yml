@@ -38,8 +38,12 @@
         - owc.certificates is defined
       tags: cert
 
+    # The credential tasks change the wallet in every run: mkstore -listCredential has no changed state
+    # and a changed password cannot be checked => no idempotence test of molecule.
+    # All tasks of the file use the result of the list task => the include is skipped as a whole.
     - name: wallet_config | include wallet_manage_dbcredential.yml
       ansible.builtin.include_tasks: wallet_manage_dbcredential.yml
+      tags: molecule-idempotence-notest
 
     - name: wallet_config | chmod over wallet directory
       ansible.builtin.file:
