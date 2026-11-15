@@ -373,13 +373,23 @@
         - "{{ host_fs_layout }}"
         - filesystem
 
+# The owner of the central inventory is only set for a new directory: oraswgi_install changes it
+# to the grid user (the installer of Grid Infrastructure needs it, INS-32039). orainstRoot.sh sets
+# the group and the permissions (g+rw, o-rwx)
+# => only the permissions of owner and group are ensured, 0770 and 0775 are both fine.
+- name: filesystem | Check directory for oraInventory
+  ansible.builtin.stat:
+    path: "{{ oracle_inventory_loc }}"
+  register: _orahost_inventory_loc
+  tags: hostfs
+
 - name: filesystem | Create directory for oraInventory
   ansible.builtin.file:
     path: "{{ oracle_inventory_loc }}"
     state: directory
-    owner: "{{ oracle_user }}"
+    owner: "{{ omit if _orahost_inventory_loc.stat.exists else oracle_user }}"
     group: "{{ oracle_group }}"
-    mode: "0775"
+    mode: "ug+rwx"
   tags: hostfs
 
 - name: Oracle-recommended kernel settings

@@ -40,7 +40,8 @@
 - name: Read host keys from remote host with ssh-keyscan
   ansible.builtin.command: ssh-keyscan -t {{ orahost_ssh_hostkeytypes | join(',') }} {{ ansible_hostname }}
   register: ssh_hostkey_res
-  changed_when: ssh_hostkey_res.rc == 0
+  # reads the host keys only, the known_hosts files are changed by the tasks below
+  changed_when: false
 
 - name: Ensure known_hosts file exists with right permissions
   ansible.builtin.file:
