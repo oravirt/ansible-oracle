@@ -115,6 +115,10 @@ run_step() {
     module-test)
       MODULE_TESTS="${MODULES}" MODULE_TESTS_LABEL="${RUN_ID}" molecule side-effect -s "${s}"
       ;;
+    idempotence)
+      # diff of the changed tasks: the log shows why a task is not idempotent
+      ANSIBLE_DIFF_ALWAYS=True molecule idempotence -s "${s}"
+      ;;
     *)
       molecule "${t}" -s "${s}"
       ;;

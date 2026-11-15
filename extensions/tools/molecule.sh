@@ -14,6 +14,12 @@ TOOLS_DIR=$(cd "$(dirname "$0")" && pwd)
 . "${TOOLS_DIR}/lock.sh"
 
 case "${1:-}" in
+  # diff of the changed tasks (only tasks with the result changed print a diff, e.g. file:
+  # owner/mode, template, lineinfile) => the log shows why a task is not idempotent
+  idempotence) export ANSIBLE_DIFF_ALWAYS=True ;;
+esac
+
+case "${1:-}" in
   # no lock for interactive shells and lists
   login | list) exec molecule "$@" ;;
 esac

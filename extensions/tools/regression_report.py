@@ -16,6 +16,14 @@ ANSI = re.compile(r"\x1b\[[0-9;]*m")
 # molecule wraps the ansible output in a box: '  │ ', '  ├─', '  └─'
 BOX = re.compile(r"^\s*[│├└┌]\s?")
 MAX_ERRORS = 3
+# diffs of the idempotence step (ansible --diff) in summary.md:
+# lines per diff and diffs per scenario
+MAX_DIFF_LINES = 15
+MAX_DIFFS = 20
+STATUS = re.compile(
+    r"^(changed|ok|skipping|failed|fatal|included|ignoring|\.\.\.ignoring)\b"
+)
+CHANGED = re.compile(r"^changed: \[([^\]]*)\](?: => \((.*?)\)?)?$")
 
 
 def read_env(run_dir):
@@ -103,6 +111,57 @@ def idempotence_tasks(path):
                 elif tasks:
                     break
     return tasks
+
+
+def idempotence_diffs(path):
+    """Diffs of the changed tasks in the log of 'molecule idempotence' (--diff).
+
+    Ansible prints the diffs before the 'changed: [host]' lines of the task, several
+    diffs can be printed before the first 'changed:' line. Every 'changed:' line takes
+    the oldest diff, which is not assigned yet.
+    Returns [(task, item, [hosts], [diff lines])], identical diffs of several hosts are
+    combined.
+    """
+    if not path.exists():
+        return []
+    lines = clean_lines(path)
+    found = {}
+    order = []
+    task = ""
+    diff = None
+    pending = []
+    for i, line in enumerate(lines):
+        if line.startswith("TASK [") or line.startswith("RUNNING HANDLER ["):
+            task = re.sub(r"\s*\*+$", "", task_header(lines, i))
+            task = re.sub(r"^(TASK|RUNNING HANDLER) \[(.*)\]$", r"\2", task)
+            diff = None
+            pending = []
+        elif line.startswith("PLAY"):
+            diff = None
+            pending = []
+        elif (line.startswith("--- ") and i + 1 < len(lines)
+                and lines[i + 1].startswith("+++ ")):
+            # a diff starts with '--- before' and '+++ after'
+            if diff is not None:
+                pending.append(diff)
+            diff = [line]
+        elif STATUS.match(line):
+            if diff is not None:
+                pending.append(diff)
+                diff = None
+            host = CHANGED.match(line)
+            if host and pending:
+                done = pending.pop(0)
+                while done and not done[-1].strip():
+                    done.pop()
+                key = (task, host.group(2) or "", tuple(done))
+                if key not in found:
+                    found[key] = []
+                    order.append(key)
+                found[key].append(host.group(1))
+        elif diff is not None:
+            diff.append(line)
+    return [(t, item, sorted(found[(t, item, d)]), list(d)) for (t, item, d) in order]
 
 
 def fmt_duration(seconds):
@@ -209,6 +268,36 @@ def main():
             for task in tasks:
                 out.append("- %s: %s" % (s, task))
         out.append("")
+    # diffs of the changed tasks (only tasks with a diff: file, template, ...)
+    # independent of the list of molecule: a run aborted by an error has no list,
+    # the log contains the diffs of the tasks before the abort
+    for s, tasks in idem:
+        diffs = idempotence_diffs(run_dir / ("%s-idempotence.log" % s))
+        if diffs:
+            out.append("## Idempotence: diffs of the changed tasks (%s)" % s)
+            out.append("")
+            if not tasks:
+                out.append("The run was aborted by an error (see Failed steps), "
+                           "the diffs are from the tasks before the abort.")
+                out.append("")
+            logname = "%s-idempotence.log" % s
+            for task, item, hosts, diff in diffs[:MAX_DIFFS]:
+                label = ""
+                if item:
+                    shown = re.sub(r"^item=", "", item).replace("`", "'")[:120]
+                    label = " item `%s`" % shown
+                out.append("**%s**%s (%s)" % (task, label, ", ".join(hosts)))
+                out.append("")
+                out.append("```diff")
+                out.extend(diff[:MAX_DIFF_LINES])
+                if len(diff) > MAX_DIFF_LINES:
+                    out.append("... %d more lines in %s"
+                               % (len(diff) - MAX_DIFF_LINES, logname))
+                out.append("```")
+                out.append("")
+            if len(diffs) > MAX_DIFFS:
+                out.append("%d more diffs in %s" % (len(diffs) - MAX_DIFFS, logname))
+                out.append("")
 
     # failed steps
     failed = [st for st in steps.values() if st["rc"] != 0]
