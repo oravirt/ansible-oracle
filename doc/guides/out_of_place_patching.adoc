@@ -436,6 +436,8 @@ Grid Infrastructure (cluster):
 
 * A switch back into a former home is not implemented: the former running home is locked by `root.sh`
   (e.g. `bin/crsctl.bin` owned by `root`), `oraswgi_install` stops with an assert. Use a new `oracle_home_gi`.
+  `gi_switch_back: allow` unlocks the former home on every node (`rootcrs.sh -unlock -crshome`) and switches back, `gi_switch_back: ignore`
+  accepts the situation (no switch, no assert). Both are *not tested*.
 * When `root.sh` fails before the switch (e.g. the CVU check of `rootcrs.pl -prepatch`), the next run resumes with `root.sh`:
   `-switchGridHome` is skipped, when `rootconfig.sh` of the new home is already owned by `root`.
 

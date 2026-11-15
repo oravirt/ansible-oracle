@@ -10,6 +10,13 @@
   tags: always
 
 # RAC is not supported at the moment!
+- name: Oraswgi_install | Assert gi_switch_back
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - gi_switch_back in ('deny', 'allow', 'ignore')
+  tags: always
+
 - name: Oraswgi_install | Assert oracle_install_option_gi
   ansible.builtin.assert:
     quiet: true
