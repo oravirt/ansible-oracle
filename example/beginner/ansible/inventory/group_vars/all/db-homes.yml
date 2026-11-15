@@ -10,21 +10,20 @@ db_homes_config:
     opatch_minversion: 12.2.0.1.36
     state: present
 
-  db1932_si_ee: &db1932_si_se2
+  # current Release Update of 19c from oracle_ru.yml (example_ru_19)
+  db19curr_si_ee: &db19curr_si_ee
     version: 19.3.0.0
-    oracle_home: /u01/app/oracle/product/19/db1932-si-ee
-    oracle_home_name: db1932_si_se2
-    imagename: db_home_19.32.zip
+    oracle_home: "/u01/app/oracle/product/19/db{{ example_ru_19_nodot }}-si-ee"
+    oracle_home_name: "db{{ example_ru_19_nodot }}_si_ee"
+    imagename: "db_home_{{ example_ru_19 }}.zip"
     edition: EE
 
   db19_si_se2:
-    <<: *db1932_si_se2
-    imagename: db_home_19.32.zip
+    <<: *db19curr_si_ee
     readonly_home: true
 
   db19_si_ee:
-    <<: *db1932_si_se2
-    # imagename: db_home_19.32.zip
+    <<: *db19curr_si_ee
     oracle_home: /u01/app/oracle/product/19/db1
     oracle_home_name: db19_si_ee
     readonly_home: true
