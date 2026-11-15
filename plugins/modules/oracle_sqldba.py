@@ -112,36 +112,36 @@ author: Dietmar Uhlig, Robotron (www.robotron.de)
 EXAMPLES = '''
 # Example 1, mixed post installation tasks
 # from inventory:
-
-oracle_databases:
-  - oracle_db_name: eek17ec
-      home: 12.2.0.1-ee
-      state: present
-      init_parameters: "{{ init_parameters['12.2.0.1-EMS'] }}"
-      profiles: "{{ db_profiles['12.2.0.1-EMS'] }}"
-      postinstall: "{{ db_postinstall['12.2.0.1-EMS'] }}"
-
-oracle_pdbs:
-  - cdb: eek17ec
-    pdb_name: eckpdb
-  - cdb: eek17ec
-    pdb_name: sckpdb
-
-db_postinstall:
-  12.2.0.1-EMS:
-    - catcon_pl: "$ORACLE_HOME/ctx/admin/catctx.sql context SYSAUX TEMP NOLOCK"
-      creates_sql: "select 1 from dba_registry where comp_id = 'CONTEXT'"
-    - sqlscript: "?/rdbms/admin/initsqlj.sql"
-      scope: pdbs
-      creates_sql: >
-        select count(*)
-        from dba_tab_privs
-        where table_name = 'SQLJUTL'
-        and grantee = 'PUBLIC'
-    - sqlscript: "?/rdbms/admin/utlrp.sql"
-    - sql: "alter pluggable database {{ pdb.pdb_name | default(omit) }} save state"
-      scope: pdbs
-
+#
+# oracle_databases:
+#   - oracle_db_name: eek17ec
+#     home: 12.2.0.1-ee
+#     state: present
+#     init_parameters: "{{ init_parameters['12.2.0.1-EMS'] }}"
+#     profiles: "{{ db_profiles['12.2.0.1-EMS'] }}"
+#     postinstall: "{{ db_postinstall['12.2.0.1-EMS'] }}"
+#
+# oracle_pdbs:
+#   - cdb: eek17ec
+#     pdb_name: eckpdb
+#   - cdb: eek17ec
+#     pdb_name: sckpdb
+#
+# db_postinstall:
+#   12.2.0.1-EMS:
+#     - catcon_pl: "$ORACLE_HOME/ctx/admin/catctx.sql context SYSAUX TEMP NOLOCK"
+#       creates_sql: "select 1 from dba_registry where comp_id = 'CONTEXT'"
+#     - sqlscript: "?/rdbms/admin/initsqlj.sql"
+#       scope: pdbs
+#       creates_sql: >
+#         select count(*)
+#         from dba_tab_privs
+#         where table_name = 'SQLJUTL'
+#         and grantee = 'PUBLIC'
+#     - sqlscript: "?/rdbms/admin/utlrp.sql"
+#     - sql: "alter pluggable database {{ pdb.pdb_name | default(omit) }} save state"
+#       scope: pdbs
+#
 # see role oradb-postinstall, loops over {{ oracle_databases }} = loop_var oradb
 
 - name: Conditionally execute post installation tasks

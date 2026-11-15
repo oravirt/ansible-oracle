@@ -27,8 +27,8 @@ description:
     - With Grid Infrastructure, the configuration of an existing service is compared
       with O(preferred_instances), O(available_instances), O(clbgoal) and O(rlbgoal)
       and changed with C(srvctl modify service) if it differs.
-    - Oracle Restart (C(local_only=TRUE) in C(/etc/oracle/ocr.loc)) has no instances:
-      O(preferred_instances) and O(available_instances) are ignored there.
+    - Oracle Restart (C(local_only=TRUE) in C(/etc/oracle/ocr.loc)) has no instances,
+      so O(preferred_instances) and O(available_instances) are ignored there.
 version_added: "2.1.0.0"
 options:
     name:
