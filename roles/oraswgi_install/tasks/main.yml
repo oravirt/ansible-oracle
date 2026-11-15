@@ -68,11 +68,25 @@
   tags:
     - directories
 
+# The installer of Grid Infrastructure needs the grid user as owner of the central inventory
+# (INS-32039 otherwise), orahost creates the directory for oracle_user and does not change the owner
+# of an existing directory. orainstRoot.sh sets the group and the permissions (g+rw, o-rwx)
+# => the permissions of owner and group are ensured, 0770 and 0775 are both fine.
+- name: install_home_gi | Create directory for oraInventory
+  ansible.builtin.file:
+    path: "{{ oracle_inventory_loc }}"
+    state: directory
+    owner: "{{ _grid_install_user }}"
+    group: "{{ oracle_group }}"
+    mode: "ug+rwx"
+  tags:
+    - directories
+
 - name: install_home_gi | Create stage directory (version specific)
   ansible.builtin.file:
     dest: "{{ oracle_stage }}/{{ item.version }}"
     mode: "0775"
-    owner: "{{ _grid_install_user }}"
+    owner: "{{ oracle_user }}"
     group: "{{ oracle_group }}"
     state: directory
   become: true
