@@ -1,5 +1,0 @@
----
-bugfixes:
-  - "oradb_standby: RMAN DUPLICATE creates the physical standby database without Flashback Database. flashback of oracle_databases is now set on every physical standby database (new and existing) after the broker configuration was created, because ALTER DATABASE FLASHBACK ON fails with ORA-38788 until the standby has applied more redo. The statement is repeated (oradb_standby_flashback_retries, oradb_standby_flashback_delay), Redo Apply is stopped with APPLY-OFF (broker) or CANCEL and started again in every case (oravirt#65)"
-minor_changes:
-  - "molecule: scenario dataguard checks Flashback Database of the standby database before and after the switchovers"

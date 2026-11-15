@@ -1429,3 +1429,1123 @@ releases:
     - sysctl.yml
     - systemd.yml
     release_date: '2024-07-21'
+  5.0.0:
+    changes:
+      breaking_changes:
+      - 'devsec: Removed dev-sec from ansible-oracle (oravirt#664)'
+      - 'example: New beginners Guide (oravirt#663)'
+      - 'galaxy: update community.general dependency to version >=11.0.0,<12.0.0 for
+        Python 3.6 (oravirt#656)'
+      - 'oracle_directory: a directory name in double quotes is case sensitive like
+        in SQL, a name without quotes is used in uppercase as before (see doc/guides/breaking_changes.adoc)
+        (oravirt#670)'
+      - 'oracle_grants: names in double quotes are case sensitive like in SQL, names
+        without quotes are used in uppercase. Grants on existing objects or roles
+        with a lower or mixed case name must be given in double quotes now, they were
+        compared case insensitive before (see doc/guides/breaking_changes.adoc) (oravirt#670)'
+      - 'oracle_profile, oracle_job: a name in double quotes is case sensitive like
+        in SQL, a name without quotes is used in uppercase. oracle_profile compares
+        the name exactly with DBA_PROFILES now, an existing profile with a lower or
+        mixed case name must be given in double quotes (see doc/guides/breaking_changes.adoc)
+        (oravirt#670)'
+      - 'oradb_manage_db: autostart with one systemd unit per database (oracle-db@<ORACLE_SID>.service)
+        and listener (oracle-listener@<LISTENER_NAME>.service), environment in /etc/sysconfig/oracledb.
+        oracle-rdbms.service is disabled and removed without stopping the databases,
+        see doc/guides/breaking_changes.adoc (oravirt#265) (oravirt#676)'
+      - 'oradb_manage_db: is_container in oracle_databases is true by default. A 19c
+        database without is_container is created as CDB, set is_container: false for
+        a non-CDB (see doc/guides/breaking_changes.adoc) (oravirt#702)'
+      - 'oradb_manage_db: omf in oracle_databases is true by default. dbca is called
+        with -useOMF true. OMF is strongly recommended, databases without OMF are
+        not tested anymore. omf: false needs an own DBCA template without OMF (dbca_templatename)
+        (see doc/guides/breaking_changes.adoc) (oravirt#702)'
+      - 'oradb_manage_db: the database unit monitors PMON and restarts a crashed database
+        after autostartup_service_restart_sec (2min). autostartup_service_restart
+        (default true) disables the restart for all databases or per database in oracle_databases.
+        A shutdown outside of systemd is detected by the alert log and not restarted,
+        see doc/guides/breaking_changes.adoc (oravirt#265) (oravirt#676)'
+      - 'oradb_manage_db: with Grid Infrastructure / Oracle Restart a listener with
+        home in listener_installed is registered with srvctl in the ORACLE_HOME of
+        home (oracle_crs_listener oraclehome), before a new listener resource was
+        added in the GI home. Use use_gi_home: true for a listener in the GI / Oracle
+        Restart home (see doc/guides/breaking_changes.adoc) (oravirt#687)'
+      - 'oradb_rman: assert for control_file_record_keep_time in init_parameters of
+        databases with rman_jobs (>= n for RECOVERY WINDOW OF n DAYS), emergency switch
+        oradb_rman_assert_control_file_record_keep_time: false (see doc/guides/breaking_changes.adoc)
+        (oravirt#685)'
+      - 'oradb_rman: rman_backup.sh allows only one execution of an action for a database
+        (flock), a 2nd execution stops with exit code 30 (see doc/guides/breaking_changes.adoc)
+        (oravirt#685)'
+      - 'oradb_rman: rman_backup.sh writes all output to stdout and a logfile per
+        execution <RMAN_LOGDIR>/<db_unique_name>_<action>_<timestamp>_<pid>.log (also
+        manual executions), symlink <db_unique_name>_<action>.log to the last execution,
+        RMAN_LOG_RETENTION removes old logfiles (oradb_rman_log_retention, default
+        30 days). The prefix is db_unique_name instead of ORACLE_SID, an old logfile
+        with the name of the symlink is renamed to ``*.log.old`` (see doc/guides/breaking_changes.adoc)
+        (oravirt#685)'
+      - 'oradb_rman: the crontab entries redirect the output to /dev/null, oradb_rman_cron_logdir
+        and rman_cron_logdir are removed, /var/log/oracle/rman/log is no longer written
+        (see doc/guides/breaking_changes.adoc) (oravirt#685)'
+      - 'oradb_rman: the templates parameter_rac and parameter_fra_disk use db_create_file_dest
+        from init_parameters for the snapshot controlfile instead of oracle_dbf_dir_asm
+        (see doc/guides/breaking_changes.adoc) (oravirt#702)'
+      - 'orahost: disable_firewall is now false by default (was true before) (oravirt#666)'
+      - 'orahost: firewall_open_listener_ports is now true by default (was false before)
+        (oravirt#666)'
+      - 'orahost_meta: the assert of oracle_databases requires processes in init_parameters
+        for databases with state present. processes is needed for the calculation
+        of kernel.sem, before a database without processes failed with an undefined
+        variable or was ignored in kernel.sem. Usually irrelevant in practice, the
+        default of processes is too small in most cases anyway (see doc/guides/breaking_changes.adoc)
+        (oravirt#706)'
+      - 'orasw_meta: init_parameters of oracle_databases with sid other than ''*''
+        and dbca=true are not allowed, because dbca has no SID clause - the assert
+        of oracle_databases fails (oravirt/ansible-oracle#677, see doc/guides/breaking_changes.adoc)
+        (oravirt#682)'
+      - 'orasw_meta: new variable autostartup_service_mode with default units. The
+        autostart with autostartup_service: true replaces oracle-rdbms.service and
+        /usr/local/bin/manage_oracle_rdbms_procs.sh by one systemd unit per database
+        and listener. Set autostartup_service_mode: legacy before the upgrade to keep
+        the solution of 4.x, see doc/guides/breaking_changes.adoc (oravirt#265) (oravirt#676)'
+      - 'orasw_meta: only Oracle 19c (19.3.0.0) and 26ai (26.1.0.0) are allowed as
+        version in db_homes_config (see doc/guides/breaking_changes.adoc) (oravirt#667)'
+      - 'orasw_meta: the assert of oracle_databases fails for memory_target or memory_max_target
+        in init_parameters with Hugepages (configure_hugepages: true, default). Automatic
+        Memory Management prevents the usage of Hugepages (see doc/guides/breaking_changes.adoc)
+        (oravirt#702)'
+      - 'orasw_meta: the assert of oracle_databases fails for omf: false with storage_type:
+        ASM (see doc/guides/breaking_changes.adoc) (oravirt#702)'
+      - 'orasw_meta: the assert of oracle_databases requires control_management_pack_access
+        in init_parameters for databases of an Enterprise Edition home with state
+        present. Allowed values are NONE, DIAGNOSTIC and DIAGNOSTIC+TUNING. For SE2
+        the parameter is optional and must be NONE if defined. DIAGNOSTIC needs a
+        license for the Diagnostics Pack, DIAGNOSTIC+TUNING for the Diagnostics and
+        Tuning Pack (see doc/guides/breaking_changes.adoc) (oravirt#702)'
+      - 'orasw_meta: the assert of oracle_databases requires db_create_file_dest and
+        db_recovery_file_dest in init_parameters for databases with state present
+        and omf: true (default). dbca uses them for the datafile and recovery area
+        destination (see doc/guides/breaking_changes.adoc) (oravirt#702)'
+      - 'orasw_meta: the assert of oracle_databases requires local_listener in init_parameters
+        of Single Instance databases (also with Oracle Restart) with state present.
+        The local_listener alias from DBCA is missing in tnsnames.ora of a new ORACLE_HOME
+        after Out-of-Place Patching, the instance does not register at the listener.
+        Use EZConnect, e.g. //localhost:1521 (see doc/guides/breaking_changes.adoc)
+        (oravirt#701)'
+      - 'orasw_meta: the assert of oracle_databases requires max_pdbs in init_parameters
+        for Container Databases (is_container: true, default) with state present.
+        The value must be <= 3 for SE2 and <= 1024 for EE. EE allows more than 3 PDBs
+        only with a license for the Multitenant Option (see doc/guides/breaking_changes.adoc)
+        (oravirt#702)'
+      - 'orasw_meta: the assert of oracle_databases requires sga_target and pga_aggregate_target
+        in init_parameters for databases with state present (see doc/guides/breaking_changes.adoc)
+        (oravirt#702)'
+      - 'orasw_meta: the default of autostartup_service is true (4.x: false), a Single
+        Instance without Grid Infrastructure / Oracle Restart gets the autostart of
+        the databases. Set autostartup_service: false to keep the behavior of 4.x,
+        see doc/guides/breaking_changes.adoc (oravirt#265) (oravirt#676)'
+      - 'orasw_meta: the default of oracle_install_version_gi is 26.1.0.0 (26ai) instead
+        of 19.3.0.0. Inventories with Grid Infrastructure or Oracle Restart must set
+        oracle_install_version_gi matching the installation media; without it, the
+        default of oracle_home_gi changes as well (see doc/guides/breaking_changes.adoc)
+        (oravirt#707)'
+      - 'orasw_meta_internal: oracle_sw_copy and oracle_sw_unpack are now real booleans.
+        With install_from_nfs: true the defaults evaluate to false as documented,
+        before they were always true (see doc/guides/breaking_changes.adoc) (oravirt#670)'
+      - 'oraswahf_install: the empty role is removed and replaced by the new role
+        ahf. Own playbooks with oraswahf_install must use ahf, see doc/guides/breaking_changes.adoc
+        (oravirt#704)'
+      - 'os.yml: the playbook installs python-oracledb with the new role pyoracledb
+        instead of cx_Oracle. The default source is the Python package index. Target
+        hosts without access to the package index or with a proxy need the new variables
+        pyoracledb_wheel_dir, pyoracledb_use_proxy and pyoracledb_http_proxy (see
+        doc/guides/breaking_changes.adoc) (oravirt#670)'
+      bugfixes:
+      - 'common: acl is installed on RHEL10/OL10, because Ansible needs setfacl for
+        become_user oracle (Failed to set permissions on the temporary files Ansible
+        needs to create when becoming an unprivileged user ... chmod: invalid mode:
+        ''A+user:oracle:rx:allow'') (oravirt#679)'
+      - 'common: fix Jinja syntax error in motd.j2 (missing for loop over ansible_interfaces),
+        sort interfaces for a stable /etc/motd (oravirt#670)'
+      - 'common: python3-packaging is installed on RHEL9/OL9 and RHEL10/OL10, because
+        ansible.builtin.pip (used by pyoracledb) needs packaging or setuptools and
+        RHEL10/OL10 has no setuptools by default. On RHEL8/OL8 python3-packaging is
+        only in CodeReady Builder, setuptools is installed by default (oravirt#680)'
+      - 'galaxy.yml: community.crypto is limited to <3.0.0, because version 3.x needs
+        ansible-core >= 2.17 (oravirt#656)'
+      - 'molecule: module test oracle_crs_listener in scenario has-ol9 (oravirt#687)'
+      - 'molecule: module test oracle_db does not check /etc/oratab for missing databases
+        with Grid Infrastructure / Oracle Restart (oravirt#686)'
+      - 'oraasm_manage_diskgroups: a disk group without attributes passed the string
+        None as attribute to oracle_asmdg. The internal variables _oraasm_manage_diskgroups_attr_name
+        and _oraasm_manage_diskgroups_attr_value are removed, see doc/guides/breaking_changes.adoc
+        (oravirt#491) (oravirt#674)'
+      - 'oracle_asmdg: attributes of an existing disk group were not set (e.g. compatible.rdbms
+        of the disk group created by gridSetup), fixed with v4.14.0 (oravirt#534).
+        Read-only attributes in a row in attribute_name were not removed, the module
+        failed (oravirt#491) (oravirt#674)'
+      - 'oracle_asmdg: compatible.asm is set first, compatible.rdbms and compatible.advm
+        can''t be higher than compatible.asm (oravirt#491) (oravirt#674)'
+      - 'oracle_asmdg: create of a disk group without attribute_name failed, attribute
+        values as numbers failed. attribute_name and attribute_value must have the
+        same number of entries (oravirt#491) (oravirt#674)'
+      - 'oracle_crs_listener: a running listener kept the old ORACLE_HOME after a
+        change of oraclehome. The listener is stopped before srvctl modify listener
+        -oraclehome and started afterwards. A listener process running from another
+        ORACLE_HOME than the resource is stopped with lsnrctl of its ORACLE_HOME and
+        started with srvctl (oravirt#705)'
+      - 'oracle_crs_listener: endpoints without protocol (1521) or in lower case (tcp:1521)
+        were modified in every run. Endpoints are normalized before the comparison
+        (oravirt#687)'
+      - 'oracle_crs_listener: fail_json was called without msg when the status of
+        the listener could not be read, warnings on stderr of srvctl failed the module
+        (oravirt#687)'
+      - 'oracle_crs_listener: oraclehome with the path of the GI home was modified
+        in every run, the path and %CRS_HOME% are the same now (oravirt#687)'
+      - 'oracle_crs_listener: srvctl add listener used -oraclehome %CRS_HOME% (default
+        of oraclehome) for a new listener. oraclehome is not set by default now, the
+        GI home is used for a new listener and an existing ORACLE_HOME is not changed
+        (oravirt#687)'
+      - 'oracle_crs_listener: srvctl/crsctl used ORACLE_HOME and LD_LIBRARY_PATH of
+        the environment (e.g. database home), now the GI home is used (oravirt#687)'
+      - 'oracle_crs_listener: the last resource of crsctl stat res -p was lost, when
+        the output did not end with an empty line (oravirt#687)'
+      - 'oracle_db: state started/restarted called start_instance with shifted arguments
+        (script_env missing, ORACLE_SID as israc) => srvctl status instance failed
+        with PRKO-2012 in Oracle Restart (oravirt#686)'
+      - 'oracle_db: state=present on 19c and newer executed ALTER DATABASE ADD/DROP
+        SUPPLEMENTAL LOG DATA on every run and returned changed=true, because the
+        current value was compared with an empty string. IMPLICIT minimal supplemental
+        logging counts as enabled. (oravirt#670)'
+      - 'oracle_db: use parameter hostname for the database connection instead of
+        always using os.uname()[1]. Set oracle_hostname for another listener address,
+        see doc/guides/breaking_changes.adoc (oravirt#542) (oravirt#672)'
+      - 'oracle_directory: a directory name in double quotes was created case sensitive,
+        but not found in the next run (ORA-00955) (oravirt#670)'
+      - 'oracle_directory: directory_mode=normal for an existing directory with a
+        different path ended without a result (module failure without msg), it returns
+        changed=false now (oravirt#670)'
+      - 'oracle_grants: granting or revoking privileges on an object with a lower
+        or mixed case name failed (ORA-00942), because the names were not quoted in
+        the SQL statements (oravirt#670)'
+      - 'oracle_grants: the option role failed on Python 3, because the result of
+        fetchone() was compared with 0 (fix by Rafal Kolodziej, oravirt#588) (oravirt#670)'
+      - 'oracle_grants: with state=absent the roles and system privileges in grants
+        had to be in lowercase to be revoked (oravirt#670)'
+      - 'oracle_job, oracle_jobschedule: invalid escape sequences in the regular expression
+        for the name (SyntaxWarning, fix by Rafal Kolodziej, oravirt#588) (oravirt#670)'
+      - 'oracle_job: an existing job without logging_level failed with an AttributeError,
+        the logging level is only compared when logging_level is set now (oravirt#670)'
+      - 'oracle_job: with convert_to_upper=false an existing job with a mixed case
+        name was not found, so state=present failed with ORA-27477 and state=absent
+        did nothing (oravirt#670)'
+      - 'oracle_ldapuser: python-ldap returns bytes on Python 3, so user names and
+        memberOf could not be compared and invalid names raised a RuntimeError (fix
+        by Rafal Kolodziej, oravirt#588) (oravirt#670)'
+      - 'oracle_opatch: restore shebang #!/usr/bin/python, /usr/bin/env python3 fails
+        with ansible-core 2.17 (oravirt#521) (oravirt#653)'
+      - 'oracle_parameter: check mode with scope=spfile failed with an AttributeError
+        for a parameter that is not set in the spfile (the current value is NULL)
+        (oravirt#670)'
+      - 'oracle_parameter: errors of ALTER SYSTEM RESET were reported without the
+        Oracle error message (oravirt#670)'
+      - 'oracle_parameter: size parameters (e.g. sga_target, shared_pool_size) were
+        changed on every run, because Oracle rounds the memory value up to the granule
+        size. Size parameters are compared in bytes now (units K, M, G, T, P), the
+        memory value of SGA components may be up to one granule larger than value.
+        (oravirt#670)'
+      - 'oracle_parameter: state=reset/absent with scope=both was never idempotent
+        with 23ai and newer, because ALTER SYSTEM RESET does not raise ORA-32010 any
+        more. The module checks V$SPPARAMETER.ISSPECIFIED and V$PARAMETER.ISMODIFIED
+        before the reset now, so check mode returns the correct changed state as well.
+        (oravirt#670)'
+      - 'oracle_parameter: state=reset/absent with scope=memory failed with ORA-32012
+        for a parameter that is not modified in memory, it returns changed=false now
+        (oravirt#670)'
+      - 'oracle_parameter: the current value is compared for the instance given in
+        sid (memory from GV$PARAMETER of the running instance, spfile entry for sid),
+        not for the connected instance or another spfile entry. Only the spfile is
+        changed for an instance that is not running, scope=memory fails for it (oravirt/ansible-oracle#677)
+        (oravirt#682)'
+      - 'oracle_parameter: the current value with scope=spfile and sid=''*'' is read
+        from the spfile entry for ''*'', not from an entry for another instance (oravirt/ansible-oracle#677)
+        (oravirt#682)'
+      - 'oracle_parameter: with scope=both the spfile value of a size parameter is
+        compared as well. If only the spfile value differs, the parameter is set with
+        SCOPE=SPFILE, because ALTER SYSTEM SET ... SCOPE=BOTH does not write the spfile
+        when the memory value is unchanged. (oravirt#670)'
+      - 'oracle_pdb: a new PDB with save_state=false was created, but the module failed
+        (oravirt#670)'
+      - 'oracle_pdb: state=absent and state=unplugged failed with ORA-65020 for a
+        closed PDB, the PDB is only closed when it is open on an instance now (oravirt#670)'
+      - 'oracle_pdb: state=status returned msg [''''] instead of the status of the
+        PDB (oravirt#670)'
+      - 'oracle_pdb: the state of an existing PDB (open, closed, read_only, restricted)
+        is compared with GV$PDBS and changed with INSTANCES=ALL. Before, only the
+        current instance was checked and changed, read_only failed on RAC with ORA-16002
+        (oravirt#707)'
+      - 'oracle_profile: profile names with special characters like ''/'' failed with
+        ORA-02000, a name in double quotes was not found and created again (ORA-02379).
+        The name is now always quoted in the SQL statements, a name in double quotes
+        is used case-sensitive, otherwise in uppercase (oravirt#566) (oravirt#670)'
+      - 'oracle_profile: the module was not idempotent and changed an existing profile
+        on every run, because the zip iterator was consumed before the comparison
+        (oravirt#564, fix by Rafal Kolodziej, oravirt#588) (oravirt#670)'
+      - 'oracle_redo: RAC in NOARCHIVELOG mode - the CURRENT redo log group of another
+        thread is switched with a one-time scheduler job on the instance of the thread
+        (SWITCH ALL LOGFILE failed with ORA-00258). The module waits until the group
+        is no longer CURRENT/ACTIVE instead of a fixed wait of 5 seconds (oravirt#707)'
+      - 'oracle_rsrc_consgroup: a failed connection ended with a MODULE FAILURE (IndexError
+        in the error handling) instead of the error message of the database (oravirt#670)'
+      - 'oracle_services: Oracle Restart (local_only=TRUE in /etc/oracle/ocr.loc)
+        has no instances. srvctl modify service was executed with -modifyconfig -preferred
+        None in every run (PRKO-2002) and srvctl add service with -r/-a. preferred_instances
+        and available_instances are only used in a Grid Infrastructure cluster (local_only=FALSE),
+        with Oracle Restart they are ignored with a warning (oravirt#688)'
+      - 'oracle_services: UnboundLocalError for state=present without changes, state=restarted
+        failed with a TypeError, every srvctl stop error was treated as ''already
+        stopped'' (CRS-2500) and without Grid Infrastructure every service was reported
+        as existing (fix by Rafal Kolodziej, oravirt#588) (oravirt#670)'
+      - 'oracle_services: a new service in an administrator managed RAC database without
+        preferred_instances failed with PRKO-3116, the error message was lost (msg
+        ['''']). Default for preferred_instances of a new service in a cluster are
+        all instances of the database (srvctl config database), errors of srvctl add
+        service are reported (oravirt#707)'
+      - 'oracle_services: the instance configuration of an existing service is only
+        compared, when preferred_instances or available_instances are set (before
+        -preferred None was added in a cluster without preferred_instances) (oravirt#688)'
+      - 'oracle_sql: every statement was committed, because the check for insert/delete/update
+        was always true (fix by Rafal Kolodziej, oravirt#588) (oravirt#670)'
+      - 'oracle_tablespace: bigfile=false (default) created a BIGFILE tablespace on
+        23ai and newer, because the default tablespace type of the database (BIGFILE)
+        was used. The tablespace is created with SMALLFILE now (also temporary and
+        undo tablespaces), so adding files with numfiles or datafile works. (oravirt#670)'
+      - 'oracle_tablespace: files were added to an existing bigfile tablespace when
+        bigfile was not set, which failed. The type of the existing tablespace (DBA_TABLESPACES.BIGFILE)
+        is used now. (oravirt#670)'
+      - 'oracle_user: state=present/unlocked was never idempotent for a user with
+        an expired password (ACCOUNT UNLOCK does not reset EXPIRED), state=locked
+        for an expired user and state=expired for a locked user changed the user on
+        every run. Only the part of ACCOUNT_STATUS that belongs to state (lock and/or
+        password expiry) is compared now. A timed lock (LOCKED(TIMED)) is unlocked
+        by state=present. (oravirt#670)'
+      - 'oracle_user: the option schema is required now. Without schema the module
+        did nothing and returned ''Undhandled exit'' with changed=false. (oravirt#670)'
+      - 'oradb_datapatch, oradb_manage_db: use oracle_hostname instead of ansible_fqdn
+        as hostname for oracle_datapatch (oravirt#542) (oravirt#672)'
+      - 'oradb_manage_db, oradb_manage_parameters, oradb_datapatch: pass oracle_hostname
+        as hostname to oracle_db (oravirt#542) (oravirt#672)'
+      - 'oradb_manage_db: _oradb_manage_db_create_listener returns a boolean instead
+        of a string (ansible-core 2.19) (oravirt#670)'
+      - 'oradb_manage_db: a stop of the database unit with systemctl no longer leaves
+        the unit failed, when the monitor sees the end of PMON before the entry in
+        the alert log (oravirt#265) (oravirt#713)'
+      - 'oradb_manage_db: assert for sys password and ORACLE_HOME failed with ''NoneType
+        has no len()'' instead of the fail_msg in ansible-core 2.19 (oravirt#670)'
+      - 'oradb_manage_db: dbca writes the tnsnames.ora of the ORACLE_HOME and removes
+        the IFILE entry for tnsnames_ansible.ora, which was created before the database.
+        The aliases of tnsnames_installed were not available after the first run,
+        the second run created the entry again. The entry is created after the creation
+        of the databases too (tnsnames_ifile.yml) (oravirt#713)'
+      - 'oradb_manage_db: storageType and diskGroupName were empty in the dbca response
+        file for 26ai, ASM databases were created with the default storageType FS
+        (oravirt#702)'
+      - 'oradb_manage_db: the dbca response file for 26ai contained the fixed passwords
+        Oracle_4U for SYS and SYSTEM. SYSTEM got Oracle_4U instead of the password
+        from dbpasswords/default_dbpass, because oracle_db does not pass -systemPassword
+        when the response file contains a password. (oravirt#669)'
+      - 'oradb_manage_db: the monitor of the systemd unit (oracle-systemd db-monitor)
+        only uses alert log entries written after its start. An older ''Instance shutdown
+        complete'' hid a crash without an entry (e.g. OOM killer) and the database
+        was not restarted (oravirt#265) (oravirt#713)'
+      - 'oradb_manage_pdb: conditionals on oracle_db_name, cdb and is_container failed
+        in ansible-core 2.19, because they are not booleans (oravirt#670)'
+      - 'oradb_rman: ASM template parameter_fra_disk used item instead of odb (oravirt#685)'
+      - 'oradb_rman: Execute RMAN-Script at playbook fails when rman_backup.sh fails
+        (pipefail), uses oradb_rman_cron_logdir instead of rman_cron_logdir (oravirt#685)'
+      - 'oradb_rman: assert for default RMAN destinations failed in ansible-core 2.19,
+        because the conditionals are strings (oravirt#670)'
+      - 'oradb_rman: oradb_rman_channel_disk_default without format => CONFIGURE CHANNEL
+        DEVICE TYPE DISK failed in the template parameter (oravirt#685)'
+      - 'oradb_rman: parameter_fra_disk created the snapshot controlfile name with
+        two + (++DATA) (oravirt#702)'
+      - 'oradb_rman: rman_backup.sh - a failed RMAN was logged as successful in syslog
+        and did not exit with code 99, invalid options exit with code 1 instead of
+        0 (oravirt#685)'
+      - 'oradb_rman: rman_backup.sh - check of local_only for --service with Oracle
+        Restart, syslog tag with logger -t, first entry from oratab only (oravirt#685)'
+      - 'oradb_rman: rman_backup.sh - default for the log directory (<rmanscriptdir>/log)
+        when -l and RMANLOGDIR are not set, default directories use the DB_NAME in
+        RAC environments (oravirt#685)'
+      - 'oradb_rman: rman_backup.sh reads the ORACLE_HOME with Grid Infrastructure
+        / Oracle Restart from the database resource (crsctl stat res ora.<ORACLE_SID>.db)
+        instead of /etc/oratab, which is not maintained correctly by the Clusterware
+        (e.g. after a switch of the ORACLE_HOME with srvctl modify database) (oravirt#701)'
+      - 'oradb_rman: rman_script_dir and rman_log_dir of a database were not created
+        (oradb_rman_script_dir, oradb_rman_log_dir in loops over oracle_databases)
+        (oravirt#685)'
+      - 'oradb_rman: rman_wallet false was handled as wallet for the registration
+        in the catalog (oravirt#685)'
+      - 'oradb_rman: the variables in vars/main.yml used item instead of loop_var
+        odb since the refactoring of the role => service, catalog connect, rman_log_dir
+        and rman_script_dir were never added to the crontab, rman_retention_policy,
+        rman_channel_disk and rman_controlfile_autobackup_disk of a database were
+        ignored, mk-job failed (oradb_rman_cron_mkjob) (oravirt#685)'
+      - 'oradb_rman: use ''| bool'' for rman_wallet in conditionals (oravirt#670)'
+      - 'oradb_standby: RMAN DUPLICATE creates the physical standby database without
+        Flashback Database. flashback of oracle_databases is now set on every physical
+        standby database (new and existing) after the broker configuration was created,
+        because ALTER DATABASE FLASHBACK ON fails with ORA-38788 until the standby
+        has applied more redo. The statement is repeated (oradb_standby_flashback_retries,
+        oradb_standby_flashback_delay), Redo Apply is stopped with APPLY-OFF (broker)
+        or CANCEL and started again in every case (oravirt#65) (oravirt#713)'
+      - 'oradb_standby: the broker properties LogXptMode, DelayMins and ReopenSecs
+        of an existing broker configuration are changed, when they differ from db_standby_config.
+        Before they were only set by dgmgrl.cfg for a new configuration (oravirt#65)
+        (oravirt#711)'
+      - 'orahost, oraswgi_install: owner and permissions of oracle_inventory_loc are
+        no longer changed in every run. orahost sets the owner (oracle_user) for a
+        new directory only, oraswgi_install sets the grid user, which is needed by
+        the installer of Grid Infrastructure. Group and the permissions of owner and
+        group (ug+rwx) are ensured by both roles, orainstRoot.sh removes the permissions
+        of others (oravirt#720)'
+      - 'orahost: Disable firewall failed with ''Conditional result was derived from
+        value of type list'' in ansible-core 2.19 (oravirt#670)'
+      - 'orahost: firewall ports with Grid Infrastructure (CRS_CONFIG) failed with
+        ''can only concatenate list'' (oracle_scan_port) (oravirt#707)'
+      - 'orahost: firewalld is not started, when its permanent config does not allow
+        the SSH connection of Ansible (check of service ssh, port and zone target;
+        rich rules and source zones are not evaluated) (oravirt#666)'
+      - 'orahost: firewalld is started and enabled again when firewall_open_listener_ports
+        is set and disable_firewall is false (opening ports failed after a previous
+        run with disable_firewall) (oravirt#666)'
+      - 'orahost: fixed reload firewalld handler failing with ''dict object'' has
+        no attribute ''results'' when disable_firewall is false (oravirt#666)'
+      - 'orahost: opening ports with firewall_open_listener_ports no longer fails
+        when firewalld is stopped by disable_firewall (only permanent config is changed)
+        (oravirt#666)'
+      - 'orahost_meta, oraswdb_manage_patches, oraswgi_manage_patches: _JAVA_OPTIONS
+        is only passed to Oracle scripts, when orahost_meta_java_options is not empty
+        (FIPS, oracle_tmp_stage). Java prints ''Picked up _JAVA_OPTIONS: ...'' even
+        for an empty value, root.sh of Grid Infrastructure (CRS_CONFIG) failed with
+        CLSRSC-732, because rootcrs.pl parses the output of cluutil (oravirt#707)'
+      - 'orahost_meta: get the kdump state as root, the task failed in plays without
+        become, e.g. when a role with orahost_meta as dependency is used in a play
+        as oracle (oravirt#444) (oravirt#675)'
+      - 'orahost_meta: oracle_script_env set _JAVA_OPTIONS=None (runInstaller: ''Unrecognized
+        option: None'') and CV_ASSUME_DISTID=None in ansible-core 2.19, because an
+        empty template is None (oravirt#670)'
+      - 'orahost_meta: the calculation of kernel.sem failed with only databases with
+        state absent without processes (oravirt#706)'
+      - 'orahost_ssh: creating known_hosts failed without --diff (''dict object has
+        no attribute diff'') with Grid Infrastructure (CRS_CONFIG) (oravirt#707)'
+      - 'orahost_ssh: the task ssh-keyscan reads the host keys only and is no longer
+        reported as changed (oravirt#720)'
+      - 'orasw_meta, oradb_standby: archivelog_deletion_policy with several blanks
+        between the words failed the assert and was configured in every run (''\\s+''
+        in a folded YAML block is not a regular expression for white space) (oravirt#687)'
+      - 'orasw_meta: oracle_opatch_patch contains OPatch for 26ai (p6880880_230000_Linux-x86-64.zip,
+        release 23.0.0.0.0 in My Oracle Support), used for the download (orasw_download_patches)
+        and the upgrade of OPatch in 26ai homes (oravirt#707)'
+      - 'orasw_meta_internal: oracle_patch_install and oracle_stage_install use oracle_stage_remote
+        when oracle_sw_copy and oracle_sw_unpack are false (oravirt#670)'
+      - 'oraswdb_install, oradb_manage_db: cluster nodes for runInstaller (clusterNodes)
+        and dbca (nodelist) from orasw_meta_cluster_hostgroup instead of hostgroup
+        (oravirt#707)'
+      - 'oraswdb_install, oradb_manage_parameters: with_nested with dummy list ""
+        skipped the task in ansible-core 2.19 (installation media not extracted, database
+        not restarted after spfile changes). Use [""] instead (oravirt#670)'
+      - 'oraswdb_install, oraswgi_install: directories were created with mode 1407
+        instead of 0775 in ansible-core 2.19, because the unquoted mode 775 is passed
+        as integer (decimal) through a template (oravirt#670)'
+      - 'oraswdb_install: /etc/oraInst.loc is owned by root (like orainstRoot.sh)
+        instead of oracle_user. The CVU check of rootcrs.pl -prepatch (Out-of-Place
+        Patching of Grid Infrastructure) failed with PRVG-2031/PRVG-2032 (oravirt#707)'
+      - 'oraswdb_install: fix Jinja syntax error in db-install.rsp.12.1.0.1.j2 (''andif''
+        instead of ''endif'') (oravirt#670)'
+      - 'oraswdb_install: installation of ORACLE_HOME 19c failed without opatch or
+        opatchauto patches in db_homes_config, because an empty template is None in
+        ansible-core 2.19 (oravirt#670)'
+      - 'oraswdb_install: root.sh of a RAC/RAC One Node ORACLE_HOME on all nodes of
+        the cluster, not only on the 1st node (oravirt#707)'
+      - 'oraswdb_install: swap check for 19c with prepatching failed with ''Template
+        delimiters are not supported in expressions'' in ansible-core 2.19 (oravirt#670)'
+      - 'oraswdb_manage_patches, oraswgi_manage_patches, oraswgi_install, orahost_ssh:
+        loops over groups[orasw_meta_cluster_hostgroup] failed with an undefined loop
+        variable in delegate_to for single instance in ansible-core 2.19. Use default([])
+        for the loop (oravirt#670)'
+      - 'oraswdb_manage_patches, oraswgi_manage_patches: _JAVA_OPTIONS=None in ansible-core
+        2.19 (oravirt#670)'
+      - 'oraswdb_manage_patches: Bugfix for empty orasw_meta_cluster_hostgroup (oravirt#659)'
+      - 'oraswgi_install, oraswdb_install, oraswdb_manage_patches, oraswgi_manage_patches:
+        owner and permissions of /tmp and /var/tmp are never changed when oracle_tmp_stage
+        is one of these directories (new variable orahost_meta_tmp_stage_os_managed).
+        Before, the roles switched /tmp between grid:oinstall, root:root and oracle:oinstall
+        in every run, the sticky bit was removed and the idempotence test failed in
+        a cluster (oravirt#714)'
+      - 'oraswgi_install, oraswgi_manage_patches, oraswdb_install: the directories
+        of the stage (oracle_stage, oracle_rsp_stage, oracle_tmp_stage below oracle_stage,
+        version and patch directories) belong to oracle_user in all roles, group oinstall
+        and 0775. Before, the roles changed the owner between the grid user and oracle_user
+        in every run in a cluster with role separation (oravirt#720)'
+      - 'oraswgi_install: CRS=TRUE in the central inventory of all nodes of Grid Infrastructure
+        (CRS_CONFIG), -ignoreSysPrereqs with gi_ignoreprereq=true (e.g. missing swap
+        space) (oravirt#707)'
+      - 'oraswgi_install: _oraswgi_install_init_dg_exists returns a boolean instead
+        of a string (ansible-core 2.19) (oravirt#670)'
+      - 'oraswgi_install: installation of Grid Infrastructure/Restart without gi_patches
+        failed with an undefined variable, because the path for -applyRU was always
+        evaluated (oravirt#670)'
+      - 'oraswgi_install: root.sh was executed twice on all nodes for 19c and newer,
+        because the old tasks were not removed when root.sh.yml was introduced. root.sh.yml
+        uses oracle_script_env now (oravirt#670)'
+      - 'oraswgi_manage_patches: Bugfix for empty orasw_meta_cluster_hostgroup (oravirt#659)'
+      - 'website: build with hugo 0.170, Docsy''s SCSS is compiled with Dart Sass
+        (hugo has no libsass anymore) (oravirt#717)'
+      major_changes:
+      - Support for ansible-core 2.19 (see doc/guides/breaking_changes.adoc) (oravirt#670)
+      - 'ahf: new role for the installation and configuration of Oracle Autonomous
+        Health Framework (AHF) incl. registration as AHF Fleet Insights client, see
+        doc/guides/ahf.adoc (oravirt#704)'
+      - 'ahf_fleet_insights: new role for the installation of Oracle AHF Fleet Insights
+        as central web interface for AHF data, see doc/guides/ahf.adoc (oravirt#704)'
+      - ansible-core 2.16 is the new minimal version of ansible-oracle (requires_ansible
+        in meta/runtime.yml, min_ansible_version of all roles) (oravirt#656)
+      - 'oracle_crs_listener: new module in opitzconsulting.ansible_oracle, replaces
+        ibre5041.ansible_oracle_modules.oracle_crs_listener in oradb_manage_db. The
+        dependency ibre5041.ansible_oracle_modules is removed from galaxy.yml. (oravirt#687)'
+      - 'oracle_crs_listener: srvctl add/modify listener is executed with srvctl of
+        the ORACLE_HOME of the listener (srvctl of a newer GI home fails with PRCN-3018
+        for a listener in an older database home) (oravirt#687)'
+      - 'oracle_crs_listener: state present adds/modifies and starts the listener
+        (same as started), a disabled listener is not started. state stopped adds
+        a listener without starting it (oravirt#687)'
+      - 'oracle_crs_listener: the GI home is always crs_home from /etc/oracle/olr.loc,
+        there is no option crs_home (oravirt#687)'
+      minor_changes:
+      - New setting `firewall_open_listener_ports` to open Listener ports on the OS
+        firewall. (oravirt#666)
+      - New variable `oracle_extra_firewall_ports` to open additional ports on the
+        OS firewall. (oravirt#666)
+      - 'ahf: new variable ahf_fleet_insights_manage - false keeps the registration
+        in AHF Fleet Insights unchanged (no registration, no deregistration) (oravirt#710)'
+      - 'all roles: boolean variables from the inventory are evaluated with ''| bool''
+        in conditionals, strings like ''yes'' or -e var=false work with ansible-core
+        2.19 (oravirt#670)'
+      - 'ansible-doctor: new version 8.4.3 (oravirt#652)'
+      - 'ansible-doctor: render all READMEs with new version (oravirt#652)'
+      - 'autoupgrade: autoupgrade_download_gold_image_latest creates a symlink to
+        the latest renamed Gold Image of each release (e.g. db_home_26_latest.zip
+        -> db_home_26.04.zip). The symlink is changed only, when a newer Gold Image
+        exists (oravirt#665)'
+      - 'doc: featurelist with Data Guard (Single Instance without Oracle Restart)
+        and Out-of-Place Patching (Single Instance without and with Oracle Restart),
+        terms Oracle Restart, Grid Infrastructure (cluster) and RAC, Grid Infrastructure
+        for a Cluster is marked as not tested (oravirt#705)'
+      - 'doc: guide doc/guides/rman.adoc for RMAN backups with oradb_rman and rman_backup.sh
+        (oravirt#685)'
+      - 'doc: new guide doc/guides/standby_databases.adoc for standby databases (Data
+        Guard, Dbvisit) - inventory structure, creation of standby databases, broker
+        configuration (oravirt#65) (oravirt#684)'
+      - 'example, molecule: the environment variable for the My Oracle Support user
+        is renamed from MOS_LOGIN to MOS_USERNAME. The inventory variable mos_login
+        is unchanged. (oravirt#704)'
+      - 'example: Data Guard Guide with 2 VMs on Hyper-V, Oracle AI Database 26ai
+        and installation media with NFS from the 1st VM (oravirt#65) (oravirt#684)'
+      - 'example: Data Guard Guide with RMAN backups to an NFS share of the 1st VM,
+        weekly level 0 and hourly archivelog backups on the current primary (oravirt#65)
+        (oravirt#685)'
+      - 'example: Oracle Release Updates (RU and RU-1 of 19c and 26ai) in oracle_ru.yml
+        of the examples beginner and dataguard, updated by renovate, used in autoupgrade_download_patches
+        and db_homes_config (oravirt#721)'
+      - 'manage_db.yml: role oradb_standby after oradb_manage_parameters, only when
+        db_standby_config is not empty (oravirt#65) (oravirt#684)'
+      - 'module_utils oracledb_connect: new shared connection handling with python-oracledb
+        in thick mode (wallet, sysdba, sysasm) for the modules (oravirt#670)'
+      - 'module_utils: new oracle_identifier with the handling of identifiers in double
+        quotes, used by oracle_job and oracle_profile (oravirt#670)'
+      - 'molecule rac: side_effect.yml with Out-of-Place Patching of Grid Infrastructure
+        (26.03 => 26.04), PDB ORCLPDB1, wallet and module tests on the 1st node (mt_hosts
+        in shared_config/module_tests/module_tests.yml); verify.yml uses the running
+        home of Grid Infrastructure (oravirt#707)'
+      - 'molecule: Taskfile - option C=false for task module-test to skip the reinstallation
+        of the collection (oravirt#671)'
+      - 'molecule: dataguard - side-effect with switchover tests (DB1_SITE1 => DB1_SITE2
+        => DB1_SITE1), roles and tempfiles of the new primary (oravirt#65) (oravirt#684)'
+      - 'molecule: dbfs - test for oracle_profile idempotence with all limits set
+        to DEFAULT, UNLIMITED and NULL (oravirt#564) (oravirt#671)'
+      - 'molecule: dbfs - tests for oracle_profile with ''/'' in the profile name,
+        with and without double quotes (oravirt#566) (oravirt#671)'
+      - 'molecule: dbfs - tests for oracle_tablespace grow and shrink the autoextend
+        nextsize/maxsize with units in lower case (k, m, g) and check the documented
+        limits (size of existing files is not changed, k and unlimited are not detected)
+        (oravirt#671)'
+      - 'molecule: dbfs-ol10 - same as dbfs on OL10 (Oracle AI Database 26ai, CDB
+        DB1 with PDB ORCLPDB, module tests in side_effect), task module-test S=dbfs-ol10
+        (oravirt#671)'
+      - 'molecule: extensions/.env.yml is replaced by extensions/.env with KEY=VALUE
+        lines (shell syntax). The Taskfile and tools/regression.sh load it with tools/load_env.sh,
+        the wrapper tools/molecule.sh calls molecule with the variables of the file.
+        Variables of the environment have precedence. (oravirt#704)'
+      - 'molecule: has-ol9 - module tests instead of the 2nd run of swgi/manage_db
+        in side_effect (use task idempotence), wallet and tnsnames.ora for ORCLPDB1,
+        3 spare ASM disks (molecule_asm_spare_disks) for the tests, new tests for
+        oracle_asmdg and oracle_services with Grid Infrastructure (oravirt#671)'
+      - 'molecule: module tests - an error outside of a check aborts only the tests
+        of the module (failed check <module>.aborted), the result file and the summary
+        are written always, new summary per module, the result file contains module
+        and status of every check (oravirt#671)'
+      - 'molecule: module tests record the runtime per module - column time in the
+        summary per module, <label>.durations.json next to the result file, section
+        ''Module test durations'' (slowest first) in summary.md of the regression
+        tests (oravirt#709)'
+      - 'molecule: new scenario dataguard - Data Guard on OL10 with Oracle AI Database
+        26ai, 2 containers dataguard-1 (primary) and dataguard-2 (standby), only the
+        primary database is created at the moment (oravirt#65) (oravirt#684)'
+      - 'molecule: new scenario has-ol9 for Oracle Restart 26ai with ASM and Oracle
+        Database 19c on Oracle Linux 9 (ASM disks are files in the container) (oravirt#670)'
+      - 'molecule: new scenario rac for Grid Infrastructure 26ai as 2 node cluster
+        on Oracle Linux 9 (ASM disks are loop devices on shared sparse files) (oravirt#707)'
+      - 'molecule: scenario dataguard checks Flashback Database of the standby database
+        before and after the switchovers (oravirt#713)'
+      - 'molecule: task converge and task test reinstall the collection from the repository
+        (molecule installs it only after a version change), C=false skips it (oravirt#684)'
+      - 'molecule: the module tests are shared by the scenarios dbfs and has-ol9 (extensions/molecule/shared_config/module_tests),
+        the scenario specific variables and known bugs are in <scenario>/module_tests.yml,
+        task module-test S=has-ol9 (oravirt#671)'
+      - 'oraasm_manage_diskgroups: new attributes failure_group and quorum for disk
+        in asm_diskgroups (oravirt#444) (oravirt#675)'
+      - 'oracle_asmdg: disks can be a dictionary with disk, failure_group and quorum
+        to create disks in (quorum) failure groups. The failure group of an existing
+        disk is not changed, the module returns a warning (oravirt#444) (oravirt#675)'
+      - 'oracle_asmdg: migrated from cx_Oracle to python-oracledb (thick mode). The
+        module requires python-oracledb, e.g. installed with the role pyoracledb.
+        Not tested against ASM yet (oravirt#670)'
+      - 'oracle_asmvol: migrated from cx_Oracle to python-oracledb (thick mode). The
+        module requires python-oracledb, e.g. installed with the role pyoracledb.
+        Not tested against ASM yet (oravirt#670)'
+      - 'oracle_awr: migrated from cx_Oracle to python-oracledb (thick mode). The
+        module requires python-oracledb, e.g. installed with the role pyoracledb (oravirt#670)'
+      - 'oracle_datapatch: removed the commented out cx_Oracle code and the unused
+        variable cursor. The module does not use a database driver, only sqlplus and
+        datapatch (oravirt#670)'
+      - 'oracle_db: migrated from cx_Oracle to python-oracledb (thick mode). The module
+        requires python-oracledb, e.g. installed with the role pyoracledb. The module
+        checks python-oracledb and the Oracle Client libraries before dbca is started
+        (oravirt#670)'
+      - 'oracle_db: new option ignore_prereq_failure (dbca -ignorePrereqFailure) (oravirt#707)'
+      - 'oracle_directory: migrated from cx_Oracle to python-oracledb (thick mode).
+        The module requires python-oracledb, e.g. installed with the role pyoracledb
+        (oravirt#670)'
+      - 'oracle_facts: migrated from cx_Oracle to python-oracledb (thick mode). The
+        module requires python-oracledb, e.g. installed with the role pyoracledb (oravirt#670)'
+      - 'oracle_grants: migrated from cx_Oracle to python-oracledb (thick mode). The
+        module requires python-oracledb, e.g. installed with the role pyoracledb (oravirt#670)'
+      - 'oracle_grants: the grantee (schema, role), roles in grants, owner and object
+        in object_privs and the directory in directory_privs can be in double quotes
+        (case sensitive). An object without owner is in the current schema of the
+        connection, sys. is optional for directory_privs. (oravirt#670)'
+      - 'oracle_job: a part of job_name in double quotes is case sensitive like in
+        SQL (e.g. SYSTEM."My_Job"), parts without quotes are converted to uppercase
+        unless convert_to_upper=false (oravirt#670)'
+      - 'oracle_job: migrated from cx_Oracle to python-oracledb (thick mode). The
+        module requires python-oracledb, e.g. installed with the role pyoracledb (oravirt#670)'
+      - 'oracle_jobclass: migrated from cx_Oracle to python-oracledb (thick mode).
+        The module requires python-oracledb, e.g. installed with the role pyoracledb
+        (oravirt#670)'
+      - 'oracle_jobschedule: migrated from cx_Oracle to python-oracledb (thick mode).
+        The module requires python-oracledb, e.g. installed with the role pyoracledb
+        (oravirt#670)'
+      - 'oracle_jobwindow: migrated from cx_Oracle to python-oracledb (thick mode).
+        The module requires python-oracledb, e.g. installed with the role pyoracledb
+        (oravirt#670)'
+      - 'oracle_ldapuser: migrated from cx_Oracle to python-oracledb (thick mode).
+        The module requires python-oracledb, e.g. installed with the role pyoracledb.
+        Not tested against a database (no LDAP server in the test environment) (oravirt#670)'
+      - 'oracle_parameter: migrated from cx_Oracle to python-oracledb (thick mode).
+        The module requires python-oracledb, e.g. installed with the role pyoracledb
+        (oravirt#670)'
+      - 'oracle_pdb: migrated from cx_Oracle to python-oracledb (thick mode). The
+        module requires python-oracledb, e.g. installed with the role pyoracledb (oravirt#670)'
+      - 'oracle_privs: migrated from cx_Oracle to python-oracledb (thick mode). The
+        module requires python-oracledb, e.g. installed with the role pyoracledb (oravirt#670)'
+      - 'oracle_privs: names in double quotes are case sensitive in roles, objs (owner
+        and object, also with the wildcard %) and for a role in privs, so case sensitive
+        and upper case names can be mixed. convert_to_upper works as before for names
+        without quotes. (oravirt#670)'
+      - 'oracle_profile: migrated from cx_Oracle to python-oracledb (thick mode).
+        The module requires python-oracledb, e.g. installed with the role pyoracledb
+        (oravirt#670)'
+      - 'oracle_redo: migrated from cx_Oracle to python-oracledb (thick mode). The
+        module requires python-oracledb, e.g. installed with the role pyoracledb (oravirt#670)'
+      - 'oracle_role: migrated from cx_Oracle to python-oracledb (thick mode). The
+        module requires python-oracledb, e.g. installed with the role pyoracledb (oravirt#670)'
+      - 'oracle_rsrc_consgroup: migrated from cx_Oracle to python-oracledb (thick
+        mode). The module requires python-oracledb, e.g. installed with the role pyoracledb
+        (oravirt#670)'
+      - 'oracle_services: migrated from cx_Oracle to python-oracledb (thick mode).
+        Without Grid Infrastructure the module requires python-oracledb, e.g. installed
+        with the role pyoracledb. With Grid Infrastructure only srvctl is used (oravirt#670)'
+      - 'oracle_sql: migrated from cx_Oracle to python-oracledb (thick mode). The
+        module requires python-oracledb, e.g. installed with the role pyoracledb (oravirt#670)'
+      - 'oracle_stats_prefs: migrated from cx_Oracle to python-oracledb (thick mode).
+        The module requires python-oracledb, e.g. installed with the role pyoracledb
+        (oravirt#670)'
+      - 'oracle_tablespace: migrated from cx_Oracle to python-oracledb (thick mode).
+        The module requires python-oracledb, e.g. installed with the role pyoracledb
+        (oravirt#670)'
+      - 'oracle_user: migrated from cx_Oracle to python-oracledb (thick mode). The
+        module requires python-oracledb, e.g. installed with the role pyoracledb (oravirt#670)'
+      - 'oracle_user: new options quotas (list of tablespace/size) and quotas_mode
+        (append/enforce) to manage the tablespace quotas of a user. With quotas, the
+        default_tablespace gets no automatic quota unlimited, see doc/guides/breaking_changes.adoc
+        (oravirt#312) (oravirt#673)'
+      - 'oradb_facts: database_role in oracledb_facts, state is standby (not present)
+        for a database with a role other than PRIMARY => roles checking state present
+        skip a standby database, an unreachable database of db_standby_config does
+        not fail (oravirt#65) (oravirt#684)'
+      - 'oradb_manage_db: Out-of-Place Patching (switch of the ORACLE_HOME) for Single
+        Instance databases with Oracle Restart. Stop/start with srvctl, srvctl modify
+        database -oraclehome (and -spfile/-pwfile, when copied), start with the start
+        option of the resource, datapatch for the role PRIMARY only. Grid Infrastructure
+        for a Cluster, RAC and RAC One Node are not supported (see doc/guides/out_of_place_patching.adoc)
+        (oravirt#705)'
+      - 'oradb_manage_db: databases and listeners started outside of systemd are attached
+        to their unit by oracle-adopt.timer, so they are stopped cleanly during a
+        shutdown of the server (oravirt#265) (oravirt#676)'
+      - 'oradb_manage_db: init_parameters with sid other than ''*'' are not passed
+        to dbca by default (oravirt/ansible-oracle#677) (oravirt#682)'
+      - 'oradb_manage_db: missing directories of a database in a standby configuration
+        are created before dbca (e.g. dg_broker_config_file1/2 for dg_broker_start
+        on the primary) (oravirt#65) (oravirt#684)'
+      - 'oradb_manage_db: new variable oradb_manage_db_dbca_ignore_prereq_failure,
+        default from gi_ignoreprereq (oravirt#707)'
+      - 'oradb_manage_db: oracle_db (dbca) is not executed for a standby database
+        of db_standby_config, systemd unit with ORACLE_START_MODE=auto opens only
+        a PRIMARY database, the unit of a database in db_standby_config is started
+        only when the SPFile exists (oravirt#65) (oravirt#684)'
+      - 'oradb_manage_db: repair of failed systemd units (reset-failed, start) for
+        databases in OPEN or physical standby databases in MOUNT (state from oradb_facts)
+        (oravirt#65) (oravirt#684)'
+      - 'oradb_manage_db: the GI / Oracle Restart home of a listener with use_gi_home
+        in listener_installed is crs_home from /etc/oracle/olr.loc (oravirt#687)'
+      - 'oradb_manage_db: the systemd unit of a standby database is enabled, but not
+        started (database may not exist or be damaged), warning when the instance
+        is not running (oravirt#65) (oravirt#684)'
+      - 'oradb_manage_db: the systemd units read the ORACLE_HOME of a database from
+        /etc/oratab, the stop uses the ORACLE_HOME of the running instance (oravirt#265)
+        (oravirt#676)'
+      - 'oradb_manage_db: with Oracle Restart (/etc/oracle/olr.loc exists) the entry
+        <db_unique_name>:<ORACLE_HOME>:N is written into /etc/oratab, because the
+        Clusterware does not maintain it correctly. /etc/oratab is never read for
+        the state of a database with Oracle Restart (oravirt#705)'
+      - 'oradb_manage_parameters: init_parameters of oracle_databases are changed
+        on a standby database (oradb_facts state standby) too, PDB parameters and
+        the restart for scope spfile only on a primary database (oravirt#65) (oravirt#684)'
+      - 'oradb_manage_parameters: new attribute sid in init_parameters of oracle_databases
+        and oracle_pdbs to set a parameter for one instance, e.g. local_listener per
+        RAC instance (oravirt/ansible-oracle#677) (oravirt#682)'
+      - 'oradb_manage_parameters: value is not required for state reset/absent (oravirt/ansible-oracle#677)
+        (oravirt#682)'
+      - 'oradb_manage_users: new attributes quotas and quotas_mode for users in oracle_databases
+        and oracle_pdbs (oravirt#312) (oravirt#673)'
+      - 'oradb_rman: immediate execution of rman_jobs uses service and role like the
+        crontab, assert for role in rman_jobs (primary, standby, not together with
+        service) (oravirt#65) (oravirt#685)'
+      - 'oradb_rman: new template parameter_standby without CONFIGURE RETENTION POLICY
+        for databases with standby role (oravirt#65) (oravirt#685)'
+      - 'oradb_rman: online_level0 uses rman_retention_policy in DELETE OBSOLETE,
+        the controlfile of a standby database may not contain the retention policy
+        (oravirt#65) (oravirt#685)'
+      - 'oradb_rman: rman_backup.cfg per database in <ORACLE_BASE>/admin/<db_unique_name>/rman
+        (mode 0600) with RMAN_SCRIPTDIR, RMAN_LOGDIR, RMAN_TNS_ADMIN and RMAN_CATALOGCONNECT
+        => the crontab contains no password and no directories, new attribute role
+        in rman_jobs (rman_backup.sh --role) (oravirt#685)'
+      - 'oradb_rman: rman_backup.sh --role PRIMARY|STANDBY executes the backup only
+        for a database with this role (Data Guard), --nocatalog, new environment variables
+        RMAN_SCRIPTDIR, RMAN_LOGDIR, RMAN_CATALOGCONNECT, RMAN_TARGETCONNECT, RMAN_SERVICE,
+        RMAN_ROLE, RMAN_TNS_ADMIN (old names are still supported) (oravirt#685)'
+      - 'oradb_rman: rman_backup.sh reads the configuration file <ORACLE_ADMIN>/rman/rman_backup.cfg
+        (KEY=VALUE, not sourced), order: parameter, environment, configuration file,
+        default. ORACLE_ADMIN from --admin, the environment or <ORACLE_BASE>/admin/<db_unique_name>
+        (db_unique_name from the running instance). -a is the only mandatory parameter,
+        ORACLE_SID is read from the environment (oravirt#685)'
+      - 'oradb_rman: the environment variables RMANLOGDIR, RMANSCRIPTDIR and RMANTNS_ADMIN
+        are removed from the crontab file, they would win over rman_backup.cfg (oravirt#685)'
+      - 'oradb_standby: RMAN CONFIGURE ARCHIVELOG DELETION POLICY on every member
+        of a Data Guard configuration (primary and standby), only when the current
+        policy differs (oravirt#65) (oravirt#685)'
+      - 'oradb_standby: dgmgrl script ORACLE_BASE/admin/<db_unique_name>/pfile/dgmgrl.cfg
+        for the creation of the Data Guard Broker configuration on each member, with
+        the local database as primary database (oravirt#65) (oravirt#684)'
+      - 'oradb_standby: executes dgmgrl.cfg once on the host of the primary database,
+        when no broker configuration exists and all other members are physical standby
+        databases, switch oradb_standby_broker_create (oravirt#65) (oravirt#684)'
+      - 'oradb_standby: new attribute reopen_secs in dg of a member of db_standby_config
+        (broker property ReopenSecs, default 300). The molecule scenario dataguard
+        uses 30 seconds, the redo transport recovers faster after the restart of the
+        standby database during a switchover (oravirt#65) (oravirt#711)'
+      - 'oradb_standby: new role - creates a physical standby database for a member
+        with initial_role physical_standby, create_method rman_duplicate_active (RMAN
+        DUPLICATE FROM ACTIVE DATABASE), external or custom (oravirt#65) (oravirt#684)'
+      - 'oradb_standby: standby_file_management is no longer set by the preparation
+        of the primary, missing directories of dg_broker_config_file1/2 are created
+        before the broker configuration, existing directories are not changed (oravirt#65)
+        (oravirt#684)'
+      - 'orasw_meta: assert archivelog true and force_logging not false for databases
+        with standby_config of type dataguard (oravirt#65) (oravirt#685)'
+      - 'orasw_meta: assert for init_parameters of databases with standby_config type
+        dataguard - dg_broker_config_file1/2 (different, not below ORACLE_HOME), dg_broker_start=TRUE
+        below the file parameters, standby_file_management (any value) (oravirt#65)
+        (oravirt#684)'
+      - 'orasw_meta: asserts for create_method, create_tasks_file in db_standby_config
+        and listener_name of databases with type dataguard, standby_state.yml for
+        the state of a database in a standby configuration (oravirt#65) (oravirt#684)'
+      - 'orasw_meta: autostartup_service_dependency moved from oraswdb_install to
+        orasw_meta and used by the new systemd units as well (oravirt#265) (oravirt#676)'
+      - 'orasw_meta: mandatory attribute archivelog_deletion_policy in dg of db_standby_config
+        or of each member, assert for valid values (NONE, APPLIED ON / SHIPPED TO
+        [ALL] STANDBY, BACKED UP n TIMES TO DEVICE TYPE DISK|SBT) (oravirt#65) (oravirt#685)'
+      - 'orasw_meta: new asserts for db_standby_config and standby_config in oracle_databases,
+        switch orasw_meta_assert_db_standby_config (oravirt#65) (oravirt#684)'
+      - 'orasw_meta: new variable assert_db_homes_config to disable the assert of
+        db_homes_config in emergency cases (oravirt#667)'
+      - 'orasw_meta: new variables autostartup_service_start_timeout, autostartup_service_stop_timeout,
+        autostartup_service_shutdown_mode, autostartup_service_restart, autostartup_service_restart_sec
+        and autostartup_service_adopt_interval for the systemd units (oravirt#265)
+        (oravirt#676)'
+      - 'orasw_meta: omf, is_container and the file destinations of dbca documented
+        for oracle_databases (oravirt#702)'
+      - 'orasw_meta: standby_prepare.yml creates the missing directories of a database
+        in a standby configuration (file destinations, audit_file_dest, diagnostic_dest,
+        dg_broker_config_file1/2), existing directories are not changed (oravirt#65)
+        (oravirt#684)'
+      - 'orasw_meta_internal: replace deprecated magic variable play_hosts with ansible_play_batch
+        in cluster_master (oravirt#670)'
+      - 'oraswdb_install: database options from oracle_ee_options and oracle_all_editions_options_state
+        are linked by one make call with a single relink of oracle (ioracle) instead
+        of one chopt/make call per option. The current state is read from libknlopt.a,
+        the chopt state files in $ORACLE_HOME/install are not used anymore. The variables
+        are unchanged. (oravirt#703)'
+      - 'oraswdb_install: oracle-rdbms.service is only created with autostartup_service_mode:
+        legacy, ulimit_systemd_mapping moved to orasw_meta (oravirt#265) (oravirt#676)'
+      - 'oraswdb_install: unknown options in oracle_ee_options or oracle_all_editions_options_state
+        fail with an assert. Options are checked per release like in chopt.ini, e.g.
+        oaa and olap are invalid for 26ai (oravirt#703)'
+      - 'oraswgi_install: Out-of-Place Patching of Grid Infrastructure (cluster) 26ai:
+        switch into a new oracle_home_gi with gridSetup.sh -setupHomeAs on every node,
+        -switchGridHome on the primary node and root.sh rolling (primary node first,
+        then the other nodes one after the other), CRS flag in the central inventory
+        of every node. A switch back into a former home of Grid Infrastructure is
+        not implemented (assert), a failed root.sh is resumed with the next run (see
+        doc/guides/out_of_place_patching.adoc) (oravirt#707)'
+      - 'oraswgi_install: Out-of-Place Patching of Oracle Restart 26ai. A change of
+        oracle_home_gi switches the running stack into the new home (gridSetup.sh
+        -setupHomeAs/-switchGridHome, root.sh, CRS flag in the central inventory),
+        see doc/guides/out_of_place_patching.adoc (oravirt#705)'
+      - 'oraswgi_install: Support for Oracle Restart 26ai (oracle_install_version_gi:
+        26.1.0.0) with new responsefile grid-install.rsp.26.1.0.0.j2 (oravirt#670)'
+      - 'oraswgi_install: failure_group and quorum of the disks are used for the initial
+        disk group in the response file for 19c, 21c and 26ai (oravirt#444) (oravirt#675)'
+      - 'oraswgi_install: failures of the Cluster Verification Utility (CVU) in gridSetup.sh
+        -executeConfigTools are ignored with gi_ignoreprereq=true, failures of all
+        other configuration assistants are still fatal (oravirt#707)'
+      - 'oraswgi_install: new variable gi_switch_back for a switch back of Grid Infrastructure
+        (cluster) into a former home. deny (default): assert, allow: unlock with rootcrs.sh
+        -unlock and switch back, ignore: no switch and no assert. allow and ignore
+        are not tested (oravirt#719)'
+      - 'oraswgi_install: new variable oraswgi_install_remove_obsolete_homes removes
+        obsolete Grid Infrastructure homes of Oracle Restart from the central inventory
+        with deinstall (only homes with oracle.crs, not crs_home and not oracle_home_gi,
+        after a check with deinstall -checkonly) (oravirt#705)'
+      - 'oraswgi_install: stops with an error, when oracle_home_gi differs from crs_home
+        in /etc/oracle/olr.loc for Grid Infrastructure for a Cluster or Oracle Restart
+        before 21c. The difference was ignored before. (oravirt#705)'
+      - 'oraswgi_meta: 26.1.0.0 added to the supported versions for oracle_install_version_gi
+        (oravirt#670)'
+      - 'os_vagrant.yml, os_racattack.yml: replace deprecated magic variable play_hosts
+        with ansible_play_batch (oravirt#670)'
+      - 'pyoracledb: installs pip>=19.3 if pip is older, because the system pip 9.0.3
+        of OL8 does not support manylinux2014 wheels and tries to build python-oracledb
+        from source (oravirt#670)'
+      - 'pyoracledb: new role to install python-oracledb with pip, the successor of
+        the role cxoracle (oravirt#670)'
+      - 'pyoracledb: the version of python-oracledb depends on the Python version
+        of the target host (pyoracledb_version_py36 ... pyoracledb_version_py39, pyoracledb_version
+        for newer Python versions, updated by renovate) (oravirt#670)'
+      - renamed _orasw_meta_primary_node to orasw_meta_primary_node and moved from
+        fact to user configurable variable (for those who want a determined first
+        node) (oravirt#575)
+      - 'renovate: check collections in galaxy.yml (task renovate:galaxy) (oravirt#671)'
+      - 'renovate: check the version of black in github workflow python-lint.yml (same
+        version as in pre-commit) (oravirt#671)'
+      - 'renovate: current Oracle Release Update and RU-1 of 19c and 26ai for the
+        molecule scenarios in oracle_ru.yml (custom datasources oracle-ru-19-prev,
+        oracle-ru-26-prev) (oravirt#708)'
+      - 'renovate: go is part of shell.nix to update website/go.sum with Docsy, the
+        Pull-Request for Docsy lists the manual steps of the update (doc/website.adoc)
+        (oravirt#690)'
+      - 'renovate: grouped updates create one changelog fragment per group instead
+        of one per dependency (oravirt#694)'
+      - 'renovate: new script tools/renovate/galaxy_requires.py to check requires_ansible
+        of the collections in galaxy.yml (task renovate:galaxy:requires) (oravirt#671)'
+      - 'renovate: oracle_ru.yml of the examples in group oracle-ru-examples, regex
+        manager for ''patch: RU:<version>'' in autoupgrade.yml removed (replaced by
+        oracle_ru.yml) (oravirt#721)'
+      - 'renovate: pip modules are checked against the python version of the venv
+        or execution environment per requirements file (oravirt#671)'
+      - 'renovate: task renovate:fork and renovate:upstream create all Pull-Requests
+        in one run (no hourly limit) (oravirt#697)'
+      - 'renovate: task renovate:fork sets milestone (M=<milestone>) and labels (L=<label>,<label>)
+        of the Pull-Requests (oravirt#690)'
+      - 'renovate: task renovate:fork takes the github token from gh auth token, if
+        RENOVATE_TOKEN is not set (oravirt#690)'
+      - 'renovate: task renovate:report shows only dependencies with updates, ONLY_UPDATES=false
+        shows all dependencies (oravirt#671)'
+      - 'renovate: task renovate:upstream creates branches and Pull-Requests directly
+        in the upstream repository (only for maintainers) (oravirt#690)'
+      - 'renovate: tools/renovate/galaxy_requires.py checks the dependencies of the
+        collections in galaxy.yml against the version ranges in galaxy.yml (e.g. ibre5041.ansible_oracle_modules
+        >=3.4.1 needs community.crypto >=3.0.0) (oravirt#671)'
+      - 'renovate: update Oracle Release Updates (19c, 26ai) in ''patch: RU:<version>''
+        of autoupgrade.yml in the examples, versions derived from the quarterly CPUs
+        in the Oracle Security Alerts feed (custom datasources oracle-ru-19, oracle-ru-26)
+        (oravirt#689)'
+      - 'renovate: update ansible-doctor from 8.4.3 to 8.4.4 (oravirt#691)'
+      - 'renovate: update ansible-lint from 26.10.1 to 26.11.0 (oravirt#692)'
+      - 'renovate: update ansible-navigator from 26.10.0 to 26.11.0 (oravirt#696)'
+      - 'renovate: update ansible.posix from 1.5.4 to 2.2.2 (oravirt#671)'
+      - 'renovate: update ansible.utils from 5.1.0 to 6.1.1 (oravirt#671)'
+      - 'renovate: update antsibull-changelog from 0.36.0 to 0.37.0 (oravirt#695)'
+      - 'renovate: update docker.io/floryn90/hugo from 0.169.0 to 0.170.0 (oravirt#715)'
+      - 'renovate: update ghcr.io/puppeteer/puppeteer from 25.16.0 to 25.17.0 (oravirt#716)'
+      - 'renovate: update github.com/google/docsy from 0.10.0 to 0.15.0 (oravirt#699)'
+      - 'renovate: update ibre5041.ansible_oracle_modules from 3.2.3 to 3.3.0 (oravirt#671)'
+      - 'renovate: update molecule from 26.10.0 to 26.11.0 (oravirt#698)'
+      - 'renovate: update molecule-plugins from 26.10.12 to 26.11.0 (oravirt#671)'
+      - 'renovate: update ocenv (roles/oradb_manage_db/files/ocenv) from opitzconsulting/oracle-scripts,
+        version is the commit date of ocenv (custom datasource ocenv), tools/renovate/ocenv_update.sh
+        replaces the file and checks the git blob sha, task renovate:ocenv detects
+        local changes (oravirt#693)'
+      - 'renovate: update opitzconsulting/oracle-scripts/ocenv from 2024.0823.083828
+        to 2026.0324.080048 (oravirt#700)'
+      - 'renovate: update pycqa/flake8 from 7.4.1 to 7.5.0 (oravirt#671)'
+      - 'renovate: update python/black from 23.10.1 to 26.10.1 (pre-commit and github
+        workflow python-lint.yml) (oravirt#671)'
+      - 'tools: Claude Code skill /aotest in tools/claude/skills/aotest - runs molecule
+        tests via extensions/Taskfile.yml (S=<scenario> default dbfs, T=full|destroy|converge|module
+        default module, M=<modules>), documented in doc/development.adoc (oravirt#683)'
+      - 'tools: Claude Code skill /pr in tools/claude/skills/pr - creates a Pull-Request
+        from the local working copy with gh (branch, commit, changelog fragment, push
+        into the fork, optional draft, milestone and labels), documented in doc/development.adoc
+        (oravirt#681)'
+      - 'tools: Claude Code skill /pr searches milestone (open milestones only) and
+        labels as regular expressions (e.g. milestone=5.0.*alpha label=enh,bug,break)
+        and uses Sonnet as model (oravirt#712)'
+      - 'website: ''Last modified'' of the documentation pages shows the last commit
+        of the source file instead of the commit of the content adapter (oravirt#651)'
+      - 'website: Docsy stays at v0.10.0, renovate proposes only Docsy versions below
+        0.16 (Docsy 0.16+ is a different Hugo module and needs a migration of the
+        website) (oravirt#678)'
+      - 'website: new documentation website https://www.ansible-oracle.eu built with
+        hugo and Docsy directly from doc/ and the README.md of the roles (task website:build,
+        website:test, website:publish) (oravirt#651)'
+      - 'website: new section Examples with one page per directory in example/ (inventory,
+        playbooks and configuration files) (oravirt#722)'
+      - 'website: new section Legacy for outdated documents, Vagrant, the Advanced
+        Guide, Ansible as a Docker Container, the Local Installation HOWTO, the Beginner
+        and the RAC example moved there, Beginners Guide moved to Examples, Breaking
+        Changes - Upgrade Guide moved to Features, new section Patching below Guides
+        with the guides for inventory settings, AutoUpgrade and out-of-place patching,
+        new section RMAN and Standby Databases below Guides (old URLs are redirected)
+        (oravirt#722)'
+      release_summary: 'This is by far the most extensive release since the project
+        began.
+
+
+        The release contains numerous breaking changes. They are described in the
+
+        documentation. Please read it carefully before updating an existing
+
+        environment.
+
+
+        All issues known over the past years have been resolved with release 5.0.0.
+
+
+        The majority of the code was developed with the help of Claude.
+
+        '
+      removed_features:
+      - 'cxoracle: the role is removed, all modules use python-oracledb instead of
+        cx_Oracle. Use the role pyoracledb (see doc/guides/breaking_changes.adoc)
+        (oravirt#670)'
+      - 'cxoracle: the variables of the role are removed and have no effect anymore.
+        Replace them in the inventory - install_cx_oracle => pyoracledb_install, cx_oracle_source
+        and cx_oracle3_source => pyoracledb_wheel_dir (directory with wheel files
+        of python-oracledb instead of a single cx_Oracle file), cx_oracle_umask =>
+        pyoracledb_umask, use_proxy => pyoracledb_use_proxy, http_proxy => pyoracledb_http_proxy,
+        extra_args => pyoracledb_extra_args (see doc/guides/breaking_changes.adoc)
+        (oravirt#670)'
+      - 'oradb_manage_db: totalMemory is not set in the dbca response files for 19c
+        and 26ai anymore (oracle_db_mem_totalmb) (oravirt#702)'
+      - 'orasw_meta: datafile_dest and recoveryfile_dest in oracle_databases are removed,
+        the assert fails. Use db_create_file_dest and db_recovery_file_dest in init_parameters
+        (see doc/guides/breaking_changes.adoc) (oravirt#702)'
+      - 'orasw_meta: oracle_db_mem_totalmb in oracle_databases is not supported anymore,
+        the assert fails. Use sga_target and pga_aggregate_target in init_parameters
+        (see doc/guides/breaking_changes.adoc) (oravirt#702)'
+      - 'orasw_meta: oracle_dbf_dir_asm and oracle_reco_dir_asm are removed. ASM databases
+        use db_create_file_dest and db_recovery_file_dest from init_parameters (see
+        doc/guides/breaking_changes.adoc) (oravirt#702)'
+      - 'oraswahf_install: removed the empty role, replaced by ahf (oravirt#704)'
+      security_fixes:
+      - 'oracle_asmdg, oracle_asmvol: the error message of a failed connection contained
+        the user and the password in plain text. The message is now the same as in
+        the other modules (error and connect descriptor only) (oravirt#670)'
+      - 'oracle_profile: the error message of a failed connection contained the user
+        and the password in plain text. The message is now the same as in the other
+        modules (error and connect descriptor only) (oravirt#670)'
+    fragments:
+    - ahf-fleet-insights-manage.yml
+    - ahf.yml
+    - ansible-2.16.yml
+    - ansible-2.19.yml
+    - ansible-doctor.yml
+    - assert-local-listener.yml
+    - autoupgrade_gold_image_latest.yml
+    - beginners_guide.yml
+    - claude-skill-aotest.yml
+    - claude-skill-pr-patterns.yml
+    - claude-skill-pr.yml
+    - common-el10-acl.yml
+    - common-el9-el10-packaging.yml
+    - configurable-_orasw_meta_primary_node.yml
+    - dataguard_example_rman.yml
+    - dataguard_guide.yml
+    - devsec.yml
+    - galaxy.yml
+    - gi-switch-back.yml
+    - idempotence-rac-directories.yml
+    - issue265.yml
+    - issue312.yml
+    - issue444.yml
+    - issue491.yml
+    - issue542.yml
+    - issue677.yml
+    - listener_installed_gi_home.yml
+    - module-test-durations.yml
+    - molecule-dataguard-tests.yml
+    - molecule-dbfs-ol10.yml
+    - molecule-idempotence-diff.yml
+    - molecule-module-tests.yml
+    - molecule_rac.yml
+    - molecule_rac_side_effect.yml
+    - molecule_restart.yml
+    - mos_username.yml
+    - opatch-shebang.yml
+    - oracle_crs_listener.yml
+    - oracle_databases-control_management_pack_access.yml
+    - oracle_databases-max_pdbs.yml
+    - oracle_databases-memory.yml
+    - oracle_databases-omf-defaults.yml
+    - oracle_databases-processes.yml
+    - oracle_db-supplemental-logging.yml
+    - oracle_db_ignore_prereq_failure.yml
+    - oracle_db_start_db_args.yml
+    - oracle_directory-fixes.yml
+    - oracle_grants-case-sensitive.yml
+    - oracle_install_version_gi_26ai.yml
+    - oracle_job-case-sensitive.yml
+    - oracle_opatch_patch_26ai.yml
+    - oracle_parameter-check-mode-spfile.yml
+    - oracle_pdb-fixes.yml
+    - oracle_pdb_rac_instances.yml
+    - oracle_privs-case-sensitive.yml
+    - oracle_profile-quoted-names.yml
+    - oracle_redo_rac_noarchivelog.yml
+    - oracle_services_rac_preferred.yml
+    - oracle_services_restart.yml
+    - oracle_tablespace-smallfile.yml
+    - oracle_user-account-status.yml
+    - oracledb-migration.yml
+    - oradb_manage_db-26ai-passwords.yml
+    - oradb_manage_db-26ai-storagetype.yml
+    - oradb_manage_db_tnsnames_ifile.yml
+    - oradb_rman_assert_keep_time.yml
+    - oradb_rman_backup_cfg.yml
+    - oradb_rman_backup_script.yml
+    - oradb_rman_channel_disk.yml
+    - oradb_rman_immediate_role.yml
+    - oradb_rman_logging.yml
+    - oradb_rman_parameter_standby.yml
+    - oradb_rman_role_fixes.yml
+    - oradb_standby.yml
+    - orahost-firewall-handler.yml
+    - orahost_firewall_scan_port.yml
+    - orahost_ssh_known_hosts.yml
+    - orasw_meta-db-versions.yml
+    - orasw_meta_cluster_hostgroup.yml
+    - oraswdb_install-link-options-once.yml
+    - oraswdb_install_orainst_loc_owner.yml
+    - oraswdb_install_rac_home.yml
+    - oraswgi-restart-switch-home.yml
+    - oraswgi_install_26ai.yml
+    - oraswgi_install_configtools_cvu.yml
+    - oraswgi_install_crs_flag.yml
+    - oraswgi_install_gi_cluster_oop.yml
+    - oraswgi_install_rootsh.yml
+    - oraswgi_install_rootsh_java_options.yml
+    - out-of-place-patching-restart.yml
+    - pr-lsnr-firewall.yml
+    - pr588-bugfixes.yml
+    - pyoracledb.yml
+    - release-summary.yml
+    - renovate-ansible-doctor.yml
+    - renovate-ansible-lint.yml
+    - renovate-ansible-navigator.yml
+    - renovate-ansible.posix.yml
+    - renovate-ansible.utils.yml
+    - renovate-antsibull-changelog.yml
+    - renovate-docker.io-floryn90-hugo.yml
+    - renovate-docsy.yml
+    - renovate-fork-milestone-labels.yml
+    - renovate-fork-token.yml
+    - renovate-galaxy.yml
+    - renovate-ghcr.io-puppeteer-puppeteer.yml
+    - renovate-go.yml
+    - renovate-group-fragment.yml
+    - renovate-ibre5041.ansible_oracle_modules.yml
+    - renovate-molecule-plugins.yml
+    - renovate-molecule.yml
+    - renovate-ocenv.yml
+    - renovate-opitzconsulting-oracle-scripts-ocenv.yml
+    - renovate-oracle-ru-examples.yml
+    - renovate-oracle-ru-molecule.yml
+    - renovate-oracle-ru.yml
+    - renovate-pr-hourly-limit.yml
+    - renovate-pycqa-flake8.yml
+    - renovate-python-black.yml
+    - renovate-python.yml
+    - renovate-report.yml
+    - renovate-upstream.yml
+    - rman-backup-gi-oracle-home.yml
+    - rman_guide.yml
+    - standby_adp_whitespace.yml
+    - standby_archivelog_deletion_policy.yml
+    - standby_assert_archivelog.yml
+    - standby_flashback.yml
+    - standby_inventory.yml
+    - standby_manage_db_playbook.yml
+    - standby_oradb_facts.yml
+    - standby_oradb_manage_db.yml
+    - standby_oradb_manage_parameters.yml
+    - standby_orasw_meta.yml
+    - standby_reopen_secs.yml
+    - systemd_monitor_alert_log.yml
+    - tmp_stage_os_managed.yml
+    - website-docsy.yml
+    - website-examples.yml
+    - website-hugo-sass.yml
+    - website-legacy.yml
+    - website.yml
+    release_date: '2026-11-15'
