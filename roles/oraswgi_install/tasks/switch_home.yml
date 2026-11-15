@@ -31,10 +31,38 @@
       {{ _oraswgi_install_olrloc_content.content | b64decode
          | regex_findall('(?m)^crs_home=(.*)$') | default([''], true) | first | trim | regex_replace('/+$', '') }}
 
+# crsctl.bin owned by root: the home was a running home of Grid Infrastructure before
+# (completely locked by root.sh/rootcrs.pl -postpatch)
+- name: switch_home | Check former running home
+  ansible.builtin.stat:
+    path: "{{ oracle_home_gi }}/bin/crsctl.bin"
+  register: _oraswgi_install_crsctlbin
+
+# Grid Infrastructure (cluster): oracle_home_gi is a former running home, the stack runs
+# from another home => switch back (gi_switch_back: deny, allow, ignore)
+- name: switch_home | Switch back of Grid Infrastructure into a former home?
+  ansible.builtin.set_fact:
+    _oraswgi_install_switch_back: >-
+      {{ _oraswgi_meta_configure_cluster | bool
+         and _oraswgi_install_crs_home | length > 0
+         and _oraswgi_install_crs_home != oracle_home_gi | regex_replace('/+$', '')
+         and _oraswgi_install_crsctlbin.stat.exists
+         and _oraswgi_install_crsctlbin.stat.pw_name == 'root' }}
+
+- name: switch_home | Switch back ignored
+  ansible.builtin.debug:
+    msg:
+      - "{{ oracle_home_gi }} is a former running home of Grid Infrastructure (locked)."
+      - "gi_switch_back: ignore => no switch, the stack keeps running from {{ _oraswgi_install_crs_home }}"
+  when:
+    - _oraswgi_install_switch_back | bool
+    - gi_switch_back == 'ignore'
+
 - name: switch_home | Switch Grid Infrastructure / Oracle Restart into oracle_home_gi
   when:
     - _oraswgi_install_crs_home | length > 0
     - _oraswgi_install_crs_home != oracle_home_gi | regex_replace('/+$', '')
+    - not (_oraswgi_install_switch_back | bool and gi_switch_back == 'ignore')
   block:
 
     - name: switch_home | Info
@@ -132,31 +160,42 @@
     # root.sh/roothas.pl -postpatch changes the owner of files to root
     # => gridSetup.sh -switchGridHome fails as grid user with INS-00001/OUI-10166
     # => unlock the home (no impact on the stack running from the current home)
-    # Oracle Restart only: a switch back of Grid Infrastructure is not implemented
-    - name: switch_home | Check lock of new ORACLE_HOME
-      ansible.builtin.stat:
-        path: "{{ oracle_home_gi }}/crs/config/rootconfig.sh"
-      register: _oraswgi_install_rootconfig
-
-    # crsctl.bin owned by root: the home was a running home of Grid Infrastructure before
-    # (completely locked by root.sh/rootcrs.pl -postpatch)
-    - name: switch_home | Check former running home
-      ansible.builtin.stat:
-        path: "{{ oracle_home_gi }}/bin/crsctl.bin"
-      register: _oraswgi_install_crsctlbin
-
+    # Oracle Restart: a switch back is supported (unlock of the home below)
+    # Grid Infrastructure: a switch back needs gi_switch_back: allow
     - name: switch_home | Assert no switch back of Grid Infrastructure
       ansible.builtin.assert:
         quiet: true
         that:
-          - not (_oraswgi_install_crsctlbin.stat.exists
-                 and _oraswgi_install_crsctlbin.stat.pw_name == 'root')
+          - gi_switch_back != 'deny'
         fail_msg: >-
           {{ oracle_home_gi }} was a running home of Grid Infrastructure before (locked).
-          A switch back of Grid Infrastructure (cluster) into a former home is not implemented.
-          Use a new oracle_home_gi or switch back manually.
+          A switch back of Grid Infrastructure (cluster) into a former home is not allowed.
+          Use a new oracle_home_gi or set gi_switch_back: allow (not tested) to switch back,
+          gi_switch_back: ignore accepts the situation without a switch.
       when:
-        - _oraswgi_meta_configure_cluster | bool
+        - _oraswgi_install_switch_back | bool
+
+    # every node: the home is local
+    - name: switch_home | Unlock new ORACLE_HOME (Grid Infrastructure)
+      ansible.builtin.command:
+        argv:
+          - "{{ oracle_home_gi }}/crs/install/rootcrs.sh"
+          - -unlock
+          - -crshome
+          - "{{ oracle_home_gi }}"
+      environment: "{{ oracle_script_env }}"
+      become: true
+      become_user: root
+      changed_when: true
+      throttle: 1
+      when:
+        - _oraswgi_install_switch_back | bool
+        - gi_switch_back == 'allow'
+
+    - name: switch_home | Check lock of new ORACLE_HOME
+      ansible.builtin.stat:
+        path: "{{ oracle_home_gi }}/crs/config/rootconfig.sh"
+      register: _oraswgi_install_rootconfig
 
     - name: switch_home | Unlock new ORACLE_HOME
       ansible.builtin.command:

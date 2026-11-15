@@ -33,6 +33,10 @@ patch_before_rootsh: false
 # cluvfy does not work inside a container
 gi_ignoreprereq: true
 
+# converge/idempotence after the module tests (side-effect): the module tests switch the stack
+# into a new oracle_home_gi, the inventory still has the former home => accepted, no switch back
+gi_switch_back: ignore
+
 device_persistence: ''
 partition_devices: false
 oracle_asm_disk_string: /dev/asmdisks/*

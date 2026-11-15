@@ -18,6 +18,7 @@ Known Issues from Oracle:
   - [default_gipass](#default_gipass)
   - [endoracle_scan_port](#endoracle_scan_port)
   - [gi_ignoreprereq](#gi_ignoreprereq)
+  - [gi_switch_back](#gi_switch_back)
   - [oracle_asm_init_dg](#oracle_asm_init_dg)
   - [oracle_asm_storage_option](#oracle_asm_storage_option)
   - [oracle_cluster_mgmdb](#oracle_cluster_mgmdb)
@@ -95,6 +96,26 @@ true => Ignore failed runcluvfy.sh
 
 ```YAML
 gi_ignoreprereq: false
+```
+
+### gi_switch_back
+
+Grid Infrastructure (cluster): `oracle_home_gi` is a former running home, the stack runs from another
+home (`/etc/oracle/olr.loc`). The former home is locked by `root.sh`/`rootcrs.pl -postpatch`
+(`bin/crsctl.bin` owned by `root`). What to do (a switch back is not part of the tested features):
+
+* `deny` => `oraswgi_install` stops with an assert.
+* `allow` => Switch back: `rootcrs.sh -unlock -crshome <oracle_home_gi>` on every node, then like
+a switch into a new home (`-switchGridHome`, `root.sh` rolling). Not tested.
+* `ignore` => The situation is accepted: no switch and no assert, the stack keeps running from the current home.
+The run continues with `oracle_home_gi`, e.g. a run after the molecule module tests.
+
+Oracle Restart is not affected: a switch back is supported and the former home is unlocked.
+
+#### Default value
+
+```YAML
+gi_switch_back: deny
 ```
 
 ### oracle_asm_init_dg
