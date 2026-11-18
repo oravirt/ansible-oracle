@@ -1,0 +1,15 @@
+---
+# docker adds '<IP of eth0> <hostname>' to /etc/hosts at every start of the container.
+# eth0 can be the private network => the hostname resolves to 2 IPs
+# (PRVH-1541, PRVG-13632 in gridSetup.sh)
+# => remove the entry of docker, the public IP is in etc_hosts (molecule.yml)
+# /etc/hosts is a bind mount => no atomic replace (unsafe_writes)
+# Needs the facts of oracle_gi_nic_priv. Used by converge.yml and start.yml.
+- name: etc_hosts | Remove private IP of hostname from /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: >-
+      ^{{ hostvars[inventory_hostname]['ansible_' + oracle_gi_nic_priv].ipv4.address
+      | regex_escape }}\s+{{ inventory_hostname | regex_escape }}\s*$
+    state: absent
+    unsafe_writes: true
