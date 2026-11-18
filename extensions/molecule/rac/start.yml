@@ -1,0 +1,171 @@
+---
+# Start of the cluster after a restart of WSL/docker: task start S=rac
+# (tools/start.sh rac: starts the stopped containers, then this playbook with
+#  molecule side-effect and tools/molecule-start.yml)
+#
+# A restart of WSL/docker loses:
+# - the loop devices of the ASM disks (devices of the kernel) and the device nodes in /dev of
+#   the containers => ASM finds no disks, the Clusterware stack does not start
+#   (the sparse files with the ASM data are still in the docker volume molecule-rac-asm)
+# - the cleanup of /etc/hosts (docker writes the private IP of the hostname again)
+# - /run/nologin is created again (no ssh login for grid/oracle)
+# - the containers (no restart policy), started by tools/start.sh
+#
+# Without /etc/oracle/olr.loc (Grid Infrastructure not configured yet) nothing is done.
+- name: Check free memory
+  hosts: localhost
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Check free memory
+      ansible.builtin.include_tasks: tasks/memory_check.yml
+
+- name: Prepare nodes after a restart
+  hosts: rac
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Wait for the container
+      ansible.builtin.wait_for_connection:
+        timeout: 120
+
+    # degraded is normal in the containers => only wait for the end of the boot
+    - name: Wait for systemd
+      ansible.builtin.command:
+        argv: [systemctl, is-system-running, --wait]
+      register: _systemd_state
+      changed_when: false
+      failed_when: false
+      timeout: 300
+
+    - name: Check for configured Grid Infrastructure
+      ansible.builtin.stat:
+        path: /etc/oracle/olr.loc
+      register: _olrloc
+
+    # end_host ends the current play only => fact for the next play
+    - name: Grid Infrastructure configured
+      ansible.builtin.set_fact:
+        _rac_gi_configured: "{{ _olrloc.stat.exists }}"
+
+    - name: Grid Infrastructure not configured => nothing to do
+      ansible.builtin.meta: end_host
+      when: not _olrloc.stat.exists
+
+    - name: Network facts (private interface for /etc/hosts)
+      ansible.builtin.setup:
+        gather_subset: [network]
+
+    # ssh between the nodes is needed by gridSetup.sh (e.g. Out-of-Place Patching)
+    - name: Start sshd and systemd-user-sessions (removes /run/nologin)
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: started
+      loop: [sshd, systemd-user-sessions]
+
+    - name: Remove private IP of hostname from /etc/hosts
+      ansible.builtin.include_tasks: tasks/etc_hosts.yml
+
+    - name: Shared ASM disks with loop devices
+      ansible.builtin.include_tasks: tasks/asm_loop_devices.yml
+
+# The stack runs from crs_home in /etc/oracle/olr.loc (oracle_home_gi or the new home after
+# the Out-of-Place Patching of side_effect.yml).
+# ohasd starts with the container, but without ASM disks the stack hangs
+# => restart of the stack on every node, where it is not online, one node after the other
+#    (inventory order: 1st node of the cluster first)
+- name: Start Clusterware stack
+  hosts: rac
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Grid Infrastructure not configured => nothing to do
+      ansible.builtin.meta: end_host
+      when: not _rac_gi_configured | default(false) | bool
+
+    - name: Read /etc/oracle/olr.loc
+      ansible.builtin.slurp:
+        src: /etc/oracle/olr.loc
+      register: _olrloc_content
+
+    - name: Running home of Grid Infrastructure
+      ansible.builtin.set_fact:
+        _crs_home: >-
+          {{ _olrloc_content.content | b64decode | regex_findall('(?m)^crs_home=(.*)$') | first | trim }}
+
+    - name: State of the Clusterware stack
+      ansible.builtin.command:
+        argv: ["{{ _crs_home }}/bin/crsctl", check, crs]
+      register: _crs_check
+      changed_when: false
+      failed_when: false
+
+    # CRS-4638: Oracle High Availability Services, CRS-4537: Cluster Ready Services,
+    # CRS-4529: Cluster Synchronization Services, CRS-4533: Event Manager is online
+    - name: Restart Clusterware stack
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          {{ _crs_home }}/bin/crsctl stop crs -f || true
+          {{ _crs_home }}/bin/crsctl start crs -wait
+        executable: /bin/bash
+      register: _crs_start
+      changed_when: true
+      throttle: 1
+      when: >-
+        not ('CRS-4638' in _crs_check.stdout and 'CRS-4537' in _crs_check.stdout
+             and 'CRS-4529' in _crs_check.stdout and 'CRS-4533' in _crs_check.stdout)
+
+    - name: Output of crsctl start crs
+      ansible.builtin.debug:
+        var: _crs_start.stdout_lines
+      when: _crs_start.stdout_lines is defined
+
+    - name: Wait for the Clusterware stack on all nodes
+      ansible.builtin.command:
+        argv: ["{{ _crs_home }}/bin/crsctl", check, cluster, -all]
+      register: _cluster_check
+      changed_when: false
+      until: >-
+        (_cluster_check.stdout | regex_findall('CRS-4537') | length) == ansible_play_hosts | length
+        and (_cluster_check.stdout | regex_findall('CRS-4529') | length) == ansible_play_hosts | length
+        and (_cluster_check.stdout | regex_findall('CRS-4533') | length) == ansible_play_hosts | length
+      retries: 60
+      delay: 10
+      run_once: true
+
+    # databases with management policy AUTOMATIC are started by the Clusterware
+    - name: Wait for the RAC databases
+      ansible.builtin.command:
+        argv:
+          - "{{ db_homes_config[item.home].oracle_home }}/bin/srvctl"
+          - status
+          - database
+          - -db
+          - "{{ item.oracle_db_unique_name | default(item.oracle_db_name) }}"
+      environment:
+        ORACLE_HOME: "{{ db_homes_config[item.home].oracle_home }}"
+      loop: >-
+        {{ oracle_databases | default([]) | selectattr('state', 'equalto', 'present')
+           | selectattr('oracle_db_type', 'equalto', 'RAC') | list }}
+      loop_control:
+        label: "{{ item.oracle_db_name }}"
+      register: _db_status
+      changed_when: false
+      until: >-
+        (_db_status.stdout_lines | select('search', 'is running on node') | list | length)
+        == ansible_play_hosts | length
+      retries: 60
+      delay: 10
+      become: true
+      become_user: oracle
+      run_once: true
+
+    - name: State of the cluster
+      ansible.builtin.debug:
+        msg: >-
+          {{ _cluster_check.stdout_lines
+             + (_db_status.results | default([]) | map(attribute='stdout_lines') | flatten) }}
+      run_once: true

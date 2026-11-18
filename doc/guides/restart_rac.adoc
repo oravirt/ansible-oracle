@@ -1071,6 +1071,10 @@ It is a test environment, not a template for production:
 * Container specific workarounds (`init.ohasd` with cgroup v2, `/run/nologin`, entries of Docker in `/etc/hosts`).
 * `converge.yml` starts only with at least 12 GB usable memory on the Docker host
   (`MemAvailable` + memory of running containers of the scenario), override with `MOLECULE_RAC_MIN_FREE_MB=<MB>`.
+* After a restart of WSL/Docker the Clusterware stack does not start: the loop devices of the ASM disks
+  (devices of the kernel) and the device nodes in the containers are gone, the ASM data is still in the Docker volume.
+  `task start S=rac` (`tools/start.sh`) starts the stopped containers, `start.yml` attaches the loop devices again,
+  restarts the Clusterware stack node by node and waits for the RAC databases.
 
 Inventory: `extensions/molecule/shared_config/inventory/group_vars/rac` (`gi.yml`, `db.yml`) and `host_vars/rac-*.yml`. +
 `verify.yml` checks the cluster stack, SCAN, VIPs, ASM, voting files, OCR, disk groups and the open instances of the RAC databases. +

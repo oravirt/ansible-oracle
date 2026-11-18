@@ -1,62 +1,13 @@
 ---
-# Grid Infrastructure + RAC database on 2 containers need a lot of memory.
-# The converge starts only, when at least molecule_rac_min_free_mb (default 12 GB) are available:
-#   MemAvailable of the docker host + memory used by running containers of this scenario
-#   (a converge of existing containers reuses their memory)
-# Override: MOLECULE_RAC_MIN_FREE_MB=<MB>
+# Grid Infrastructure + RAC database on 2 containers need a lot of memory
+# (at least 12 GB usable, MOLECULE_RAC_MIN_FREE_MB=<MB>), see tasks/memory_check.yml
 - name: Check free memory on the docker host
   hosts: localhost
   gather_facts: false
   become: false
-  vars:
-    molecule_rac_min_free_mb: "{{ lookup('ansible.builtin.env', 'MOLECULE_RAC_MIN_FREE_MB') | default(12288, true) | int }}"
-    _rac_containers: "{{ groups['all'] | difference(['localhost']) }}"
   tasks:
-    - name: MemAvailable of the docker host
-      ansible.builtin.command:
-        argv: [awk, '/^MemAvailable:/ {print int($2 / 1024)}', /proc/meminfo]
-      register: _mem_available
-      changed_when: false
-
-    - name: Running containers of this scenario
-      ansible.builtin.command:
-        argv: [docker, ps, --format, '{% raw %}{{.Names}}{% endraw %}']
-      register: _docker_ps
-      changed_when: false
-
-    # MemUsage: '4.295GiB / 31.31GiB' => MB of the 1st value
-    - name: Memory used by running containers of this scenario
-      ansible.builtin.shell:
-        cmd: >-
-          set -o pipefail;
-          docker stats --no-stream --format '{% raw %}{{.MemUsage}}{% endraw %}' {{ _running | join(' ') }}
-          | awk '{v=$1; n=v+0; u=v; gsub(/[0-9.]/, "", u);
-                  f=1; if (u=="B") f=1/1048576; else if (u=="KiB" || u=="kB") f=1/1024;
-                  else if (u=="GiB" || u=="GB") f=1024; else if (u=="TiB" || u=="TB") f=1048576;
-                  s+=n*f} END {print int(s)}'
-        executable: /bin/bash
-      vars:
-        _running: "{{ _docker_ps.stdout_lines | intersect(_rac_containers) }}"
-      register: _mem_containers
-      changed_when: false
-      when: _running | length > 0
-
-    - name: Assert free memory for Grid Infrastructure and RAC
-      ansible.builtin.assert:
-        quiet: true
-        that:
-          - _usable_mb | int >= molecule_rac_min_free_mb | int
-        success_msg: >-
-          {{ _usable_mb }} MB usable (MemAvailable {{ _mem_available.stdout }} MB
-          + {{ _containers_mb }} MB of running containers {{ _rac_containers | join(', ') }})
-        fail_msg: >-
-          Not enough memory for the scenario rac: {{ _usable_mb }} MB usable
-          (MemAvailable {{ _mem_available.stdout }} MB + {{ _containers_mb }} MB of running containers
-          {{ _rac_containers | join(', ') }}), {{ molecule_rac_min_free_mb }} MB needed.
-          Stop other scenarios or set MOLECULE_RAC_MIN_FREE_MB.
-      vars:
-        _containers_mb: "{{ _mem_containers.stdout | default(0, true) | int }}"
-        _usable_mb: "{{ _mem_available.stdout | int + _containers_mb | int }}"
+    - name: Check free memory
+      ansible.builtin.include_tasks: tasks/memory_check.yml
 
 - name: Converge
   hosts: all
@@ -113,122 +64,23 @@
           {{ oracle_gi_nic_pub }} must be in 10.89.20.0/24 (molecule-rac-pub),
           {{ oracle_gi_nic_priv }} in 10.89.21.0/24 (molecule-rac-priv)
 
-    # docker adds '<IP of eth0> <hostname>' to /etc/hosts. eth0 is the private network
-    # => the hostname resolves to 2 IPs (PRVH-1541, PRVG-13632 in gridSetup.sh)
-    # => remove the entry of docker, the public IP is in etc_hosts (molecule.yml)
-    # /etc/hosts is a bind mount => no atomic replace (unsafe_writes)
+    # docker adds the private IP of the hostname to /etc/hosts, see tasks/etc_hosts.yml
     - name: Remove private IP of hostname from /etc/hosts
-      ansible.builtin.lineinfile:
-        path: /etc/hosts
-        regexp: >-
-          ^{{ hostvars[inventory_hostname]['ansible_' + oracle_gi_nic_priv].ipv4.address
-          | regex_escape }}\s+{{ inventory_hostname | regex_escape }}\s*$
-        state: absent
-        unsafe_writes: true
+      ansible.builtin.include_tasks: tasks/etc_hosts.yml
 
 - name: Converge os
   ansible.builtin.import_playbook: opitzconsulting.ansible_oracle.os
 
-# Shared storage for ASM without block devices:
-# - sparse files in the docker volume molecule-rac-asm (molecule_asm_shared_dir)
-# - loop devices are created on the 1st node. Loop devices are devices of the kernel
-#   => the same block device is usable in all containers
-# - /dev of a privileged container is a copy from the start of the container
-#   => device nodes are created with mknod (major/minor from the 1st node)
-# ASM accepts block devices => no workaround for plain files (has-ol9) needed
+# Shared storage for ASM: loop devices on sparse files in the docker volume molecule-rac-asm,
+# see tasks/asm_loop_devices.yml (also used by start.yml after a restart of WSL/docker)
 - name: Shared ASM disks with loop devices
   hosts: rac
   gather_facts: false
   become: true
   any_errors_fatal: true
-  vars:
-    _asm_disks: "{{ asm_diskgroups | subelements('disk') | map(attribute='1') | list }}"
-    _primary_node: "{{ groups[orasw_meta_cluster_hostgroup][0] }}"
   tasks:
-    - name: Create device nodes for loop devices
-      ansible.builtin.shell:
-        cmd: |
-          set -o pipefail
-          changed=0
-          for i in $(seq 0 127); do
-            if [ ! -b /dev/loop${i} ]; then
-              mknod -m 0660 /dev/loop${i} b 7 ${i}
-              changed=1
-            fi
-          done
-          echo "changed=${changed}"
-        executable: /bin/bash
-      register: _loop_nodes
-      changed_when: "'changed=1' in _loop_nodes.stdout"
-
-    - name: Create sparse files for ASM disks
-      ansible.builtin.command:
-        argv: [truncate, -s, "{{ item.size }}", "{{ molecule_asm_shared_dir }}/{{ item.device | basename }}"]
-        creates: "{{ molecule_asm_shared_dir }}/{{ item.device | basename }}"
-      loop: "{{ _asm_disks }}"
-      loop_control:
-        label: "{{ item.device | basename }}"
-      when: inventory_hostname == _primary_node
-
-    # result: '<major> <minor>' (decimal) of the loop device
-    - name: Attach loop devices to sparse files
-      ansible.builtin.shell:
-        cmd: |
-          set -o pipefail
-          file={{ molecule_asm_shared_dir }}/{{ item.device | basename }}
-          dev=$(losetup --list --noheadings -O NAME -j "${file}" | head -1)
-          if [ -z "${dev}" ]; then
-            dev=$(losetup --find --show "${file}")
-            echo "attached ${dev}" >&2
-          fi
-          echo "$((16#$(stat -L -c '%t' ${dev}))) $((16#$(stat -L -c '%T' ${dev})))"
-        executable: /bin/bash
-      loop: "{{ _asm_disks }}"
-      loop_control:
-        label: "{{ item.device | basename }}"
-      register: _loop_devices
-      changed_when: "'attached' in _loop_devices.stderr"
-      when: inventory_hostname == _primary_node
-
-    - name: Create directory for ASM disks
-      ansible.builtin.file:
-        path: "{{ oracle_asm_disk_string | dirname }}"
-        state: directory
-        owner: root
-        group: root
-        mode: "0755"
-
-    # recreate the device node when major/minor are different
-    - name: Create device nodes for ASM disks
-      ansible.builtin.shell:
-        cmd: |
-          set -o pipefail
-          dev={{ item.item.device }}
-          if [ -b "${dev}" ] \
-            && [ "$((16#$(stat -c '%t' ${dev}))) $((16#$(stat -c '%T' ${dev})))" = "{{ item.stdout }}" ]; then
-            echo "ok"
-            exit 0
-          fi
-          rm -f "${dev}"
-          mknod "${dev}" b {{ item.stdout }}
-          echo "created"
-        executable: /bin/bash
-      loop: "{{ hostvars[_primary_node]['_loop_devices']['results'] }}"
-      loop_control:
-        label: "{{ item.item.device }} ({{ item.stdout }})"
-      register: _asm_dev_nodes
-      changed_when: "'created' in _asm_dev_nodes.stdout"
-
-    - name: Set ownership of ASM disks
-      ansible.builtin.file:
-        path: "{{ item.device }}"
-        # role defaults (grid_user, asmadmin_group) are not available in this play
-        owner: grid
-        group: asmadmin
-        mode: "0660"
-      loop: "{{ _asm_disks }}"
-      loop_control:
-        label: "{{ item.device }}"
+    - name: Shared ASM disks with loop devices
+      ansible.builtin.include_tasks: tasks/asm_loop_devices.yml
 
 - name: Prepare container for Grid Infrastructure
   hosts: rac

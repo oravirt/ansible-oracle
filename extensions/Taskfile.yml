@@ -117,6 +117,15 @@ tasks:
       - '[ "{{.C}}" = "false" ] || tools/collection_install.sh'
       - tools/molecule.sh side-effect -s {{if eq .S "default"}}dbfs{{else}}{{.S}}{{end}} {{.CLI_ARGS}}
 
+  start:
+    desc: >-
+      Start the instances again, e.g. after a restart of WSL/docker (S=<scenario>):
+      stopped containers and start.yml of the scenario, if it exists
+      (rac: loop devices of the ASM disks, /etc/hosts, Clusterware stack and RAC databases)
+    dir: "{{.TASKFILE_DIR}}"
+    cmds:
+      - tools/start.sh {{.S}}
+
   idempotence:
     desc: "Run converge again and check for changes (S=<scenario>)"
     cmds:

@@ -16,8 +16,13 @@
 #
 # Inventory: shared_config/inventory/group_vars/rac and host_vars/rac-*.yml
 #
-# Memory: converge.yml starts only with at least 12 GB usable on the docker host
+# Memory: converge.yml and start.yml start only with at least 12 GB usable on the docker host
 # (MemAvailable + memory of running containers of this scenario), MOLECULE_RAC_MIN_FREE_MB=<MB>
+#
+# Restart of WSL/docker: loop devices, device nodes and the cleanup of /etc/hosts are lost,
+# the Clusterware stack does not start => task start S=rac (tools/start.sh: starts the
+# containers, start.yml attaches the loop devices again, restarts the stack, waits for the
+# databases)
 dependency:
   name: galaxy
   enabled: true

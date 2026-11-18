@@ -1,0 +1,102 @@
+---
+# Shared storage for ASM without block devices (hosts: rac, become: true).
+# - sparse files in the docker volume molecule-rac-asm (molecule_asm_shared_dir)
+# - loop devices are created on the 1st node. Loop devices are devices of the kernel
+#   => the same block device is usable in all containers
+# - /dev of a privileged container is a copy from the start of the container
+#   => device nodes are created with mknod (major/minor from the 1st node)
+# ASM accepts block devices => no workaround for plain files (has-ol9) needed
+#
+# Idempotent. After a restart of WSL/docker the loop devices (kernel) and the device nodes
+# (/dev of the containers) are gone, the sparse files with the ASM data are still in the
+# volume => the same tasks attach them again (start.yml).
+# Used by converge.yml and start.yml.
+- name: asm_loop_devices | Variables
+  ansible.builtin.set_fact:
+    _asm_disks: "{{ asm_diskgroups | subelements('disk') | map(attribute='1') | list }}"
+    _primary_node: "{{ groups[orasw_meta_cluster_hostgroup][0] }}"
+
+- name: asm_loop_devices | Create device nodes for loop devices
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      changed=0
+      for i in $(seq 0 127); do
+        if [ ! -b /dev/loop${i} ]; then
+          mknod -m 0660 /dev/loop${i} b 7 ${i}
+          changed=1
+        fi
+      done
+      echo "changed=${changed}"
+    executable: /bin/bash
+  register: _loop_nodes
+  changed_when: "'changed=1' in _loop_nodes.stdout"
+
+- name: asm_loop_devices | Create sparse files for ASM disks
+  ansible.builtin.command:
+    argv: [truncate, -s, "{{ item.size }}", "{{ molecule_asm_shared_dir }}/{{ item.device | basename }}"]
+    creates: "{{ molecule_asm_shared_dir }}/{{ item.device | basename }}"
+  loop: "{{ _asm_disks }}"
+  loop_control:
+    label: "{{ item.device | basename }}"
+  when: inventory_hostname == _primary_node
+
+# result: '<major> <minor>' (decimal) of the loop device
+- name: asm_loop_devices | Attach loop devices to sparse files
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      file={{ molecule_asm_shared_dir }}/{{ item.device | basename }}
+      dev=$(losetup --list --noheadings -O NAME -j "${file}" | head -1)
+      if [ -z "${dev}" ]; then
+        dev=$(losetup --find --show "${file}")
+        echo "attached ${dev}" >&2
+      fi
+      echo "$((16#$(stat -L -c '%t' ${dev}))) $((16#$(stat -L -c '%T' ${dev})))"
+    executable: /bin/bash
+  loop: "{{ _asm_disks }}"
+  loop_control:
+    label: "{{ item.device | basename }}"
+  register: _loop_devices
+  changed_when: "'attached' in _loop_devices.stderr"
+  when: inventory_hostname == _primary_node
+
+- name: asm_loop_devices | Create directory for ASM disks
+  ansible.builtin.file:
+    path: "{{ oracle_asm_disk_string | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# recreate the device node when major/minor are different
+- name: asm_loop_devices | Create device nodes for ASM disks
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      dev={{ item.item.device }}
+      if [ -b "${dev}" ] \
+        && [ "$((16#$(stat -c '%t' ${dev}))) $((16#$(stat -c '%T' ${dev})))" = "{{ item.stdout }}" ]; then
+        echo "ok"
+        exit 0
+      fi
+      rm -f "${dev}"
+      mknod "${dev}" b {{ item.stdout }}
+      echo "created"
+    executable: /bin/bash
+  loop: "{{ hostvars[_primary_node]['_loop_devices']['results'] }}"
+  loop_control:
+    label: "{{ item.item.device }} ({{ item.stdout }})"
+  register: _asm_dev_nodes
+  changed_when: "'created' in _asm_dev_nodes.stdout"
+
+- name: asm_loop_devices | Set ownership of ASM disks
+  ansible.builtin.file:
+    path: "{{ item.device }}"
+    # role defaults (grid_user, asmadmin_group) are not available in this play
+    owner: grid
+    group: asmadmin
+    mode: "0660"
+  loop: "{{ _asm_disks }}"
+  loop_control:
+    label: "{{ item.device }}"
