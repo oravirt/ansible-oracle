@@ -107,25 +107,44 @@
     # Don't try to stop the listener at this point
     # => Restart of role will fail at create/manage database due to TNS-12514
     # Only executed when on Single-Instance!
-    - name: listener | Start/Reload Listener  # noqa no-changed-when
+    #
+    # There is no way to ask a running listener, if it knows the current listener.ora.
+    # => the sha256 of the listener.ora is stored in a stamp file after every start/reload
+    #    The stamp is stored next to the listener.ora of the ORACLE_HOME => it belongs to the home
+    #    (the listener is started from the new home after Out-of-Place Patching: stamp is missing)
+    # => listener not running: start (changed)
+    # => listener running and listener.ora differs from stamp (or no stamp): reload (changed)
+    # => listener running and listener.ora is known by the listener: nothing to do (ok)
+    - name: listener | Start/Reload Listener
       ansible.builtin.shell: |
-        #!/usr/bin/env bash
         set -eu
         set -o pipefail
         LSNRCTL="${ORACLE_HOME}/bin/lsnrctl"
+        STAMP="${LISTENER_ORA}.${LSNR_NAME}.sha256"
+        SUM=$(sha256sum "${LISTENER_ORA}" | cut -d' ' -f1)
 
-        if "${LSNRCTL}" status {{ lsnrinst.listener_name }} 2>/dev/null ; then
-          # Reload running listener
-          "${LSNRCTL}" reload {{ lsnrinst.listener_name }} > /dev/null
+        if "${LSNRCTL}" status "${LSNR_NAME}" > /dev/null 2>&1 ; then
+          if [ -f "${STAMP}" ] && [ "$(cat "${STAMP}")" = "${SUM}" ] ; then
+            exit 0
+          fi
+          "${LSNRCTL}" reload "${LSNR_NAME}" > /dev/null
+          echo "reloaded"
         else
-          # Start listener
-          "${LSNRCTL}" start {{ lsnrinst.listener_name }} > /dev/null
+          "${LSNRCTL}" start "${LSNR_NAME}" > /dev/null
+          echo "started"
         fi
-      environment: "{{ oracle_env_lsnrctl }}"
+        echo "${SUM}" > "${STAMP}"
+      args:
+        executable: /bin/bash
+      environment: "{{ oracle_env_lsnrctl | combine(_oradb_manage_db_listener_lsnrctl_env) }}"
+      vars:
+        _oradb_manage_db_listener_lsnrctl_env:
+          LSNR_NAME: "{{ lsnrinst.listener_name }}"
+          LISTENER_ORA: "{{ _oradb_manage_db_listener_home }}/network/admin/listener.ora"
+      register: _oradb_manage_db_listener_start
+      changed_when: _oradb_manage_db_listener_start.stdout | trim in ['started', 'reloaded']
       when:
         - oracle_install_option_gi == ''
-      tags:
-        - molecule-idempotence-notest
 
     # srvctl add/modify listener with the ORACLE_HOME of the listener:
     # home => ORACLE_HOME of home, use_gi_home => GI / Oracle Restart home
