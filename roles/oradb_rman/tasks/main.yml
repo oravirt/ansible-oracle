@@ -17,6 +17,7 @@
         dest: "/etc/auto.master"
         regexp: "^{{ rmanautofsmount }} "
         line: "{{ rmanautofsmount }} /etc/auto.net --timeout=60 rw,hard,rsize=32768,wsize=32768,proto=tcp,nfsvers=3"
+      register: __oradb_rman_autofs_master
 
     # IMPORTANT: Do not own the mountpoint by Oracle!
     # => Prevent writing RMAN backups to wrong mount point
@@ -29,11 +30,13 @@
         owner: root
         group: root
 
+    # No handler: following tasks (e.g. backups) need the running autofs with the new configuration.
+    # Restart only if auto.master was changed, otherwise just make sure autofs is running.
     - name: Restart autofs
       ansible.builtin.service:
         name: autofs
         enabled: true
-        state: restarted
+        state: "{{ __oradb_rman_autofs_master is changed | ternary('restarted', 'started') }}"
 
 - name: Create bin-Directory for rman_backup
   ansible.builtin.file:
