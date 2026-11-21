@@ -65,6 +65,10 @@ Attempts to enable Flashback Database on a physical standby database.
 `ALTER DATABASE FLASHBACK ON` fails with ORA-38788 until the standby database has applied more redo
 than after `RMAN DUPLICATE`. The task retries after `oradb_standby_flashback_delay` seconds.
 
+Before `FLASHBACK ON` a log switch is executed on the primary database and the task waits
+(at most `oradb_standby_flashback_retries` times `oradb_standby_flashback_delay` seconds)
+until the standby database has applied this log.
+
 #### Default value
 
 ```YAML

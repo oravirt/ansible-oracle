@@ -9,6 +9,14 @@
   when:
     - _odb_standby_config.type | default('') == 'dataguard'
 
+# The primary database is needed for a log switch before FLASHBACK ON (standby_flashback.yml)
+- name: Flashback | Find primary database
+  ansible.builtin.include_tasks: primary_detect.yml
+  when:
+    - odb.flashback | bool
+    - _odb_standby_config.type | default('') == 'dataguard'
+    - _orasw_meta_standby_state.role | default('') | trim == 'PHYSICAL STANDBY'
+
 - name: Flashback | Flashback Database of physical standby database
   ansible.builtin.include_tasks: standby_flashback.yml
   when:

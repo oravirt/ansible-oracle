@@ -11,6 +11,13 @@
 # - ORA-38788 (more standby database recovery is needed): the standby database has to apply more redo,
 #   e.g. directly after RMAN DUPLICATE => Redo Apply is started again and the statement is repeated
 #   after oradb_standby_flashback_delay seconds, oradb_standby_flashback_retries times.
+# - Timing: the standby database has to receive and apply redo of the primary database before
+#   FLASHBACK ON is possible (ORA-38788). On a primary without activity there is no new redo.
+#   => before FLASHBACK ON a log switch is executed on the primary database (ALTER SYSTEM ARCHIVE LOG CURRENT,
+#      connect from the standby host as in primary_prepare.yml) and the task waits until the standby
+#      database has applied this log (v$archived_log.applied) - at most oradb_standby_flashback_retries
+#      times oradb_standby_flashback_delay seconds. Without a primary database (_oradb_standby_primary_ci)
+#      the task works as before.
 # - Redo Apply is started again in every case, also when the statement fails.
 - name: Standby flashback | Flashback Database {{ 'ON' if odb.flashback | bool else 'OFF' }}
   ansible.builtin.shell: |
@@ -52,6 +59,50 @@
       # without broker: Redo Apply is running, when MRP0 exists
       [ "$(sql "select count(*) from v\$dataguard_process where name like 'MRP%';" | tr -d '[:space:]')" != "0" ] \
         && apply_wanted=1 || apply_wanted=0
+    fi
+
+    # query on the primary database (log switch), only for FLASHBACK ON
+    pri() {
+      "${ORACLE_HOME}/bin/sqlplus" -S -L /nolog <<EOF
+    connect sys/"${ORADB_STANDBY_PW}"@${PRIMARY_CI} as sysdba
+    whenever sqlerror exit failure
+    set heading off feedback off pagesize 0 linesize 200
+    $1
+    EOF
+    }
+    # Log switch on the primary and wait until the standby has applied this log (Redo Apply is running)
+    wait_for_primary_redo() {
+      local targets t thr seq n all attempt=1
+      if ! targets=$(pri "alter system archive log current;
+    select thread#||':'||max(sequence#) from v\$log_history where resetlogs_change# = (select resetlogs_change# from v\$database) group by thread#;") ; then
+        echo "WARNING: log switch on the primary database failed: ${targets}"
+        return 0
+      fi
+      targets=$(echo "${targets}" | tr -d '[:blank:]' | grep -E '^[0-9]+:[0-9]+$' | tr '\n' ' ')
+      [ -n "${targets}" ] || { echo "WARNING: no log history of the primary database"; return 0; }
+      echo "Log switch on the primary database, last log (thread:sequence): ${targets}"
+      while : ; do
+        all=1
+        for t in ${targets} ; do
+          thr=${t%%:*}
+          seq=${t##*:}
+          n=$(sql "select count(*) from v\$archived_log where thread# = ${thr} and sequence# >= ${seq} and applied = 'YES' and resetlogs_change# = (select resetlogs_change# from v\$database);" | tr -d '[:space:]')
+          [ "${n:-0}" != "0" ] || all=0
+        done
+        if [ "${all}" = "1" ] ; then
+          echo "Redo of the log switch applied on the standby database"
+          return 0
+        fi
+        if [ "${attempt}" -ge "${RETRIES}" ] ; then
+          echo "WARNING: redo of the log switch not applied after $((attempt * DELAY)) seconds"
+          return 0
+        fi
+        attempt=$((attempt + 1))
+        sleep "${DELAY}"
+      done
+    }
+    if [ "${WANTED}" = "YES" ] && [ "${apply_wanted}" = "1" ] && [ -n "${PRIMARY_CI}" ] ; then
+      wait_for_primary_redo
     fi
 
     stop_apply() {
@@ -103,7 +154,11 @@
                               'WANTED': 'YES' if odb.flashback | bool else 'NO',
                               'DB_UNIQUE_NAME': _oradb_standby_unique_name | trim,
                               'RETRIES': oradb_standby_flashback_retries | string,
-                              'DELAY': oradb_standby_flashback_delay | string}) }}
+                              'DELAY': oradb_standby_flashback_delay | string,
+                              'PRIMARY_CI': _oradb_standby_primary_ci | default(''),
+                              'ORADB_STANDBY_PW': _oradb_standby_sys_password}) }}
+  vars:
+    db_user: sys
   become: true
   become_user: "{{ oracle_user }}"
   register: _oradb_standby_flashback
