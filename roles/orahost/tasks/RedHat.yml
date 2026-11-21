@@ -190,11 +190,21 @@
         state: disabled
       register: selinux
 
-    - name: Disable selinux (runtime)  # noqa command-instead-of-shell
-      ansible.builtin.shell: setenforce 0
-      changed_when: disable_selinux_runtime.rc == 0
-      failed_when: disable_selinux_runtime.rc > 0 and "SELinux is disabled" not in disable_selinux_runtime.stderr
-      register: disable_selinux_runtime
+    # setenforce is only needed if SELinux is enforcing at the moment
+    # => disabled or permissive: nothing to do
+    - name: Get current SELinux mode
+      ansible.builtin.command: getenforce
+      changed_when: false
+      failed_when: false
+      check_mode: false
+      register: __orahost_selinux_mode
+
+    - name: Disable selinux (runtime)
+      ansible.builtin.command: setenforce 0
+      changed_when: true
+      when:
+        - __orahost_selinux_mode.rc == 0
+        - __orahost_selinux_mode.stdout | trim | lower == 'enforcing'
 
 - name: Oracle-recommended security limits
   ansible.builtin.template:
