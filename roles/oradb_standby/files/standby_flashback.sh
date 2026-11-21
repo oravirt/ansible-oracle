@@ -129,10 +129,12 @@ select thread#||':'||max(sequence#) from v\$log_history where resetlogs_change# 
   echo "${out}" | tr -d '[:blank:]' | grep -E '^[0-9]+:[0-9]+$' | tr '\n' ' '
 }
 
-# 0: the standby has applied the log <thread> <sequence> (or a later one)
+# 0: the standby has applied the log <thread> <sequence> completely.
+# v$archived_log.applied is not usable: with real-time apply the flag of a log is set late
+# (e.g. when Redo Apply is stopped). Redo Apply works on a later log (MRP0) => the log is applied.
 standby_applied() {
   local n
-  n=$(sql "select count(*) from v\$archived_log where thread# = $1 and sequence# >= $2 and applied = 'YES' and resetlogs_change# = (select resetlogs_change# from v\$database);" | tr -d '[:space:]')
+  n=$(sql "select count(*) from v\$managed_standby where process like 'MRP%' and thread# = $1 and sequence# > $2;" | tr -d '[:space:]')
   [ "${n:-0}" != "0" ]
 }
 
