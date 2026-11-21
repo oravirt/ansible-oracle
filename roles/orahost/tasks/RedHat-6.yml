@@ -1,10 +1,13 @@
 ---
 - name: Disable Transparent Hugepages (runtime)
-  ansible.builtin.shell: if test -f {{ item.path }}; then {{ item.disable }} {{ item.path }}; fi;
-  # noqa no-changed-when
+  ansible.builtin.shell: >-
+    if test -f {{ item.path }} && ! grep -q '\[never\]' {{ item.path }};
+    then {{ item.disable }} {{ item.path }} && echo changed; fi
+  register: __orahost_thp_runtime
+  changed_when: "'changed' in __orahost_thp_runtime.stdout"
   with_items:
     - "{{ transparent_hugepage_disable }}"
-  tags: tphnuma,molecule-idempotence-notest
+  tags: tphnuma
 
 - name: Disable Transparent Hugepages (permanently)
   ansible.builtin.lineinfile:
