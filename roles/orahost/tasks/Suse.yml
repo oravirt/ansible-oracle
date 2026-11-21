@@ -51,8 +51,11 @@
 - name: Disable Transparent Hugepages (runtime)
   when: not transparent_hugepage_disable_by_grub | bool
   ansible.builtin.shell: |
-    [ -f /sys/kernel/mm/transparent_hugepage/enabled ] && echo never > /sys/kernel/mm/transparent_hugepage/enabled && echo changed
-    [ -f /sys/kernel/mm/transparent_hugepage/defrag ] && echo never > /sys/kernel/mm/transparent_hugepage/defrag && echo changed
+    for p in /sys/kernel/mm/transparent_hugepage/enabled /sys/kernel/mm/transparent_hugepage/defrag; do
+      if [ -f "$p" ] && ! grep -q '\[never\]' "$p"; then
+        echo never > "$p" && echo changed
+      fi
+    done
   register: tphnuma_result
   changed_when: "'changed' in tphnuma_result.stdout"
   tags: tphnuma
