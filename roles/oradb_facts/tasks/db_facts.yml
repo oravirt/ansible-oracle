@@ -49,16 +49,23 @@
   rescue:
     # default is
     # => Fail execution of Playbook
-    # A database of a standby configuration (db_standby_config) may not exist yet
-    # (created by oradb_standby) => no fail, state unreachable
+    # A database of a standby configuration (db_standby_config) may not exist yet when
+    # the member is a physical standby (created by oradb_standby) => no fail, state unreachable.
+    # All other databases must exist (e.g. the primary after the creation with dbca): without
+    # facts the roles with oracledb_facts[...]['state'] would skip the database without an error,
+    # e.g. oradb_manage_parameters (dg_broker_start).
     - name: Fail execution of oradb_facts
       ansible.builtin.fail:
         msg: >-
-          Set oradb_facts_ignore_unreachable=false in oracle_databases
-          to disable this fail task.
+          The database {{ odb['oracle_db_unique_name'] | default(odb['oracle_db_name']) }} is not reachable
+          ({{ oracle_hostname }}:{{ _listener_port_cdb }}/{{ _db_service_name }}):
+          {{ ansible_failed_result.msg | default('') }}
+          Set oradb_facts_ignore_unreachable: true in oracle_databases to disable this fail task.
       when:
         - not _odb_loop_helper.oradb_facts_ignore_unreachable | default(false) | bool
-        - _odb_standby_config | length == 0
+        - >-
+          _odb_standby_config | length == 0
+          or _odb_standby_member.initial_role | default('') != 'physical_standby'
 
     - name: Write empty facts to oracledb.db_unique_name (rescue from failure above)
       ansible.builtin.set_fact:
