@@ -94,7 +94,7 @@ The version is selected with the Python version of the target host (`ansible_pyt
 #### Default value
 
 ```YAML
-pyoracledb_version: 26.1.0
+pyoracledb_version: 26.2.0
 ```
 
 ### pyoracledb_version_py36
