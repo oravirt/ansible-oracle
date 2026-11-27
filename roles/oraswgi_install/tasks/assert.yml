@@ -24,6 +24,21 @@
       - oracle_install_option_gi in ('HA_CONFIG', 'CRS_CONFIG')
   tags: always
 
+# Oracle desupported the ASM Filter Driver with 26ai
+- name: Oraswgi_install | Assert ASM Filter Driver
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - device_persistence != 'asmfd'
+        or
+        oracle_install_version_gi is version('23', '<')
+    fail_msg: >-
+      device_persistence: asmfd is not supported with oracle_install_version_gi={{ oracle_install_version_gi }}.
+      The ASM Filter Driver is desupported by Oracle with 26ai.
+      Use asmlib, udev or device_persistence '' with own device preparation.
+      See doc/guides/breaking_changes.adoc (ASM Filter Driver desupported with 26ai).
+  tags: always
+
 - name: Oraswgi_install | Assert role_separation
   ansible.builtin.assert:
     quiet: true
