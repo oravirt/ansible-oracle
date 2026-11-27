@@ -150,6 +150,10 @@ This guide only covers the changes from the section _Breaking Changes / Porting 
 |<<Default of oracle_install_version_gi is 26ai>>
 |`oracle_install_option_gi` is `HA_CONFIG` or `CRS_CONFIG` *and* `oracle_install_version_gi` is not set in inventory
 |Set `oracle_install_version_gi` to the base release of the installation media, e.g. `19.3.0.0` for 19c. Usually irrelevant in practice, the version must match the installation media anyway
+
+|<<ASM Filter Driver desupported with 26ai>>
+|`device_persistence: asmfd` *and* Oracle Restart or Grid Infrastructure 26ai (`oracle_install_version_gi: 26.1.0.0`, default as of 5.0.0)
+|Use `asmlib`, `udev` or `device_persistence: ''` with own device preparation for 26ai. Keep `asmfd` only for Grid Infrastructure 19c
 |===
 
 ==== Minimum ansible-core 2.16
@@ -1628,6 +1632,63 @@ oracle_install_option_gi: HA_CONFIG
 oracle_install_version_gi: 19.3.0.0
 oracle_home_gi: /u01/app/oracle/19.3.0.0/grid   # the former default
 ----
+
+==== ASM Filter Driver desupported with 26ai
+
+Oracle desupported the ASM Filter Driver (ASMFD) with Oracle AI Database 26ai.
+ASMFD is not available for Oracle Restart and Grid Infrastructure (cluster) 26ai.
+`device_persistence: asmfd` works with Grid Infrastructure 19c only.
+
+As of 5.0.0 the default of `oracle_install_version_gi` is 26ai (see <<Default of oracle_install_version_gi is 26ai>>).
+Inventories with `device_persistence: asmfd` must not be used for new installations or upgrades to 26ai.
+
+.Device persistence for Oracle Restart and Grid Infrastructure 26ai
+[cols="2,4",options="header"]
+|===
+|`device_persistence` |Description
+
+|`asmfd`
+|Not supported with 26ai (desupported by Oracle).
+
+|`asmlib`
+|ASMLib, recommended by Oracle as replacement for ASMFD.
+
+|`udev`
+|udev rules created by `orahost_storage`.
+
+|`''`
+|No device preparation by `ansible-oracle`. The devices must exist with owner and group for ASM,
+e.g. with own udev rules (tested in the molecule scenario `has-ol9`).
+|===
+
+.Before: Grid Infrastructure 19c with ASMFD
+[source,yaml]
+----
+oracle_install_version_gi: 19.3.0.0
+device_persistence: asmfd
+oracle_asmfd_disk_string: "AFD:*"
+----
+
+.After: Grid Infrastructure 26ai with own udev rules
+[source,yaml]
+----
+oracle_install_version_gi: 26.1.0.0
+device_persistence: ''
+partition_devices: false
+oracle_asm_disk_string: /dev/oracleasm/*
+
+asm_diskgroups:
+  - diskgroup: data
+    ...
+    disk:
+      - {device: /dev/oracleasm/data01, asmlabel: data01}
+----
+
+NOTE: Existing installations of Grid Infrastructure 19c with ASMFD must be migrated from ASMFD to another device persistence
+before the upgrade to 26ai. See the Oracle documentation _Migrating from Oracle ASM Filter Driver to Oracle ASMLib_.
+`ansible-oracle` does not migrate ASM disks.
+
+TIP: A complete example with udev rules is the link:restart.adoc[Oracle Restart Guide] (`example/restart`).
 
 === Adding new breaking changes
 
