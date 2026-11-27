@@ -1,0 +1,116 @@
+---
+# Prepare the ASM disk (asm_disk_device) for the disk groups DATA and FRA.
+#
+# 1. Split the disk into 2 GPT partitions:
+#      partition 1, name data1: 50%
+#      partition 2, name fra1:  50%
+#    The disk is partitioned only, when it is empty (no partition table, no filesystem, no ASM header).
+# 2. udev rule for the partition names => /dev/oracleasm/data01 and /dev/oracleasm/fra01
+#    with owner/group/mode for ASM (devices in asm_diskgroups, see inventory/group_vars/all/asm.yml).
+#
+# Execute it after the playbook os: the OS group asmadmin must exist.
+- name: Prepare ASM disk
+  hosts: "{{ hostgroup | default('has') }}"
+  become: true
+  any_errors_fatal: true
+  vars:
+    # partition name => name of the ASM device in /dev/oracleasm
+    _asm_partitions:
+      data1: data01
+      fra1: fra01
+    # owner of Oracle Restart (role_separation: false) and OSASM group
+    _asm_disk_owner: oracle
+    _asm_disk_group: asmadmin
+    _asm_udev_rule: /etc/udev/rules.d/99-oracle-asm.rules
+  tasks:
+    - name: Check partitions of ASM disk
+      ansible.builtin.stat:
+        path: "/dev/disk/by-partlabel/{{ item }}"
+      loop: "{{ _asm_partitions.keys() | list }}"
+      register: _asm_partition_stat
+
+    - name: Partition empty ASM disk
+      when:
+        - _asm_partition_stat.results | rejectattr('stat.exists') | list | length > 0
+      block:
+        # rc=2: no signature found => disk is empty
+        - name: Check ASM disk for existing signatures
+          ansible.builtin.command:
+            argv: [blkid, -p, "{{ asm_disk_device }}"]
+          register: _asm_disk_blkid
+          changed_when: false
+          failed_when: _asm_disk_blkid.rc not in [0, 2]
+
+        - name: Stop when the ASM disk is not empty
+          ansible.builtin.assert:
+            quiet: true
+            that:
+              - _asm_disk_blkid.rc == 2
+            fail_msg: >-
+              {{ asm_disk_device }} is not empty ({{ _asm_disk_blkid.stdout }}).
+              The disk is not partitioned to prevent data loss.
+              Check asm_disk_device or clean the disk manually (wipefs -a {{ asm_disk_device }}).
+
+        - name: Create GPT partitions on ASM disk
+          ansible.builtin.command:
+            argv:
+              - parted
+              - --script
+              - --align=optimal
+              - "{{ asm_disk_device }}"
+              - mklabel gpt
+              - mkpart data1 1MiB 50%
+              - mkpart fra1 50% 100%
+          changed_when: true
+
+    # ID_PART_ENTRY_NAME is the name of the GPT partition (set by 60-persistent-storage.rules)
+    - name: Create udev rule for ASM devices
+      ansible.builtin.copy:
+        dest: "{{ _asm_udev_rule }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          # ASM devices for Oracle Restart, created by playbooks/asm_disk.yml
+          {% for part, dev in _asm_partitions.items() %}
+          KERNEL=="sd*", ENV{DEVTYPE}=="partition", ENV{ID_PART_ENTRY_NAME}=="{{ part }}", SYMLINK+="oracleasm/{{ dev }}", OWNER="{{ _asm_disk_owner }}", GROUP="{{ _asm_disk_group }}", MODE="0660"
+          {% endfor %}
+      register: _asm_udev_rule_copy
+
+    - name: Reload udev rules
+      ansible.builtin.command:
+        argv: [udevadm, control, --reload-rules]
+      changed_when: false
+
+    - name: Apply udev rules to block devices
+      ansible.builtin.command:
+        argv: [udevadm, trigger, --subsystem-match=block, --action=change]
+      changed_when: false
+
+    - name: Wait for udev
+      ansible.builtin.command:
+        argv: [udevadm, settle]
+      changed_when: false
+
+    - name: Check ASM devices
+      ansible.builtin.stat:
+        path: "/dev/oracleasm/{{ item }}"
+        follow: true
+      loop: "{{ _asm_partitions.values() | list }}"
+      register: _asm_device_stat
+
+    - name: Assert ASM devices
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - item.stat.exists
+          - item.stat.isblk
+          - item.stat.pw_name == _asm_disk_owner
+          - item.stat.gr_name == _asm_disk_group
+          - item.stat.mode == '0660'
+        fail_msg: >-
+          /dev/oracleasm/{{ item.item }} is missing or has wrong permissions
+          (expected {{ _asm_disk_owner }}:{{ _asm_disk_group }} 0660).
+      loop: "{{ _asm_device_stat.results }}"
+      loop_control:
+        label: "/dev/oracleasm/{{ item.item }}"

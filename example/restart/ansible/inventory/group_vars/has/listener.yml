@@ -1,0 +1,13 @@
+---
+# LISTENER in the ORACLE_HOME of Oracle Restart (oracle_home_gi), managed with srvctl
+oracle_listeners_config:
+  LISTENER:
+    address:
+      - host: "{{ ansible_hostname }}"
+        protocol: TCP
+        port: 1521
+
+listener_installed:
+  - listener_name: LISTENER
+    use_gi_home: true
+    state: present

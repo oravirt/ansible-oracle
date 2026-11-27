@@ -1,0 +1,44 @@
+@startuml
+!include <C4/C4_Component>
+
+LAYOUT_TOP_DOWN()
+
+AddContainerTag("oradb", $legendText="Database")
+AddContainerTag("media", $legendText="Installation Media")
+AddContainerTag("ansible", $bgColor="DarkBlue", $legendText="Ansible")
+
+Person(admin, "Administrator")
+System_Ext(mos, "My Oracle Support", "Gold Images 26ai\nGrid Infrastructure + Database")
+
+System_Boundary(host, "Ansible Controller", "Ubuntu on WSL2 (Windows)") {
+  Container(ansible, "Ansible", "ansible-playbook playbooks/do_all.yml", $tags="ansible")
+}
+
+System_Boundary(vmhost, "Hypervisor", "e.g. Hyper-V") {
+  System(restart, "VM Database Server", "Inventory: restart\nansible_host: 192.168.66.171\nOracle Linux 9\n12GB RAM, 2 vCPUs\n/dev/sdb 50GB for ASM") {
+    Container(autoupgrade, "AutoUpgrade", "autoupgrade.jar -patch -mode download\nJDK, pexpect", $tags="ansible")
+    Container(instmedia, "Installation Media", "/u01/sw/gi_goldimage_26_xx.zip\n/u01/sw/db_home_26.xx.zip", $tags="media")
+    Container(has, "Oracle Restart 26ai", "/u01/app/oracle/product/gi26_restart\nLISTENER")
+    ContainerDb(asm, "ASM", "+DATA: /dev/oracleasm/data01 (25GB)\n+FRA: /dev/oracleasm/fra01 (25GB)\nudev")
+    SetPropertyHeader("Parameter","Value")
+    AddProperty("ORACLE_BASE", "/u01/app/oracle")
+    AddProperty("ORACLE_HOME", "/u01/app/oracle/product/db26_si_ee")
+    AddProperty("ORACLE_SID", "DB1")
+    AddProperty("db_create_file_dest", "+DATA")
+    AddProperty("db_recovery_file_dest", "+FRA")
+    ContainerDb(rdbms, "Oracle AI Database 26ai", "CDB DB1, PDB ORCLPDB", $tags="oradb")
+  }
+}
+
+Rel_Down(admin, ansible, "ansible-playbook")
+Rel_Down(ansible, restart, "ssh: os, asm_disk, autoupgrade, swgi, swdb, manage_db")
+Rel(autoupgrade, mos, "download")
+Rel(autoupgrade, instmedia, "")
+Rel(instmedia, has, "install")
+Rel(instmedia, rdbms, "install")
+Rel(has, asm, "")
+Rel(has, rdbms, "srvctl")
+Rel(rdbms, asm, "datafiles, FRA")
+
+SHOW_LEGEND()
+@enduml
