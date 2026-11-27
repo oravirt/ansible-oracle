@@ -162,7 +162,9 @@
         - name: autoupgrade | Find renamed Gold Images
           ansible.builtin.find:
             paths: "{{ autoupgrade_download_dir }}"
-            patterns: "^{{ autoupgrade_download_gold_image_prefix | regex_escape }}[0-9]+\\.[0-9]+\\.zip$"
+            patterns:
+              - "{{ _autoupgrade_gold_image_re_db }}"
+              - "{{ _autoupgrade_gold_image_re_gi }}"
             use_regex: true
             file_type: file
           register: _autoupgrade_gold_image_files
@@ -172,12 +174,12 @@
         - name: autoupgrade | Create symlink to the latest Gold Image
           ansible.builtin.file:
             src: "{{ aulg.value.file }}"
-            dest: "{{ autoupgrade_download_dir }}/{{ autoupgrade_download_gold_image_prefix }}{{ aulg.key }}_latest.zip"
+            dest: "{{ autoupgrade_download_dir }}/{{ aulg.key }}"
             state: link
           loop: "{{ _autoupgrade_gold_image_latest | dict2items }}"
           loop_control:
             loop_var: aulg
-            label: "{{ autoupgrade_download_gold_image_prefix }}{{ aulg.key }}_latest.zip -> {{ aulg.value.file }}"
+            label: "{{ aulg.key }} -> {{ aulg.value.file }}"
           when:
             - autoupgrade_download_gold_image_latest | bool
 

@@ -585,6 +585,33 @@ Remove `gold_image` from the entry, when the gold image should be controlled fro
   Whether a gold image from AutoUpgrade can be used there, is not tested.
 - *Information:* `patches_info.json` in `autoupgrade_download_dir` lists the downloaded gold images with release update and included patches.
 
+===== Gold image of Grid Infrastructure
+
+AutoUpgrade downloads the gold image of Grid Infrastructure (Oracle Restart and Grid Infrastructure cluster)
+with the patch keyword `GI` in an own entry.
+
+.Example: gold images of Grid Infrastructure and database for 26ai
+----
+autoupgrade_download_patches:
+  - target_version: 26
+    patch: "RU:23.26.4,MRP"
+    gold_image: ALL
+  - target_version: 26
+    patch: "GI:23.26.4"
+    gold_image: ALL
+----
+
+With `autoupgrade_download_gold_image_rename: true`, the gold image of Grid Infrastructure is renamed to
+`autoupgrade_download_gold_image_prefix_gi` (default `gi_goldimage_`) + release with `_` + `.zip`,
+e.g. `gi_goldimage_26_04.zip`.
+`autoupgrade_download_gold_image_latest: true` creates the symlink `gi_goldimage_26_latest.zip`.
+Use the file for `oracle_install_image_gi`.
+
+A gold image is detected as Grid Infrastructure, when the filename starts with `gi_`
+or the description in `patches_info.json` contains `Grid Infrastructure`.
+
+TIP: A complete example is the link:restart.adoc[Oracle Restart Guide] (`example/restart`).
+
 .Disable the download of gold images for all sections
 ----
 autoupgrade_download_gold_image: "NO"
