@@ -25,6 +25,7 @@ See `doc/guides/autoupgrade_upgrade.adoc` for the upgrade of PDBs.
   - [autoupgrade_download_gold_image](#autoupgrade_download_gold_image)
   - [autoupgrade_download_gold_image_latest](#autoupgrade_download_gold_image_latest)
   - [autoupgrade_download_gold_image_prefix](#autoupgrade_download_gold_image_prefix)
+  - [autoupgrade_download_gold_image_prefix_gi](#autoupgrade_download_gold_image_prefix_gi)
   - [autoupgrade_download_gold_image_rename](#autoupgrade_download_gold_image_rename)
   - [autoupgrade_download_latest](#autoupgrade_download_latest)
   - [autoupgrade_download_patches](#autoupgrade_download_patches)
@@ -122,18 +123,21 @@ autoupgrade_download_gold_image: "NO"
 
 Create a symlink to the latest Gold Image of each release (`autoupgrade_download_gold_image_rename: true`).
 
-The symlink is named `autoupgrade_download_gold_image_prefix` + major release + `_latest.zip`
+The symlink is named `autoupgrade_download_gold_image_prefix` (Grid Infrastructure:
+`autoupgrade_download_gold_image_prefix_gi`) + major release + `_latest.zip`
 and points to the renamed Gold Image with the highest release update in `autoupgrade_download_dir`:
 
 | Renamed Gold Images | Symlink |
 | --- | --- |
 | `db_home_19.31.zip`, `db_home_19.32.zip` | `db_home_19_latest.zip -> db_home_19.32.zip` |
 | `db_home_26.03.zip`, `db_home_26.04.zip` | `db_home_26_latest.zip -> db_home_26.04.zip` |
+| `gi_goldimage_26_03.zip`, `gi_goldimage_26_04.zip` | `gi_goldimage_26_latest.zip -> gi_goldimage_26_04.zip` |
 
 The symlink is changed only, when a newer Gold Image exists.
 The download of an older release update does not change the symlink.
 
-Use the symlink as `imagename` in `db_homes_config` for an inventory independent of the release update.
+Use the symlink as `imagename` in `db_homes_config` or as `oracle_install_image_gi`
+for an inventory independent of the release update.
 
 #### Default value
 
@@ -151,6 +155,19 @@ Prefix for the new filename of a Gold Image (`autoupgrade_download_gold_image_re
 autoupgrade_download_gold_image_prefix: db_home_
 ```
 
+### autoupgrade_download_gold_image_prefix_gi
+
+Prefix for the new filename of a Gold Image of Grid Infrastructure (`autoupgrade_download_gold_image_rename: true`).
+
+The release is written with `_`, e.g. `gi_goldimage_26_04.zip` for 23.26.4.
+Use the filename for `oracle_install_image_gi`.
+
+#### Default value
+
+```YAML
+autoupgrade_download_gold_image_prefix_gi: gi_goldimage_
+```
+
 ### autoupgrade_download_gold_image_rename
 
 Rename downloaded Gold Images after the download.
@@ -162,6 +179,11 @@ The file is renamed to `autoupgrade_download_gold_image_prefix` + release + `.zi
 | --- | --- |
 | `db_goldimage_19_32_<timestamp>.zip` (19.32) | `db_home_19.32.zip` |
 | `db_goldimage_23_26_3_<timestamp>.zip` (23.26.3) | `db_home_26.03.zip` |
+
+Gold Images of Grid Infrastructure (Oracle Restart and Grid Infrastructure cluster) get
+`autoupgrade_download_gold_image_prefix_gi` + release with `_` + `.zip`, e.g. `gi_goldimage_26_04.zip`.
+A Gold Image is detected as Grid Infrastructure, when the filename starts with `gi_`
+or the description in `patches_info.json` contains `Grid Infrastructure`.
 
 A symlink with the original filename is created for the renamed file.
 AutoUpgrade finds the file under the original name and skips a new download.

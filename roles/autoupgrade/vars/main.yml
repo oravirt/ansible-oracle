@@ -153,8 +153,10 @@ _autoupgrade_download_expected: >-
 
 # Gold Images from patches_info.json (autoupgrade_download_gold_image_rename)
 # src:  filename created by AutoUpgrade, e.g. db_goldimage_19_32_20261021112350.zip
-# dest: autoupgrade_download_gold_image_prefix + release + .zip
-#       19.32.0.0.0 => 19.32, 23.26.3.0.0 => 26.03 (23ai with RU >= 23.26)
+# dest: database:             autoupgrade_download_gold_image_prefix + release + .zip
+#       Grid Infrastructure:  autoupgrade_download_gold_image_prefix_gi + release with '_' + .zip
+#       19.32.0.0.0 => 19.32 / 19_32, 23.26.3.0.0 => 26.03 / 26_03 (23ai with RU >= 23.26)
+# Grid Infrastructure: filename starts with gi_ or description contains 'Grid Infrastructure'
 _autoupgrade_gold_images: >-
   {%- set ns = namespace(res=[]) -%}
   {%- set info = (_autoupgrade_patches_info.content | default('') | b64decode or '{}') | from_json -%}
@@ -167,22 +169,37 @@ _autoupgrade_gold_images: >-
   {%-       set rel = v[0] ~ '.' ~ v[1] | default('0') -%}
   {%-     endif -%}
   {%-     for f in p.files | default([]) -%}
-  {%-       set ns.res = ns.res + [{'src': f.name, 'dest': autoupgrade_download_gold_image_prefix ~ rel ~ '.zip'}] -%}
+  {%-       if f.name is match('gi_') or p.description is search('Grid Infrastructure', ignorecase=true) -%}
+  {%-         set dest = autoupgrade_download_gold_image_prefix_gi ~ (rel | replace('.', '_')) ~ '.zip' -%}
+  {%-       else -%}
+  {%-         set dest = autoupgrade_download_gold_image_prefix ~ rel ~ '.zip' -%}
+  {%-       endif -%}
+  {%-       set ns.res = ns.res + [{'src': f.name, 'dest': dest}] -%}
   {%-     endfor -%}
   {%-   endif -%}
   {%- endfor -%}
   {{ ns.res }}
 
-# Latest renamed Gold Image per major release (autoupgrade_download_gold_image_latest)
-# db_home_26.03.zip, db_home_26.04.zip => {'26': {'release': '26.04', 'file': 'db_home_26.04.zip'}}
+# regex for renamed Gold Images (autoupgrade_download_gold_image_latest)
+# database: db_home_26.04.zip, Grid Infrastructure: gi_goldimage_26_04.zip
+_autoupgrade_gold_image_re_db: "^{{ autoupgrade_download_gold_image_prefix | regex_escape }}[0-9]+\\.[0-9]+\\.zip$"
+_autoupgrade_gold_image_re_gi: "^{{ autoupgrade_download_gold_image_prefix_gi | regex_escape }}[0-9]+_[0-9]+\\.zip$"
+
+# latest renamed Gold Image per symlink name
+# key:   name of the symlink, e.g. db_home_26_latest.zip or gi_goldimage_26_latest.zip
+# value: release and file of the latest Gold Image
 _autoupgrade_gold_image_latest: >-
   {%- set ns = namespace(res={}) -%}
-  {%- set prefix_re = '^' ~ (autoupgrade_download_gold_image_prefix | regex_escape) -%}
   {%- for f in _autoupgrade_gold_image_files.files | default([]) | map(attribute='path') | map('basename') -%}
-  {%-   set rel = f | regex_replace(prefix_re, '') | regex_replace('\.zip$', '') -%}
-  {%-   set major = rel.split('.')[0] -%}
-  {%-   if major not in ns.res or rel is version(ns.res[major]['release'], '>') -%}
-  {%-     set ns.res = ns.res | combine({major: {'release': rel, 'file': f}}) -%}
+  {%-   if f is match(_autoupgrade_gold_image_re_gi) -%}
+  {%-     set prefix = autoupgrade_download_gold_image_prefix_gi -%}
+  {%-   else -%}
+  {%-     set prefix = autoupgrade_download_gold_image_prefix -%}
+  {%-   endif -%}
+  {%-   set rel = f[prefix | length:] | regex_replace('\\.zip$', '') | replace('_', '.') -%}
+  {%-   set link = prefix ~ rel.split('.')[0] ~ '_latest.zip' -%}
+  {%-   if link not in ns.res or rel is version(ns.res[link]['release'], '>') -%}
+  {%-     set ns.res = ns.res | combine({link: {'release': rel, 'file': f}}) -%}
   {%-   endif -%}
   {%- endfor -%}
   {{ ns.res }}
