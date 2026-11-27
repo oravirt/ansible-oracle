@@ -1,0 +1,36 @@
+---
+# Oracle Release Updates for this example, updated by renovate
+# (custom datasources oracle-ru-* in renovate.json).
+#
+# example_ru_*:      current Release Update
+# example_ru_*_prev: previous Release Update (RU-1)
+#
+# Used for autoupgrade_download_patches (autoupgrade.yml) and the Gold Images
+# in db_homes_config (db-homes.yml). Gold Images renamed by autoupgrade
+# (autoupgrade_download_gold_image_rename: true) are named
+# db_home_{{ example_ru_19 }}.zip / db_home_{{ example_ru_26_short }}.zip.
+#
+# Do not change the format: renovate needs the comment directly above the variable.
+
+# renovate: datasource=custom.oracle-ru-19 depName=oracle-ru-19
+example_ru_19: "19.33"
+# renovate: datasource=custom.oracle-ru-19-prev depName=oracle-ru-19-prev
+example_ru_19_prev: "19.32"
+
+# renovate: datasource=custom.oracle-ru-26 depName=oracle-ru-26
+example_ru_26: "23.26.4"
+# renovate: datasource=custom.oracle-ru-26-prev depName=oracle-ru-26-prev
+example_ru_26_prev: "23.26.3"
+
+# Short forms for ORACLE_HOME, gold images and oracle_home_name
+# 19c:  19.33    => 1933
+# 26ai: 23.26.4  => 26.04 (_short) / 2604 (_nodot) / 26_04 (_gi)
+example_ru_19_nodot: "{{ example_ru_19 | replace('.', '') }}"
+example_ru_19_prev_nodot: "{{ example_ru_19_prev | replace('.', '') }}"
+example_ru_26_short: "26.{{ '%02d' | format(example_ru_26.split('.')[2] | int) }}"
+example_ru_26_prev_short: "26.{{ '%02d' | format(example_ru_26_prev.split('.')[2] | int) }}"
+example_ru_26_nodot: "{{ example_ru_26_short | replace('.', '') }}"
+example_ru_26_prev_nodot: "{{ example_ru_26_prev_short | replace('.', '') }}"
+# Gold images of Grid Infrastructure: gi_goldimage_26_04.zip
+example_ru_26_gi: "{{ example_ru_26_short | replace('.', '_') }}"
+example_ru_26_prev_gi: "{{ example_ru_26_prev_short | replace('.', '_') }}"

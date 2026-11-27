@@ -1,0 +1,24 @@
+---
+autoupgrade_run_local: false
+autoupgrade_download_use_oracle_sw_patches: false
+autoupgrade_download_latest: true
+
+autoupgrade_download_gold_image_rename: true
+# db_home_26_latest.zip      -> latest downloaded Gold Image of the database (imagename in db-homes.yml)
+# gi_goldimage_26_latest.zip -> latest downloaded Gold Image of Oracle Restart (oracle_install_image_gi in restart.yml)
+autoupgrade_download_gold_image_latest: true
+autoupgrade_jar_filesource: /u01/stage/autoupgrade.jar
+
+autoupgrade_download_patches:
+  # - target_version: 19
+  #   patch: "RU:{{ example_ru_19 }},MRP,OPATCH,OJVM,DPBP"
+  #   gold_image: "ALL"
+  - target_version: 26
+    patch: "RU:{{ example_ru_26 }},MRP,AHF,CVU"
+    gold_image: "ALL"
+    platform: LINUX.X64
+  # Gold Image of Grid Infrastructure for Oracle Restart
+  - target_version: 26
+    patch: "GI:{{ example_ru_26 }}"
+    gold_image: "ALL"
+    platform: LINUX.X64

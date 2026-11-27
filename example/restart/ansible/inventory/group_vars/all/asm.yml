@@ -1,0 +1,43 @@
+---
+# ASM disks with udev
+#
+# The 2nd disk of the VM (asm_disk_device) is split into 2 GPT partitions
+# by playbooks/asm_disk.yml before the installation of Oracle Restart:
+#
+#   partition 1, name data1: 50% => /dev/oracleasm/data01 => disk group DATA
+#   partition 2, name fra1:  50% => /dev/oracleasm/fra01  => disk group FRA
+#
+# asm_disk.yml creates a udev rule for the partition names with owner, group and mode for ASM.
+# The partition names do not depend on the device name of the disk (/dev/sdb).
+#
+# The ASM Filter Driver (device_persistence: asmfd) is desupported with 26ai.
+asm_disk_device: /dev/sdb
+
+# devices are prepared by asm_disk.yml, not by ansible-oracle
+device_persistence: ''
+partition_devices: false
+oracle_asm_disk_string: /dev/oracleasm/*
+
+# 1st disk group, created by root.sh. Contains the SPFile of ASM.
+oracle_asm_init_dg: data
+
+asm_diskgroups:
+  - diskgroup: data
+    state: present
+    properties:
+      - {redundancy: external, ausize: 4}
+    attributes:
+      - {name: compatible.rdbms, value: 19.0.0.0.0}
+      - {name: compatible.asm, value: 23.0.0.0.0}
+    disk:
+      - {device: /dev/oracleasm/data01, asmlabel: data01}
+  - diskgroup: fra
+    state: present
+    properties:
+      - {redundancy: external}
+    attributes:
+      - {name: compatible.rdbms, value: 19.0.0.0.0}
+      - {name: compatible.asm, value: 23.0.0.0.0}
+      - {name: au_size, value: 4M}
+    disk:
+      - {device: /dev/oracleasm/fra01, asmlabel: fra01}

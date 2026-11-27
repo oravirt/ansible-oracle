@@ -1,0 +1,353 @@
+:toc:
+:toc-placement!:
+:toclevels: 4
+toc::[]
+
+:sectnums:
+:sectnumlevels: 4
+
+== Oracle Restart Guide
+
+This guide installs Oracle Restart 26ai and an Oracle AI Database 26ai with a container database `DB1` and the PDB `ORCLPDB`
+in ASM on an Oracle Linux 9 VM with `ansible-oracle`.
+
+AutoUpgrade downloads the _gold images_ of Oracle Restart (Grid Infrastructure) and of the database from My Oracle Support.
+
+The guide is based on the link:beginner.adoc[Beginners Guide].
+Steps that are identical are referenced and not repeated.
+
+See link:restart_rac.adoc[Setup of Oracle Restart and Grid Infrastructure] for the details of Oracle Restart in `ansible-oracle`.
+
+=== Overview
+
+==== Architecture overview
+:puml: http://www.plantuml.com/plantuml/proxy?src=https://raw.githubusercontent.com/oravirt/ansible-oracle/master/doc
+
+image::{puml}/guides/restart.puml[Architecture]
+
+==== What are we going to do?
+
+. Prepare the Ansible controller: Ansible in Ubuntu on WSL2 on Windows.
+. Create an Oracle Linux 9 VM with a 2nd disk for ASM on Hyper-V.
+. Configure the inventory with the IP address and login user of the VM.
+. Start the playbook `playbooks/do_all.yml`. It executes all needed playbooks:
+.. `opitzconsulting.ansible_oracle.os`: prepare the VM
+.. `playbooks/asm_disk.yml`: split the 2nd disk into 2 partitions for the disk groups `DATA` and `FRA`
+   and create the ASM devices with udev
+.. `playbooks/autoupgrade.yml`: install AutoUpgrade on the VM and download the gold images of Oracle Restart and of the database
+.. `opitzconsulting.ansible_oracle.swgi`: install Oracle Restart from the gold image, configure
+   ASM with the disk groups `DATA` and `FRA` and the listener `LISTENER`
+.. `opitzconsulting.ansible_oracle.swdb`: install the ORACLE_HOME of the database from the gold image
+.. `opitzconsulting.ansible_oracle.manage_db`: create the database in ASM, registered in Oracle Restart
+
+==== Defaults
+
+.Defaults used in this guide
+[options="header"]
+|=======================
+|Value |Description
+|`~/git/ansible-oracle` |git repository on the Ansible controller
+|`~/git/ansible-oracle/example/restart/ansible` |Working directory for all Ansible commands
+|`restart` |Name of the VM in the inventory
+|`192.168.66.171` |IP address of the VM (`ansible_host`)
+|`ol` |Login user on the VM (`ansible_user`)
+|`/dev/sdb` |2nd disk of the VM for ASM (`asm_disk_device`)
+|`/u01/sw` |Installation media on the VM, target of the download (`oracle_sw_source_local`)
+|`/u01/stage` |Staging directory on the VM (`oracle_stage`)
+|=======================
+
+=== Requirements
+
+==== Oracle Linux 9 VM
+
+A VM with the requirements of the link:beginner.adoc#_oracle_linux_9_vm[Beginners Guide] is needed, with the following differences:
+
+.Differences to the Beginners Guide
+[options="header"]
+|=======================
+|Item |Requirement
+|Memory |12 GB RAM, available from the start of the VM.
+The prerequisite checks of Oracle Restart check the memory of the running VM.
+|Disk 1 |`/dev/sda` with the volume group `ol` on `/dev/sda3`.
+The volume group needs min. 76 GB free space for swap (16 GB) and `/u01` (60 GB).
+See `host_fs_layout` in `group_vars/all/host.yml`.
+|Disk 2 |`/dev/sdb` with 50 GB, empty (no partition table).
+`playbooks/asm_disk.yml` creates 2 partitions with 25 GB each.
+|=======================
+
+==== Create the VM with Hyper-V and Packer
+
+Build the Oracle Linux 9 template as described in
+link:beginner.adoc#_create_the_vm_with_hyper_v_and_packer[Create the VM with Hyper-V and Packer] of the Beginners Guide.
+
+IMPORTANT: All steps in this chapter are executed in PowerShell on Windows, not in WSL.
+
+`create-vm.ps1` adds the 2nd disk with `-DataDiskGB`.
+`-StartupMemoryGB 12 -MemoryGB 6` gives the VM 12 GB memory from the start
+(maximum of the dynamic memory: `max(2 x MemoryGB, StartupMemoryGB)`).
+
+.Create the VM from the template
+----
+cd OL9
+.\create-vm.ps1 -NewVMName restart -Hostname restart -ExternalSwitch intern_66 -FixedIP 192.168.66.171 `
+    -CPUs 2 -StartupMemoryGB 12 -MemoryGB 6 -DataDiskGB 50
+----
+
+The 2nd disk is connected to the SCSI controller of the VM and appears as `/dev/sdb` in the VM.
+At the end, `create-vm.ps1` shows the block devices of the VM (`lsblk`).
+
+IMPORTANT: Increase the system disk of the VM, e.g. to 130 GB, before you start the installation
+(see the link:beginner.adoc#_create_the_vm_with_hyper_v_and_packer[Beginners Guide]).
+
+==== Ansible controller and My Oracle Support
+
+The requirements are identical to the Beginners Guide:
+
+- link:beginner.adoc#_ansible_controller[Ansible controller]
+- link:beginner.adoc#_my_oracle_support[My Oracle Support]
+
+=== Setup Ansible controller
+
+Follow link:beginner.adoc#_setup_ansible_controller[Setup Ansible controller] of the Beginners Guide,
+but install the collections in the working directory of this guide.
+
+.Install collections
+----
+cd ~/git/ansible-oracle/example/restart/ansible
+ansible-galaxy collection install -r requirements.yml
+----
+
+IMPORTANT: The gold image of Oracle Restart needs `ansible-oracle` 5.1.0 or newer
+(renamed gold images of Grid Infrastructure in role `autoupgrade`). +
+Use the development entry in `requirements.yml` to install the collection from the git repository,
+as long as 5.1.0 is not released.
+
+=== Configure inventory
+
+==== IP address and login user
+
+The VM is configured in `inventory/hosts.yml`.
+Change `ansible_host` and `ansible_user` for your VM.
+
+.inventory/hosts.yml
+----
+---
+all:
+  children:
+    has:
+      hosts:
+        restart:
+          # IP address or DNS name of the Oracle Linux 9 VM
+          ansible_host: 192.168.66.171
+          # Login user on the VM with sudo privileges (SSH key login)
+          ansible_user: ol
+----
+
+NOTE: `restart` is only the name of the host in the inventory.
+The host specific variables are in `inventory/host_vars/restart/`.
+Rename the directory as well, when you change the name.
+
+==== SSH key, connection test, credentials and passwords
+
+Follow the Beginners Guide:
+
+- link:beginner.adoc#_ssh_key[SSH key]: `ssh-copy-id ol@192.168.66.171`
+- link:beginner.adoc#_check_the_connection[Check the connection]
+- link:beginner.adoc#_my_oracle_support_credentials[My Oracle Support credentials] (`.env` in `example/restart/ansible`)
+- link:beginner.adoc#_database_passwords[Database passwords]
+
+The passwords of `SYS` (SYSASM) and `ASMSNMP` in ASM are `default_gipass` in `inventory/group_vars/all/password.yml`.
+
+WARNING: The default `Oracle_123` is for test environments only. Change it and use `ansible-vault` for other environments.
+
+==== ASM disk
+
+`playbooks/asm_disk.yml` prepares the 2nd disk of the VM for ASM before the installation of Oracle Restart:
+
+. It splits the disk into 2 GPT partitions.
+. It creates the udev rule `/etc/udev/rules.d/99-oracle-asm.rules`.
+  The rule creates a symlink in `/dev/oracleasm` for each partition and sets owner, group and mode for ASM.
+
+.Partitions and ASM devices
+[options="header"]
+|=======================
+|Partition |Name |Size |ASM device |Owner |Disk group
+|1 |`data1` |50% (25 GB) |`/dev/oracleasm/data01` |`oracle:asmadmin`, `0660` |`DATA`
+|2 |`fra1` |50% (25 GB) |`/dev/oracleasm/fra01` |`oracle:asmadmin`, `0660` |`FRA`
+|=======================
+
+The udev rule uses the name of the GPT partition (`ID_PART_ENTRY_NAME`), not the device name of the disk.
+The ASM devices stay the same, even when the disk gets another name than `/dev/sdb`.
+
+The playbook partitions the disk only, when it is empty (no partition table, no filesystem, no ASM header).
+Otherwise it stops with an error.
+
+.inventory/group_vars/all/asm.yml (extract)
+----
+asm_disk_device: /dev/sdb
+
+device_persistence: ''
+partition_devices: false
+oracle_asm_disk_string: /dev/oracleasm/*
+oracle_asm_init_dg: data
+
+asm_diskgroups:
+  - diskgroup: data
+    ...
+    disk:
+      - {device: /dev/oracleasm/data01, asmlabel: data01}
+  - diskgroup: fra
+    ...
+    disk:
+      - {device: /dev/oracleasm/fra01, asmlabel: fra01}
+----
+
+* `device_persistence: ''`: `ansible-oracle` uses the devices from `asm_diskgroups` as they are.
+  The devices must exist with owner `oracle` and group `asmadmin` before the installation of Oracle Restart.
+* `partition_devices: false`: `ansible-oracle` does not partition the devices.
+
+Change `asm_disk_device`, when the 2nd disk is not `/dev/sdb`, e.g. check it with `lsblk` on the VM.
+
+NOTE: The ASM Filter Driver (`device_persistence: asmfd`) is desupported with Oracle AI Database 26ai.
+
+The disk group `data` (`oracle_asm_init_dg`) is created by `root.sh` during the configuration of Oracle Restart
+and contains the SPFile of ASM.
+The disk group `fra` is created afterwards by the role `oraasm_manage_diskgroups`.
+
+=== AutoUpgrade and gold images
+
+AutoUpgrade is executed on the VM and downloads the gold images into `/u01/sw`,
+as described in link:beginner.adoc#_autoupgrade_on_the_vm[AutoUpgrade on the VM] of the Beginners Guide.
+
+This guide downloads 2 gold images:
+
+.Download configuration in inventory/group_vars/all/autoupgrade.yml
+----
+autoupgrade_download_patches:
+  - target_version: 26
+    patch: "RU:{{ example_ru_26 }},MRP,AHF,CVU"
+    gold_image: "ALL"
+    platform: LINUX.X64
+  # Gold Image of Grid Infrastructure for Oracle Restart
+  - target_version: 26
+    patch: "GI:{{ example_ru_26 }}"
+    gold_image: "ALL"
+    platform: LINUX.X64
+----
+
+The role `autoupgrade` renames the gold images and creates a symlink to the latest gold image of each release
+(`autoupgrade_download_gold_image_rename: true`, `autoupgrade_download_gold_image_latest: true`).
+
+.Check the downloaded gold images on the VM
+----
+ls -l /u01/sw/db_home_*.zip /u01/sw/gi_goldimage_*.zip
+----
+
+.Example
+----
+db_home_26.04.zip
+db_home_26_latest.zip -> db_home_26.04.zip
+gi_goldimage_26_04.zip
+gi_goldimage_26_latest.zip -> gi_goldimage_26_04.zip
+----
+
+The inventory uses the symlinks:
+
+[options="header"]
+|=======================
+|Gold image |Variable |File
+|Oracle Restart |`oracle_install_image_gi` in `group_vars/all/restart.yml` |`gi_goldimage_26_latest.zip`
+|Database |`imagename` in `group_vars/all/db-homes.yml` |`db_home_26_latest.zip`
+|=======================
+
+IMPORTANT: The version of the database home must not be newer than Oracle Restart.
+Both gold images are downloaded with the same release update (`example_ru_26` in `group_vars/all/oracle_ru.yml`).
+
+TIP: Use the real filenames, e.g. `gi_goldimage_26_04.zip`, when Oracle Restart must be installed with a fixed release update.
+
+=== Oracle Restart
+
+.inventory/group_vars/all/restart.yml
+----
+oracle_install_option_gi: HA_CONFIG
+oracle_install_version_gi: 26.1.0.0
+
+oracle_install_image_gi: gi_goldimage_26_latest.zip
+oracle_home_gi: /u01/app/oracle/product/gi26_restart
+
+apply_patches_gi: false
+patch_before_rootsh: false
+
+role_separation: false
+----
+
+* `oracle_install_option_gi: HA_CONFIG` configures Oracle Restart.
+* `oracle_install_version_gi` is the base release, not the release update of the gold image.
+* `oracle_home_gi` must be below `grid_base` (default for Oracle Restart: `oracle_base`, `/u01/app/oracle`).
+* `apply_patches_gi: false`: the gold image contains the release update.
+* `role_separation: false`: Oracle Restart is installed and owned by `oracle`.
+
+The listener `LISTENER` runs in the ORACLE_HOME of Oracle Restart (`use_gi_home: true` in `group_vars/has/listener.yml`).
+
+See link:restart_rac.adoc#_oracle_restart[Oracle Restart] for all variables.
+
+=== Install Oracle Restart and database with Ansible
+
+.Start installation
+----
+cd ~/git/ansible-oracle/example/restart/ansible
+ansible-playbook playbooks/do_all.yml
+----
+
+NOTE: The execution takes approx. 90 minutes plus the download of the gold images.
+
+.Configuration of Oracle Restart and the database
+[options="header"]
+|=======================
+|Parameter |Value
+|ORACLE_BASE |`/u01/app/oracle`
+|ORACLE_HOME of Oracle Restart |`/u01/app/oracle/product/gi26_restart`
+|ORACLE_HOME of the database |`/u01/app/oracle/product/db26_si_ee`
+|ASM disk groups |`DATA` (25 GB), `FRA` (25 GB)
+|ORACLE_SID |`DB1`
+|PDB |`ORCLPDB`
+|db_create_file_dest |`+DATA`
+|db_recovery_file_dest |`+FRA`
+|Listener |`LISTENER` in the ORACLE_HOME of Oracle Restart, port 1521
+|=======================
+
+=== How to work with Oracle Restart
+
+Login into the VM and initialize `ocenv` as described in
+link:beginner.adoc#_how_to_work_with_the_installed_database[How to work with the installed database] of the Beginners Guide.
+
+.Login into the VM and switch to user oracle
+----
+ssh ol@192.168.66.171
+sudo -iu oracle
+ocenv
+----
+
+.Status of all resources in Oracle Restart
+----
+crsctl stat res -t
+----
+
+.Configuration and status of the database
+----
+srvctl config database -db DB1
+srvctl status database -db DB1
+----
+
+.Disk groups and ASM disks
+----
+asmcmd lsdg
+asmcmd lsdsk -k
+----
+
+=== Next Steps
+
+* link:restart_rac.adoc[Setup of Oracle Restart and Grid Infrastructure]
+* link:out_of_place_patching.adoc[Out-of-Place Patching]
+* link:autoupgrade.adoc[Oracle AutoUpgrade in `ansible-oracle`]
+* link:../roles.adoc[List of roles in `ansible-oracle`]

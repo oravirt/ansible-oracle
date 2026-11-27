@@ -20,6 +20,7 @@
 1. Vagrant setup on Windows <https://github.com/oravirt/ansible-oracle/blob/master/doc/vagrant.adoc>
 1. Beginner <https://github.com/oravirt/ansible-oracle/blob/master/doc/guides/beginner.adoc>
 1. Data Guard <https://github.com/oravirt/ansible-oracle/blob/master/doc/guides/dataguard.adoc>
+1. Oracle Restart <https://github.com/oravirt/ansible-oracle/blob/master/doc/guides/restart.adoc>
 
 ### Next Steps
 
