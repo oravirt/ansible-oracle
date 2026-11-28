@@ -103,7 +103,7 @@ options:
             - The new value of the parameter.
             - Required in practice for O(state=present).
             - A value containing whitespace or one of the characters
-              C(?*$%#()!,._/=+-) is enclosed in single quotes, so lists of values
+              C(?*$%#()!,._/=+:-) is enclosed in single quotes, so lists of values
               (like V('a','b')) are not supported.
             - Use V('') (quoted) to set an empty value.
             - Ignored for O(state=reset) and O(state=absent).
@@ -257,7 +257,7 @@ def check_parameter_exists(module, mode, msg, cursor, name):
 
 
 def modify_parameter(module, mode, msg, cursor, name, value, comment, scope, sid):
-    contains = re.compile(r'[?*$%#()!\s,._/=+-]')
+    contains = re.compile(r'[?*$%#()!\s,._/=+:-]')
     starters = ('+', '_', '"', '"_', '/')
 
     if not (name) or not (value) or name is None or value is None:
