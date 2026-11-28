@@ -1,6 +1,5 @@
 ---
-# OL8/RHEL8 has all needed RPMs in orahost role!
-- name: Install packages required by Oracle on OL/RHEL version 6,7,8,9
+- name: Install packages required by Oracle on OL/RHEL version 6 and 7
   ansible.builtin.yum:  # noqa fqcn[action-core]
     name: "{{ oracle_packages }}"
     state: installed
@@ -9,6 +8,19 @@
   when:
     - install_os_packages | bool
     - ansible_distribution_major_version is version('7', '<=')
+  tags: os_packages, oscheck
+  notify: Reboot concerning package updates
+
+# official package lists of Oracle for RHEL/OL 8 and 9 (oracle_packages_el8, oracle_packages_el9)
+- name: Install packages required by Oracle on OL/RHEL version 8 and 9
+  ansible.builtin.yum:  # noqa fqcn[action-core]
+    name: "{{ lookup('ansible.builtin.vars', 'oracle_packages_el' ~ ansible_distribution_major_version) }}"
+    state: installed
+    enablerepo: "{{ extrarepos_enabled | default(omit, True) }}"
+    disablerepo: "{{ extrarepos_disabled | default(omit, True) }}"
+  when:
+    - install_os_packages | bool
+    - ansible_distribution_major_version | int in [8, 9]
   tags: os_packages, oscheck
   notify: Reboot concerning package updates
 

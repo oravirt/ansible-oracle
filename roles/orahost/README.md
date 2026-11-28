@@ -50,6 +50,8 @@ Role to configure the hostsystem for ansible-oracle
   - [oracle_hugepages_sysctl_file](#oracle_hugepages_sysctl_file)
   - [oracle_ic_net](#oracle_ic_net)
   - [oracle_packages](#oracle_packages)
+  - [oracle_packages_el8](#oracle_packages_el8)
+  - [oracle_packages_el9](#oracle_packages_el9)
   - [oracle_packages_sles_multi](#oracle_packages_sles_multi)
   - [oracle_sysctl](#oracle_sysctl)
   - [oracle_sysctl_file](#oracle_sysctl_file)
@@ -587,7 +589,9 @@ oracle_ic_net: 3.3.3.{{ ansible_all_ipv4_addresses[0].split(".")[-1] }}
 
 ### oracle_packages
 
-List of additinal RPMs for RHEL/OL.
+List of additinal RPMs for RHEL/OL 6 and 7.
+
+RHEL/OL 8 and 9 use `oracle_packages_el8` and `oracle_packages_el9`.
 
 `install_os_packages: true` is needed to install the RPMs.
 
@@ -651,6 +655,99 @@ oracle_packages:
   - compat-openssl11
   - fontconfig
   - glibc-langpack-en
+```
+
+### oracle_packages_el8
+
+Required RPMs for Oracle Grid Infrastructure and Oracle AI Database on RHEL/OL 8.
+
+Official list of Oracle: Grid Infrastructure Installation and Upgrade Guide 26ai for Linux,
+_Supported Oracle Linux 8 Distributions for x86-64_.
+The same packages are installed by the Oracle Preinstallation RPM.
+
+Optional packages from the same guide (`extra_packages`): `ipmiutil` (IPMI), `net-tools` (Oracle RAC and Oracle Clusterware),
+`nfs-utils` (Oracle ACFS), `libnsl2`, `libnsl2-devel` (Oracle Database Client only).
+
+`install_os_packages: true` is needed to install the RPMs.
+
+#### Default value
+
+```YAML
+oracle_packages_el8:
+  - bc
+  - binutils
+  - compat-openssl10
+  - elfutils-libelf
+  - fontconfig
+  - glibc
+  - glibc-devel
+  - ksh
+  - libaio
+  - libXrender
+  - libX11
+  - libXau
+  - libXi
+  - libXtst
+  - libgcc
+  - libstdc++
+  - libxcb
+  - libibverbs
+  - libasan
+  - liblsan
+  - librdmacm
+  - make
+  - policycoreutils
+  - policycoreutils-python-utils
+  - smartmontools
+  - sysstat
+  - xz-devel
+```
+
+### oracle_packages_el9
+
+Required RPMs for Oracle Grid Infrastructure and Oracle AI Database on RHEL/OL 9.
+
+Official list of Oracle: Grid Infrastructure Installation and Upgrade Guide 26ai for Linux,
+_Supported Oracle Linux 9 Distributions for x86-64_.
+The same packages are installed by the Oracle Preinstallation RPM.
+The guide requires `make-4.4.1-3`, the package is installed in the version of the distribution.
+
+Optional packages from the same guide (`extra_packages`): `ipmiutil` (IPMI), `net-tools` (Oracle RAC and Oracle Clusterware),
+`nfs-utils` (Oracle ACFS), `libnsl`, `libnsl2`, `libnsl2-devel` (Oracle Database Client only).
+
+`install_os_packages: true` is needed to install the RPMs.
+
+#### Default value
+
+```YAML
+oracle_packages_el9:
+  - bc
+  - binutils
+  - compat-openssl11
+  - elfutils-libelf
+  - fontconfig
+  - glibc
+  - glibc-devel
+  - glibc-headers
+  - ksh
+  - libaio
+  - libgcc
+  - libibverbs
+  - libstdc++
+  - libvirt-libs
+  - libX11
+  - libXau
+  - libXi
+  - libXrender
+  - libXtst
+  - libxcb
+  - libxcrypt-compat
+  - make
+  - policycoreutils
+  - policycoreutils-python-utils
+  - smartmontools
+  - sysstat
+  - xz-devel
 ```
 
 ### oracle_packages_sles_multi
@@ -749,6 +846,7 @@ oracle_sysctl:
   - {name: net.core.wmem_default, value: 262144}
   - {name: net.core.wmem_max, value: 1048576}
   - {name: kernel.panic_on_oops, value: 1}
+  - {name: kernel.panic, value: 10}
   - {name: vm.min_free_kbytes, value: 524288}
 ```
 
