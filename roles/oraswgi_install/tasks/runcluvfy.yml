@@ -45,6 +45,36 @@
         - orasw_meta_primary_node | bool
         - not gi_ignoreprereq | bool
 
+    # Oracle Restart: cluvfy of the standalone CVU (role oracluvfy) or runcluvfy.sh
+    # of the unpacked Gold Image in oracle_home_gi.
+    # runcluvfy.sh is used only, when the standalone CVU is not available on the target:
+    # no installed cluvfy and no archive in the stage directory (oracle_sw_copy: false).
+    # AutoUpgrade does not download the standalone CVU (keyword CVU) as a file.
+    - name: runcluvfy | Check for standalone CVU and runcluvfy.sh for Oracle Restart
+      ansible.builtin.stat:
+        path: "{{ item }}"
+        get_checksum: false
+      loop:
+        - "{{ oracluvfy_home | default(oracle_base + '/product/cluvfy') }}/bin/cluvfy"
+        - >-
+          {{ oracluvfy_archive_filesource
+             | default(oracle_stage_remote + '/' + oracluvfy_archive | default('cvupack_linux_ol7_x86_64.zip'), true) }}
+        - "{{ oracle_home_gi }}/runcluvfy.sh"
+      register: _oraswgi_install_cluvfy_stat
+      when:
+        - not _oraswgi_meta_configure_cluster
+        - not gi_ignoreprereq | bool
+        - not oracle_sw_copy | bool
+
+    - name: runcluvfy | Use runcluvfy.sh of oracle_home_gi for Oracle Restart
+      ansible.builtin.set_fact:
+        _oraswgi_install_cluvfy_gi_home: >-
+          {{ not _oraswgi_install_cluvfy_stat.results[0].stat.exists
+             and not _oraswgi_install_cluvfy_stat.results[1].stat.exists
+             and _oraswgi_install_cluvfy_stat.results[2].stat.exists }}
+      when:
+        - _oraswgi_install_cluvfy_stat.results is defined
+
     - name: runcluvfy | Execute cluvfy for Oracle Restart
       ansible.builtin.import_role:
         name: oracluvfy
@@ -62,6 +92,43 @@
       when:
         - not _oraswgi_meta_configure_cluster
         - not gi_ignoreprereq | bool
+        - not _oraswgi_install_cluvfy_gi_home | default(false) | bool
+
+    - name: runcluvfy | Execute runcluvfy.sh of oracle_home_gi for Oracle Restart
+      ansible.builtin.command:
+        argv:
+          - "{{ oracle_home_gi }}/runcluvfy.sh"
+          - stage
+          - -pre
+          - hacfg
+          - -osdba
+          - "{{ asmdba_group }}"
+          - -osoper
+          - "{{ asmoper_group }}"
+          - -orainv
+          - oinstall
+        chdir: "{{ oracle_home_gi }}"
+      register: _oraswgi_install_runcluvfy_gi
+      changed_when: false
+      failed_when: false
+      become: true
+      become_user: "{{ _grid_install_user }}"
+      environment: "{{ oracle_script_env | ansible.utils.remove_keys(target=['CV_ASSUME_DISTID']) }}"
+      when:
+        - _oraswgi_install_cluvfy_gi_home | default(false) | bool
+
+    - name: runcluvfy | Show result of runcluvfy.sh
+      ansible.builtin.debug:
+        var: _oraswgi_install_runcluvfy_gi.stdout_lines
+      when:
+        - _oraswgi_install_runcluvfy_gi.stdout_lines is defined
+
+    - name: runcluvfy | runcluvfy.sh failed
+      ansible.builtin.fail:
+        msg: "runcluvfy.sh failed - aborting Playbook rc={{ _oraswgi_install_runcluvfy_gi.rc }}"
+      when:
+        - _oraswgi_install_runcluvfy_gi.rc is defined
+        - _oraswgi_install_runcluvfy_gi.rc != 0
 
     - ansible.builtin.debug:  # noqa name[missing]
         var: cmdruncluvfy.stdout_lines

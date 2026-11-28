@@ -493,6 +493,18 @@ Failures of all other configuration assistants (NETCA, ASMCA) still stop the ins
 |Run `gridSetup.sh -executeConfigTools` after `root.sh`.
 |=======================
 
+The prerequisite check `cluvfy stage -pre hacfg` uses one of the following executables:
+
+. `cluvfy` of the standalone CVU (role `oracluvfy`),
+  when it is installed in `oracluvfy_home` or the archive `oracluvfy_archive` (`cvupack_linux_ol7_x86_64.zip`) is available.
+. `runcluvfy.sh` of the unpacked installation media in `oracle_home_gi`, when the standalone CVU is not available
+  and the installation media are not copied (`oracle_sw_copy: false`).
+  AutoUpgrade does not download the standalone CVU as a file, the CVU of the Golden Image is used then.
+
+The prerequisite checks need the packages and kernel parameters of Oracle.
+`orahost` installs the packages of the official lists of Oracle on RHEL/OL 8 and 9 (`oracle_packages_el8`, `oracle_packages_el9`)
+and sets the kernel parameters in `oracle_sysctl`.
+
 === Listener and databases with Oracle Restart
 
 Databases on Oracle Restart are created by `oradb_manage_db` (playbook `manage_db`) with `storage_type: ASM`.
