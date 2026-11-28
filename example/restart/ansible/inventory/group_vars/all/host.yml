@@ -12,9 +12,19 @@ size_in_gb_hugepages: 0
 
 configure_host_disks: true
 
-# Hyper-V VM from packer-hyperv: system disk /dev/sda, the free space of VG "ol" (/dev/sda3)
+# Hyper-V VM from packer-hyperv: the free space of VG "ol" (partition 3 of the system disk)
 # is used for swap and /u01 (Oracle Restart, database home, installation media).
 # The database files are stored in ASM on the 2nd disk (see asm.yml).
+#
+# The device names /dev/sda and /dev/sdb are not stable: Hyper-V detects the IDE controller
+# (system disk) and the SCSI controller (2nd disk) in parallel.
+# => the system disk is used with its path on IDE controller 0 of Hyper-V Generation 1
+#    (fixed VMBus ID 00000000-0000-8899-0000-000000000000, LUN 0).
+# Other VMs (VirtualBox, KVM, VMware, Hyper-V Generation 2): change hyperv_system_disk to a
+# stable path of the system disk (/dev/disk/by-id/...) and pvname in host_fs_layout,
+# see doc/guides/restart.adoc (Disks of the VM).
+hyperv_system_disk: /dev/disk/by-path/acpi-VMBUS:01-vmbus-00000000000088990000000000000000-lun-0
+
 host_fs_layout:
   - vgname: ol
     state: present
@@ -22,4 +32,4 @@ host_fs_layout:
       - {mntp: swap, lvname: lvswap, lvsize: 16G, fstype: swap}
       - {mntp: /u01, lvname: lvorabase, lvsize: 60G, fstype: xfs}
     disk:
-      - {device: /dev/sda, pvname: /dev/sda3}
+      - {device: "{{ hyperv_system_disk }}", pvname: "{{ hyperv_system_disk }}-part3"}

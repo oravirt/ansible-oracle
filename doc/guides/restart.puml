@@ -15,7 +15,7 @@ System_Boundary(host, "Ansible Controller", "Ubuntu on WSL2 (Windows)") {
 }
 
 System_Boundary(vmhost, "Hypervisor", "e.g. Hyper-V") {
-  System(restart, "VM Database Server", "Inventory: restart\nansible_host: 192.168.66.171\nOracle Linux 9\n12GB RAM, 2 vCPUs\n/dev/sdb 50GB for ASM") {
+  System(restart, "VM Database Server", "Inventory: restart\nansible_host: 192.168.66.171\nOracle Linux 9\n12GB RAM, 2 vCPUs\n2nd disk 50GB for ASM (SCSI)") {
     Container(autoupgrade, "AutoUpgrade", "autoupgrade.jar -patch -mode download\nJDK, pexpect", $tags="ansible")
     Container(instmedia, "Installation Media", "/u01/sw/gi_goldimage_26_xx.zip\n/u01/sw/db_home_26.xx.zip", $tags="media")
     Container(has, "Oracle Restart 26ai", "/u01/app/oracle/product/gi26_restart\nLISTENER")

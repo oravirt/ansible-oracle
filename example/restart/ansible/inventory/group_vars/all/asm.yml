@@ -8,10 +8,17 @@
 #   partition 2, name fra1:  50% => /dev/oracleasm/fra01  => disk group FRA
 #
 # asm_disk.yml creates a udev rule for the partition names with owner, group and mode for ASM.
-# The partition names do not depend on the device name of the disk (/dev/sdb).
+# The partition names do not depend on the device name of the disk.
 #
 # The ASM Filter Driver (device_persistence: asmfd) is desupported with 26ai.
-asm_disk_device: /dev/sdb
+#
+# asm_disk_device: ASM disk, empty (default) => playbooks/asm_disk.yml uses the disk on the
+# SCSI controller of the Hyper-V VM (/dev/disk/by-path/acpi-VMBUS:*-vmbus-<id>-lun-0).
+# The device names /dev/sda and /dev/sdb are not stable (see host.yml),
+# the id of the SCSI controller is new for every VM.
+# Set it only for other hypervisors or more than 1 disk on the SCSI controller, e.g.
+# asm_disk_device: /dev/disk/by-id/wwn-0x...
+asm_disk_device: ""
 
 # devices are prepared by asm_disk.yml, not by ansible-oracle
 device_persistence: ''

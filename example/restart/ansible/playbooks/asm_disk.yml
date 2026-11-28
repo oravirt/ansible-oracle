@@ -1,11 +1,18 @@
 ---
-# Prepare the ASM disk (asm_disk_device) for the disk groups DATA and FRA.
+# Prepare the ASM disk for the disk groups DATA and FRA.
 #
-# 1. Split the disk into 2 GPT partitions:
+# 1. Find the ASM disk:
+#      asm_disk_device, when it is set in the inventory, otherwise
+#      the disk on the SCSI controller of the Hyper-V VM (Generation 1):
+#      the only /dev/disk/by-path/acpi-VMBUS:*-vmbus-<id>-lun-0, that is not on
+#      IDE controller 0 (fixed id 00000000000088990000000000000000, system disk).
+#      The device names /dev/sda and /dev/sdb are not stable, Hyper-V detects
+#      the IDE and SCSI controller in parallel.
+# 2. Split the disk into 2 GPT partitions:
 #      partition 1, name data1: 50%
 #      partition 2, name fra1:  50%
 #    The disk is partitioned only, when it is empty (no partition table, no filesystem, no ASM header).
-# 2. udev rule for the partition names => /dev/oracleasm/data01 and /dev/oracleasm/fra01
+# 3. udev rule for the partition names => /dev/oracleasm/data01 and /dev/oracleasm/fra01
 #    with owner/group/mode for ASM (devices in asm_diskgroups, see inventory/group_vars/all/asm.yml).
 #
 # Execute it after the playbook os: the OS group asmadmin must exist.
@@ -22,7 +29,66 @@
     _asm_disk_owner: oracle
     _asm_disk_group: asmadmin
     _asm_udev_rule: /etc/udev/rules.d/99-oracle-asm.rules
+    # VMBus id of IDE controller 0 of Hyper-V Generation 1 (system disk)
+    _hyperv_ide0_id: "00000000000088990000000000000000"
   tasks:
+    - name: Find disks on the VMBus of Hyper-V
+      ansible.builtin.find:
+        paths: /dev/disk/by-path
+        patterns: '^acpi-VMBUS:[0-9]+-vmbus-[0-9a-f]{32}-lun-0$'
+        use_regex: true
+        file_type: link
+      register: _asm_vmbus_disks
+      when:
+        - asm_disk_device | default('', true) | length == 0
+
+    - name: Select disk on the SCSI controller of Hyper-V
+      ansible.builtin.set_fact:
+        _asm_disk_candidates: >-
+          {{ _asm_vmbus_disks.files | map(attribute='path')
+             | reject('search', '-vmbus-' ~ _hyperv_ide0_id ~ '-')
+             | list }}
+      when:
+        - asm_disk_device | default('', true) | length == 0
+
+    - name: Assert exactly 1 disk on the SCSI controller of Hyper-V
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - _asm_disk_candidates | length == 1
+        fail_msg: >-
+          Expected exactly 1 disk on the SCSI controller of the Hyper-V VM,
+          found: {{ _asm_disk_candidates }}.
+          Set asm_disk_device in inventory/group_vars/all/asm.yml.
+      when:
+        - asm_disk_device | default('', true) | length == 0
+
+    - name: Set ASM disk
+      ansible.builtin.set_fact:
+        _asm_disk: "{{ asm_disk_device | default('', true) or _asm_disk_candidates[0] }}"
+
+    - name: Check ASM disk
+      ansible.builtin.stat:
+        path: "{{ _asm_disk }}"
+        follow: true
+      register: _asm_disk_stat
+
+    - name: Resolve device name of ASM disk
+      ansible.builtin.command:
+        argv: [readlink, -f, "{{ _asm_disk }}"]
+      register: _asm_disk_realpath
+      changed_when: false
+      check_mode: false
+
+    - name: Assert ASM disk
+      ansible.builtin.assert:
+        quiet: false
+        that:
+          - _asm_disk_stat.stat.exists
+          - _asm_disk_stat.stat.isblk
+        fail_msg: "ASM disk {{ _asm_disk }} is not a block device. Check asm_disk_device in inventory/group_vars/all/asm.yml."
+        success_msg: "ASM disk: {{ _asm_disk }} => {{ _asm_disk_realpath.stdout }}"
+
     - name: Check partitions of ASM disk
       ansible.builtin.stat:
         path: "/dev/disk/by-partlabel/{{ item }}"
@@ -36,7 +102,7 @@
         # rc=2: no signature found => disk is empty
         - name: Check ASM disk for existing signatures
           ansible.builtin.command:
-            argv: [blkid, -p, "{{ asm_disk_device }}"]
+            argv: [blkid, -p, "{{ _asm_disk }}"]
           register: _asm_disk_blkid
           changed_when: false
           failed_when: _asm_disk_blkid.rc not in [0, 2]
@@ -47,9 +113,9 @@
             that:
               - _asm_disk_blkid.rc == 2
             fail_msg: >-
-              {{ asm_disk_device }} is not empty ({{ _asm_disk_blkid.stdout }}).
+              {{ _asm_disk }} is not empty ({{ _asm_disk_blkid.stdout }}).
               The disk is not partitioned to prevent data loss.
-              Check asm_disk_device or clean the disk manually (wipefs -a {{ asm_disk_device }}).
+              Check the ASM disk or clean it manually (wipefs -a {{ _asm_disk }}).
 
         - name: Create GPT partitions on ASM disk
           ansible.builtin.command:
@@ -57,7 +123,7 @@
               - parted
               - --script
               - --align=optimal
-              - "{{ asm_disk_device }}"
+              - "{{ _asm_disk }}"
               - mklabel gpt
               - mkpart data1 1MiB 50%
               - mkpart fra1 50% 100%
