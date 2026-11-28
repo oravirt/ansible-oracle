@@ -216,10 +216,19 @@ cd ~/git/ansible-oracle/example/restart/ansible
 ansible-galaxy collection install -r requirements.yml
 ----
 
-IMPORTANT: The gold image of Oracle Restart needs `ansible-oracle` 5.1.0 or newer
-(renamed gold images of Grid Infrastructure in role `autoupgrade`). +
-Use the development entry in `requirements.yml` to install the collection from the git repository,
-as long as 5.1.0 is not released.
+IMPORTANT: The example needs `ansible-oracle` 5.1.0 or newer
+(renamed gold images of Grid Infrastructure in role `autoupgrade`, prerequisite checks of Oracle Restart, package lists for Oracle Linux 9).
+As long as 5.1.0 is not released, build and install the collection from the git repository.
+
+.Install the collection from the git repository
+----
+cd ~/git/ansible-oracle
+ansible-galaxy collection build --force --output-path /tmp
+ansible-galaxy collection install --force /tmp/opitzconsulting-ansible_oracle-*.tar.gz
+----
+
+NOTE: `ansible-galaxy collection build` leaves out the files of the development environment (`build_ignore` in `galaxy.yml`), e.g. `.venv`.
+The development entry in `requirements.yml` (`type: dir`) copies all files of the git repository.
 
 === Configure inventory
 
