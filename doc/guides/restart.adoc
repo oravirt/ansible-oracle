@@ -18,6 +18,10 @@ Steps that are identical are referenced and not repeated.
 
 See link:restart_rac.adoc[Setup of Oracle Restart and Grid Infrastructure] for the details of Oracle Restart in `ansible-oracle`.
 
+IMPORTANT: The example is made for a Hyper-V VM (Generation 1) created with `packer-hyperv`.
+It finds the system disk and the ASM disk with Hyper-V specific paths, not with `/dev/sda` or `/dev/sdb`.
+Read <<Disks of the VM>> before you use the example, especially with another hypervisor or another disk layout.
+
 === Overview
 
 ==== Architecture overview
@@ -51,7 +55,8 @@ image::{puml}/guides/restart.puml[Architecture]
 |`restart` |Name of the VM in the inventory
 |`192.168.66.171` |IP address of the VM (`ansible_host`)
 |`ol` |Login user on the VM (`ansible_user`)
-|`/dev/sdb` |2nd disk of the VM for ASM (`asm_disk_device`)
+|IDE controller 0, LUN 0 |System disk with the volume group `ol` (`hyperv_system_disk`), see <<Disks of the VM>>
+|SCSI controller, LUN 0 |2nd disk for ASM, found by `playbooks/asm_disk.yml` (`asm_disk_device`), see <<Disks of the VM>>
 |`/u01/sw` |Installation media on the VM, target of the download (`oracle_sw_source_local`)
 |`/u01/stage` |Staging directory on the VM (`oracle_stage`)
 |=======================
@@ -68,12 +73,104 @@ A VM with the requirements of the link:beginner.adoc#_oracle_linux_9_vm[Beginner
 |Item |Requirement
 |Memory |12 GB RAM, available from the start of the VM.
 The prerequisite checks of Oracle Restart check the memory of the running VM.
-|Disk 1 |`/dev/sda` with the volume group `ol` on `/dev/sda3`.
+|Disk 1 |System disk with the volume group `ol` on partition 3.
 The volume group needs min. 76 GB free space for swap (16 GB) and `/u01` (60 GB).
 See `host_fs_layout` in `group_vars/all/host.yml`.
-|Disk 2 |`/dev/sdb` with 50 GB, empty (no partition table).
+|Disk 2 |2nd disk with 50 GB, empty (no partition table).
 `playbooks/asm_disk.yml` creates 2 partitions with 25 GB each.
 |=======================
+
+==== Disks of the VM
+
+The example expects exactly 2 disks in a Hyper-V VM of Generation 1:
+
+.Disks expected by the example
+[options="header" cols="1,2,3,3"]
+|=======================
+|Disk |Hyper-V |Path in the VM |Used for
+|System disk
+|IDE controller 0, location 0
+|`/dev/disk/by-path/acpi-VMBUS:01-vmbus-00000000000088990000000000000000-lun-0`
+|Volume group `ol` on partition 3: swap and `/u01` (`host_fs_layout` in `group_vars/all/host.yml`)
+|2nd disk
+|SCSI controller 0, location 0
+|`/dev/disk/by-path/acpi-VMBUS:01-vmbus-<id of the SCSI controller>-lun-0`
+|ASM: partitions `data1` and `fra1` (`playbooks/asm_disk.yml`)
+|=======================
+
+===== Why not /dev/sda and /dev/sdb?
+
+Hyper-V detects the IDE controller and the SCSI controller of a VM in parallel.
+The device names depend on the order of the detection and can change with every new VM:
+
+.Example: 2 VMs created with the same command
+[options="header"]
+|=======================
+|VM |System disk |2nd disk
+|1st VM |`/dev/sda` |`/dev/sdb`
+|2nd VM |`/dev/sdb` |`/dev/sda`
+|=======================
+
+WARNING: With fixed device names, the playbooks would partition the wrong disk.
+`orahost` creates a partition on the device of `host_fs_layout`, when its `pvname` does not exist.
+
+Therefore the example uses paths, that do not depend on the order of the detection:
+
+* *System disk*: IDE controller 0 has the fixed VMBus id `00000000-0000-8899-0000-000000000000` in every Hyper-V VM of Generation 1.
+  The path is set in `hyperv_system_disk` in `group_vars/all/host.yml`.
+* *ASM disk*: the id of the SCSI controller is new for every VM.
+  `playbooks/asm_disk.yml` finds the disk itself: it is the only path `/dev/disk/by-path/acpi-VMBUS:*-vmbus-<id>-lun-0`,
+  that is not on IDE controller 0.
+  The playbook stops, when it finds no disk or more than 1 disk on the SCSI controller.
+  `asm_disk_device` in `group_vars/all/asm.yml` is empty for this.
+
+.Check the disks on the VM
+----
+lsblk -o NAME,SIZE,TYPE
+ls -l /dev/disk/by-path/
+----
+
+.Example
+----
+NAME   SIZE TYPE
+sda     50G disk
+sdb    130G disk
+...
+acpi-VMBUS:01-vmbus-00000000000088990000000000000000-lun-0 -> ../../sdb
+acpi-VMBUS:01-vmbus-c0b75e5252b24f7b9a989844d2250e0e-lun-0 -> ../../sda
+----
+
+`playbooks/asm_disk.yml` shows the ASM disk it uses:
+
+----
+ASM disk: /dev/disk/by-path/acpi-VMBUS:01-vmbus-c0b75e5252b24f7b9a989844d2250e0e-lun-0 => /dev/sda
+----
+
+===== Other VMs: what to change
+
+Change the inventory, when your VM is not a Hyper-V VM of Generation 1 with exactly these 2 disks,
+e.g. VirtualBox, KVM, VMware, a Hyper-V VM of Generation 2 or more than 1 disk on the SCSI controller.
+Use a stable path from `/dev/disk/by-id/` or `/dev/disk/by-path/` of your VM, not `/dev/sdX`.
+
+.Variables for other VMs
+[options="header" cols="2,2,4"]
+|=======================
+|Variable |File |Change
+
+|`hyperv_system_disk`
+|`group_vars/all/host.yml`
+|Stable path of the system disk. `host_fs_layout` uses `<hyperv_system_disk>-part3` as physical volume of the volume group `ol`.
+Change `pvname` in `host_fs_layout` as well, when the volume group is not on partition 3,
+e.g. `{device: /dev/disk/by-id/wwn-0x..., pvname: /dev/disk/by-id/wwn-0x...-part2}`.
+
+|`asm_disk_device`
+|`group_vars/all/asm.yml`
+|Stable path of the ASM disk, e.g. `/dev/disk/by-id/wwn-0x...`.
+Mandatory, when the VM is not a Hyper-V VM: the automatic detection works with the VMBus of Hyper-V only.
+|=======================
+
+TIP: Check the paths with `ls -l /dev/disk/by-id/ /dev/disk/by-path/` on the VM before the 1st execution of the playbooks.
+`playbooks/asm_disk.yml` partitions the ASM disk only, when it is empty, and stops otherwise.
 
 ==== Create the VM with Hyper-V and Packer
 
@@ -93,8 +190,10 @@ cd OL9
     -CPUs 2 -StartupMemoryGB 12 -MemoryGB 6 -DataDiskGB 50
 ----
 
-The 2nd disk is connected to the SCSI controller of the VM and appears as `/dev/sdb` in the VM.
+The 2nd disk is connected to the SCSI controller of the VM.
 At the end, `create-vm.ps1` shows the block devices of the VM (`lsblk`).
+
+IMPORTANT: The 2nd disk can be `/dev/sda` or `/dev/sdb` in the VM, see <<Disks of the VM>>.
 
 IMPORTANT: Increase the system disk of the VM, e.g. to 130 GB, before you start the installation
 (see the link:beginner.adoc#_create_the_vm_with_hyper_v_and_packer[Beginners Guide]).
@@ -177,14 +276,14 @@ WARNING: The default `Oracle_123` is for test environments only. Change it and u
 |=======================
 
 The udev rule uses the name of the GPT partition (`ID_PART_ENTRY_NAME`), not the device name of the disk.
-The ASM devices stay the same, even when the disk gets another name than `/dev/sdb`.
+The ASM devices stay the same, even when the disk gets another device name.
 
 The playbook partitions the disk only, when it is empty (no partition table, no filesystem, no ASM header).
 Otherwise it stops with an error.
 
 .inventory/group_vars/all/asm.yml (extract)
 ----
-asm_disk_device: /dev/sdb
+asm_disk_device: ""
 
 device_persistence: ''
 partition_devices: false
@@ -206,7 +305,8 @@ asm_diskgroups:
   The devices must exist with owner `oracle` and group `asmadmin` before the installation of Oracle Restart.
 * `partition_devices: false`: `ansible-oracle` does not partition the devices.
 
-Change `asm_disk_device`, when the 2nd disk is not `/dev/sdb`, e.g. check it with `lsblk` on the VM.
+`asm_disk_device` is empty: `playbooks/asm_disk.yml` finds the disk on the SCSI controller of the Hyper-V VM.
+See <<Disks of the VM>> for the details and the changes for other VMs.
 
 NOTE: The ASM Filter Driver (`device_persistence: asmfd`) is desupported with Oracle AI Database 26ai.
 
